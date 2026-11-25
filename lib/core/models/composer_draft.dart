@@ -14,7 +14,6 @@ class ComposerDraftInput {
     this.selectionExtent = -1,
     this.images = const [],
     this.documents = const [],
-    this.allowImagesApiRouting = true,
     this.uiContext,
   });
 
@@ -24,7 +23,6 @@ class ComposerDraftInput {
   final int selectionExtent;
   final List<DraftImage> images;
   final List<DocumentAttachment> documents;
-  final bool allowImagesApiRouting;
   final UiContextAttachment? uiContext;
   bool get isEmpty =>
       text.isEmpty && images.isEmpty && documents.isEmpty && uiContext == null;
@@ -52,7 +50,6 @@ class ComposerDraftInput {
     selectionExtent: selectionExtent ?? this.selectionExtent,
     images: images ?? this.images,
     documents: documents ?? this.documents,
-    allowImagesApiRouting: allowImagesApiRouting,
     uiContext: clearUiContext ? null : uiContext ?? this.uiContext,
   );
 
@@ -61,7 +58,6 @@ class ComposerDraftInput {
     quotes: quotes,
     imagePaths: images.map((image) => image.path).toList(),
     documents: documents,
-    allowImagesApiRouting: allowImagesApiRouting,
     draftSubmission: submission,
     uiContext: uiContext,
   );
@@ -72,7 +68,6 @@ class ComposerDraftInput {
         quotes: input.quotes,
         images: [for (final path in input.imagePaths) DraftImage(path: path)],
         documents: List.of(input.documents),
-        allowImagesApiRouting: input.allowImagesApiRouting,
         uiContext: input.uiContext,
       );
 
@@ -86,7 +81,6 @@ class ComposerDraftInput {
       for (final doc in documents)
         {'path': doc.path, 'fileName': doc.fileName, 'mime': doc.mime},
     ],
-    'allowImagesApiRouting': allowImagesApiRouting,
     'uiContext': uiContext?.toJson(),
   };
 
@@ -108,7 +102,6 @@ class ComposerDraftInput {
               mime: value['mime'] as String,
             ),
         ],
-        allowImagesApiRouting: json['allowImagesApiRouting'] as bool,
         uiContext: json['uiContext'] == null
             ? null
             : UiContextAttachment.fromJson(
@@ -121,7 +114,6 @@ class ComposerDraftInput {
       listEquals(quotes, other.quotes) &&
       selectionBase == other.selectionBase &&
       selectionExtent == other.selectionExtent &&
-      allowImagesApiRouting == other.allowImagesApiRouting &&
       uiContext == other.uiContext &&
       images.length == other.images.length &&
       Iterable<int>.generate(

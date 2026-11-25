@@ -1,6 +1,7 @@
 enum BackupCategory {
   chats,
   files,
+  creations,
   assistants,
   providers,
   mcp,
@@ -61,6 +62,7 @@ final class BackupScope {
       'fonts',
       'sessions',
     },
+    if (includes(BackupCategory.creations)) 'generations',
     if (includes(BackupCategory.skills)) 'skills',
     if (includes(BackupCategory.workspaces)) 'workspaces',
   };

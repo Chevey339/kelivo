@@ -9,6 +9,7 @@ import 'provider_custom_request_editor.dart';
 class ProviderBalanceRequestEditor extends StatelessWidget {
   const ProviderBalanceRequestEditor({
     super.key,
+    this.fal = false,
     required this.method,
     required this.headers,
     required this.bodyController,
@@ -17,6 +18,7 @@ class ProviderBalanceRequestEditor extends StatelessWidget {
     required this.onBodyChanged,
   });
 
+  final bool fal;
   final String method;
   final List<Map<String, String>> headers;
   final TextEditingController bodyController;
@@ -31,27 +33,31 @@ class ProviderBalanceRequestEditor extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          l10n.providerDetailPageBalanceMethodLabel,
-          style: TextStyle(
-            fontSize: 13,
-            color: cs.onSurface.withValues(alpha: 0.8),
+        if (!fal) ...[
+          Text(
+            l10n.providerDetailPageBalanceMethodLabel,
+            style: TextStyle(
+              fontSize: 13,
+              color: cs.onSurface.withValues(alpha: 0.8),
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
-        SegmentedTabs(
-          key: const ValueKey('provider-balance-method'),
-          tabs: const [
-            SegmentedTab(label: 'GET'),
-            SegmentedTab(label: 'POST'),
-          ],
-          index: method == 'POST' ? 1 : 0,
-          radioGroup: true,
-          onChanged: (index) => onMethodChanged(index == 1 ? 'POST' : 'GET'),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 6),
+          SegmentedTabs(
+            key: const ValueKey('provider-balance-method'),
+            tabs: const [
+              SegmentedTab(label: 'GET'),
+              SegmentedTab(label: 'POST'),
+            ],
+            index: method == 'POST' ? 1 : 0,
+            radioGroup: true,
+            onChanged: (index) => onMethodChanged(index == 1 ? 'POST' : 'GET'),
+          ),
+          const SizedBox(height: 12),
+        ],
         Text(
-          l10n.providerDetailPageBalanceRequestHint('{{apiKey}}'),
+          fal
+              ? l10n.providerBalanceFalPermissionHint
+              : l10n.providerDetailPageBalanceRequestHint('{{apiKey}}'),
           style: TextStyle(
             fontSize: 12,
             height: 1.4,
@@ -67,7 +73,7 @@ class ProviderBalanceRequestEditor extends StatelessWidget {
           onHeadersChanged: onHeadersChanged,
           onBodyChanged: (_) async {},
         ),
-        if (method == 'POST') ...[
+        if (!fal && method == 'POST') ...[
           const SizedBox(height: 12),
           IosFormTextField(
             key: const ValueKey('provider-balance-body'),

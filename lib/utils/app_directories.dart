@@ -95,6 +95,10 @@ class AppDirectories {
     return Directory('${root.path}/cache');
   }
 
+  /// Managed creation outputs and their saved reference images.
+  static Future<Directory> getGenerationsDirectory() =>
+      _ensureSubdir('generations');
+
   /// Managed workspace roots: `<appData>/workspaces`.
   static Future<Directory> getWorkspacesDirectory() =>
       _ensureSubdir('workspaces');

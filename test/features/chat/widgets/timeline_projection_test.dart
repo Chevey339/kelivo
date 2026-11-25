@@ -28,6 +28,43 @@ List<TimelineToolRef> _toolsIn(TimelineProjection projected) {
 }
 
 void main() {
+  test(
+    'an image becoming available splits consecutive tools at its call site',
+    () {
+      final projection = projectAssistantTimeline(
+        parts: const [
+          ToolCallPart('{"id":"a","name":"first","arguments":{}}'),
+          ToolCallPart('{"id":"b","name":"generate_image","arguments":{}}'),
+          ToolCallPart('{"id":"c","name":"second","arguments":{}}'),
+        ],
+        liveTools: const [],
+        reasoningSegments: const [],
+        visualContent: '',
+        partsArrivalOrdered: true,
+      );
+      final cache = TimelineVisibilityCache();
+      final ordinal = _toolsIn(
+        projection,
+      ).indexWhere((call) => call.providerId == 'b');
+      List<TimelineVisibleBlock> visible(Set<int> sites, {bool tools = true}) =>
+          cache.project(
+            projection,
+            showThinkingCards: false,
+            showToolCards: tools,
+            imageCallOrdinals: sites,
+            isPendingApproval: (_) => false,
+          );
+      expect(visible({}).single.thinkingSteps, hasLength(2));
+      final blocks = visible({ordinal});
+      expect(blocks, hasLength(3));
+      expect(blocks.first.thinkingSteps.single.tool!.toolName, 'first');
+      expect(blocks[1].imageCallOrdinal, ordinal);
+      expect(blocks.last.thinkingSteps.single.tool!.toolName, 'second');
+      expect(visible({ordinal}, tools: false).single.imageCallOrdinal, ordinal);
+      expect(visible({}).single.thinkingSteps, hasLength(2));
+    },
+  );
+
   test('tool parsing is reused until its immutable payload changes', () {
     const first = ToolCallPart(
       '{"id":"t","name":"search","arguments":{},"content":"same","metadata":{"version":1}}',

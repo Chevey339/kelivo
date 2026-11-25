@@ -7,12 +7,14 @@ import 'business_repository.dart';
 import 'chat_database_observer.dart';
 import 'chat_database_repository.dart';
 import 'extension_entity_store.dart';
+import 'media_repository.dart';
 
 final class ChatDatabaseLease {
   ChatDatabaseLease._(
     this.repository,
     this.businessRepository,
     this.extensionEntityStore,
+    this.mediaRepository,
     this._gateway,
   );
 
@@ -21,6 +23,7 @@ final class ChatDatabaseLease {
   ChatDatabaseRepository get chatRepository => repository;
   final BusinessRepository businessRepository;
   final ExtensionEntityStore extensionEntityStore;
+  final MediaRepository mediaRepository;
   final ChatDatabaseGateway _gateway;
   bool _released = false;
 
@@ -35,6 +38,7 @@ typedef _DatabaseRepositories = ({
   ChatDatabaseRepository chat,
   BusinessRepository business,
   ExtensionEntityStore extensionEntities,
+  MediaRepository media,
 });
 
 final class ChatDatabaseGateway {
@@ -87,6 +91,7 @@ final class ChatDatabaseGateway {
       repositories.chat,
       repositories.business,
       repositories.extensionEntities,
+      repositories.media,
       this,
     );
   }
@@ -128,6 +133,7 @@ final class ChatDatabaseGateway {
           chat: chatRepository,
           business: BusinessRepository(database),
           extensionEntities: ExtensionEntityStore(database),
+          media: chatRepository.mediaRepository,
         );
       } catch (_) {
         await chatRepository.close();

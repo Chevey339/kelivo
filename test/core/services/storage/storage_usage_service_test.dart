@@ -78,6 +78,27 @@ void main() {
     }
   });
 
+  test('creation results and references are counted just once', () async {
+    await _writeSizedFile(tempDir, 'generations/batch/artwork.png', 27);
+    await _writeSizedFile(tempDir, 'generations/batch/refs/0.png', 15);
+    await _writeSizedFile(tempDir, 'unrelated.txt', 8);
+
+    final report = await StorageUsageService.computeReport();
+    final creations = report.categories.singleWhere(
+      (category) => category.key == StorageUsageCategoryKey.creations,
+    );
+    expect(creations.stats.bytes, 42);
+    expect(creations.stats.fileCount, 2);
+    final batch = creations.subcategories.single;
+    expect(batch.id, 'batch');
+    expect(batch.isDirectory, isTrue);
+    expect(batch.path, p.join(tempDir.path, 'generations', 'batch'));
+    expect(batch.stats.bytes, 42);
+    expect(batch.stats.fileCount, 2);
+    expect(report.totalBytes, 50);
+    expect(report.totalFiles, 3);
+  });
+
   test(
     'chat records size uses SQLite files instead of legacy Hive files',
     () async {

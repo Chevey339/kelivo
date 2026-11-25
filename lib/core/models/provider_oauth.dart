@@ -3,6 +3,8 @@ import 'dart:convert';
 enum OAuthProvider { chatgpt, grok, kimi, claude }
 
 const grokComposerFastModelId = 'grok-composer-2.5-fast';
+const grokMediaBaseUrl = 'https://cli-chat-proxy.grok.com/v1';
+const codexImageModelId = 'gpt-image-2';
 
 extension OAuthProviderInfo on OAuthProvider {
   String get displayName => switch (this) {

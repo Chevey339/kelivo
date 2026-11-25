@@ -98,6 +98,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowShowToolCards(),
                   _RowDivider(),
+                  _ChatImageDisplayRows(),
+                  _RowDivider(),
                   _ToggleRowShowProducedFiles(),
                   _RowDivider(),
                   _ToggleRowShowReasoningLevelBadge(),
@@ -2712,6 +2714,37 @@ class _ToggleRowShowToolCards extends StatelessWidget {
       tip: l10n.displaySettingsPageShowToolCardsSubtitle,
       value: sp.showToolCards,
       onChanged: (v) => context.read<SettingsProvider>().setShowToolCards(v),
+    );
+  }
+}
+
+class _ChatImageDisplayRows extends StatelessWidget {
+  const _ChatImageDisplayRows();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        _ToggleRow(
+          label: l10n.displayChatImagesAtToolCall,
+          value: settings.inlineChatImages,
+          onChanged: settings.setInlineChatImages,
+        ),
+        const _RowDivider(),
+        _ToggleRow(
+          label: l10n.displayChatImageInfo,
+          value: settings.showChatImageInfo,
+          onChanged: settings.setShowChatImageInfo,
+        ),
+        const _RowDivider(),
+        _ToggleRow(
+          label: l10n.displayChatImageLink,
+          value: settings.showChatImageLink,
+          onChanged: settings.setShowChatImageLink,
+        ),
+      ],
     );
   }
 }

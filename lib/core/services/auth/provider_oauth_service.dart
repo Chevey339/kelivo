@@ -445,8 +445,11 @@ class ProviderOAuthService extends ChangeNotifier {
           if (oauthString(row['id']) case final id?)
             if (ids.add(id) &&
                 (config.oauthProvider != OAuthProvider.grok ||
-                    !RegExp(r'grok-(?:imagine|stt|voice|tts)').hasMatch(id)))
+                    !RegExp(r'grok-(?:stt|voice|tts)').hasMatch(id)))
               _modelFromRow(config, row),
+        if (config.oauthProvider == OAuthProvider.chatgpt &&
+            ids.add(codexImageModelId))
+          _modelFromRow(config, {'id': codexImageModelId}),
       ];
     }, isCurrent: isCurrent);
   }
@@ -500,6 +503,7 @@ class ProviderOAuthService extends ChangeNotifier {
 
   static bool _hasCurrentCodexModels(ProviderConfig config, String version) =>
       config.oauthModelsClientVersion == version &&
+      config.models.contains(codexImageModelId) &&
       config.models.every((model) {
         final override = config.modelOverrides[model];
         return override is Map &&
@@ -986,6 +990,16 @@ class _OAuthModelSpec extends ModelSpec {
 
 /// Attaches current credentials and enforces each subscription wire contract
 /// after custom request overrides, for initial requests and tool follow-ups.
+bool _isGrokMediaPath(String method, String path) => switch (method) {
+  'POST' => const {
+    '/v1/images/generations',
+    '/v1/images/edits',
+    '/v1/videos/generations',
+  }.contains(path),
+  'GET' => RegExp(r'^/v1/(?:images|videos)/[a-zA-Z0-9_-]+$').hasMatch(path),
+  _ => false,
+};
+
 class _ProviderOAuthHttpClient extends http.BaseClient {
   _ProviderOAuthHttpClient(
     this.inner,
@@ -1034,12 +1048,25 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     await _resolve();
     final base = Uri.parse(config.oauthProvider!.baseUrl);
-    if (request.url.origin != base.origin ||
-        !request.url.path.startsWith('${base.path}/') ||
+    final grokMedia =
+        config.oauthProvider == OAuthProvider.grok &&
+        _isGrokMediaPath(request.method, request.url.path);
+    final grokMediaOrigin =
+        grokMedia &&
+        request.url.origin == Uri.parse(grokMediaBaseUrl).origin &&
+        request.url.userInfo.isEmpty;
+    final regularOrigin =
+        request.url.origin == base.origin &&
+        request.url.path.startsWith('${base.path}/');
+    if (!(regularOrigin || grokMediaOrigin) ||
         request is! http.Request &&
             config.oauthProvider != OAuthProvider.claude) {
       throw const ProviderOAuthException(ProviderOAuthFailure.invalidResponse);
     }
+    final codexResponses =
+        config.oauthProvider == OAuthProvider.chatgpt &&
+        (request.url.path == '${base.path}/responses' ||
+            request.url.path.startsWith('${base.path}/responses/'));
     final body = request is http.Request
         ? request.bodyBytes
         : await request.finalize().toBytes();
@@ -1076,7 +1103,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
         result.headers.remove(name);
       }
       result.headers.addAll(authHeaders);
-      if (config.oauthProvider == OAuthProvider.chatgpt) {
+      if (codexResponses) {
         _codexTurnState.apply(result.headers, config);
       }
       if (isClaude) {
@@ -1104,10 +1131,16 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
           request.url.path.endsWith('/messages')) {
         result.headers['x-api-key'] = config.oauthCredentials!.accessToken;
       }
-      if (request.method == 'POST' && (!isClaude || claudeMessages)) {
+      final rewriteBody =
+          codexResponses ||
+          claudeMessages ||
+          config.oauthProvider == OAuthProvider.kimi &&
+              request.url.path.endsWith('/messages') ||
+          config.oauthProvider == OAuthProvider.grok && !grokMedia;
+      if (request.method == 'POST' && rewriteBody) {
         final payload = (jsonDecode(utf8.decode(body)) as Map)
             .cast<String, dynamic>();
-        if (config.oauthProvider == OAuthProvider.chatgpt) {
+        if (codexResponses) {
           applyCodexRequest(
             payload,
             result.headers,
@@ -1162,7 +1195,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
       final requestVersion = claudeCodeVersion;
       final requestConfig = config;
       final response = await inner.send(build());
-      if (requestConfig.oauthProvider == OAuthProvider.chatgpt &&
+      if (codexResponses &&
           response.statusCode >= 200 &&
           response.statusCode < 300) {
         _codexTurnState.capture(response.headers, requestConfig);

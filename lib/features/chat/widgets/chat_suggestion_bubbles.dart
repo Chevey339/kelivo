@@ -8,17 +8,21 @@ class ChatSuggestionBubbles extends StatelessWidget {
     super.key,
     required this.suggestions,
     required this.onTap,
+    this.maxSuggestions = 3,
+    this.alignment = WrapAlignment.start,
   });
 
   final List<String> suggestions;
   final ValueChanged<String> onTap;
+  final int maxSuggestions;
+  final WrapAlignment alignment;
 
   @override
   Widget build(BuildContext context) {
     final visible = suggestions
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
-        .take(3)
+        .take(maxSuggestions)
         .toList();
     if (visible.isEmpty) return const SizedBox.shrink();
 
@@ -31,6 +35,7 @@ class ChatSuggestionBubbles extends StatelessWidget {
     final textColor = cs.onSurface.withValues(alpha: isDark ? 0.92 : 0.88);
 
     return Wrap(
+      alignment: alignment,
       spacing: 8,
       runSpacing: 8,
       children: [

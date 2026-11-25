@@ -110,7 +110,6 @@
       "text"
     ],
     "output": [
-      "text",
       "image"
     ],
     "abilities": []
@@ -522,7 +521,6 @@
       "image"
     ],
     "output": [
-      "text",
       "image"
     ],
     "abilities": []
@@ -1094,7 +1092,7 @@
       "image"
     ],
     "output": [
-      "text"
+      "image"
     ],
     "abilities": []
   },
@@ -1104,7 +1102,7 @@
       "text"
     ],
     "output": [
-      "text"
+      "image"
     ],
     "abilities": []
   },
@@ -3488,7 +3486,6 @@
       "image"
     ],
     "output": [
-      "text",
       "image"
     ],
     "abilities": []
@@ -3500,7 +3497,6 @@
       "image"
     ],
     "output": [
-      "text",
       "image"
     ],
     "abilities": []
@@ -3512,7 +3508,6 @@
       "image"
     ],
     "output": [
-      "text",
       "image"
     ],
     "abilities": []
@@ -3524,7 +3519,6 @@
       "image"
     ],
     "output": [
-      "text",
       "image"
     ],
     "abilities": []
@@ -3647,58 +3641,55 @@
     "abilities": []
   },
   "grok-imagine-image": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text",
       "image"
     ],
     "output": [
-      "text",
       "image"
     ],
     "abilities": []
   },
   "grok-imagine-image-2.0": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text",
       "image"
     ],
     "output": [
-      "text",
       "image"
     ],
     "abilities": []
   },
   "grok-imagine-image-quality": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text",
       "image"
     ],
     "output": [
-      "text",
       "image"
     ],
     "abilities": []
   },
   "grok-imagine-video": {
-    "type": "chat",
+    "type": "video",
     "input": [
       "text"
     ],
     "output": [
-      "text"
+      "video"
     ],
     "abilities": []
   },
   "grok-imagine-video-1.5": {
-    "type": "chat",
+    "type": "video",
     "input": [
       "text"
     ],
     "output": [
-      "text"
+      "video"
     ],
     "abilities": []
   },
@@ -7914,7 +7905,7 @@
       "text"
     ],
     "output": [
-      "text"
+      "image"
     ],
     "abilities": []
   },
@@ -8257,32 +8248,32 @@
     ]
   },
   "veo-3.1-fast-generate-preview": {
-    "type": "chat",
+    "type": "video",
     "input": [
       "text"
     ],
     "output": [
-      "text"
+      "video"
     ],
     "abilities": []
   },
   "veo-3.1-generate-preview": {
-    "type": "chat",
+    "type": "video",
     "input": [
       "text"
     ],
     "output": [
-      "text"
+      "video"
     ],
     "abilities": []
   },
   "veo-3.1-lite-generate-preview": {
-    "type": "chat",
+    "type": "video",
     "input": [
       "text"
     ],
     "output": [
-      "text"
+      "video"
     ],
     "abilities": []
   },

@@ -249,7 +249,10 @@ void main() {
         isNot(saved.oauthCredentials!.sessionId),
       );
       await service.syncModels(saved.id);
-      expect(settings.getProviderConfig(saved.id).enabledModels, ['keep']);
+      expect(settings.getProviderConfig(saved.id).enabledModels, [
+        'keep',
+        codexImageModelId,
+      ]);
       expect(settings.getProviderConfig(saved.id).disabledModels, {'hide'});
       expect(launches, 2);
       expect(exchanges, 2);

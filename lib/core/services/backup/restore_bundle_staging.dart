@@ -12,6 +12,7 @@ import '../../database/app_database.dart';
 import '../../database/backup_content_filter.dart';
 import '../../models/backup_scope.dart';
 import '../../database/backup_portability.dart';
+import '../../database/media_repository.dart';
 import '../../database/extension_entity_store.dart';
 import '../../database/schema_migrations.dart';
 import '../../database/business_repository.dart';
@@ -98,6 +99,7 @@ final class RestoreBundleStaging {
     'skills',
     'workspaces',
     'sessions',
+    'generations',
   ];
   static const _databaseEntry = 'database/kelivo.db';
   // Settings contain structured preferences, never chat rows or binary assets.
@@ -501,7 +503,10 @@ final class RestoreBundleStaging {
     // v1.3.0 staged all asset roots together. Interpret that exact schema in
     // memory without rewriting the manifest bound by the existing receipts.
     final rawAssetRoots = formatVersion == 2
-        ? (includeFiles ? _assetRoots : const <String>[])
+        ? [
+            if (includeFiles)
+              ..._assetRoots.where((root) => root != 'generations'),
+          ]
         : manifest['assetRoots'];
     if (rawAssetRoots is! List ||
         rawAssetRoots.any(
@@ -1175,10 +1180,18 @@ final class RestoreBundleStaging {
         preserveExplicitEmptyInstructionList:
             args.preserveExplicitEmptyInstructionList,
       );
+      if (!args.scope.includes(BackupCategory.creations)) {
+        await MediaRepository(database).clear();
+      }
       final devicePath = args.deviceDatabasePath;
       if (devicePath != null && await File(devicePath).exists()) {
         final localDatabase = AppDatabase.open(file: File(devicePath));
         try {
+          if (!args.scope.includes(BackupCategory.creations)) {
+            await MediaRepository(
+              database,
+            ).importFrom(MediaRepository(localDatabase), overwrite: true);
+          }
           final local = await BusinessRepository(localDatabase).readSnapshot();
           await BusinessRepository(database).transformSnapshot(
             (incoming) => BackupPortability.preserveDeviceState(

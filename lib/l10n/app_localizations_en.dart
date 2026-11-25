@@ -3494,12 +3494,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarImageProcessing => 'Processing image';
 
   @override
-  String get chatInputBarImageMode => 'Image mode';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => 'Turn off image mode';
-
-  @override
   String get chatInputBarQueuedPending => 'Queued to send';
 
   @override
@@ -3795,7 +3789,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      'Summarizes conversation titles using the current chat model by default, or a selected model.';
+      'Summarizes conversation titles using the current chat model by default, or a selected model. Creation also uses it to name topics automatically.';
 
   @override
   String get titleModelThinkingTitle => 'Enable Thinking';
@@ -4574,6 +4568,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerBalanceInterval => 'Timed refresh';
+
+  @override
+  String get providerBalanceFalPermissionHint =>
+      'Balance queries need a fal key with the billing:usage:read permission. To use a separate billing key, add an Authorization header here with the value Key followed by a space and the key.';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration =>
+      'Refresh after generation';
 
   @override
   String get providerBalanceRefreshOnReply => 'Refresh after replies';
@@ -17739,4 +17741,1137 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get worldBookGroupClearSelection => 'Clear group selection';
+
+  @override
+  String get sidebarSettingsTitle => 'Sidebar';
+
+  @override
+  String get sidebarCustomize => 'Customize sidebar';
+
+  @override
+  String get sidebarLayoutTitle => 'Layout';
+
+  @override
+  String get sidebarPresetCurrent => 'Current layout';
+
+  @override
+  String get sidebarPresetNavigation => 'Navigation list';
+
+  @override
+  String get sidebarPresetAssistantBottom => 'Assistant at bottom';
+
+  @override
+  String get sidebarPresetAllTop => 'All at the top';
+
+  @override
+  String get sidebarPresetCustom => 'Custom layout';
+
+  @override
+  String get sidebarReorderTitle => 'Arrange blocks';
+
+  @override
+  String get sidebarReorderHint => 'Drag above or below the conversation list';
+
+  @override
+  String get sidebarReorderHandle => 'Reorder';
+
+  @override
+  String get sidebarBlockUser => 'User bar';
+
+  @override
+  String get sidebarBlockSearch => 'Search bar';
+
+  @override
+  String get sidebarBlockEntries => 'Entries';
+
+  @override
+  String get sidebarBlockAssistant => 'Assistant';
+
+  @override
+  String get sidebarBlockConversations => 'Conversation list';
+
+  @override
+  String get sidebarBlockTop => 'Top';
+
+  @override
+  String get sidebarBlockBottom => 'Bottom';
+
+  @override
+  String get sidebarDisplayAs => 'Display as';
+
+  @override
+  String get sidebarStyleList => 'List';
+
+  @override
+  String get sidebarStyleIcons => 'Icons';
+
+  @override
+  String get sidebarVisibilityShow => 'Show';
+
+  @override
+  String get sidebarMore => 'More';
+
+  @override
+  String get sidebarVisibilityHidden => 'Hide';
+
+  @override
+  String get sidebarLocationEntries => 'Entry list';
+
+  @override
+  String get sidebarLocationSearch => 'Beside search';
+
+  @override
+  String get sidebarLocationUserBar => 'User bar icons';
+
+  @override
+  String get sidebarLocationMore => 'In More';
+
+  @override
+  String get sidebarLocationHidden => 'Hidden from the sidebar';
+
+  @override
+  String get sidebarLocationRail => 'Left icon rail';
+
+  @override
+  String get sidebarMenuShow => 'Show in sidebar';
+
+  @override
+  String get sidebarMenuMore => 'Move to More';
+
+  @override
+  String get sidebarMenuHide => 'Hide from sidebar';
+
+  @override
+  String get sidebarHideCustomize => 'Hide from More';
+
+  @override
+  String get sidebarShowCustomizeInMore => 'Show Customize sidebar in More';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint => 'You can always change it here';
+
+  @override
+  String get sidebarHideSingleAssistant =>
+      'Hide assistant row when there is only one';
+
+  @override
+  String get sidebarHideSingleAssistantHint =>
+      'The assistant row is shown by default';
+
+  @override
+  String get sidebarRestoreDefaults => 'Restore defaults';
+
+  @override
+  String get sidebarOpenSettings => 'Open sidebar settings…';
+
+  @override
+  String get creationTitle => 'Create';
+
+  @override
+  String get creationTopics => 'Topics';
+
+  @override
+  String get creationNewTopic => 'New topic';
+
+  @override
+  String get creationNameAfterSending => 'Named after the first prompt';
+
+  @override
+  String get creationPromptTitle =>
+      'Uses the start of your prompt as the title';
+
+  @override
+  String get creationSearchTopics => 'Search topics and prompts';
+
+  @override
+  String get creationTopicsEmpty =>
+      'Topics appear here after your first prompt';
+
+  @override
+  String get creationNaming => 'Naming topic…';
+
+  @override
+  String get creationRenameTopic => 'Rename topic';
+
+  @override
+  String get creationDeleteTopic => 'Delete topic';
+
+  @override
+  String get creationDeleteTopicBody =>
+      'Delete this topic and all its creations?';
+
+  @override
+  String get creationImage => 'Image';
+
+  @override
+  String get creationVideo => 'Video';
+
+  @override
+  String get creationImagePrompt => 'Describe the image to create';
+
+  @override
+  String get creationVideoPrompt => 'Describe the video to generate';
+
+  @override
+  String get creationNewImagePrompt => 'Describe an image to start a new topic';
+
+  @override
+  String get creationNewVideoPrompt => 'Describe a video to start a new topic';
+
+  @override
+  String get creationSelectModel => 'Select model';
+
+  @override
+  String get creationSearchModels => 'Search models or providers';
+
+  @override
+  String get creationNoModelTitle => 'No image or video models yet';
+
+  @override
+  String get creationNoModelBody =>
+      'Create uses image and video models configured in Providers. Sign in with a subscription, or enter an API key for fal or another provider.';
+
+  @override
+  String get creationEmptyTitle => 'Start with an idea';
+
+  @override
+  String get creationEmptyBody =>
+      'Describe what to create. Sending the first prompt starts a topic for the result and later edits.';
+
+  @override
+  String get creationAddReference => 'Add reference image';
+
+  @override
+  String get creationReferenceTooLarge =>
+      'Reference images must total 20 MB or less.';
+
+  @override
+  String get creationApiProtocol => 'Creation API protocol';
+
+  @override
+  String get creationApiProtocolHelp =>
+      'Auto uses the provider’s API. For a custom gateway, choose the protocol listed in its documentation.';
+
+  @override
+  String get creationAspectRatio => 'Aspect ratio';
+
+  @override
+  String get creationCountLabel => 'Image count';
+
+  @override
+  String get creationDuration => 'Duration';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds seconds',
+      one: '1 second',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationResolution => 'Resolution';
+
+  @override
+  String get creationFirstLastFrame => 'First and last frames';
+
+  @override
+  String get creationFirstFrame => 'First frame';
+
+  @override
+  String get creationLastFrame => 'Last frame';
+
+  @override
+  String get creationBothFramesRequired =>
+      'Choose both a first and a last frame.';
+
+  @override
+  String get creationFirstFrameRequired =>
+      'Choose a first frame. The last frame is optional.';
+
+  @override
+  String get creationFirstFrameOnly => 'This model supports a first frame.';
+
+  @override
+  String get creationImageModels => 'Image models';
+
+  @override
+  String get creationVideoModels => 'Video models';
+
+  @override
+  String get creationPlayVideo => 'Play video';
+
+  @override
+  String get creationPauseVideo => 'Pause video';
+
+  @override
+  String get creationMuteVideo => 'Mute';
+
+  @override
+  String get creationUnmuteVideo => 'Unmute';
+
+  @override
+  String get creationOpenVideo => 'Open in system player';
+
+  @override
+  String get creationFullScreen => 'Full screen';
+
+  @override
+  String get creationExitFullScreen => 'Exit full screen';
+
+  @override
+  String get creationSaveVideo => 'Save video';
+
+  @override
+  String get creationParameters => 'Generation options';
+
+  @override
+  String get creationAuto => 'Auto';
+
+  @override
+  String get creationGenerate => 'Generate';
+
+  @override
+  String get creationWaitingImage => 'Creating image';
+
+  @override
+  String get creationWaitingVideo => 'Preparing video';
+
+  @override
+  String get creationDownloading => 'Downloading';
+
+  @override
+  String get creationFailed => 'Generation failed';
+
+  @override
+  String get creationInterrupted =>
+      'Generation interrupted when the app closed';
+
+  @override
+  String get creationCancelled => 'Cancelled';
+
+  @override
+  String get creationPartial => 'Some results could not be saved';
+
+  @override
+  String get creationRetry => 'Try again';
+
+  @override
+  String get creationCopyPrompt => 'Copy prompt';
+
+  @override
+  String get creationSaveImage => 'Save image';
+
+  @override
+  String get creationCopyImage => 'Copy image';
+
+  @override
+  String get creationShare => 'Share';
+
+  @override
+  String get creationDeleteItem => 'Delete creation';
+
+  @override
+  String get creationDeleteItemBody => 'Delete this creation?';
+
+  @override
+  String get creationActionFailed => 'Could not complete the action';
+
+  @override
+  String get creationOptionSaved => 'Saved';
+
+  @override
+  String get creationOptionCopied => 'Copied';
+
+  @override
+  String get backupScopeCreations => 'Creations';
+
+  @override
+  String creationQueuePosition(int count) {
+    return 'Queued · $count ahead';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count images',
+      one: '1 image',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count generations',
+      one: '1 generation',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count creations',
+      one: '1 creation',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return 'Topics $count';
+  }
+
+  @override
+  String get creationMoreOptions => 'More options';
+
+  @override
+  String get creationImageSize => 'Image size';
+
+  @override
+  String get creationQuality => 'Quality';
+
+  @override
+  String get creationLowQuality => 'Low';
+
+  @override
+  String get creationMediumQuality => 'Medium';
+
+  @override
+  String get creationHighQuality => 'High';
+
+  @override
+  String get creationNegativePrompt => 'Negative prompt';
+
+  @override
+  String get creationSeed => 'Seed';
+
+  @override
+  String get creationTransparentBackground => 'Transparent background';
+
+  @override
+  String get creationOutputFormat => 'Output format';
+
+  @override
+  String get creationExtraJson => 'Extra parameters (JSON)';
+
+  @override
+  String get creationExtraJsonHint =>
+      'These values are sent with each request. You can override them in More options.';
+
+  @override
+  String get creationModelKnown =>
+      'Defaults come from Kelivo’s built-in model data. Changes apply to this model only.';
+
+  @override
+  String get creationModelUnknown =>
+      'Kelivo filled in common parameters. You can adjust them using your provider’s documentation.';
+
+  @override
+  String get creationMaxPerRequest => 'Maximum per request';
+
+  @override
+  String get creationMaxPerRequestHelp =>
+      'Larger batches are split into multiple requests and kept in one group.';
+
+  @override
+  String get creationReferenceLimit => 'Reference images';
+
+  @override
+  String get creationReferenceLimitHelp =>
+      'Set to zero to hide reference images and editing for this model.';
+
+  @override
+  String get creationRatioHelp =>
+      'Select the ratios available in Create. Auto lets the model decide.';
+
+  @override
+  String get creationMediaOther => 'Other options';
+
+  @override
+  String get creationEnableOptionHelp => 'Show this control in More options.';
+
+  @override
+  String get creationImageTypeHelp =>
+      'Image models appear in Create and in the Image Generation tool.';
+
+  @override
+  String get creationVideoTypeHelp => 'Video models appear in Create.';
+
+  @override
+  String get creationFalKeyHint =>
+      'Create a key in fal.ai › Dashboard › API Keys';
+
+  @override
+  String get creationFalCatalogHint =>
+      'Use Fetch to browse fal’s live catalog, or use + to add a model by its endpoint ID.';
+
+  @override
+  String falUnsupportedInput(String field) {
+    return 'This model requires $field, which Creation cannot supply.';
+  }
+
+  @override
+  String get falUnsupportedOutput =>
+      'This model does not return an image or video that Creation can save.';
+
+  @override
+  String get falCheckingModel => 'Checking model…';
+
+  @override
+  String get falInvalidEndpointId =>
+      'Enter a fal endpoint ID, such as fal-ai/flux/dev.';
+
+  @override
+  String get creationOptionalTitle => 'Name this work (optional)';
+
+  @override
+  String get falCatalogMore => 'Load more models';
+
+  @override
+  String get falCatalogNoMatch => 'No matching image or video models';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return 'Could not load fal model data ($error)';
+  }
+
+  @override
+  String get creationFalModelId => 'model ID';
+
+  @override
+  String get creationSelectPlatformImage => 'Choose image';
+
+  @override
+  String get creationPlatformOptions => 'Model-specific options';
+
+  @override
+  String get creationParameterRequired => 'Required';
+
+  @override
+  String get creationBackground => 'Background';
+
+  @override
+  String get creationOpaqueBackground => 'Opaque';
+
+  @override
+  String get creationTransparentOption => 'Transparent';
+
+  @override
+  String get creationChatModelBadge => 'Chat model';
+
+  @override
+  String get creationCommonOptions => 'Common options';
+
+  @override
+  String get creationNoCommonOptions => 'This model has no common options.';
+
+  @override
+  String get creationGallery => 'All creations';
+
+  @override
+  String get creationFilterAll => 'All';
+
+  @override
+  String get creationFilterImages => 'Images';
+
+  @override
+  String get creationFilterVideos => 'Videos';
+
+  @override
+  String get creationFilterFavorites => 'Favorites';
+
+  @override
+  String get creationSearchGallery => 'Search prompts or topics';
+
+  @override
+  String get creationGalleryEmpty => 'No creations yet';
+
+  @override
+  String get creationFavoritesEmpty => 'No favorites yet';
+
+  @override
+  String get creationGalleryNoResults => 'No matching creations';
+
+  @override
+  String get creationShowInTopic => 'Show in topic';
+
+  @override
+  String get creationFavorite => 'Favorite';
+
+  @override
+  String get creationUnfavorite => 'Remove favorite';
+
+  @override
+  String get creationFavorited => 'Added to favorites';
+
+  @override
+  String get creationUnfavorited => 'Removed from favorites';
+
+  @override
+  String get creationTopicDisplay => 'Topic display';
+
+  @override
+  String get creationCoversAndTitles => 'Covers and titles';
+
+  @override
+  String get creationCoversOnly => 'Covers only';
+
+  @override
+  String get creationTopicList => 'List';
+
+  @override
+  String get creationAutoTitle => 'Name topics automatically';
+
+  @override
+  String get creationAutoTitleHelp =>
+      'Use the title summary model to name a topic from its first prompt.';
+
+  @override
+  String get creationAutoTitleOffHelp =>
+      'Use the beginning of the first prompt as the title.';
+
+  @override
+  String get creationCustomCount => 'Custom';
+
+  @override
+  String get creationCustomCountMaximum => 'Up to 16';
+
+  @override
+  String creationRequestSplit(String model, int limit, int requests) {
+    return '$model produces up to $limit images per request. $requests requests will be grouped together.';
+  }
+
+  @override
+  String get creationNoModelPlaceholder =>
+      'Add a model that can create media first';
+
+  @override
+  String get creationConnectChatGPT => 'Sign in to ChatGPT';
+
+  @override
+  String get creationConnectGrok => 'Sign in to Grok';
+
+  @override
+  String get creationConfigureFal => 'Set up fal';
+
+  @override
+  String get creationOtherProviders => 'Other providers';
+
+  @override
+  String get creationChooseReferenceFile => 'Choose files…';
+
+  @override
+  String get creationChooseFromLibrary => 'Choose from Photos';
+
+  @override
+  String get creationTakeReferencePhoto => 'Take a photo';
+
+  @override
+  String get creationPasteReference => 'Paste image';
+
+  @override
+  String get creationRecentImages => 'Recent images';
+
+  @override
+  String get creationReferenceDrop => 'Drop to add reference images';
+
+  @override
+  String get creationFirstFrameDrop => 'Drop to set the first frame';
+
+  @override
+  String get creationReferenceDropHint =>
+      'You can also drop images onto Create.';
+
+  @override
+  String get creationNoClipboardImage => 'No image on the clipboard';
+
+  @override
+  String get creationReferenceAdded => 'Added to references';
+
+  @override
+  String get creationReferenceAlreadyAdded => 'Already in your references';
+
+  @override
+  String creationReferenceLimitReached(int count) {
+    return 'This model accepts up to $count reference images.';
+  }
+
+  @override
+  String creationReferenceUnsupported(String model) {
+    return '$model does not support reference images';
+  }
+
+  @override
+  String get creationReferenceIgnored =>
+      'Your references stay in the draft. A model that accepts them can use them.';
+
+  @override
+  String get creationRecentChat => 'Chat';
+
+  @override
+  String get creationRecentCreation => 'Create';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return 'Choose up to $count more';
+  }
+
+  @override
+  String get creationTapToSelect => 'Tap an image to select it';
+
+  @override
+  String creationSelectedImages(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String creationAddSelected(int count) {
+    return 'Add ($count)';
+  }
+
+  @override
+  String get creationRecentEmpty => 'No recent images';
+
+  @override
+  String get creationEditImage => 'Edit image';
+
+  @override
+  String get creationUseReference => 'Use as reference';
+
+  @override
+  String get creationEditReference => 'Editing with this image';
+
+  @override
+  String get creationEditPrompt => 'What should change?';
+
+  @override
+  String get creationEditPromptExample =>
+      'For example, use a beach background and keep the person and lighting';
+
+  @override
+  String get creationEditOriginalRatio => 'Original ratio';
+
+  @override
+  String get creationEditNewGroup => 'Generate a new group';
+
+  @override
+  String get creationEditHelp =>
+      'The edit appears as a new group in this topic.';
+
+  @override
+  String get creationEditStarted =>
+      'Editing started. The result will appear at the bottom of this topic.';
+
+  @override
+  String get creationEditedResult => 'Edited result';
+
+  @override
+  String get creationEditedFrom => 'Edited from';
+
+  @override
+  String get creationRepeat => 'Generate again';
+
+  @override
+  String get creationDeleteBatch => 'Delete group';
+
+  @override
+  String creationDeleteBatchBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delete this group and its $count files from this device?',
+      one: 'Delete this group and its file from this device?',
+      zero: 'Delete this generation record from this device?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationRequestDetails => 'Request details';
+
+  @override
+  String get creationNoRequestDetails => 'No request details are available.';
+
+  @override
+  String creationReferenceSummary(int count, int limit) {
+    return 'References $count / $limit';
+  }
+
+  @override
+  String get creationPrevious => 'Previous creation';
+
+  @override
+  String get creationNext => 'Next creation';
+
+  @override
+  String get creationWaitingSketch => 'Sketching the composition';
+
+  @override
+  String get creationWaitingDetails => 'Refining the details';
+
+  @override
+  String get creationWaitingFinish => 'Finishing the image';
+
+  @override
+  String get creationWaitingVideoMotion => 'Planning the motion';
+
+  @override
+  String get creationWaitingVideoFrames => 'Generating frames';
+
+  @override
+  String get creationWaitingVideoFinish => 'Finishing the video';
+
+  @override
+  String get creationWaitingLong => 'Taking a little longer';
+
+  @override
+  String get creationSuggestionPoster => 'Design a minimalist concert poster';
+
+  @override
+  String get creationSuggestionLandscape => 'Paint a mountain village at dawn';
+
+  @override
+  String get creationSuggestionProduct =>
+      'Photograph a ceramic cup in soft daylight';
+
+  @override
+  String get creationSuggestionIllustration =>
+      'Illustrate a fox under a starry sky';
+
+  @override
+  String get creationSuggestionRoom => 'Sketch a reading nook with warm wood';
+
+  @override
+  String get creationSuggestionSticker =>
+      'Make a set of playful plant stickers';
+
+  @override
+  String get creationSuggestionMotion => 'A slow push in on a rainy garden';
+
+  @override
+  String get creationSuggestionOcean => 'Waves rolling onto a beach at sunset';
+
+  @override
+  String get creationWaitingDraft => 'Generating the first draft';
+
+  @override
+  String get creationWaitingScene => 'Setting up the scene';
+
+  @override
+  String get creationWaitingVideoRendering => 'Rendering motion';
+
+  @override
+  String get creationWaitingVideoComposite => 'Compositing the video';
+
+  @override
+  String get creationWaitingNearlyDone => 'Almost done';
+
+  @override
+  String creationUseGroupReferences(int count) {
+    return 'Use all $count as references';
+  }
+
+  @override
+  String get creationDownloadFailed => 'Download failed';
+
+  @override
+  String get creationAutomaticRetry => 'Automatic retry';
+
+  @override
+  String get creationNoAutomaticRetry => 'Manual retry';
+
+  @override
+  String get creationRetryHistory => 'Retry history';
+
+  @override
+  String get creationLoggedRequest => 'Request metadata';
+
+  @override
+  String get creationLoggedResponse => 'Response metadata';
+
+  @override
+  String get creationDefaultImage => 'Image generation model';
+
+  @override
+  String get creationDefaultImageHelp =>
+      'Used for images in Creation and the image generation tool in chat.';
+
+  @override
+  String get creationDefaultVideo => 'Video generation model';
+
+  @override
+  String get creationDefaultVideoHelp => 'Used in video mode in Creation.';
+
+  @override
+  String get creationDefaultEnhance => 'Prompt enhancement model';
+
+  @override
+  String get creationDefaultEnhanceHelp =>
+      'Refines prompts in Creation. Reference images are included if this model supports image input.';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return 'Use $variable for the current creation prompt.';
+  }
+
+  @override
+  String get creationLocalToolTitle => 'Image generation';
+
+  @override
+  String get creationLocalToolHelp =>
+      'Let this assistant draw or edit images in chat using the default image generation model.';
+
+  @override
+  String creationStorageFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files',
+      one: '1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationSelectDefaultImage => 'Choose a default image model';
+
+  @override
+  String get creationConfigureImageProvider =>
+      'Add or enable an image model in Providers first.';
+
+  @override
+  String get displayChatImagesAtToolCall =>
+      'Show generated images at the tool call';
+
+  @override
+  String get displayChatImageInfo => 'Show generated image details';
+
+  @override
+  String get displayChatImageLink => 'Show link to Creation';
+
+  @override
+  String get creationLocalToolNeedsModel =>
+      'Choose an image generation model in Default models first.';
+
+  @override
+  String creationChatSource(String title) {
+    return 'Chat · $title';
+  }
+
+  @override
+  String get creationSendToChat => 'Send to chat';
+
+  @override
+  String get creationShowInConversation => 'Show in conversation';
+
+  @override
+  String get creationShowInCreation => 'Show in Creation';
+
+  @override
+  String get creationChatCancelled => 'Image creation cancelled';
+
+  @override
+  String get creationChatRegenerate => 'Generate again';
+
+  @override
+  String get creationChatImageUnavailable => 'Image unavailable';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Generated $count images',
+      one: 'Generated 1 image',
+    );
+    return '$_temp0 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => 'Enhance prompt';
+
+  @override
+  String get creationEnhanceLoading => 'Rewriting prompt…';
+
+  @override
+  String get creationEnhanceResult => 'Rewritten prompt';
+
+  @override
+  String get creationEnhanceOriginal => 'Original';
+
+  @override
+  String get creationEnhanceAgain => 'Try another';
+
+  @override
+  String get creationEnhanceApply => 'Replace';
+
+  @override
+  String get creationEnhanceNeedsModel =>
+      'Choose a prompt enhancement model in Default models.';
+
+  @override
+  String get creationStorageHint =>
+      'Images, videos, thumbnails, and reference images stored by Creation.';
+
+  @override
+  String get creationStorageDate => 'Clear creations through this date';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return 'Delete finished generations through $date, including their images, videos, and reference copies? Images from these generations will also be unavailable in chat.';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Cleared $count generations',
+      one: 'Cleared 1 generation',
+      zero: 'No generations to clear',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationStorageClean => 'Clear by date';
+
+  @override
+  String get creationDisplayAndGames => 'Display and waiting games';
+
+  @override
+  String get creationWaitGame => 'Waiting game';
+
+  @override
+  String get creationGameRandom => 'Random';
+
+  @override
+  String get creationGameOff => 'Off';
+
+  @override
+  String get creationGameSnake => 'Snake';
+
+  @override
+  String get creationGameBrick => 'Brick Breaker';
+
+  @override
+  String get creationGameSnakeControls =>
+      'Snake. Use arrow keys, W A S D, or swipes to steer. Press Space to pause or resume and Escape to exit.';
+
+  @override
+  String get creationGameBrickControls =>
+      'Brick Breaker. Drag the paddle or hold Left, Right, A, or D to move. Press Space to pause or resume and Escape to exit.';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return 'Play $game during image generation';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return 'Play $game during video generation';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return 'Score $score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return 'Paused · $score';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return 'Game over · $score';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return 'Creation ready · $score';
+  }
+
+  @override
+  String get creationNoSelectableModels => 'No models available';
+
+  @override
+  String get creationNoMatchingTopics => 'No matching topics';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return 'All topics $count';
+  }
+
+  @override
+  String get creationNoImageModels => 'No image generation models yet';
+
+  @override
+  String get creationNoVideoModels => 'No video generation models yet';
+
+  @override
+  String get creationFrameSources =>
+      'Add from recent images, files, or the clipboard';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model supports the first frame only';
+  }
+
+  @override
+  String get creationSubscriptionLogin => 'Subscription';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return 'Up to $count references';
+  }
+
+  @override
+  String get creationTextOnlyImage => 'Text to image';
+
+  @override
+  String get creationTextOnlyVideo => 'Text to video';
+
+  @override
+  String get creationCustomCountLabel => 'Custom count';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': 'Network connection',
+      'rateLimited': 'Rate limit',
+      'server': 'Provider error',
+      'rejected': 'Request rejected',
+      'login': 'Sign-in required',
+      'unavailable': 'Model or endpoint unavailable',
+      'parameters': 'Invalid parameters',
+      'referenceTooLarge': 'Reference too large',
+      'download': 'Download failed',
+      'invalidResponse': 'Invalid response',
+      'other': 'Generation error',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp =>
+      'The app closed before this request finished. Your prompt and settings are saved.';
+
+  @override
+  String get creationCancelledHelp =>
+      'Your prompt and settings are saved. You can generate again at any time.';
+
+  @override
+  String get creationChatImageReady => 'Image created';
 }

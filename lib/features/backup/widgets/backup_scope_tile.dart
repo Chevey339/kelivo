@@ -112,6 +112,7 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
   static const _contentCategories = [
     BackupCategory.chats,
     BackupCategory.files,
+    BackupCategory.creations,
   ];
 
   late BackupScope _scope = widget.scope;

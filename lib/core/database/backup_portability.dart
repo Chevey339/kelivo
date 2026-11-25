@@ -5,6 +5,7 @@ import '../models/backup_scope.dart';
 import 'backup_content_filter.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
+import 'media_repository.dart';
 
 /// Device state stays in SQLite at runtime, but must not travel in a backup.
 final class BackupPortability {
@@ -106,6 +107,11 @@ final class BackupPortability {
     // Erase removed payloads from SQLite cells as well as its logical rows.
     await database.customStatement('PRAGMA secure_delete = ON;');
     await database.transaction(() async {
+      if (!scope.includes(BackupCategory.creations)) {
+        await MediaRepository(database).clear();
+      } else {
+        await MediaRepository(database).markInterrupted();
+      }
       await BusinessRepository(database).transformSnapshot(
         (snapshot) =>
             portable(BackupContentFilter.selectSnapshot(snapshot, scope)),

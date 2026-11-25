@@ -16,6 +16,83 @@ import 'package:provider/provider.dart';
 import '../../support/business_test_harness.dart';
 
 void main() {
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'fal balance can be enabled from provider settings on ${desktop ? "desktop" : "mobile"}',
+      (tester) async {
+        tester.view.physicalSize = desktop
+            ? const Size(1200, 900)
+            : const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await tester.runAsync(() => settings.loaded);
+        addTearDown(settings.dispose);
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: settings,
+            child: MaterialApp(
+              locale: const Locale('en'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: desktop
+                  ? const Scaffold(
+                      body: DesktopProviderDetailPane(
+                        providerKey: 'fal',
+                        displayName: 'fal',
+                      ),
+                    )
+                  : const ProviderDetailPage(
+                      keyName: 'fal',
+                      displayName: 'fal',
+                    ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        Future<void> tap(Finder finder) async {
+          await tester.ensureVisible(finder);
+          await tester.tap(finder);
+          await tester.pumpAndSettle();
+        }
+
+        await tap(
+          desktop
+              ? find.byKey(const ValueKey('desktop-provider-settings-fal'))
+              : find.text('Get account balance'),
+        );
+        await tap(find.byKey(const ValueKey('provider-balance-enabled')));
+        expect(settings.getProviderConfig('fal').balanceEnabled, isTrue);
+        expect(find.textContaining('billing:usage:read'), findsOneWidget);
+        expect(find.text('Refresh after generation'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('provider-balance-method')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('provider-balance-api-path')),
+          findsNothing,
+        );
+        final editor = tester.widget<ProviderBalanceRequestEditor>(
+          find.byType(ProviderBalanceRequestEditor),
+        );
+        await editor.onHeadersChanged(const [
+          {'name': 'Authorization', 'value': 'Key billing-test'},
+        ]);
+        await tester.pumpAndSettle();
+        expect(
+          settings.getProviderConfig('fal').balanceHeaders.single['value'],
+          'Key billing-test',
+        );
+        expect(settings.getProviderConfig('fal').apiKey, isEmpty);
+        await tap(find.byKey(const ValueKey('provider-balance-enabled')));
+        expect(settings.getProviderConfig('fal').balanceEnabled, isFalse);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(milliseconds: 500));
+      },
+    );
+  }
   testWidgets('first mobile refresh override preserves a preset display name', (
     tester,
   ) async {

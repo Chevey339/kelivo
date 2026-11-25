@@ -140,6 +140,34 @@ void main() {
   );
 
   test(
+    'keep-alive tasks participate in sync without completion alerts',
+    () async {
+      await coordinator.configure(
+        const MobileBackgroundSettings(notificationsEnabled: true),
+        l10n,
+      );
+      await coordinator.start(
+        id: 'creation-video',
+        conversationId: '',
+        title: 'Video',
+        keepAliveOnly: true,
+        cancel: () async {},
+      );
+      expect(
+        (snapshots().last['tasks'] as List).single['id'],
+        'creation-video',
+      );
+      await coordinator.finish(
+        'creation-video',
+        BackgroundTaskOutcome.completed,
+      );
+      expect(snapshots().last['tasks'], isEmpty);
+      expect(snapshots().last['terminal'], isNull);
+      expect(notifications, isEmpty);
+    },
+  );
+
+  test(
     'initialization and status never request permissions or enable features',
     () async {
       await coordinator.refreshStatus();

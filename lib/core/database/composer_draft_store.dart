@@ -791,7 +791,6 @@ class ComposerDraftStore extends ChangeNotifier {
             mime: doc.mime,
           ),
       ],
-      allowImagesApiRouting: input.allowImagesApiRouting,
       uiContext: input.uiContext,
       draftSubmission: submission,
     );

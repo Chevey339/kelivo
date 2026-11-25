@@ -7,6 +7,8 @@ import '../features/provider/utils/provider_test_failure.dart';
 import '../features/provider/widgets/provider_test_details.dart';
 import '../features/provider/utils/provider_url_editor.dart';
 import '../features/provider/widgets/provider_input_row.dart';
+import '../features/provider/widgets/fal_catalog_notice.dart';
+import '../features/provider/widgets/fal_model_picker.dart';
 import '../features/provider/widgets/provider_base_url_field.dart';
 import '../features/provider/widgets/provider_icon_picker.dart';
 import '../features/provider/widgets/provider_sponsor_card.dart';
@@ -159,6 +161,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   SettingsSearchItem? _searchTarget;
   int _searchNavigation = 0;
   bool _showTopicPosition = false;
+  bool _selectFal = false;
   bool _showDetail = false;
 
   Future<void> _openSearch() async {
@@ -232,11 +235,15 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
             _SettingsMenuItem.display,
           DesktopSettingsNavigationTarget.backup => _SettingsMenuItem.backup,
           DesktopSettingsNavigationTarget.mcp => _SettingsMenuItem.mcp,
+          DesktopSettingsNavigationTarget.providers ||
+          DesktopSettingsNavigationTarget.fal => _SettingsMenuItem.providers,
+          DesktopSettingsNavigationTarget.defaultModel =>
+            _SettingsMenuItem.defaultModel,
         };
-        if (target == DesktopSettingsNavigationTarget.topicPosition) {
-          _showTopicPosition = true;
-          _searchNavigation++;
-        }
+        _showTopicPosition =
+            target == DesktopSettingsNavigationTarget.topicPosition;
+        _selectFal = target == DesktopSettingsNavigationTarget.fal;
+        _searchNavigation++;
       });
     });
   }
@@ -321,8 +328,13 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                       );
                     case _SettingsMenuItem.providers:
                       return _DesktopProvidersBody(
-                        key: const ValueKey('providers'),
-                        initialSelectedKey: widget.initialProviderKey,
+                        key: ValueKey((
+                          'providers',
+                          _selectFal ? _searchNavigation : 0,
+                        )),
+                        initialSelectedKey: _selectFal
+                            ? 'fal'
+                            : widget.initialProviderKey,
                       );
                     case _SettingsMenuItem.defaultModel:
                       return const DesktopDefaultModelPane(

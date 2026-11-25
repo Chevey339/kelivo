@@ -20,6 +20,7 @@ final class KelivoFileUri {
     'avatars',
     'fonts',
     'drafts',
+    'generations',
   ];
 
   /// Cheap prefix check. Does **not** validate structure.
@@ -57,6 +58,23 @@ final class KelivoFileUri {
     if (segments.length < 2) return null;
     if (!_isManaged(segments.first)) return null;
     return List<String>.unmodifiable(segments);
+  }
+
+  static final _creationSegment = RegExp(r'^[a-zA-Z0-9_.-]+$');
+  static final _creationId = RegExp(r'^[a-zA-Z0-9_-]+$');
+
+  /// Stored media is produced under one batch. External picker paths are
+  /// accepted only before snapshotting, never as published or restored assets.
+  static bool isGenerationId(String id) => _creationId.hasMatch(id);
+
+  static bool isGenerationFile(String uri, String batchId) {
+    final parts = decodeToSegments(uri);
+    return parts != null &&
+        parts.length >= 3 &&
+        parts.first == 'generations' &&
+        parts[1] == batchId &&
+        isGenerationId(batchId) &&
+        parts.skip(1).every(_creationSegment.hasMatch);
   }
 
   /// Resolve against an absolute app-data [root]. No existence checks.

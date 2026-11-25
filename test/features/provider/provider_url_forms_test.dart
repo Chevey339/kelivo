@@ -180,6 +180,10 @@ void formTest(String description, WidgetTesterCallback callback) {
 void main() {
   formTest('mobile ordinary provider fields use normal input', (tester) async {
     await mount(tester, false);
+    expect(
+      find.textContaining('/images/generations', findRichText: true),
+      findsNothing,
+    );
     await expectInputConfiguration(
       tester,
       providerField('Name'),

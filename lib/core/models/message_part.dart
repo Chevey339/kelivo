@@ -234,6 +234,7 @@ final class ImagePart extends MessagePart {
     required this.uri,
     this.mime,
     this.assetId,
+    this.generationItemId,
     this.id,
     this.unavailable = false,
   });
@@ -248,6 +249,7 @@ final class ImagePart extends MessagePart {
       uri: uri,
       mime: _optionalString(map, 'mime'),
       assetId: _optionalString(map, 'assetId'),
+      generationItemId: _optionalString(map, 'generationItemId'),
       unavailable: _optionalBool(map, 'unavailable'),
     );
   }
@@ -255,6 +257,7 @@ final class ImagePart extends MessagePart {
   final String uri;
   final String? mime;
   final String? assetId;
+  final String? generationItemId;
 
   /// Stream image id. Runtime-only — not written to [encodePayload].
   final String? id;
@@ -268,6 +271,7 @@ final class ImagePart extends MessagePart {
     'uri': uri,
     if (mime != null) 'mime': mime,
     if (assetId != null) 'assetId': assetId,
+    if (generationItemId != null) 'generationItemId': generationItemId,
     if (unavailable) 'unavailable': true,
   });
 
@@ -278,11 +282,13 @@ final class ImagePart extends MessagePart {
           uri == other.uri &&
           mime == other.mime &&
           assetId == other.assetId &&
+          generationItemId == other.generationItemId &&
           id == other.id &&
           unavailable == other.unavailable;
 
   @override
-  int get hashCode => Object.hash(uri, mime, assetId, id, unavailable);
+  int get hashCode =>
+      Object.hash(uri, mime, assetId, generationItemId, id, unavailable);
 }
 
 final class FilePart extends MessagePart {

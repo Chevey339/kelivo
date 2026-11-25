@@ -333,6 +333,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'Claude', key: 'Claude'),
       (name: 'Grok', key: 'Grok'),
       (name: l10n.providersPageByteDanceName, key: 'ByteDance'),
+      (name: 'fal', key: 'fal'),
     ];
 
     final cfgs = settings.providerConfigs;
@@ -1072,7 +1073,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
       _syncCtrl(_baseUrlCtrl, cfg.baseUrl);
       _baseEditor = ProviderUrlEditor(
         _baseUrlCtrl,
-        autoVersionDisabled: cfg.autoVersionDisabled,
+        autoVersionDisabled: cfg.isFal || cfg.autoVersionDisabled,
       );
     } else {
       _baseEditor!.sync(cfg);
@@ -1634,7 +1635,9 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                     obscure: !_showApiKey,
                     enableSuggestions: false,
                     mono: _showApiKey,
-                    hint: l10n.providerDetailPageApiKeyExample,
+                    hint: cfg.isFal
+                        ? l10n.creationFalKeyHint
+                        : l10n.providerDetailPageApiKeyExample,
                     trailing: TrailingKind.eye,
                     onTrailingTap: () =>
                         setState(() => _showApiKey = !_showApiKey),
@@ -1919,6 +1922,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
 
               // API Path (OpenAI chat)
               if (kind == ProviderKind.openai &&
+                  !cfg.isFal &&
                   (cfg.useResponseApi != true)) ...[
                 const SizedBox(height: 14),
                 Focus(
@@ -2190,6 +2194,17 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                           icon: lucide.Lucide.RefreshCcwDot,
                           label: l10n.providerDetailPageFetchModelsButton,
                           onTap: () async {
+                            final current = sp.getProviderConfig(
+                              widget.providerKey,
+                            );
+                            if (current.isFal) {
+                              await showFalModelPicker(
+                                context,
+                                current,
+                                desktop: true,
+                              );
+                              return;
+                            }
                             final providerName = widget.displayName;
                             await showModelFetchDialog(
                               context,
@@ -2229,6 +2244,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                 },
               ),
 
+              if (cfg.isFal) ...[
+                const SizedBox(height: 8),
+                const FalCatalogNotice(),
+              ],
               const SizedBox(height: 6),
               // Accordion groups
               for (final entry in groups.entries)
@@ -3054,22 +3073,23 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                               OAuthConnectionInfo(config: cfgNow, desktop: true)
                             else ...[
                               // 2) Provider type
-                              row(
-                                l10n.providerDetailPageProviderTypeTitle,
-                                _ProviderTypeDropdown(
-                                  value: kindNow,
-                                  onChanged: (k) async {
-                                    final old = spWatch.getProviderConfig(
-                                      widget.providerKey,
-                                      defaultName: widget.displayName,
-                                    );
-                                    await spWatch.setProviderConfig(
-                                      widget.providerKey,
-                                      old.copyWith(providerType: k),
-                                    );
-                                  },
+                              if (!cfgNow.isFal)
+                                row(
+                                  l10n.providerDetailPageProviderTypeTitle,
+                                  _ProviderTypeDropdown(
+                                    value: kindNow,
+                                    onChanged: (k) async {
+                                      final old = spWatch.getProviderConfig(
+                                        widget.providerKey,
+                                        defaultName: widget.displayName,
+                                      );
+                                      await spWatch.setProviderConfig(
+                                        widget.providerKey,
+                                        old.copyWith(providerType: k),
+                                      );
+                                    },
+                                  ),
                                 ),
-                              ),
                               const SizedBox(height: 4),
                               // 3) Multi-Key
                               row(
@@ -3093,70 +3113,74 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                               ),
                               const SizedBox(height: 4),
                               // 4) Response (OpenAI) or Vertex (Google). Hide for Claude, with animation.
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 180),
-                                switchInCurve: Curves.easeOutCubic,
-                                switchOutCurve: Curves.easeInCubic,
-                                child: () {
-                                  if (kindNow == ProviderKind.openai) {
-                                    return KeyedSubtree(
-                                      key: const ValueKey('openai-resp'),
-                                      child: row(
-                                        l10n.providerDetailPageResponseApiTitle,
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: IosSwitch(
-                                            value: respNow,
-                                            onChanged: (v) async {
-                                              final old = spWatch
-                                                  .getProviderConfig(
-                                                    widget.providerKey,
-                                                    defaultName:
-                                                        widget.displayName,
-                                                  );
-                                              await spWatch.setProviderConfig(
-                                                widget.providerKey,
-                                                old.copyWith(useResponseApi: v),
-                                              );
-                                            },
+                              if (!cfgNow.isFal)
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 180),
+                                  switchInCurve: Curves.easeOutCubic,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  child: () {
+                                    if (kindNow == ProviderKind.openai) {
+                                      return KeyedSubtree(
+                                        key: const ValueKey('openai-resp'),
+                                        child: row(
+                                          l10n.providerDetailPageResponseApiTitle,
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: IosSwitch(
+                                              value: respNow,
+                                              onChanged: (v) async {
+                                                final old = spWatch
+                                                    .getProviderConfig(
+                                                      widget.providerKey,
+                                                      defaultName:
+                                                          widget.displayName,
+                                                    );
+                                                await spWatch.setProviderConfig(
+                                                  widget.providerKey,
+                                                  old.copyWith(
+                                                    useResponseApi: v,
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  }
-                                  if (kindNow == ProviderKind.google) {
-                                    return KeyedSubtree(
-                                      key: const ValueKey('google-vertex'),
-                                      child: row(
-                                        l10n.providerDetailPageVertexAiTitle,
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: IosSwitch(
-                                            value: vertexNow,
-                                            onChanged: (v) async {
-                                              final old = spWatch
-                                                  .getProviderConfig(
-                                                    widget.providerKey,
-                                                    defaultName:
-                                                        widget.displayName,
-                                                  );
-                                              await spWatch.setProviderConfig(
-                                                widget.providerKey,
-                                                old.copyWith(vertexAI: v),
-                                              );
-                                            },
+                                      );
+                                    }
+                                    if (kindNow == ProviderKind.google) {
+                                      return KeyedSubtree(
+                                        key: const ValueKey('google-vertex'),
+                                        child: row(
+                                          l10n.providerDetailPageVertexAiTitle,
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: IosSwitch(
+                                              value: vertexNow,
+                                              onChanged: (v) async {
+                                                final old = spWatch
+                                                    .getProviderConfig(
+                                                      widget.providerKey,
+                                                      defaultName:
+                                                          widget.displayName,
+                                                    );
+                                                await spWatch.setProviderConfig(
+                                                  widget.providerKey,
+                                                  old.copyWith(vertexAI: v),
+                                                );
+                                              },
+                                            ),
                                           ),
                                         ),
-                                      ),
+                                      );
+                                    }
+                                    return const SizedBox.shrink(
+                                      key: ValueKey('none'),
                                     );
-                                  }
-                                  return const SizedBox.shrink(
-                                    key: ValueKey('none'),
-                                  );
-                                }(),
-                              ),
+                                  }(),
+                                ),
                               const SizedBox(height: 4),
-                              if (kindNow == ProviderKind.openai) ...[
+                              if (!cfgNow.isFal &&
+                                  kindNow == ProviderKind.openai) ...[
                                 row(
                                   l10n.providerDetailPagePromptCacheKeyTitle,
                                   Row(
@@ -3233,43 +3257,45 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
-                                      row(
-                                        l10n.providerDetailPageBalanceApiPathLabel,
-                                        TextField(
-                                          key: const ValueKey(
-                                            'provider-balance-api-path',
+                                      if (!cfgNow.isFal)
+                                        row(
+                                          l10n.providerDetailPageBalanceApiPathLabel,
+                                          TextField(
+                                            key: const ValueKey(
+                                              'provider-balance-api-path',
+                                            ),
+                                            controller: _balanceApiPathCtrl,
+                                            style: TextStyle(fontSize: 13),
+                                            decoration: _proxyInputDecoration(
+                                              ctx,
+                                            ),
+                                            onChanged: (_) async {
+                                              if (_balanceApiPathCtrl
+                                                  .value
+                                                  .composing
+                                                  .isValid) {
+                                                return;
+                                              }
+                                              final old = spWatch
+                                                  .getProviderConfig(
+                                                    widget.providerKey,
+                                                    defaultName:
+                                                        widget.displayName,
+                                                  );
+                                              await spWatch.setProviderConfig(
+                                                widget.providerKey,
+                                                old.copyWith(
+                                                  balanceApiPath:
+                                                      _balanceApiPathCtrl.text
+                                                          .trim(),
+                                                ),
+                                              );
+                                            },
                                           ),
-                                          controller: _balanceApiPathCtrl,
-                                          style: TextStyle(fontSize: 13),
-                                          decoration: _proxyInputDecoration(
-                                            ctx,
-                                          ),
-                                          onChanged: (_) async {
-                                            if (_balanceApiPathCtrl
-                                                .value
-                                                .composing
-                                                .isValid) {
-                                              return;
-                                            }
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                  defaultName:
-                                                      widget.displayName,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceApiPath:
-                                                    _balanceApiPathCtrl.text
-                                                        .trim(),
-                                              ),
-                                            );
-                                          },
                                         ),
-                                      ),
                                       const SizedBox(height: 12),
                                       ProviderBalanceRequestEditor(
+                                        fal: cfgNow.isFal,
                                         method: cfgNow.balanceMethod,
                                         headers: cfgNow.balanceHeaders,
                                         bodyController: _balanceBodyCtrl,
@@ -3307,41 +3333,43 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                         },
                                       ),
                                       const SizedBox(height: 4),
-                                      row(
-                                        l10n.providerDetailPageBalanceResultPathLabel,
-                                        TextField(
-                                          key: const ValueKey(
-                                            'provider-balance-result-path',
+                                      if (!cfgNow.isFal)
+                                        row(
+                                          l10n.providerDetailPageBalanceResultPathLabel,
+                                          TextField(
+                                            key: const ValueKey(
+                                              'provider-balance-result-path',
+                                            ),
+                                            controller: _balanceResultPathCtrl,
+                                            style: TextStyle(fontSize: 13),
+                                            decoration: _proxyInputDecoration(
+                                              ctx,
+                                            ),
+                                            onChanged: (_) async {
+                                              if (_balanceResultPathCtrl
+                                                  .value
+                                                  .composing
+                                                  .isValid) {
+                                                return;
+                                              }
+                                              final old = spWatch
+                                                  .getProviderConfig(
+                                                    widget.providerKey,
+                                                    defaultName:
+                                                        widget.displayName,
+                                                  );
+                                              await spWatch.setProviderConfig(
+                                                widget.providerKey,
+                                                old.copyWith(
+                                                  balanceResultPath:
+                                                      _balanceResultPathCtrl
+                                                          .text
+                                                          .trim(),
+                                                ),
+                                              );
+                                            },
                                           ),
-                                          controller: _balanceResultPathCtrl,
-                                          style: TextStyle(fontSize: 13),
-                                          decoration: _proxyInputDecoration(
-                                            ctx,
-                                          ),
-                                          onChanged: (_) async {
-                                            if (_balanceResultPathCtrl
-                                                .value
-                                                .composing
-                                                .isValid) {
-                                              return;
-                                            }
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                  defaultName:
-                                                      widget.displayName,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceResultPath:
-                                                    _balanceResultPathCtrl.text
-                                                        .trim(),
-                                              ),
-                                            );
-                                          },
                                         ),
-                                      ),
                                       const SizedBox(height: 4),
                                       row(
                                         l10n.providerDetailPageBalanceTitle,
@@ -7074,7 +7102,9 @@ class _ModelRow extends StatelessWidget {
     final resolved = ModelSpecResolver.instance.resolve(cfg, modelId);
     final info = resolved.spec;
     final baseId = info.upstreamId;
-    final displayName = resolved.override.displayName ?? baseId;
+    final displayName = cfg.isFal
+        ? info.displayName
+        : resolved.override.displayName ?? baseId;
 
     return GestureDetector(
       onTap: isSelectionMode
@@ -7130,7 +7160,7 @@ class _ModelRow extends StatelessWidget {
                           maxWidth: constraints.maxWidth / 2,
                         ),
                         child: ModelCapsulesRow(
-                          model: info,
+                          model: mediaCapsuleModel(cfg, info),
                           alignment: WrapAlignment.end,
                         ),
                       ),

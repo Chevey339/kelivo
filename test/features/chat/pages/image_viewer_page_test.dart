@@ -139,6 +139,7 @@ Widget _viewerApp({
 Widget _viewerRouteApp({
   required List<String> images,
   int initialIndex = 0,
+  bool dismissOnTap = false,
   Map<String, ImageProvider> imageProviders = const <String, ImageProvider>{},
   Size size = _mobileSize,
 }) {
@@ -158,6 +159,7 @@ Widget _viewerRouteApp({
                   MaterialPageRoute<void>(
                     builder: (_) => ImageViewerPage(
                       images: images,
+                      dismissOnTap: dismissOnTap,
                       initialIndex: initialIndex,
                       imageProviders: imageProviders,
                     ),
@@ -177,6 +179,7 @@ Future<void> _pumpViewerRoute(
   WidgetTester tester, {
   required List<String> images,
   int initialIndex = 0,
+  bool dismissOnTap = false,
   Map<String, ImageProvider> imageProviders = const <String, ImageProvider>{},
   Size size = _mobileSize,
 }) async {
@@ -184,6 +187,7 @@ Future<void> _pumpViewerRoute(
     _viewerRouteApp(
       images: images,
       initialIndex: initialIndex,
+      dismissOnTap: dismissOnTap,
       imageProviders: imageProviders,
       size: size,
     ),
@@ -202,6 +206,20 @@ class _ViewerSavePathProvider extends PathProviderPlatform {
 }
 
 void main() {
+  testWidgets('generated chat attachment preview closes with a single tap', (
+    tester,
+  ) async {
+    await _pumpViewerRoute(
+      tester,
+      images: [_widePngDataUrl],
+      dismissOnTap: true,
+    );
+    final viewer = find.byType(InteractiveViewer);
+    await tester.tapAt(tester.getCenter(viewer));
+    await tester.pumpAndSettle();
+    expect(viewer, findsNothing);
+  });
+
   group('saving original images to the gallery', () {
     late Directory temporaryDirectory;
     late PathProviderPlatform previousPaths;

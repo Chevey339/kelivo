@@ -40,7 +40,6 @@ void main() {
         ),
         apiMessages: const [],
         userImagePaths: const [],
-        allowImagesApiRouting: false,
         providerKey: 'test',
         modelId: 'test-model',
         assistant: null,

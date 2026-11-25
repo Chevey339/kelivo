@@ -16,6 +16,13 @@ import '../services/custom_request_merger.dart';
 import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_spec.dart';
+import '../services/media/openrouter_media_catalog.dart';
+import '../services/media/fal_model_discovery.dart';
+import '../services/media/replicate_models.dart';
+import '../services/media/modelscope_models.dart';
+import '../services/media/gemini_media_models.dart';
+import '../services/media/adapters/gemini_images.dart';
+import '../services/media/adapters/veo_video.dart';
 import '../services/model_spec/model_list_metadata_cache.dart';
 import '../services/model_spec/model_spec_resolver.dart';
 import '../services/model_spec/ollama_model_service.dart';
@@ -55,7 +62,25 @@ class OpenAIProvider extends BaseProvider {
 
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    if (cfg.isFal) {
+      final client = providerHttpClient(
+        cfg,
+        timeout: const Duration(seconds: 15),
+      );
+      try {
+        return await FalModelDiscovery.forProvider(client, cfg).listModels();
+      } finally {
+        client.close();
+      }
+    }
     final replaceMetadata = await _resolver.startModelListRefresh(cfg);
+    if (ReplicateMediaModel.isHost(Uri.tryParse(cfg.baseUrl)?.host)) {
+      await replaceMetadata(const []);
+      return [
+        for (final model in ReplicateMediaModel.values)
+          _resolver.spec(cfg, model.id),
+      ];
+    }
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
@@ -74,7 +99,26 @@ class OpenAIProvider extends BaseProvider {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final data = jsonDecode(res.body)['data'] as List?;
         if (data == null) return [];
-        final rows = _Http.modelRows(data);
+        final keyed = {
+          for (final row in _Http.modelRows(data)) row.id: row.json,
+        };
+        if (isModelScopeInferenceHost(uri.host)) {
+          for (final id in modelScopeCreationModels) {
+            keyed.putIfAbsent(id, () => {'id': id});
+          }
+        }
+        if (OpenRouterMediaModel.isHost(uri.host)) {
+          await mergeOpenRouterMediaCatalogs(
+            client,
+            Uri.parse(cfg.baseUrl),
+            mergedHeaders,
+            keyed,
+            cached: (mode) => _resolver.cachedOpenRouterMedia(cfg, mode),
+          );
+        }
+        final rows = keyed.entries.map(
+          (entry) => (id: entry.key, json: entry.value),
+        );
         await replaceMetadata(rows);
         return [
           for (final row in rows)
@@ -133,12 +177,18 @@ class ClaudeProvider extends BaseProvider {
 
 class GoogleProvider extends BaseProvider {
   String _buildUrl(ProviderConfig cfg) {
+    final host = Uri.tryParse(cfg.baseUrl)?.host ?? '';
+    final directGoogle =
+        host == 'generativelanguage.googleapis.com' ||
+        host == 'aiplatform.googleapis.com' ||
+        host.endsWith('-aiplatform.googleapis.com') ||
+        host.endsWith('.rep.googleapis.com');
     if (cfg.vertexAI == true &&
-        (cfg.location?.isNotEmpty == true) &&
-        (cfg.projectId?.isNotEmpty == true)) {
-      final loc = cfg.location!;
-      final proj = cfg.projectId!;
-      return 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models';
+        (directGoogle ||
+            (cfg.projectId ?? '').trim().isNotEmpty ||
+            (cfg.serviceAccountJson ?? '').trim().isNotEmpty)) {
+      final location = (cfg.location ?? '').trim();
+      return "${providerVertexOrigin(cfg, location.isEmpty ? 'us-central1' : location)}/v1beta1/publishers/google/models";
     }
     final base = cfg.baseUrl.endsWith('/')
         ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
@@ -180,42 +230,76 @@ class GoogleProvider extends BaseProvider {
       }
       final out = <ModelSpec>[];
       try {
-        final res = await client.get(
-          Uri.parse(url),
-          headers: _Http.modelListHeaders(cfg, headers),
-        );
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          final obj = jsonDecode(res.body) as Map<String, dynamic>;
-          final data = obj['models'] as List?;
-          if (data != null) {
-            final rows = <ModelListRow>[];
-            for (final row in data.whereType<Map>()) {
-              final name = row['name'];
-              if (name is! String) continue;
-              final id = name.startsWith('models/')
-                  ? name.substring('models/'.length)
-                  : name;
-              if (id.trim().isNotEmpty) rows.add((id: id, json: row));
-            }
-            await replaceMetadata(rows);
-            for (final row in rows) {
-              final methods = row.json['supportedGenerationMethods'];
-              if (methods != null &&
-                  (methods is! List ||
-                      !(methods.contains('generateContent') ||
-                          methods.contains('embedContent')))) {
-                continue;
-              }
-              final displayName = row.json['displayName'];
-              out.add(
-                resolver.spec(
-                  cfg,
-                  row.id,
-                  displayName: displayName is String ? displayName : row.id,
-                ),
-              );
-            }
+        final base = Uri.parse(url);
+        final rows = <String, ModelListRow>{};
+        final tokens = <String>{};
+        Uri page = base;
+        var complete = false;
+        while (true) {
+          final Map<String, dynamic> data;
+          try {
+            final res = await client.get(
+              page,
+              headers: _Http.modelListHeaders(cfg, headers),
+            );
+            if (res.statusCode < 200 || res.statusCode >= 300) break;
+            data = jsonDecode(res.body) as Map<String, dynamic>;
+          } on Exception {
+            break;
           }
+          final models = cfg.vertexAI == true
+              ? data['publisherModels'] ?? data['models']
+              : data['models'];
+          if (models is! List) break;
+          for (final row in models.whereType<Map>()) {
+            final name = row['name'];
+            if (name is! String) continue;
+            final id = name.replaceFirst(
+              RegExp(r'^(?:publishers/google/)?models/'),
+              '',
+            );
+            if (id.trim().isNotEmpty) rows[id] = (id: id, json: row);
+          }
+          final next = data['nextPageToken'];
+          if (next == null || next == '') {
+            complete = true;
+            break;
+          }
+          if (next is! String || !tokens.add(next)) break;
+          page = base.replace(
+            queryParameters: {...base.queryParameters, 'pageToken': next},
+          );
+        }
+        if (complete) await replaceMetadata(rows.values);
+        for (final row in rows.values) {
+          if (cfg.vertexAI == true &&
+              (VeoVideoAdapter.retiredOnVertex(row.id) ||
+                  GeminiImagesAdapter.retiredOnVertex(row.id))) {
+            continue;
+          }
+          final methods = row.json['supportedGenerationMethods'];
+          final nativeMedia =
+              isGeminiOmniVideoModel(row.id) ||
+              cfg.vertexAI == true && row.id.startsWith('veo-') ||
+              base.host != 'generativelanguage.googleapis.com' &&
+                  GeminiImagesAdapter.isImagen(row.id) &&
+                  (cfg.vertexAI != true ||
+                      !GeminiImagesAdapter.retiredOnVertex(row.id));
+          if (!nativeMedia &&
+              methods != null &&
+              (methods is! List ||
+                  !(methods.contains('generateContent') ||
+                      methods.contains('embedContent')))) {
+            continue;
+          }
+          final name = row.json['displayName'];
+          out.add(
+            resolver.spec(
+              cfg,
+              row.id,
+              displayName: name is String ? name : row.id,
+            ),
+          );
         }
       } catch (_) {}
 

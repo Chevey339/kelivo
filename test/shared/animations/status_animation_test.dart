@@ -57,6 +57,26 @@ void main() {
     expect(tester.binding.hasScheduledFrame, isFalse);
   });
 
+  testWidgets('elapsed clock continues through a repeating effect boundary', (
+    tester,
+  ) async {
+    late ValueListenable<double> seconds;
+    await tester.pumpWidget(
+      _host(
+        StatusAnimation.elapsed(
+          builder: (_, value) {
+            seconds = value;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.pump(const Duration(minutes: 4, seconds: 1));
+    expect(seconds.value, greaterThan(240));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final pause in [
     'explicit pause',
     'ticker mode',

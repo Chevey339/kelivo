@@ -1,3 +1,6 @@
+import '../services/media/fal_model_catalog.dart';
+import '../services/media/replicate_models.dart';
+import '../services/media/modelscope_models.dart';
 import '../models/image_upload_quality.dart';
 export '../models/image_upload_quality.dart';
 import '../models/attachment_retention.dart';
@@ -6,10 +9,12 @@ import '../../l10n/app_language.dart';
 import '../models/compression_config.dart';
 import '../services/auth/provider_oauth_service.dart';
 import '../models/mobile_background_settings.dart';
+import '../models/sidebar_layout.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:collection';
+import 'package:collection/collection.dart' show DeepCollectionEquality;
 import 'dart:io';
 import 'package:socks5_proxy/socks_client.dart' as socks;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -43,6 +48,7 @@ import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
 import '../models/assistant.dart';
 import '../models/model_spec.dart';
+import '../models/media_creation.dart';
 import '../models/reasoning_request.dart';
 import '../services/model_spec/model_list_metadata_cache.dart';
 import '../services/model_spec/model_spec_resolver.dart';
@@ -116,6 +122,7 @@ class SettingsProvider extends ChangeNotifier {
     'Claude',
     'Grok',
     'ByteDance',
+    'fal',
   ];
   static const Set<String> _builtInProviderKeys = {
     ..._builtInProviderKeysInOrder,
@@ -129,6 +136,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _selectedModelKey = 'selected_model_v1';
   static const String _perChatModelEnabledKey = 'per_chat_model_enabled_v1';
   static const String _titleModelKey = 'title_model_v1';
+  static const String _promptEnhancePromptKey = 'prompt_enhance_prompt_v1';
   static const String _titleGenerationEnabledKey =
       'title_generation_enabled_v1';
   static const String _titlePromptKey = 'title_prompt_v1';
@@ -231,6 +239,9 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowThinkingCardsKey =
       'display_show_thinking_cards_v1';
   static const String _displayShowToolCardsKey = 'display_show_tool_cards_v1';
+  static const String _inlineChatImagesKey = 'display_inline_chat_images_v1';
+  static const String _showChatImageInfoKey = 'display_chat_image_info_v1';
+  static const String _showChatImageLinkKey = 'display_chat_image_link_v1';
   static const String _displayShowProducedFilesKey =
       'display_show_produced_files_v1';
   static const String _displayShowReasoningLevelBadgeKey =
@@ -612,6 +623,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _balanceRefreshOnReply = _defaultBalanceRefreshOnReply;
   int get balanceRefreshInterval => _balanceRefreshInterval;
   bool get balanceRefreshOnReply => _balanceRefreshOnReply;
+  StreamSubscription<String>? _mediaBalanceSubscription;
   ProviderBalanceRefresh? _balanceRefresh;
   ProviderBalanceRefresh get balanceRefresh =>
       _balanceRefresh ??= ProviderBalanceRefresh(this);
@@ -722,8 +734,12 @@ class SettingsProvider extends ChangeNotifier {
   SettingsProvider(
     this._preferences, {
     this.onProviderModelsRetired,
+    Stream<String>? mediaOutputsSaved,
     this.backupPasswordStore = const BackupSecurePasswordStore(),
   }) {
+    _mediaBalanceSubscription = mediaOutputsSaved?.listen(
+      refreshBalanceAfterReply,
+    );
     ProviderOAuthService.instance.bind(this);
     _appLocaleTag = _readAppLocaleTag(_preferences);
     _loaded = _load();
@@ -844,6 +860,13 @@ class SettingsProvider extends ChangeNotifier {
         _titleModelId = parts.sublist(1).join('::');
       }
     }
+    for (final slot in CreationModelSlot.values) {
+      if (prefs.getString(slot.settingKey) case final key?) {
+        _creationModelKeys[slot] = key;
+      }
+    }
+    _promptEnhancePrompt =
+        prefs.getString(_promptEnhancePromptKey) ?? defaultPromptEnhancePrompt;
     _perChatModelEnabled = prefs.getBool(_perChatModelEnabledKey) ?? false;
     _titleGenerationEnabled = prefs.getBool(_titleGenerationEnabledKey) ?? true;
     // load title prompt
@@ -1111,6 +1134,9 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowUserMessageActionsKey) ?? true;
     _showThinkingCards = prefs.getBool(_displayShowThinkingCardsKey) ?? true;
     _showToolCards = prefs.getBool(_displayShowToolCardsKey) ?? true;
+    _inlineChatImages = prefs.getBool(_inlineChatImagesKey) ?? false;
+    _showChatImageInfo = prefs.getBool(_showChatImageInfoKey) ?? true;
+    _showChatImageLink = prefs.getBool(_showChatImageLinkKey) ?? true;
     _showProducedFiles = prefs.getBool(_displayShowProducedFilesKey) ?? true;
     _showReasoningLevelBadge =
         prefs.getBool(_displayShowReasoningLevelBadgeKey) ?? false;
@@ -1165,6 +1191,28 @@ class SettingsProvider extends ChangeNotifier {
     _showAppUpdates = prefs.getBool(_displayShowAppUpdatesKey) ?? true;
     _keepSidebarOpenOnAssistantTap =
         prefs.getBool(_displayKeepSidebarOpenOnAssistantTapKey) ?? false;
+    _mobileSidebarLayout = SidebarLayout.fromPreferences(
+      prefs.getString(BusinessKeyRegistry.mobileSidebarStyleKey),
+      prefs.getStringList(BusinessKeyRegistry.mobileSidebarBlockOrderKey),
+    );
+    _mobileSidebarEntries = decodeSidebarEntries(
+      prefs.getString(BusinessKeyRegistry.mobileSidebarEntriesKey),
+      defaultMobileSidebarEntries,
+    );
+    _mediaEntrySeen =
+        prefs.getBool(BusinessKeyRegistry.mediaEntrySeenKey) ?? false;
+    _desktopRailEntries = decodeSidebarEntries(
+      prefs.getString(BusinessKeyRegistry.desktopRailEntriesKey),
+      defaultDesktopSidebarEntries,
+    );
+    _showSidebarCustomizeInMore =
+        prefs.getBool(BusinessKeyRegistry.mobileSidebarShowCustomizeKey) ??
+        true;
+    _hideSidebarSingleAssistant =
+        prefs.getBool(
+          BusinessKeyRegistry.mobileSidebarHideSingleAssistantKey,
+        ) ??
+        false;
     _keepSidebarOpenOnTopicTap =
         prefs.getBool(_displayKeepSidebarOpenOnTopicTapKey) ?? false;
     _keepAssistantListExpandedOnSidebarClose =
@@ -1628,6 +1676,31 @@ class SettingsProvider extends ChangeNotifier {
     await _reloadLocalFontsIfAny();
 
     // Final cleanup pass for provider order + grouping state (best-effort).
+    // Reordering providers in the preview also persisted unused presets.
+    // Keep entries with settings, models, or a group chosen by the user.
+    var removedUnusedPreset = false;
+    for (final key in const ['Replicate', 'ModelScope', 'BytePlus']) {
+      final saved = _providerConfigs[key];
+      if (saved == null ||
+          saved.enabled ||
+          saved.apiKey.isNotEmpty ||
+          saved.modelOverrides.isNotEmpty ||
+          _providerGroupMap.containsKey(key)) {
+        continue;
+      }
+      final preset = ProviderConfig.defaultsFor(key);
+      if (listEquals(saved.models, preset.models) &&
+          const DeepCollectionEquality().equals(
+            saved.toJson(),
+            preset.toJson(),
+          )) {
+        _providerConfigs.remove(key);
+        removedUnusedPreset = true;
+      }
+    }
+    if (removedUnusedPreset) {
+      await prefs.setString(_providerConfigsKey, jsonEncode(_providerConfigs));
+    }
     if (_cleanupProviderOrderAndGrouping()) {
       try {
         await prefs.setStringList(_providersOrderKey, _providersOrder);
@@ -3444,6 +3517,7 @@ class SettingsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    unawaited(_mediaBalanceSubscription?.cancel());
     _balanceRefresh?.dispose();
     _backupEncryptionPassword = null;
     ProviderOAuthService.instance.unbind(this);
@@ -3601,7 +3675,11 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<int> deleteModels(String providerKey, Set<String> modelIds) async {
     if (modelIds.isEmpty) return 0;
-    final old = _providerConfigs[providerKey];
+    final old =
+        _providerConfigs[providerKey] ??
+        (_builtInProviderKeys.contains(providerKey)
+            ? getProviderConfig(providerKey)
+            : null);
     if (old == null) return 0;
     final deletedModelIds = old.models
         .where((modelId) => modelIds.contains(modelId))
@@ -3623,10 +3701,16 @@ class SettingsProvider extends ChangeNotifier {
 
     await setProviderConfig(
       providerKey,
-      old.copyWith(models: nextModels, modelOverrides: nextOverrides),
+      old.copyWith(
+        models: nextModels,
+        modelOverrides: nextOverrides,
+        disabledModels: old.disabledModels.difference(deletedModelIds),
+      ),
     );
     for (final modelId in deletedModelIds) {
-      await clearSelectionsForModel(providerKey, modelId);
+      if (_providerConfigs[providerKey]?.models.contains(modelId) != true) {
+        await clearSelectionsForModel(providerKey, modelId);
+      }
     }
     return deletedCount;
   }
@@ -3770,7 +3854,7 @@ class SettingsProvider extends ChangeNotifier {
   /// Used when a provider is disabled or deleted.
   Future<void> clearSelectionsForProvider(String providerKey) async {
     final prefs = _preferences;
-    bool changed = false;
+    bool changed = await _clearCreationSelections(providerKey);
     if (_currentModelProvider == providerKey) {
       _currentModelProvider = null;
       _currentModelId = null;
@@ -3836,7 +3920,7 @@ class SettingsProvider extends ChangeNotifier {
     bool preserveModelPreferences = false,
   }) async {
     final prefs = _preferences;
-    bool changed = false;
+    bool changed = await _clearCreationSelections(providerKey, modelId);
     if (_currentModelProvider == providerKey && _currentModelId == modelId) {
       _currentModelProvider = null;
       _currentModelId = null;
@@ -3925,6 +4009,7 @@ class SettingsProvider extends ChangeNotifier {
 
     // Clear selections referencing this provider to avoid re-creating defaults
     final prefs = _preferences;
+    await _clearCreationSelections(key);
     if (_currentModelProvider == key) {
       _currentModelProvider = null;
       _currentModelId = null;
@@ -4053,6 +4138,69 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   // Title model and prompt
+  final _creationModelKeys = <CreationModelSlot, String>{};
+  String? creationModelKey(CreationModelSlot slot) => _creationModelKeys[slot];
+  ({String providerKey, String modelId})? creationModel(
+    CreationModelSlot slot,
+  ) {
+    final key = _creationModelKeys[slot];
+    if (key == null) return null;
+    final split = key.indexOf('::');
+    if (split <= 0 || split + 2 >= key.length) return null;
+    return (
+      providerKey: key.substring(0, split),
+      modelId: key.substring(split + 2),
+    );
+  }
+
+  Future<void> setCreationModel(
+    CreationModelSlot slot,
+    ({String providerKey, String modelId})? value,
+  ) async {
+    if (value == null) {
+      _creationModelKeys.remove(slot);
+      await _preferences.remove(slot.settingKey);
+    } else {
+      final key = '${value.providerKey}::${value.modelId}';
+      _creationModelKeys[slot] = key;
+      await _preferences.setString(slot.settingKey, key);
+    }
+    notifyListeners();
+  }
+
+  Future<bool> _clearCreationSelections(
+    String providerKey, [
+    String? modelId,
+  ]) async {
+    var changed = false;
+    for (final slot in CreationModelSlot.values) {
+      final selected = creationModel(slot);
+      if (selected?.providerKey == providerKey &&
+          (modelId == null || selected?.modelId == modelId)) {
+        _creationModelKeys.remove(slot);
+        await _preferences.remove(slot.settingKey);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  static const defaultPromptEnhancePrompt =
+      'Rewrite this prompt for an image or video generation model. Preserve the '
+      'user\'s intent, language, and any quoted text. Add useful visual details '
+      'without changing the subject. If reference images are included, use them '
+      'to clarify the description. Return only the rewritten prompt.\n\n{prompt}';
+
+  String _promptEnhancePrompt = defaultPromptEnhancePrompt;
+  String get promptEnhancePrompt => _promptEnhancePrompt;
+
+  Future<void> setPromptEnhancePrompt(String value) async {
+    final prompt = value.trim();
+    _promptEnhancePrompt = prompt.isEmpty ? defaultPromptEnhancePrompt : prompt;
+    await _preferences.setString(_promptEnhancePromptKey, _promptEnhancePrompt);
+    notifyListeners();
+  }
+
   String? _titleModelProvider;
   String? _titleModelId;
   bool _titleGenerationEnabled = true;
@@ -5264,6 +5412,33 @@ Requirements:
     await prefs.setBool(_displayShowToolCardsKey, v);
   }
 
+  bool _inlineChatImages = false;
+  bool get inlineChatImages => _inlineChatImages;
+  Future<void> setInlineChatImages(bool value) async {
+    if (_inlineChatImages == value) return;
+    _inlineChatImages = value;
+    notifyListeners();
+    await _preferences.setBool(_inlineChatImagesKey, value);
+  }
+
+  bool _showChatImageInfo = true;
+  bool get showChatImageInfo => _showChatImageInfo;
+  Future<void> setShowChatImageInfo(bool value) async {
+    if (_showChatImageInfo == value) return;
+    _showChatImageInfo = value;
+    notifyListeners();
+    await _preferences.setBool(_showChatImageInfoKey, value);
+  }
+
+  bool _showChatImageLink = true;
+  bool get showChatImageLink => _showChatImageLink;
+  Future<void> setShowChatImageLink(bool value) async {
+    if (_showChatImageLink == value) return;
+    _showChatImageLink = value;
+    notifyListeners();
+    await _preferences.setBool(_showChatImageLinkKey, value);
+  }
+
   // Display: files produced by tools at the bottom of assistant messages.
   bool _showProducedFiles = true;
   bool get showProducedFiles => _showProducedFiles;
@@ -6171,7 +6346,87 @@ Requirements:
     await prefs.setBool(_displayShowAppUpdatesKey, v);
   }
 
-  // Display: keep sidebar open when selecting assistant (mobile)
+  // Sidebar layout and entry preferences.
+  SidebarLayout _mobileSidebarLayout = SidebarPreset.current.layout;
+  SidebarLayout get mobileSidebarLayout => _mobileSidebarLayout;
+  Future<void> setMobileSidebarLayout(SidebarLayout layout) async {
+    if (layout.style == _mobileSidebarLayout.style &&
+        listEquals(layout.order, _mobileSidebarLayout.order)) {
+      return;
+    }
+    _mobileSidebarLayout = layout;
+    notifyListeners();
+    await _preferences.setMany({
+      BusinessKeyRegistry.mobileSidebarStyleKey: layout.style.name,
+      BusinessKeyRegistry.mobileSidebarBlockOrderKey: [
+        for (final block in layout.order) block.id,
+      ],
+    });
+  }
+
+  Map<SidebarEntry, SidebarVisibility> _mobileSidebarEntries =
+      defaultMobileSidebarEntries;
+  Map<SidebarEntry, SidebarVisibility> get mobileSidebarEntries =>
+      _mobileSidebarEntries;
+  Future<void> setMobileSidebarEntries(
+    Map<SidebarEntry, SidebarVisibility> entries,
+  ) async {
+    _mobileSidebarEntries = Map.unmodifiable(entries);
+    notifyListeners();
+    await _preferences.setString(
+      BusinessKeyRegistry.mobileSidebarEntriesKey,
+      encodeSidebarEntries(entries),
+    );
+  }
+
+  Map<SidebarEntry, SidebarVisibility> _desktopRailEntries =
+      defaultDesktopSidebarEntries;
+  Map<SidebarEntry, SidebarVisibility> get desktopRailEntries =>
+      _desktopRailEntries;
+  Future<void> setDesktopRailEntries(
+    Map<SidebarEntry, SidebarVisibility> entries,
+  ) async {
+    _desktopRailEntries = Map.unmodifiable(entries);
+    notifyListeners();
+    await _preferences.setString(
+      BusinessKeyRegistry.desktopRailEntriesKey,
+      encodeSidebarEntries(entries),
+    );
+  }
+
+  bool _mediaEntrySeen = false;
+  bool get mediaEntrySeen => _mediaEntrySeen;
+  Future<void> markMediaEntrySeen() async {
+    if (_mediaEntrySeen) return;
+    _mediaEntrySeen = true;
+    notifyListeners();
+    await _preferences.setBool(BusinessKeyRegistry.mediaEntrySeenKey, true);
+  }
+
+  bool _showSidebarCustomizeInMore = true;
+  bool get showSidebarCustomizeInMore => _showSidebarCustomizeInMore;
+  Future<void> setShowSidebarCustomizeInMore(bool value) async {
+    if (value == _showSidebarCustomizeInMore) return;
+    _showSidebarCustomizeInMore = value;
+    notifyListeners();
+    await _preferences.setBool(
+      BusinessKeyRegistry.mobileSidebarShowCustomizeKey,
+      value,
+    );
+  }
+
+  bool _hideSidebarSingleAssistant = false;
+  bool get hideSidebarSingleAssistant => _hideSidebarSingleAssistant;
+  Future<void> setHideSidebarSingleAssistant(bool value) async {
+    if (value == _hideSidebarSingleAssistant) return;
+    _hideSidebarSingleAssistant = value;
+    notifyListeners();
+    await _preferences.setBool(
+      BusinessKeyRegistry.mobileSidebarHideSingleAssistantKey,
+      value,
+    );
+  }
+
   bool _keepSidebarOpenOnAssistantTap = false;
   bool get keepSidebarOpenOnAssistantTap => _keepSidebarOpenOnAssistantTap;
   Future<void> setKeepSidebarOpenOnAssistantTap(bool v) async {
@@ -6462,6 +6717,8 @@ Requirements:
     copy._currentModelProvider = _currentModelProvider;
     copy._currentModelId = _currentModelId;
     copy._perChatModelEnabled = _perChatModelEnabled;
+    copy._creationModelKeys.addAll(_creationModelKeys);
+    copy._promptEnhancePrompt = _promptEnhancePrompt;
     copy._titleModelProvider = _titleModelProvider;
     copy._titleModelId = _titleModelId;
     copy._titleGenerationEnabled = _titleGenerationEnabled;
@@ -6542,6 +6799,9 @@ Requirements:
     copy._showModelTimestamp = _showModelTimestamp;
     copy._showThinkingCards = _showThinkingCards;
     copy._showToolCards = _showToolCards;
+    copy._inlineChatImages = _inlineChatImages;
+    copy._showChatImageInfo = _showChatImageInfo;
+    copy._showChatImageLink = _showChatImageLink;
     copy._showProducedFiles = _showProducedFiles;
     copy._showReasoningLevelBadge = _showReasoningLevelBadge;
     copy._iosNativeSelectionMenuEnabled = _iosNativeSelectionMenuEnabled;
@@ -6569,6 +6829,12 @@ Requirements:
     copy._hapticsOnCardTap = _hapticsOnCardTap;
     copy._showAppUpdates = _showAppUpdates;
     copy._keepSidebarOpenOnAssistantTap = _keepSidebarOpenOnAssistantTap;
+    copy._mobileSidebarLayout = _mobileSidebarLayout;
+    copy._mobileSidebarEntries = _mobileSidebarEntries;
+    copy._desktopRailEntries = _desktopRailEntries;
+    copy._mediaEntrySeen = _mediaEntrySeen;
+    copy._showSidebarCustomizeInMore = _showSidebarCustomizeInMore;
+    copy._hideSidebarSingleAssistant = _hideSidebarSingleAssistant;
     copy._keepSidebarOpenOnTopicTap = _keepSidebarOpenOnTopicTap;
     copy._keepAssistantListExpandedOnSidebarClose =
         _keepAssistantListExpandedOnSidebarClose;
@@ -6859,6 +7125,21 @@ class ProviderConfig {
   final DateTime? oauthModelsSyncedAt;
   final String? oauthModelsClientVersion;
   bool get isOAuth => oauthProvider != null;
+  bool get isFal => id == 'fal' || usesOfficialFalQueue;
+
+  // Shared configurations receive a new provider ID when imported.
+  late final bool usesOfficialFalQueue =
+      !isOAuth &&
+      (providerType == null || providerType == ProviderKind.openai) &&
+      _isOfficialFalOrigin(baseUrl);
+
+  static bool _isOfficialFalOrigin(String baseUrl) {
+    final base = Uri.tryParse(baseUrl);
+    return base?.scheme == 'https' &&
+        base?.host == 'queue.fal.run' &&
+        base?.port == 443;
+  }
+
   final String baseUrl;
   final bool autoVersionDisabled;
   final ProviderKind?
@@ -7346,6 +7627,12 @@ class ProviderConfig {
 
   static String _defaultBase(String key) {
     final k = key.toLowerCase();
+    if (k == 'fal') return 'https://queue.fal.run';
+    if (k == 'modelscope') return 'https://api-inference.modelscope.cn/v1';
+    if (k == 'byteplus') {
+      return 'https://ark.ap-southeast.bytepluses.com/api/v3';
+    }
+    if (k == 'replicate') return 'https://api.replicate.com/v1';
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
     if (k.contains('kelivoin')) return 'https://api.psycheas.top/v1';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
@@ -7518,7 +7805,17 @@ class ProviderConfig {
           providerType: ProviderKind.openai,
           chatPath: '/chat/completions',
           useResponseApi: lowerKey == 'marucode',
-          models: const [],
+          models: switch (lowerKey) {
+            'fal' => falModels.keys.toList(),
+            'modelscope' => modelScopeCreationModels,
+            'replicate' => [
+              for (final model in ReplicateMediaModel.values) model.id,
+            ],
+            _ => const [],
+          },
+          autoVersionDisabled: lowerKey == 'fal',
+          avatarType: lowerKey == 'fal' ? 'icon' : null,
+          avatarValue: lowerKey == 'fal' ? 'assets/icons/fal-color.svg' : null,
           modelOverrides: const {},
           proxyEnabled: false,
           proxyHost: '',

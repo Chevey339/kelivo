@@ -163,6 +163,7 @@ final class RestorePreviousAssetsPlan {
     'skills',
     'workspaces',
     'sessions',
+    'generations',
   ];
 
   RestorePreviousAssetsPlan({

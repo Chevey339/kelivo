@@ -33,15 +33,19 @@ class CurrentModelIcon extends StatelessWidget {
     final cfg = context.select<SettingsProvider?, ProviderConfig?>(
       (settings) => settings?.providerConfigs[providerKey],
     );
-    final upstreamId = cfg == null
-        ? modelId!
-        : ModelSpecResolver.instance.spec(cfg, modelId!).upstreamId;
-    final modelAsset = BrandAssets.assetForName(upstreamId);
+    final spec = cfg == null
+        ? null
+        : ModelSpecResolver.instance.spec(cfg, modelId!);
+    final modelAsset = BrandAssets.assetForModel(
+      spec?.upstreamId ?? modelId!,
+      displayName: spec?.displayName,
+    );
     return ConfigurableAvatar(
       avatar:
           cfg?.modelAvatar(modelId!) ??
           (modelAsset == null ? cfg?.avatar : null),
       name: modelId!,
+      matchBrandByName: false,
       fallbackAsset:
           modelAsset ??
           BrandAssets.assetForName(cfg?.name ?? '') ??

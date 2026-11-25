@@ -15,11 +15,13 @@ class DesktopSelectOption<T> {
     required this.value,
     required this.label,
     this.subtitle,
+    this.icon,
   });
 
   final T value;
   final String label;
   final String? subtitle;
+  final IconData? icon;
 }
 
 bool _optionHasSubtitle<T>(DesktopSelectOption<T> option) {
@@ -127,7 +129,8 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
           (i) =>
               oldWidget.options[i].value == widget.options[i].value &&
               oldWidget.options[i].label == widget.options[i].label &&
-              oldWidget.options[i].subtitle == widget.options[i].subtitle,
+              oldWidget.options[i].subtitle == widget.options[i].subtitle &&
+              oldWidget.options[i].icon == widget.options[i].icon,
         ).every((same) => same);
     if (_open && (!widget.enabled || !sameOptions)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -174,7 +177,10 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
           textDirection: Directionality.of(context),
           textScaler: MediaQuery.textScalerOf(context),
         )..layout();
-        labelWidth = math.max(labelWidth, painter.width);
+        labelWidth = math.max(
+          labelWidth,
+          painter.width + (option.icon == null ? 0 : 24),
+        );
         painter.dispose();
       }
       // Include item padding and the checkmark, even for a narrow trigger.
@@ -528,6 +534,7 @@ class _DesktopSelectOverlayState<T> extends State<_DesktopSelectOverlay<T>>
                     onFocused: () => _active = i,
                     label: widget.options[i].label,
                     subtitle: widget.options[i].subtitle,
+                    icon: widget.options[i].icon,
                     selected: widget.selected == widget.options[i].value,
                     onTap: () => widget.onSelected(widget.options[i].value),
                   ),
@@ -554,10 +561,12 @@ class _DesktopSelectOptionTile extends StatefulWidget {
     required this.selected,
     required this.onTap,
     this.subtitle,
+    this.icon,
   });
 
   final String label;
   final String? subtitle;
+  final IconData? icon;
   final bool selected;
   final VoidCallback onTap;
   final FocusNode focusNode;
@@ -674,6 +683,10 @@ class _DesktopSelectOptionTileState extends State<_DesktopSelectOptionTile> {
                   ),
                   child: Row(
                     children: [
+                      if (widget.icon case final icon?) ...[
+                        Icon(icon, size: 16),
+                        const SizedBox(width: 8),
+                      ],
                       Expanded(child: _labelColumn(cs)),
                       const SizedBox(width: 8),
                       Icon(

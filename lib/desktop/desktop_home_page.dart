@@ -4,6 +4,12 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'desktop_nav_rail.dart';
+import 'desktop_media_creation_page.dart';
+import '../core/providers/settings_provider.dart';
+import 'package:provider/provider.dart';
+import 'desktop_tab.dart';
+import 'desktop_sidebar_customization.dart';
+import '../core/models/sidebar_layout.dart';
 import 'desktop_chat_page.dart';
 import 'window_title_bar.dart';
 import '../shared/responsive/screen_type_helper.dart';
@@ -28,11 +34,11 @@ import '../theme/surface_ladder.dart';
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({
     super.key,
-    this.initialTabIndex,
+    this.initialTab = DesktopTab.chat,
     this.initialProviderKey,
   });
 
-  final int? initialTabIndex; // 0=Chat,1=Translate,2=Storage,3=Settings
+  final DesktopTab initialTab;
   final String? initialProviderKey;
 
   @override
@@ -40,32 +46,33 @@ class DesktopHomePage extends StatefulWidget {
 }
 
 class _DesktopHomePageState extends State<DesktopHomePage> {
-  int _tabIndex = 0; // 0=Chat, 1=Translate, 2=Storage, 3=Settings
-  final _visitedTabs = <int>{};
+  late DesktopTab _activeTab;
+  final _visitedTabs = <DesktopTab>{};
+  bool _customizeSidebarOpen = false;
   bool _navigationOpen = false;
   bool _globalSearchActive = false;
   StreamSubscription<HotkeyAction>? _hotkeySub;
   StreamSubscription<ChatAction>? _chatActionSub;
+  StreamSubscription<CreationChatAction>? _creationActionSub;
+  OpenCreationArtwork? _artworkRequest;
   StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
   StreamSubscription<String>? _conversationOpenSub;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialTabIndex != null) {
-      _tabIndex = widget.initialTabIndex!.clamp(0, 3);
-    }
-    _visitedTabs.add(_tabIndex);
+    _activeTab = widget.initialTab;
+    _visitedTabs.add(_activeTab);
     _conversationOpenSub = NotificationService.conversationTaps.listen((_) {
       if (!mounted) return;
       setState(() {
-        _tabIndex = 0;
+        _activeTab = DesktopTab.chat;
         _globalSearchActive = false;
       });
       ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
     });
     // 初始进入时如果就是聊天页，则聚焦聊天输入框
-    if (_tabIndex == 0) {
+    if (_activeTab == DesktopTab.chat) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ChatActionBus.instance.fire(ChatAction.focusInput);
       });
@@ -76,9 +83,9 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
         case HotkeyAction.toggleSidePanel:
         case HotkeyAction.sidePanelNewWeb:
         case HotkeyAction.sidePanelFiles:
-          if (mounted && _tabIndex != 0) {
+          if (mounted && _activeTab != DesktopTab.chat) {
             setState(() {
-              _tabIndex = 0;
+              _activeTab = DesktopTab.chat;
               _globalSearchActive = false;
             });
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -94,11 +101,13 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
         case HotkeyAction.sidePanelFocus:
           break;
         case HotkeyAction.openSettings:
-          if (mounted) _selectTab(3, dismissNavigation: false);
+          if (mounted) {
+            _selectTab(DesktopTab.settings, dismissNavigation: false);
+          }
           break;
         case HotkeyAction.closeWindow:
           final panel = DesktopSidePanelController.instance;
-          if (_tabIndex == 0 &&
+          if (_activeTab == DesktopTab.chat &&
               mounted &&
               ModalRoute.of(context)?.isCurrent != false &&
               panel.handleCloseWindow()) {
@@ -122,13 +131,13 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
               await windowManager.show();
               await windowManager.focus();
               // 如果当前是聊天页，显示窗口时聚焦输入框
-              if (_tabIndex == 0) {
+              if (_activeTab == DesktopTab.chat) {
                 ChatActionBus.instance.fire(ChatAction.focusInput);
               }
             } else if (!focused) {
               await windowManager.focus();
               // 如果当前是聊天页，聚焦窗口时也聚焦输入框
-              if (_tabIndex == 0) {
+              if (_activeTab == DesktopTab.chat) {
                 ChatActionBus.instance.fire(ChatAction.focusInput);
               }
             } else {
@@ -137,22 +146,22 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
           } catch (_) {}
           break;
         case HotkeyAction.newTopic:
-          if (_tabIndex == 0) {
+          if (_activeTab == DesktopTab.chat) {
             ChatActionBus.instance.fire(ChatAction.newTopic);
           }
           break;
         case HotkeyAction.switchModel:
-          if (_tabIndex == 0) {
+          if (_activeTab == DesktopTab.chat) {
             ChatActionBus.instance.fire(ChatAction.switchModel);
           }
           break;
         case HotkeyAction.toggleLeftPanelAssistants:
-          if (_tabIndex == 0) {
+          if (_activeTab == DesktopTab.chat) {
             ChatActionBus.instance.fire(ChatAction.toggleLeftPanelAssistants);
           }
           break;
         case HotkeyAction.toggleLeftPanelTopics:
-          if (_tabIndex == 0) {
+          if (_activeTab == DesktopTab.chat) {
             ChatActionBus.instance.fire(ChatAction.toggleLeftPanelTopics);
           }
           break;
@@ -164,7 +173,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       switch (action) {
         case ChatAction.enterGlobalSearch:
           setState(() {
-            _tabIndex = 0;
+            _activeTab = DesktopTab.chat;
             _globalSearchActive = true;
           });
           break;
@@ -178,27 +187,102 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       }
     });
     _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((_) {
-      if (mounted) _selectTab(3, dismissNavigation: false);
+      if (mounted) _selectTab(DesktopTab.settings, dismissNavigation: false);
+    });
+    _creationActionSub = ChatActionBus.instance.creationStream.listen((action) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+      switch (action) {
+        case OpenCreationArtwork():
+          _artworkRequest = action;
+          _selectTab(DesktopTab.media);
+        case PrefillChatImage() || OpenCreationConversation():
+          _selectTab(DesktopTab.chat);
+      }
     });
   }
 
   void _selectTab(
-    int index, {
+    DesktopTab tab, {
     bool search = false,
     bool dismissNavigation = true,
   }) {
     setState(() {
-      _tabIndex = index;
+      _activeTab = tab;
       _globalSearchActive = search;
       if (dismissNavigation) _navigationOpen = false;
-      _visitedTabs.add(index);
+      _visitedTabs.add(tab);
     });
     ChatActionBus.instance.fire(
       search ? ChatAction.enterGlobalSearch : ChatAction.exitGlobalSearch,
     );
-    if (index == 0 && !search) {
+    if (tab == DesktopTab.chat && !search) {
       ChatActionBus.instance.fire(ChatAction.focusInput);
     }
+  }
+
+  void _selectSidebarEntry(SidebarEntry entry) {
+    switch (entry) {
+      case SidebarEntry.search:
+        _selectTab(DesktopTab.chat, search: true);
+      case SidebarEntry.media:
+        unawaited(context.read<SettingsProvider>().markMediaEntrySeen());
+        _selectTab(DesktopTab.media);
+      case SidebarEntry.translate:
+        _selectTab(DesktopTab.translate);
+      case SidebarEntry.storage:
+        _selectTab(DesktopTab.storage);
+      case SidebarEntry.history:
+        _selectTab(DesktopTab.chat);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) ChatActionBus.instance.fire(ChatAction.openHistory);
+        });
+    }
+  }
+
+  Widget _buildTab(DesktopTab tab) {
+    if (tab != DesktopTab.chat && !_visitedTabs.contains(tab)) {
+      return const SizedBox.shrink();
+    }
+    return switch (tab) {
+      DesktopTab.chat => TickerMode(
+        enabled: _activeTab == tab,
+        child: const DesktopChatPage(),
+      ),
+      DesktopTab.media => TickerMode(
+        enabled: _activeTab == tab,
+        child: ColoredBox(
+          color: Theme.of(context).colorScheme.surface,
+          child: Column(
+            children: [
+              if (defaultTargetPlatform == TargetPlatform.macOS &&
+                  !ResponsiveHelper.isMobile(context))
+                const SizedBox(
+                  height: 38,
+                  child: DragToMoveArea(child: SizedBox.expand()),
+                ),
+              Expanded(
+                child: DesktopMediaCreationPage(
+                  artworkRequest: _artworkRequest,
+                  onArtworkOpened: () => setState(() => _artworkRequest = null),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      DesktopTab.translate => const DesktopTranslatePage(
+        key: ValueKey('translate_page'),
+      ),
+      DesktopTab.storage => StorageSpacePage(
+        key: const ValueKey('storage_space_page'),
+        embedded: true,
+        active: _activeTab == tab,
+      ),
+      DesktopTab.settings => DesktopSettingsPage(
+        key: const ValueKey('settings_page'),
+        initialProviderKey: widget.initialProviderKey,
+      ),
+    };
   }
 
   @override
@@ -220,113 +304,107 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
         ).surfaceFill,
         child: const ChatAssistantBackground(desktop: true),
       ),
-      child: Column(
-        children: [
-          if (isWindows)
-            WindowTitleBar(
-              leftChildren: [if (compact) menu, const _TitleBarLeading()],
-            )
-          else
-            SizedBox(
-              height: compact ? 40 : 0,
-              child: Offstage(
-                offstage: !compact,
-                child: Stack(
-                  children: [
-                    const Positioned.fill(
-                      child: DragToMoveArea(child: SizedBox.expand()),
-                    ),
-                    Row(
-                      children: [
-                        if (isMac) const SizedBox(width: 72),
-                        menu,
-                        const _TitleBarLeading(),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  key: const ValueKey('desktop-pages'),
-                  child: Row(
+      child: NotificationListener<DesktopCustomizeSidebarNotification>(
+        onNotification: (_) {
+          setState(() {
+            _customizeSidebarOpen = true;
+            _navigationOpen = false;
+          });
+          return true;
+        },
+        child: Column(
+          children: [
+            if (isWindows)
+              WindowTitleBar(
+                leftChildren: [if (compact) menu, const _TitleBarLeading()],
+              )
+            else
+              SizedBox(
+                height: compact ? 40 : 0,
+                child: Offstage(
+                  offstage: !compact,
+                  child: Stack(
                     children: [
-                      SizedBox(width: compact ? 0 : DesktopNavRail.width),
-                      Expanded(
-                        // Keep the same subtree across resizing and tab changes.
-                        child: ClipRect(
-                          key: const ValueKey('desktopWorkspaceFrame'),
-                          child: IndexedStack(
-                            index: _tabIndex,
-                            children: [
-                              TickerMode(
-                                enabled: _tabIndex == 0,
-                                child: const DesktopChatPage(),
-                              ),
-                              _visitedTabs.contains(1)
-                                  ? const DesktopTranslatePage(
-                                      key: ValueKey('translate_page'),
-                                    )
-                                  : const SizedBox.shrink(),
-                              _visitedTabs.contains(2)
-                                  ? StorageSpacePage(
-                                      key: const ValueKey('storage_space_page'),
-                                      embedded: true,
-                                      active: _tabIndex == 2,
-                                    )
-                                  : const SizedBox.shrink(),
-                              _visitedTabs.contains(3)
-                                  ? DesktopSettingsPage(
-                                      key: const ValueKey('settings_page'),
-                                      initialProviderKey:
-                                          widget.initialProviderKey,
-                                    )
-                                  : const SizedBox.shrink(),
-                            ],
-                          ),
-                        ),
+                      const Positioned.fill(
+                        child: DragToMoveArea(child: SizedBox.expand()),
+                      ),
+                      Row(
+                        children: [
+                          if (isMac) const SizedBox(width: 72),
+                          menu,
+                          const _TitleBarLeading(),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                if (compact && _navigationOpen)
+              ),
+            Expanded(
+              child: Stack(
+                children: [
                   Positioned.fill(
-                    child: ModalBarrier(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.scrim.withValues(alpha: .16),
-                      onDismiss: () => setState(() => _navigationOpen = false),
+                    key: const ValueKey('desktop-pages'),
+                    child: Row(
+                      children: [
+                        SizedBox(width: compact ? 0 : DesktopNavRail.width),
+                        Expanded(
+                          // Keep the same subtree across resizing and tab changes.
+                          child: ClipRect(
+                            key: const ValueKey('desktopWorkspaceFrame'),
+                            child: IndexedStack(
+                              index: _activeTab.index,
+                              children: [
+                                for (final tab in DesktopTab.values)
+                                  _buildTab(tab),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                Positioned(
-                  key: const ValueKey('desktop-navigation'),
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: DesktopNavRail.width,
-                  child: ExcludeFocus(
-                    excluding: compact && !_navigationOpen,
-                    child: Offstage(
-                      offstage: compact && !_navigationOpen,
-                      child: DesktopNavRail(
-                        activeIndex: _tabIndex,
-                        globalSearchActive: _globalSearchActive,
-                        onTapChat: () => _selectTab(0),
-                        onTapGlobalSearch: () => _selectTab(0, search: true),
-                        onTapTranslate: () => _selectTab(1),
-                        onTapStorage: () => _selectTab(2),
-                        onTapSettings: () => _selectTab(3),
+                  if (compact && _navigationOpen)
+                    Positioned.fill(
+                      child: ModalBarrier(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.scrim.withValues(alpha: .16),
+                        onDismiss: () =>
+                            setState(() => _navigationOpen = false),
+                      ),
+                    ),
+                  Positioned(
+                    key: const ValueKey('desktop-navigation'),
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: DesktopNavRail.width,
+                    child: ExcludeFocus(
+                      excluding: compact && !_navigationOpen,
+                      child: Offstage(
+                        offstage: compact && !_navigationOpen,
+                        child: DesktopNavRail(
+                          activeTab: _activeTab,
+                          globalSearchActive: _globalSearchActive,
+                          onTapChat: () => _selectTab(DesktopTab.chat),
+                          onTapEntry: _selectSidebarEntry,
+                          onTapSettings: () => _selectTab(DesktopTab.settings),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  Positioned.fill(
+                    child: DesktopSidebarCustomization(
+                      open: _customizeSidebarOpen,
+                      onClose: () =>
+                          setState(() => _customizeSidebarOpen = false),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -334,6 +412,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   @override
   void dispose() {
     unawaited(_conversationOpenSub?.cancel());
+    unawaited(_creationActionSub?.cancel());
     try {
       _hotkeySub?.cancel();
     } catch (_) {}

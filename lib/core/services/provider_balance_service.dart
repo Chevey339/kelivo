@@ -108,6 +108,7 @@ class ProviderBalanceService {
       );
 
   static List<Object?> _requestSettings(ProviderConfig config) => [
+    config.isFal,
     config.baseUrl,
     config.balanceApiPath,
     config.balanceResultPath,
@@ -124,8 +125,20 @@ class ProviderBalanceService {
     config.proxyPassword,
   ];
 
-  static Uri balanceUri(ProviderConfig config) =>
-      _balanceUri(config.baseUrl, (config.balanceApiPath ?? '/credits').trim());
+  static Uri balanceUri(ProviderConfig config) {
+    if (config.isFal) {
+      // The official account API lives on a different origin than inference.
+      // Custom queue deployments keep their credentials on their own origin.
+      return _balanceUri(
+        config.usesOfficialFalQueue ? 'https://api.fal.ai' : config.baseUrl,
+        '/v1/account/billing?expand=credits',
+      );
+    }
+    return _balanceUri(
+      config.baseUrl,
+      (config.balanceApiPath ?? '/credits').trim(),
+    );
+  }
 
   static Future<String> fetchBalance(
     ProviderConfig config, {
@@ -135,9 +148,8 @@ class ProviderBalanceService {
       throw const ProviderBalanceException('Balance query is disabled');
     }
 
-    final resultPath = (config.balanceResultPath ?? 'data.total_usage').trim();
     final uri = balanceUri(config);
-    final method = config.balanceMethod;
+    final method = config.isFal ? 'GET' : config.balanceMethod;
     if (method != 'GET' && method != 'POST') {
       throw ProviderBalanceException(
         'Unsupported balance HTTP method: $method',
@@ -154,7 +166,8 @@ class ProviderBalanceService {
       final request = http.Request(method, uri);
       final hasBody = method == 'POST' && config.balanceBody.trim().isNotEmpty;
       request.headers.addAll({
-        if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
+        if (apiKey.isNotEmpty)
+          'Authorization': config.isFal ? 'Key $apiKey' : 'Bearer $apiKey',
         ...providerDefaultHeaders(config),
         if (hasBody) 'Content-Type': 'application/json',
       });
@@ -185,7 +198,21 @@ class ProviderBalanceService {
         );
       }
       final decoded = jsonDecode(response.body);
-      return ProviderBalanceValueParser.format(decoded, resultPath);
+      if (config.isFal) {
+        if (decoded case {
+          'credits': {
+            'current_balance': final num amount,
+            'currency': final String currency,
+          },
+        } when currency.trim().isNotEmpty) {
+          return '${amount.toStringAsFixed(2)} ${currency.trim()}';
+        }
+        throw const ProviderBalanceException('Invalid fal credit balance');
+      }
+      return ProviderBalanceValueParser.format(
+        decoded,
+        config.balanceResultPath ?? 'data.total_usage',
+      );
     } on ProviderBalanceException {
       rethrow;
     } on FormatException catch (e) {

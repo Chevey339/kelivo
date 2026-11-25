@@ -1631,7 +1631,6 @@ class GenerationContext {
     this.contextUsageRevision,
     this.imageContext,
     required this.userImagePaths,
-    required this.allowImagesApiRouting,
     required this.providerKey,
     required this.modelId,
     required this.assistant,
@@ -1660,7 +1659,6 @@ class GenerationContext {
   final int? contextUsageRevision;
   final RequestImageContext? imageContext;
   final List<String> userImagePaths;
-  final bool allowImagesApiRouting;
   final String providerKey;
   final String modelId;
   final dynamic assistant;

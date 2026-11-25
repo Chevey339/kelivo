@@ -32,7 +32,6 @@ void main() {
             assistantMessage: message,
             apiMessages: const [],
             userImagePaths: const [],
-            allowImagesApiRouting: false,
             providerKey: 'test',
             modelId: 'test',
             assistant: null,

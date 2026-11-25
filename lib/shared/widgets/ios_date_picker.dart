@@ -17,6 +17,7 @@ Future<DateTime?> showIosDatePicker(
   required DateTime firstDate,
   required DateTime lastDate,
   required DateTime initialDate,
+  String? title,
 }) {
   final useDialog = switch (defaultTargetPlatform) {
     TargetPlatform.macOS ||
@@ -35,6 +36,7 @@ Future<DateTime?> showIosDatePicker(
           firstDate: firstDate,
           lastDate: lastDate,
           initialDate: normalizedInitial,
+          title: title,
           desktop: true,
         ),
       ),
@@ -49,6 +51,7 @@ Future<DateTime?> showIosDatePicker(
       firstDate: firstDate,
       lastDate: lastDate,
       initialDate: normalizedInitial,
+      title: title,
     ),
   );
 }
@@ -58,9 +61,11 @@ class _IosDatePickerPanel extends StatefulWidget {
     required this.firstDate,
     required this.lastDate,
     required this.initialDate,
+    this.title,
     this.desktop = false,
   });
 
+  final String? title;
   final DateTime firstDate;
   final DateTime lastDate;
   final DateTime initialDate;
@@ -101,6 +106,22 @@ class _IosDatePickerPanelState extends State<_IosDatePickerPanel> {
         key: const ValueKey('ios-date-picker-calendar'),
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (widget.title case final title?)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+
           Row(
             children: [
               IosIconButton(

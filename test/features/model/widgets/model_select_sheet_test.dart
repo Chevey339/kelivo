@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/models/provider_oauth.dart';
+import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/features/model/widgets/model_select_sheet.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -95,6 +96,7 @@ Future<void> _pumpModelSelector(
   String? limitProviderKey,
   String? initialProviderKey,
   String? initialModelId,
+  CreationModelSlot? creationSlot,
   TextScaler textScaler = TextScaler.noScaling,
   ValueChanged<ModelSelection?>? onSelected,
 }) async {
@@ -124,6 +126,7 @@ Future<void> _pumpModelSelector(
                   final selection = await showModelSelector(
                     context,
                     limitProviderKey: limitProviderKey,
+                    creationSlot: creationSlot,
                     initialProviderKey: initialProviderKey,
                     initialModelId: initialModelId,
                   );
@@ -196,6 +199,53 @@ void main() {
 
   for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
     testWidgets(
+      'image model picker keeps favorites inside its model type on $platform',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        try {
+          tester.view.physicalSize = platform == TargetPlatform.iOS
+              ? const Size(390, 844)
+              : const Size(1100, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final settings = await _settingsWithOnlyTestProviders(tester);
+          addTearDown(settings.dispose);
+          await settings.setProviderConfig(
+            'provider-0',
+            _providerConfig('provider-0', 'Provider', [
+              'gpt-5',
+              'gpt-image-2',
+            ]).copyWith(
+              baseUrl: 'https://example.test/v1',
+              modelOverrides: {
+                'gpt-5': {'name': 'Pinned chat model'},
+                'gpt-image-2': {'name': 'Pinned image model'},
+              },
+            ),
+          );
+          await settings.togglePinModel('provider-0', 'gpt-5');
+          await settings.togglePinModel('provider-0', 'gpt-image-2');
+          ModelSelection? selection;
+          await _pumpModelSelector(
+            tester,
+            settings: settings,
+            creationSlot: CreationModelSlot.image,
+            onSelected: (value) => selection = value,
+          );
+          expect(find.text('Pinned chat model'), findsNothing);
+          expect(find.text('Pinned image model'), findsOneWidget);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Pinned image model'));
+          await tester.pumpAndSettle();
+          expect(selection?.modelId, 'gpt-image-2');
+          await tester.pumpWidget(const SizedBox());
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+    testWidgets(
       'model picker uses custom icons for logical aliases on $platform',
       (tester) async {
         debugDefaultTargetPlatformOverride = platform;
@@ -266,12 +316,25 @@ void main() {
               apiKey: '',
               baseUrl: OAuthProvider.chatgpt.baseUrl,
               oauthProvider: OAuthProvider.chatgpt,
-              models: ['enabled-model', 'disabled-model'],
+              models: [
+                'enabled-model',
+                'disabled-model',
+                'gpt-image-2',
+                'sora-2',
+                'gemini-2.5-flash-image',
+              ],
               disabledModels: {'disabled-model'},
+              modelOverrides: {
+                'gpt-image-2': {'name': 'Standalone image'},
+                'sora-2': {'name': 'Standalone video'},
+                'gemini-2.5-flash-image': {'name': 'Gemini chat image'},
+              },
             ),
           );
           // Old/imported favorites must not bypass the disabled-model filter.
           await settings.togglePinModel('oauth', 'disabled-model');
+          await settings.togglePinModel('oauth', 'gpt-image-2');
+          await settings.togglePinModel('oauth', 'sora-2');
           await settings.setCurrentModel('oauth', 'enabled-model');
           await _pumpModelSelector(
             tester,
@@ -280,6 +343,9 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(find.text('enabled-model'), findsOneWidget);
+          expect(find.text('Gemini chat image'), findsOneWidget);
+          expect(find.text('Standalone image'), findsNothing);
+          expect(find.text('Standalone video'), findsNothing);
           expect(
             find.textContaining('disabled-model', findRichText: true),
             findsNothing,

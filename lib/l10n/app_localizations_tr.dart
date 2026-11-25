@@ -3519,12 +3519,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get chatInputBarImageProcessing => 'Görsel işleniyor';
 
   @override
-  String get chatInputBarImageMode => 'Görsel modu';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => 'Görsel modunu kapat';
-
-  @override
   String get chatInputBarQueuedPending => 'Gönderilmek üzere sırada';
 
   @override
@@ -3822,7 +3816,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      'Sohbet başlıklarını varsayılan olarak geçerli sohbet modelini kullanarak veya seçili bir modelle özetler.';
+      'Sohbet başlıklarını varsayılan olarak geçerli sohbet modeliyle veya seçilen bir modelle özetler. Oluşturma, konuları otomatik adlandırmak için de bunu kullanır.';
 
   @override
   String get titleModelThinkingTitle => 'Akıl Yürütmeyi Etkinleştir';
@@ -4604,6 +4598,14 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get providerBalanceInterval => 'Zamanlı yenileme';
+
+  @override
+  String get providerBalanceFalPermissionHint =>
+      'Bakiye sorguları için billing:usage:read iznine sahip bir fal anahtarı gerekir. Ayrı bir faturalandırma anahtarı kullanmak için buraya Authorization başlığı ekleyin; değeri Key, bir boşluk ve anahtar olsun.';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration =>
+      'Oluşturma sonrası yenile';
 
   @override
   String get providerBalanceRefreshOnReply => 'Yanıtlardan sonra yenile';
@@ -17840,4 +17842,1146 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get worldBookGroupClearSelection => 'Grup seçimini temizle';
+
+  @override
+  String get sidebarSettingsTitle => 'Kenar çubuğu';
+
+  @override
+  String get sidebarCustomize => 'Kenar çubuğunu özelleştir';
+
+  @override
+  String get sidebarLayoutTitle => 'Düzen';
+
+  @override
+  String get sidebarPresetCurrent => 'Mevcut düzen';
+
+  @override
+  String get sidebarPresetNavigation => 'Gezinme listesi';
+
+  @override
+  String get sidebarPresetAssistantBottom => 'Asistan altta';
+
+  @override
+  String get sidebarPresetAllTop => 'Hepsi üstte';
+
+  @override
+  String get sidebarPresetCustom => 'Özel düzen';
+
+  @override
+  String get sidebarReorderTitle => 'Blokları düzenle';
+
+  @override
+  String get sidebarReorderHint =>
+      'Sohbet listesinin üstüne veya altına sürükleyin';
+
+  @override
+  String get sidebarReorderHandle => 'Yeniden sırala';
+
+  @override
+  String get sidebarBlockUser => 'Kullanıcı çubuğu';
+
+  @override
+  String get sidebarBlockSearch => 'Arama çubuğu';
+
+  @override
+  String get sidebarBlockEntries => 'Girişler';
+
+  @override
+  String get sidebarBlockAssistant => 'Asistan';
+
+  @override
+  String get sidebarBlockConversations => 'Sohbet listesi';
+
+  @override
+  String get sidebarBlockTop => 'Üst';
+
+  @override
+  String get sidebarBlockBottom => 'Alt';
+
+  @override
+  String get sidebarDisplayAs => 'Görünüm';
+
+  @override
+  String get sidebarStyleList => 'Liste';
+
+  @override
+  String get sidebarStyleIcons => 'Simgeler';
+
+  @override
+  String get sidebarVisibilityShow => 'Göster';
+
+  @override
+  String get sidebarMore => 'Daha fazla';
+
+  @override
+  String get sidebarVisibilityHidden => 'Gizle';
+
+  @override
+  String get sidebarLocationEntries => 'Giriş listesi';
+
+  @override
+  String get sidebarLocationSearch => 'Aramanın yanında';
+
+  @override
+  String get sidebarLocationUserBar => 'Kullanıcı çubuğu simgeleri';
+
+  @override
+  String get sidebarLocationMore => 'Daha fazla içinde';
+
+  @override
+  String get sidebarLocationHidden => 'Kenar çubuğundan gizlendi';
+
+  @override
+  String get sidebarLocationRail => 'Sol simge çubuğu';
+
+  @override
+  String get sidebarMenuShow => 'Kenar çubuğunda göster';
+
+  @override
+  String get sidebarMenuMore => 'Daha fazla bölümüne taşı';
+
+  @override
+  String get sidebarMenuHide => 'Kenar çubuğundan gizle';
+
+  @override
+  String get sidebarHideCustomize => 'Daha fazla bölümünden gizle';
+
+  @override
+  String get sidebarShowCustomizeInMore =>
+      'Daha fazla bölümünde Kenar çubuğunu özelleştir\'i göster';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint =>
+      'Buradan her zaman değiştirebilirsiniz';
+
+  @override
+  String get sidebarHideSingleAssistant =>
+      'Yalnızca bir asistan varsa asistan satırını gizle';
+
+  @override
+  String get sidebarHideSingleAssistantHint =>
+      'Asistan satırı varsayılan olarak gösterilir';
+
+  @override
+  String get sidebarRestoreDefaults => 'Varsayılanlara geri dön';
+
+  @override
+  String get sidebarOpenSettings => 'Kenar çubuğu ayarlarını aç…';
+
+  @override
+  String get creationTitle => 'Oluştur';
+
+  @override
+  String get creationTopics => 'Konular';
+
+  @override
+  String get creationNewTopic => 'Yeni konu';
+
+  @override
+  String get creationNameAfterSending => 'İlk istemden sonra adlandırılır';
+
+  @override
+  String get creationPromptTitle =>
+      'İstemcinizin başlangıcını başlık olarak kullanır';
+
+  @override
+  String get creationSearchTopics => 'Konularda ve istemlerde ara';
+
+  @override
+  String get creationTopicsEmpty =>
+      'İlk isteminizden sonra konular burada görünür';
+
+  @override
+  String get creationNaming => 'Konu adlandırılıyor…';
+
+  @override
+  String get creationRenameTopic => 'Konuyu yeniden adlandır';
+
+  @override
+  String get creationDeleteTopic => 'Konuyu sil';
+
+  @override
+  String get creationDeleteTopicBody =>
+      'Bu konu ve tüm oluşturulanlar silinsin mi?';
+
+  @override
+  String get creationImage => 'Görsel';
+
+  @override
+  String get creationVideo => 'Video';
+
+  @override
+  String get creationImagePrompt => 'Oluşturulacak görseli tanımlayın';
+
+  @override
+  String get creationVideoPrompt => 'Oluşturulacak videoyu tanımlayın';
+
+  @override
+  String get creationNewImagePrompt =>
+      'Yeni konu başlatmak için bir görsel tanımlayın';
+
+  @override
+  String get creationNewVideoPrompt =>
+      'Yeni konu başlatmak için bir video tanımlayın';
+
+  @override
+  String get creationSelectModel => 'Model seç';
+
+  @override
+  String get creationSearchModels => 'Model veya sağlayıcı ara';
+
+  @override
+  String get creationNoModelTitle => 'Henüz görsel veya video modeli yok';
+
+  @override
+  String get creationNoModelBody =>
+      'Oluşturma, Sağlayıcılar bölümünde yapılandırılmış görsel ve video modellerini kullanır. Bir abonelikle oturum açın veya fal ya da başka bir sağlayıcı için API anahtarı girin.';
+
+  @override
+  String get creationEmptyTitle => 'Bir fikirle başlayın';
+
+  @override
+  String get creationEmptyBody =>
+      'Ne oluşturmak istediğinizi açıklayın. İlk istemi göndermek, sonuç ve sonraki düzenlemeler için bir konu başlatır.';
+
+  @override
+  String get creationAddReference => 'Referans görsel ekle';
+
+  @override
+  String get creationReferenceTooLarge =>
+      'Referans görsellerin toplam boyutu 20 MB veya daha az olmalıdır.';
+
+  @override
+  String get creationApiProtocol => 'Oluşturma API protokolü';
+
+  @override
+  String get creationApiProtocolHelp =>
+      'Otomatik, sağlayıcının API\'sini kullanır. Özel bir ağ geçidi için belgelerinde listelenen protokolü seçin.';
+
+  @override
+  String get creationAspectRatio => 'En-boy oranı';
+
+  @override
+  String get creationCountLabel => 'Görsel sayısı';
+
+  @override
+  String get creationDuration => 'Süre';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds saniye',
+      one: '$seconds saniye',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationResolution => 'Çözünürlük';
+
+  @override
+  String get creationFirstLastFrame => 'İlk ve son kareler';
+
+  @override
+  String get creationFirstFrame => 'İlk kare';
+
+  @override
+  String get creationLastFrame => 'Son kare';
+
+  @override
+  String get creationBothFramesRequired => 'Hem ilk hem de son kareyi seçin.';
+
+  @override
+  String get creationFirstFrameRequired =>
+      'Bir ilk kare seçin. Son kare isteğe bağlıdır.';
+
+  @override
+  String get creationFirstFrameOnly => 'Bu model bir ilk kareyi destekler.';
+
+  @override
+  String get creationImageModels => 'Görsel modelleri';
+
+  @override
+  String get creationVideoModels => 'Video modelleri';
+
+  @override
+  String get creationPlayVideo => 'Videoyu oynat';
+
+  @override
+  String get creationPauseVideo => 'Videoyu duraklat';
+
+  @override
+  String get creationMuteVideo => 'Sessize al';
+
+  @override
+  String get creationUnmuteVideo => 'Sesi aç';
+
+  @override
+  String get creationOpenVideo => 'Sistem oynatıcısında aç';
+
+  @override
+  String get creationFullScreen => 'Tam ekran';
+
+  @override
+  String get creationExitFullScreen => 'Tam ekrandan çık';
+
+  @override
+  String get creationSaveVideo => 'Videoyu kaydet';
+
+  @override
+  String get creationParameters => 'Oluşturma seçenekleri';
+
+  @override
+  String get creationAuto => 'Otomatik';
+
+  @override
+  String get creationGenerate => 'Oluştur';
+
+  @override
+  String get creationWaitingImage => 'Görsel oluşturuluyor';
+
+  @override
+  String get creationWaitingVideo => 'Video hazırlanıyor';
+
+  @override
+  String get creationDownloading => 'İndiriliyor';
+
+  @override
+  String get creationFailed => 'Oluşturma başarısız';
+
+  @override
+  String get creationInterrupted => 'Uygulama kapanırken oluşturma kesildi';
+
+  @override
+  String get creationCancelled => 'İptal edildi';
+
+  @override
+  String get creationPartial => 'Bazı sonuçlar kaydedilemedi';
+
+  @override
+  String get creationRetry => 'Tekrar dene';
+
+  @override
+  String get creationCopyPrompt => 'İstemi kopyala';
+
+  @override
+  String get creationSaveImage => 'Görseli kaydet';
+
+  @override
+  String get creationCopyImage => 'Görseli kopyala';
+
+  @override
+  String get creationShare => 'Paylaş';
+
+  @override
+  String get creationDeleteItem => 'Oluşturmayı sil';
+
+  @override
+  String get creationDeleteItemBody => 'Bu oluşturma silinsin mi?';
+
+  @override
+  String get creationActionFailed => 'İşlem tamamlanamadı';
+
+  @override
+  String get creationOptionSaved => 'Kaydedildi';
+
+  @override
+  String get creationOptionCopied => 'Kopyalandı';
+
+  @override
+  String get backupScopeCreations => 'Oluşturmalar';
+
+  @override
+  String creationQueuePosition(int count) {
+    return 'Sırada · önünde $count görev var';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count görsel',
+      one: '1 görsel',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count üretim',
+      one: '1 üretim',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count oluşturma',
+      one: '1 oluşturma',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return 'Konular $count';
+  }
+
+  @override
+  String get creationMoreOptions => 'Diğer seçenekler';
+
+  @override
+  String get creationImageSize => 'Görsel boyutu';
+
+  @override
+  String get creationQuality => 'Kalite';
+
+  @override
+  String get creationLowQuality => 'Düşük';
+
+  @override
+  String get creationMediumQuality => 'Orta';
+
+  @override
+  String get creationHighQuality => 'Yüksek';
+
+  @override
+  String get creationNegativePrompt => 'Negatif istem';
+
+  @override
+  String get creationSeed => 'Tohum';
+
+  @override
+  String get creationTransparentBackground => 'Şeffaf arka plan';
+
+  @override
+  String get creationOutputFormat => 'Çıktı formatı';
+
+  @override
+  String get creationExtraJson => 'Ek parametreler (JSON)';
+
+  @override
+  String get creationExtraJsonHint =>
+      'Bu değerler her istekle birlikte gönderilir. Diğer seçenekler bölümünde geçici olarak değiştirebilirsiniz.';
+
+  @override
+  String get creationModelKnown =>
+      'Varsayılanlar Kelivo’nun yerleşik model verilerinden gelir. Değişiklikler yalnızca bu modeli etkiler.';
+
+  @override
+  String get creationModelUnknown =>
+      'Kelivo yaygın parametreleri doldurdu. Sağlayıcınızın belgelerine göre bunları düzenleyebilirsiniz.';
+
+  @override
+  String get creationMaxPerRequest => 'İstek başına en fazla';
+
+  @override
+  String get creationMaxPerRequestHelp =>
+      'Daha büyük gruplar birden çok isteğe bölünür ve tek bir grupta tutulur.';
+
+  @override
+  String get creationReferenceLimit => 'Referans görseller';
+
+  @override
+  String get creationReferenceLimitHelp =>
+      'Bu model için referans görselleri ve düzenlemeyi gizlemek üzere sıfıra ayarlayın.';
+
+  @override
+  String get creationRatioHelp =>
+      'Oluştur bölümünde kullanılabilir oranları seçin. Otomatik, modelin karar vermesini sağlar.';
+
+  @override
+  String get creationMediaOther => 'Diğer seçenekler';
+
+  @override
+  String get creationEnableOptionHelp =>
+      'Bu kontrolü Diğer seçenekler bölümünde göster.';
+
+  @override
+  String get creationImageTypeHelp =>
+      'Görsel modelleri Oluştur bölümünde ve Görsel Oluşturma aracında görünür.';
+
+  @override
+  String get creationVideoTypeHelp =>
+      'Video modelleri Oluştur bölümünde görünür.';
+
+  @override
+  String get creationFalKeyHint =>
+      'fal.ai › Dashboard › API Keys bölümünde bir anahtar oluşturun';
+
+  @override
+  String get creationFalCatalogHint =>
+      'fal’ın canlı kataloğuna göz atmak için Getir’i kullanın veya uç nokta kimliğiyle model eklemek için + simgesini kullanın.';
+
+  @override
+  String falUnsupportedInput(String field) {
+    return 'Bu model, Creation\'ın sağlayamadığı $field alanını gerektiriyor.';
+  }
+
+  @override
+  String get falUnsupportedOutput =>
+      'Bu model, Creation\'ın kaydedebileceği bir görsel veya video döndürmüyor.';
+
+  @override
+  String get falCheckingModel => 'Model kontrol ediliyor…';
+
+  @override
+  String get falInvalidEndpointId =>
+      'Bir fal uç noktası ID\'si girin, örneğin fal-ai/flux/dev.';
+
+  @override
+  String get creationOptionalTitle => 'Bu çalışmayı adlandırın (isteğe bağlı)';
+
+  @override
+  String get falCatalogMore => 'Daha fazla model yükle';
+
+  @override
+  String get falCatalogNoMatch => 'Eşleşen görsel veya video modeli yok';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return 'fal model verileri yüklenemedi ($error)';
+  }
+
+  @override
+  String get creationFalModelId => 'model ID';
+
+  @override
+  String get creationSelectPlatformImage => 'Görsel seç';
+
+  @override
+  String get creationPlatformOptions => 'Modele özgü seçenekler';
+
+  @override
+  String get creationParameterRequired => 'Gerekli';
+
+  @override
+  String get creationBackground => 'Arka plan';
+
+  @override
+  String get creationOpaqueBackground => 'Opak';
+
+  @override
+  String get creationTransparentOption => 'Şeffaf';
+
+  @override
+  String get creationChatModelBadge => 'Sohbet modeli';
+
+  @override
+  String get creationCommonOptions => 'Genel seçenekler';
+
+  @override
+  String get creationNoCommonOptions => 'Bu modelin genel seçeneği yok.';
+
+  @override
+  String get creationGallery => 'Tüm oluşturmalar';
+
+  @override
+  String get creationFilterAll => 'Tümü';
+
+  @override
+  String get creationFilterImages => 'Görseller';
+
+  @override
+  String get creationFilterVideos => 'Videolar';
+
+  @override
+  String get creationFilterFavorites => 'Favoriler';
+
+  @override
+  String get creationSearchGallery => 'İstem veya konu ara';
+
+  @override
+  String get creationGalleryEmpty => 'Henüz oluşturma yok';
+
+  @override
+  String get creationFavoritesEmpty => 'Henüz favori yok';
+
+  @override
+  String get creationGalleryNoResults => 'Eşleşen oluşturma yok';
+
+  @override
+  String get creationShowInTopic => 'Konuda göster';
+
+  @override
+  String get creationFavorite => 'Favorilere ekle';
+
+  @override
+  String get creationUnfavorite => 'Favorilerden çıkar';
+
+  @override
+  String get creationFavorited => 'Favorilere eklendi';
+
+  @override
+  String get creationUnfavorited => 'Favorilerden çıkarıldı';
+
+  @override
+  String get creationTopicDisplay => 'Konu görünümü';
+
+  @override
+  String get creationCoversAndTitles => 'Kapaklar ve başlıklar';
+
+  @override
+  String get creationCoversOnly => 'Yalnızca kapaklar';
+
+  @override
+  String get creationTopicList => 'Liste';
+
+  @override
+  String get creationAutoTitle => 'Konuları otomatik adlandır';
+
+  @override
+  String get creationAutoTitleHelp =>
+      'İlk istemden yola çıkarak konuyu adlandırmak için başlık özetleme modelini kullan.';
+
+  @override
+  String get creationAutoTitleOffHelp =>
+      'Başlık olarak ilk istemin başlangıcını kullan.';
+
+  @override
+  String get creationCustomCount => 'Özel';
+
+  @override
+  String get creationCustomCountMaximum => 'En fazla 16';
+
+  @override
+  String creationRequestSplit(String model, int limit, int requests) {
+    return '$model istek başına en fazla $limit görsel oluşturur. $requests istek aynı grupta birleştirilecek.';
+  }
+
+  @override
+  String get creationNoModelPlaceholder =>
+      'Önce medya oluşturabilen bir model ekleyin';
+
+  @override
+  String get creationConnectChatGPT => 'ChatGPT\'de oturum aç';
+
+  @override
+  String get creationConnectGrok => 'Grok\'ta oturum aç';
+
+  @override
+  String get creationConfigureFal => 'fal\'ı ayarla';
+
+  @override
+  String get creationOtherProviders => 'Diğer sağlayıcılar';
+
+  @override
+  String get creationChooseReferenceFile => 'Dosya seç…';
+
+  @override
+  String get creationChooseFromLibrary => 'Fotoğraflardan seç';
+
+  @override
+  String get creationTakeReferencePhoto => 'Fotoğraf çek';
+
+  @override
+  String get creationPasteReference => 'Görsel yapıştır';
+
+  @override
+  String get creationRecentImages => 'Son görseller';
+
+  @override
+  String get creationReferenceDrop =>
+      'Referans görselleri eklemek için bırakın';
+
+  @override
+  String get creationFirstFrameDrop => 'İlk kare olarak ayarlamak için bırakın';
+
+  @override
+  String get creationReferenceDropHint =>
+      'Görselleri doğrudan Oluştur sayfasına da sürükleyebilirsiniz.';
+
+  @override
+  String get creationNoClipboardImage => 'Panoda görsel yok';
+
+  @override
+  String get creationReferenceAdded => 'Referanslara eklendi';
+
+  @override
+  String get creationReferenceAlreadyAdded => 'Zaten referanslarınızda';
+
+  @override
+  String creationReferenceLimitReached(int count) {
+    return 'Bu model en fazla $count referans görseli kabul eder.';
+  }
+
+  @override
+  String creationReferenceUnsupported(String model) {
+    return '$model referans görselleri desteklemiyor';
+  }
+
+  @override
+  String get creationReferenceIgnored =>
+      'Referanslarınız taslakta kalır. Bunları kabul eden bir model kullanabilir.';
+
+  @override
+  String get creationRecentChat => 'Sohbet';
+
+  @override
+  String get creationRecentCreation => 'Oluştur';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return '$count tane daha seçebilirsiniz';
+  }
+
+  @override
+  String get creationTapToSelect => 'Seçmek için bir görsele dokunun';
+
+  @override
+  String creationSelectedImages(int count) {
+    return '$count seçildi';
+  }
+
+  @override
+  String creationAddSelected(int count) {
+    return 'Ekle ($count)';
+  }
+
+  @override
+  String get creationRecentEmpty => 'Son görsel yok';
+
+  @override
+  String get creationEditImage => 'Görseli düzenle';
+
+  @override
+  String get creationUseReference => 'Referans olarak kullan';
+
+  @override
+  String get creationEditReference => 'Bu görselle düzenleniyor';
+
+  @override
+  String get creationEditPrompt => 'Ne değişmeli?';
+
+  @override
+  String get creationEditPromptExample =>
+      'Örneğin, plaj arka planı kullan ve kişiyi ve ışığı koru';
+
+  @override
+  String get creationEditOriginalRatio => 'Orijinal oran';
+
+  @override
+  String get creationEditNewGroup => 'Yeni bir grup oluştur';
+
+  @override
+  String get creationEditHelp =>
+      'Düzenleme bu konuda yeni bir grup olarak görünür.';
+
+  @override
+  String get creationEditStarted =>
+      'Düzenleme başladı. Sonuç bu konunun altında görünecek.';
+
+  @override
+  String get creationEditedResult => 'Düzenlenmiş sonuç';
+
+  @override
+  String get creationEditedFrom => 'Şuradan düzenlendi';
+
+  @override
+  String get creationRepeat => 'Tekrar oluştur';
+
+  @override
+  String get creationDeleteBatch => 'Grubu sil';
+
+  @override
+  String creationDeleteBatchBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Bu grup ve $count dosyası bu cihazdan silinsin mi?',
+      one: 'Bu grup ve dosyası bu cihazdan silinsin mi?',
+      zero: 'Bu üretim kaydı bu cihazdan silinsin mi?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationRequestDetails => 'İstek ayrıntıları';
+
+  @override
+  String get creationNoRequestDetails => 'İstek ayrıntısı yok.';
+
+  @override
+  String creationReferenceSummary(int count, int limit) {
+    return 'Referanslar $count / $limit';
+  }
+
+  @override
+  String get creationPrevious => 'Önceki oluşturma';
+
+  @override
+  String get creationNext => 'Sonraki oluşturma';
+
+  @override
+  String get creationWaitingSketch => 'Kompozisyon çiziliyor';
+
+  @override
+  String get creationWaitingDetails => 'Ayrıntılar işleniyor';
+
+  @override
+  String get creationWaitingFinish => 'Görsel tamamlanıyor';
+
+  @override
+  String get creationWaitingVideoMotion => 'Hareket planlanıyor';
+
+  @override
+  String get creationWaitingVideoFrames => 'Kareler oluşturuluyor';
+
+  @override
+  String get creationWaitingVideoFinish => 'Video tamamlanıyor';
+
+  @override
+  String get creationWaitingLong => 'Biraz daha uzun sürüyor';
+
+  @override
+  String get creationSuggestionPoster => 'Minimalist bir konser afişi tasarla';
+
+  @override
+  String get creationSuggestionLandscape => 'Şafakta bir dağ köyü resmet';
+
+  @override
+  String get creationSuggestionProduct =>
+      'Yumuşak gün ışığında seramik bir fincan fotoğrafla';
+
+  @override
+  String get creationSuggestionIllustration =>
+      'Yıldızlı gökyüzü altında bir tilki çiz';
+
+  @override
+  String get creationSuggestionRoom => 'Sıcak ahşaplı bir okuma köşesi çiz';
+
+  @override
+  String get creationSuggestionSticker =>
+      'Eğlenceli bitki çıkartmalarından bir set yap';
+
+  @override
+  String get creationSuggestionMotion =>
+      'Yağmurlu bir bahçeye yavaşça yaklaşan kamera';
+
+  @override
+  String get creationSuggestionOcean => 'Gün batımında sahile vuran dalgalar';
+
+  @override
+  String get creationWaitingDraft => 'İlk taslak oluşturuluyor';
+
+  @override
+  String get creationWaitingScene => 'Sahne hazırlanıyor';
+
+  @override
+  String get creationWaitingVideoRendering => 'Hareket işleniyor';
+
+  @override
+  String get creationWaitingVideoComposite => 'Video birleştiriliyor';
+
+  @override
+  String get creationWaitingNearlyDone => 'Neredeyse bitti';
+
+  @override
+  String creationUseGroupReferences(int count) {
+    return 'Tümünü ($count) referans olarak kullan';
+  }
+
+  @override
+  String get creationDownloadFailed => 'İndirme başarısız oldu';
+
+  @override
+  String get creationAutomaticRetry => 'Otomatik yeniden deneme';
+
+  @override
+  String get creationNoAutomaticRetry => 'Manuel yeniden deneme';
+
+  @override
+  String get creationRetryHistory => 'Yeniden deneme geçmişi';
+
+  @override
+  String get creationLoggedRequest => 'İstek meta verileri';
+
+  @override
+  String get creationLoggedResponse => 'Yanıt meta verileri';
+
+  @override
+  String get creationDefaultImage => 'Görsel oluşturma modeli';
+
+  @override
+  String get creationDefaultImageHelp =>
+      'Oluşturma bölümündeki görseller ve sohbetteki görsel oluşturma aracı için kullanılır.';
+
+  @override
+  String get creationDefaultVideo => 'Video oluşturma modeli';
+
+  @override
+  String get creationDefaultVideoHelp =>
+      'Oluşturma bölümündeki video modunda kullanılır.';
+
+  @override
+  String get creationDefaultEnhance => 'İstem geliştirme modeli';
+
+  @override
+  String get creationDefaultEnhanceHelp =>
+      'Oluşturma bölümündeki istemleri geliştirir. Bu model görsel girişini destekliyorsa referans görseller de gönderilir.';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return 'Geçerli oluşturma istemi için $variable kullanın.';
+  }
+
+  @override
+  String get creationLocalToolTitle => 'Görsel oluşturma';
+
+  @override
+  String get creationLocalToolHelp =>
+      'Bu asistanın sohbette varsayılan görsel oluşturma modelini kullanarak görsel çizmesine veya düzenlemesine izin verin.';
+
+  @override
+  String creationStorageFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dosya',
+      one: '1 dosya',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationSelectDefaultImage => 'Varsayılan bir görsel modeli seçin';
+
+  @override
+  String get creationConfigureImageProvider =>
+      'Önce Sağlayıcılar bölümünde bir görsel modeli ekleyin veya etkinleştirin.';
+
+  @override
+  String get displayChatImagesAtToolCall =>
+      'Oluşturulan görselleri araç çağrısında göster';
+
+  @override
+  String get displayChatImageInfo => 'Oluşturulan görsel ayrıntılarını göster';
+
+  @override
+  String get displayChatImageLink => 'Oluşturma bağlantısını göster';
+
+  @override
+  String get creationLocalToolNeedsModel =>
+      'Önce Varsayılan modeller bölümünde bir görsel oluşturma modeli seçin.';
+
+  @override
+  String creationChatSource(String title) {
+    return 'Sohbet · $title';
+  }
+
+  @override
+  String get creationSendToChat => 'Sohbete gönder';
+
+  @override
+  String get creationShowInConversation => 'Sohbette göster';
+
+  @override
+  String get creationShowInCreation => 'Oluşturma bölümünde göster';
+
+  @override
+  String get creationChatCancelled => 'Görsel oluşturma iptal edildi';
+
+  @override
+  String get creationChatRegenerate => 'Yeniden oluştur';
+
+  @override
+  String get creationChatImageUnavailable => 'Görsel kullanılamıyor';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count görsel oluşturuldu',
+      one: '1 görsel oluşturuldu',
+    );
+    return '$_temp0 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => 'İstemi geliştir';
+
+  @override
+  String get creationEnhanceLoading => 'İstem yeniden yazılıyor…';
+
+  @override
+  String get creationEnhanceResult => 'Yeniden yazılmış istem';
+
+  @override
+  String get creationEnhanceOriginal => 'Orijinal';
+
+  @override
+  String get creationEnhanceAgain => 'Başka dene';
+
+  @override
+  String get creationEnhanceApply => 'Değiştir';
+
+  @override
+  String get creationEnhanceNeedsModel =>
+      'Varsayılan modeller bölümünden bir istem geliştirme modeli seçin.';
+
+  @override
+  String get creationStorageHint =>
+      'Oluşturma tarafından saklanan görseller, videolar, küçük resimler ve referans görselleri.';
+
+  @override
+  String get creationStorageDate =>
+      'Bu tarihe kadar olan oluşturmaları temizle';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return '$date tarihine kadar tamamlanmış üretimler, görselleri, videoları ve referans kopyalarıyla birlikte silinsin mi? Bu üretimlerden gelen görseller sohbette de görüntülenemeyecek.';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count üretim temizlendi',
+      one: '1 üretim temizlendi',
+      zero: 'Temizlenecek üretim yok',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationStorageClean => 'Tarihe göre temizle';
+
+  @override
+  String get creationDisplayAndGames => 'Görünüm ve bekleme oyunları';
+
+  @override
+  String get creationWaitGame => 'Bekleme oyunu';
+
+  @override
+  String get creationGameRandom => 'Rastgele';
+
+  @override
+  String get creationGameOff => 'Kapalı';
+
+  @override
+  String get creationGameSnake => 'Yılan';
+
+  @override
+  String get creationGameBrick => 'Tuğla Kırma';
+
+  @override
+  String get creationGameSnakeControls =>
+      'Yılan. Yön vermek için ok tuşlarını, W A S D tuşlarını veya kaydırmayı kullanın. Duraklatmak veya devam etmek için Space, çıkmak için Escape tuşuna basın.';
+
+  @override
+  String get creationGameBrickControls =>
+      'Tuğla Kırma. Raketi sürükleyin veya hareket ettirmek için Sol, Sağ, A ya da D tuşlarını basılı tutun. Duraklatmak veya devam etmek için Space, çıkmak için Escape tuşuna basın.';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return 'Görsel oluşturulurken $game oyna';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return 'Video oluşturulurken $game oyna';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return 'Puan $score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return 'Duraklatıldı · $score';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return 'Oyun bitti · $score';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return 'Oluşturma hazır · $score';
+  }
+
+  @override
+  String get creationNoSelectableModels => 'Kullanılabilir model yok';
+
+  @override
+  String get creationNoMatchingTopics => 'Eşleşen konu yok';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return 'Tüm konular $count';
+  }
+
+  @override
+  String get creationNoImageModels => 'Henüz görsel oluşturma modeli yok';
+
+  @override
+  String get creationNoVideoModels => 'Henüz video oluşturma modeli yok';
+
+  @override
+  String get creationFrameSources =>
+      'Son görsellerden, dosyalardan veya panodan ekle';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model yalnızca ilk kareyi destekler';
+  }
+
+  @override
+  String get creationSubscriptionLogin => 'Abonelik';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return 'En fazla $count referans';
+  }
+
+  @override
+  String get creationTextOnlyImage => 'Metinden görsel';
+
+  @override
+  String get creationTextOnlyVideo => 'Metinden video';
+
+  @override
+  String get creationCustomCountLabel => 'Özel sayı';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': 'Ağ bağlantısı',
+      'rateLimited': 'İstek sınırı',
+      'server': 'Sağlayıcı hatası',
+      'rejected': 'İstek reddedildi',
+      'login': 'Oturum açma gerekli',
+      'unavailable': 'Model veya uç nokta kullanılamıyor',
+      'parameters': 'Geçersiz parametreler',
+      'referenceTooLarge': 'Referans çok büyük',
+      'download': 'İndirme başarısız',
+      'invalidResponse': 'Geçersiz yanıt',
+      'other': 'Oluşturma hatası',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp =>
+      'Bu istek tamamlanmadan uygulama kapandı. İstem ve ayarlarınız kaydedildi.';
+
+  @override
+  String get creationCancelledHelp =>
+      'İstem ve ayarlarınız kaydedildi. İstediğiniz zaman yeniden oluşturabilirsiniz.';
+
+  @override
+  String get creationChatImageReady => 'Görsel oluşturuldu';
 }

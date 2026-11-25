@@ -97,6 +97,8 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 | Linux | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | AppImage、DEB、RPM、tar.gz | x86_64 |
 | HarmonyOS | [kelivo-ohos](https://github.com/Chevey339/kelivo-ohos) | 在独立仓库中维护 | — |
 
+Linux 使用系统播放器播放视频。使用 AppImage 或 tar.gz 时，安装 `ffmpeg` 即可为视频生成封面。
+
 官网的[下载页](https://kelivo.psycheas.top/downloads)提供同样的安装包。
 
 ## 🧭 快速上手

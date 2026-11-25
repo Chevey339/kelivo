@@ -52,6 +52,7 @@ import '../../utils/kelivo_file_uri.dart';
 import '../models/memory_entry.dart';
 import '../models/user_profile_field.dart';
 import 'app_database.dart';
+import 'media_repository.dart';
 import 'empty_database_recovery_guard.dart';
 import 'empty_database_permission.dart';
 import 'message_timeline_index.dart';
@@ -162,12 +163,14 @@ class BackupMergeReport {
     required this.skippedConversations,
     required this.remappedConversationIds,
     this.importedConversationIds = const <String>[],
+    this.mergedMessageIds = const {},
   });
 
   final int importedConversations;
   final int deduplicatedConversations;
   final int skippedConversations;
   final Map<String, String> remappedConversationIds;
+  final Map<String, String> mergedMessageIds;
 
   /// Target conversation ids newly inserted by this merge (post-remap ids).
   final List<String> importedConversationIds;
@@ -198,6 +201,7 @@ class ChatDatabaseRepository {
        _observer = observer ?? ChatDatabaseObserver.instance;
 
   final AppDatabase _db;
+  late final MediaRepository mediaRepository = MediaRepository(_db);
   late final compression = CompressionRepository(ExtensionEntityStore(_db));
   late final _timelineIndex = MessageTimelineIndex(_db);
   late final _contextIndex = ContextOperationIndex(_db);
@@ -895,7 +899,9 @@ class ChatDatabaseRepository {
       throw StateError('foreign_key_check');
     }
 
-    return _readSnapshotInfo(database);
+    final info = _readSnapshotInfo(database);
+    MediaRepository.validateSnapshotPaths(database);
+    return info;
   }
 
   static ChatDatabaseSnapshotInfo _readSnapshotInfo(sqlite.Database database) {
@@ -1124,6 +1130,50 @@ class ChatDatabaseRepository {
       'owner_id',
       'payload',
       'updated_at',
+    ],
+    'generation_topic_rows': [
+      'id',
+      'title',
+      'title_source',
+      'created_at',
+      'updated_at',
+    ],
+    'generation_batch_rows': [
+      'id',
+      'topic_id',
+      'provider_id',
+      'model_id',
+      'mode',
+      'prompt',
+      'negative_prompt',
+      'params_json',
+      'references_json',
+      'status',
+      'error_json',
+      'source',
+      'parent_item_id',
+      'conversation_id',
+      'message_id',
+      'created_at',
+      'started_at',
+      'finished_at',
+    ],
+    'generation_item_rows': [
+      'id',
+      'batch_id',
+      'ordinal',
+      'mode',
+      'path',
+      'thumbnail_path',
+      'width',
+      'height',
+      'duration_ms',
+      'mime',
+      'byte_size',
+      'revised_prompt',
+      'favorite',
+      'status',
+      'created_at',
     ],
     'gen_ui_surface_state_rows': [
       'revision_id',
@@ -1783,6 +1833,7 @@ class ChatDatabaseRepository {
           uri: nextUri,
           mime: part.mime,
           assetId: part.assetId,
+          generationItemId: part.generationItemId,
           unavailable: nextUnavailable,
         ).encodePayload(),
         parseError: null,
@@ -6403,11 +6454,22 @@ ORDER BY m.message_order DESC LIMIT 20
         if (foreignKeyFailures.isNotEmpty) {
           throw StateError('foreign_key_check');
         }
+        final creationSources = await _db
+            .customSelect(
+              'SELECT DISTINCT message_id FROM merge_source.generation_batch_rows WHERE message_id IS NOT NULL',
+            )
+            .get();
         return BackupMergeReport(
           importedConversations: imported,
           deduplicatedConversations: deduplicated,
           skippedConversations: skipped,
           remappedConversationIds: Map.unmodifiable(remapped),
+          mergedMessageIds: Map.unmodifiable({
+            for (final row in creationSources)
+              if (allMessageIds[row.read<String>('message_id')]
+                  case final target?)
+                row.read<String>('message_id'): target,
+          }),
           importedConversationIds: List.unmodifiable(importedIds),
         );
       });
@@ -6448,6 +6510,7 @@ ORDER BY m.message_order DESC LIMIT 20
                 uri: part.uri,
                 mime: part.mime,
                 assetId: part.assetId,
+                generationItemId: part.generationItemId,
                 unavailable: unavailable,
               ),
             );
@@ -7216,6 +7279,29 @@ ORDER BY m.message_order DESC LIMIT 20
   /// changes; the other columns never affect parts. Returns the post-update
   /// message,
   /// or null when no row matches [messageId].
+  Future<bool> waitForFinishedMessage(String messageId) async {
+    final table = _db.messageRows;
+    final row =
+        await (_db.selectOnly(table)
+              ..addColumns([table.isStreaming])
+              ..where(table.id.equals(messageId)))
+            .watchSingleOrNull()
+            .firstWhere((row) => row?.read(table.isStreaming) != true);
+    return row != null;
+  }
+
+  Future<ChatMessage?> updateFinishedMessageParts(
+    String messageId,
+    List<MessagePart> Function(List<MessagePart>) transform,
+  ) => _writeTransaction(() async {
+    final current = await getMessage(messageId);
+    if (current == null || current.isStreaming) return null;
+    final parts = transform(current.parts);
+    if (identical(parts, current.parts)) return current;
+    await markMessageAssetReferencesDirty(messageId);
+    return updateMessageFields(messageId, parts: parts);
+  });
+
   Future<ChatMessage?> updateMessageFields(
     String messageId, {
     String? content,

@@ -1,6 +1,7 @@
 import '../widgets/settings_search_target.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'mobile_background_settings_page.dart';
+import 'sidebar_settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -99,6 +100,13 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   await _showLanguageSheet(context);
                   if (mounted) setState(() {});
                 },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.panelLeft,
+                label: l10n.sidebarSettingsTitle,
+                onTap: () => openSidebarSettings(context),
               ),
               _iosDivider(context),
               _iosNavRow(
@@ -327,7 +335,6 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               ),
             ],
           ),
-          // Inline cards replaced by sheet-triggering rows above.
         ],
       ),
     );
@@ -1438,6 +1445,30 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
                 value: sp.showToolCards,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowToolCards(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Image,
+                label: l10n.displayChatImagesAtToolCall,
+                value: sp.inlineChatImages,
+                onChanged: sp.setInlineChatImages,
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.info,
+                label: l10n.displayChatImageInfo,
+                value: sp.showChatImageInfo,
+                onChanged: sp.setShowChatImageInfo,
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.ExternalLink,
+                label: l10n.displayChatImageLink,
+                value: sp.showChatImageLink,
+                onChanged: sp.setShowChatImageLink,
               ),
               _iosDivider(context),
               _iosSwitchRow(

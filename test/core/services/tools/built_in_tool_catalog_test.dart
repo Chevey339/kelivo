@@ -28,14 +28,20 @@ void main() {
                     entry.group == BuiltInToolGroup.images,
               )
               .toList();
-      expect(
-        entries.map((e) => e.name).toSet(),
-        WorkspaceToolsService.toolNames,
-      );
+      expect(entries.map((e) => e.name).toSet(), {
+        ...WorkspaceToolsService.toolNames,
+        LocalToolNames.generateImage,
+      });
       final image = entries.singleWhere((entry) => entry.name == 'view_image');
       expect(image.group, BuiltInToolGroup.images);
       expect(ViewImageTool.supportsFiles(image.defaultDefinition), isTrue);
       expect(ViewImageTool.supportsHistory(image.defaultDefinition), isTrue);
+      expect(
+        entries
+            .where((entry) => entry.group == BuiltInToolGroup.images)
+            .map((entry) => entry.name),
+        ['view_image', LocalToolNames.generateImage],
+      );
       expect(
         entries.map((entry) => entry.name),
         isNot(contains('read_chat_image')),

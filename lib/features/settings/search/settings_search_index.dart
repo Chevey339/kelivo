@@ -640,6 +640,24 @@ class SettingsSearchIndex {
       (l) => l.displaySettingsPageShowToolCardsTitle,
     );
     add(
+      'displayChatImagesAtToolCall',
+      SettingsSearchDestination.chatDisplay,
+      (l) => l.displayChatImagesAtToolCall,
+      keywords: 'image generation 图片 生图 创作 工具',
+    );
+    add(
+      'displayChatImageInfo',
+      SettingsSearchDestination.chatDisplay,
+      (l) => l.displayChatImageInfo,
+      keywords: 'image generation 图片 生图 创作 工具',
+    );
+    add(
+      'displayChatImageLink',
+      SettingsSearchDestination.chatDisplay,
+      (l) => l.displayChatImageLink,
+      keywords: 'image generation 图片 生图 创作 工具',
+    );
+    add(
       'displaySettingsPageShowProducedFilesTitle',
       SettingsSearchDestination.chatDisplay,
       (l) => l.displaySettingsPageShowProducedFilesTitle,

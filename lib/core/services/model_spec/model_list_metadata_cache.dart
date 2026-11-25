@@ -7,8 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../database/business_settings_router.dart';
 import '../../models/model_spec.dart';
+import '../../models/media_creation.dart' show MediaMode;
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
+import '../media/tokendance_media_protocol.dart';
+import '../media/openrouter_media_catalog.dart';
 
 typedef ModelListRow = ({String id, Map<dynamic, dynamic> json});
 typedef ModelListRefresh = Future<void> Function(Iterable<ModelListRow> rows);
@@ -16,9 +19,11 @@ typedef ModelListMetadata = ({
   int? contextWindow,
   int? maxOutput,
   ModelPricing? pricing,
+  TokenDanceMediaProtocol? mediaProtocol,
+  OpenRouterMediaModel? openRouterMedia,
 });
 
-/// Numeric metadata reported by a provider's model list, separate from edits.
+/// Metadata reported by a provider's model list, separate from manual edits.
 class ModelListMetadataCache extends ChangeNotifier {
   ModelListMetadataCache({Future<SharedPreferences> Function()? preferences})
     : _preferences = preferences ?? SharedPreferences.getInstance;
@@ -53,6 +58,20 @@ class ModelListMetadataCache extends ChangeNotifier {
         : models.byLowercase[id.toLowerCase()];
   }
 
+  Map<String, OpenRouterMediaModel> openRouterCatalog(
+    ProviderConfig cfg,
+    MediaMode mode,
+  ) {
+    final cached = _providers[cfg.id];
+    if (cached == null || cached.scope != _scope(cfg)) return {};
+    return {
+      for (final entry in cached.exact.entries)
+        if (entry.value?.openRouterMedia case final media?
+            when media.mode == mode)
+          entry.key: media,
+    };
+  }
+
   Future<ModelListRefresh> startRefresh(ProviderConfig cfg) async {
     final provider = _providers.putIfAbsent(cfg.id, _ProviderModels.new);
     final request = ++provider.started;
@@ -61,6 +80,7 @@ class ModelListMetadataCache extends ChangeNotifier {
     final pricingPerToken =
         Uri.tryParse(cfg.baseUrl.trim())?.host.toLowerCase() ==
         'ai-gateway.vercel.sh';
+    final host = Uri.tryParse(cfg.baseUrl)?.host;
     return (rows) async {
       if (!identical(_providers[cfg.id], provider) ||
           request <= provider.latestSuccess) {
@@ -74,6 +94,15 @@ class ModelListMetadataCache extends ChangeNotifier {
         final metadata = parseModelListMetadata(
           row.json,
           pricingPerToken: pricingPerToken,
+          advertisedProtocol: TokenDanceMediaProtocol.isHost(host)
+              ? TokenDanceMediaProtocol.advertised(
+                  id.toLowerCase(),
+                  row.json['supported_protocols'],
+                )
+              : null,
+          openRouterMedia: OpenRouterMediaModel.isHost(host)
+              ? OpenRouterMediaModel.fromJson(row.json['openrouter_media'])
+              : null,
         );
         entries.putIfAbsent(id, () => metadata);
       }
@@ -122,6 +151,11 @@ class ModelListMetadataCache extends ChangeNotifier {
           if (model.key is! String || model.value is! Map) continue;
           entries[model.key as String] = parseModelListMetadata(
             model.value as Map,
+            advertisedProtocol: TokenDanceMediaProtocol.values
+                .asNameMap()[(model.value as Map)['media_protocol']],
+            openRouterMedia: OpenRouterMediaModel.fromJson(
+              (model.value as Map)['openrouter_media'],
+            ),
           );
         }
         if (_providers
@@ -162,6 +196,10 @@ class ModelListMetadataCache extends ChangeNotifier {
                       'max_output': output,
                     if (entry.value?.pricing case final pricing?)
                       'cost': pricing.toJson(),
+                    if (entry.value?.mediaProtocol case final protocol?)
+                      'media_protocol': protocol.name,
+                    if (entry.value?.openRouterMedia case final media?)
+                      'openrouter_media': media.toJson(),
                   },
               },
             },
@@ -230,6 +268,8 @@ class _ProviderModels {
 ModelListMetadata? parseModelListMetadata(
   Map row, {
   bool pricingPerToken = false,
+  TokenDanceMediaProtocol? advertisedProtocol,
+  OpenRouterMediaModel? openRouterMedia,
 }) {
   final top = row['top_provider'];
   final limit = row['limit'];
@@ -273,10 +313,14 @@ ModelListMetadata? parseModelListMetadata(
   if (contextWindow == null &&
       maxOutput == null &&
       inputPrice == null &&
-      outputPrice == null) {
+      outputPrice == null &&
+      advertisedProtocol == null &&
+      openRouterMedia == null) {
     return null;
   }
   return (
+    mediaProtocol: advertisedProtocol,
+    openRouterMedia: openRouterMedia,
     contextWindow: contextWindow,
     maxOutput: maxOutput,
     pricing: inputPrice != null || outputPrice != null

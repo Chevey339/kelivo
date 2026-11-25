@@ -9,6 +9,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/startup_failure_report.dart';
+import 'package:Kelivo/core/models/backup_scope.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
@@ -938,6 +939,7 @@ Future<PreparedRestoreBundle> _prepareV130Bundle({
     appData: appData,
     directoryName: 'v130_source',
     includeFiles: includeFiles,
+    scope: const BackupScope(excluded: {BackupCategory.creations}),
   );
   // v1.3.0 persisted version 2, without an assetRoots declaration. Its
   // receipt format is unchanged; bind the fixture receipt to the old bytes.
@@ -1076,6 +1078,7 @@ Future<PreparedRestoreBundle> _prepareBundle({
   required String directoryName,
   required bool includeFiles,
   bool consumeExtractedFiles = false,
+  BackupScope scope = const BackupScope(),
 }) async {
   final extracted = Directory(p.join(root.path, directoryName));
   await extracted.create();
@@ -1122,6 +1125,7 @@ Future<PreparedRestoreBundle> _prepareBundle({
     appDataDirectory: appData,
     extractedDirectory: extracted,
     consumeExtractedFiles: consumeExtractedFiles,
+    scope: scope,
     sourceManifestSha256: (await sha256.bind(manifest.openRead()).first)
         .toString(),
     bundleIncludesChats: true,

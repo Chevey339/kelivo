@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/models/model_spec.dart';
+import '../../../../core/providers/settings_provider.dart';
 import '../../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/ios_form_text_field.dart';
 import '../../../../shared/widgets/ios_tactile.dart';
-import '../../../../shared/widgets/segmented_tabs.dart';
+import '../../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../../shared/widgets/snackbar.dart';
 import 'model_spec_form_controller.dart';
 import 'spec_field_header.dart';
@@ -31,6 +32,22 @@ class BasicSection extends StatelessWidget {
       builder: (context, _) {
         final l10n = AppLocalizations.of(context)!;
         final spec = controller.spec;
+        final kind = ProviderConfig.classify(
+          controller.config.id,
+          explicitType: controller.config.providerType,
+        );
+        final types = [
+          if (!controller.config.isFal) ...[
+            ModelType.chat,
+            ModelType.embedding,
+          ],
+          if (kind != ProviderKind.claude || spec.type.isMedia) ...[
+            ModelType.image,
+            ModelType.video,
+          ],
+        ];
+        if (!types.contains(spec.type)) types.add(spec.type);
+        final media = spec.type.isMedia;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -47,7 +64,9 @@ class BasicSection extends StatelessWidget {
               IosFormTextField(
                 label: '',
                 controller: controller.apiModelIdController,
-                hintText: l10n.modelDetailSheetModelIdHint,
+                hintText: controller.config.isFal
+                    ? 'fal-ai/flux/dev'
+                    : l10n.modelDetailSheetModelIdHint,
                 inlineLabel: false,
                 onChanged: controller.setApiModelId,
               )
@@ -71,32 +90,49 @@ class BasicSection extends StatelessWidget {
             const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelDetailSheetModelTypeLabel,
-              source: controller.sourceOf(ModelSpecField.type),
+              source:
+                  media &&
+                      controller.hasMediaModelData &&
+                      !controller.isOverridden(ModelSpecField.type)
+                  ? SpecSource.catalog
+                  : controller.sourceOf(ModelSpecField.type),
               overridden: controller.isOverridden(ModelSpecField.type),
               onReset: () => controller.reset(ModelSpecField.type),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-              child: SegmentedTabs(
+              child: SlidingSegmentedTabs(
                 tabs: [
-                  SegmentedTab(label: l10n.modelDetailSheetChatType),
-                  SegmentedTab(label: l10n.modelDetailSheetEmbeddingType),
-                  SegmentedTab(label: l10n.modelSpecFormImageType),
+                  for (final type in types)
+                    SegmentedTab(
+                      label: switch (type) {
+                        ModelType.chat => l10n.modelDetailSheetChatType,
+                        ModelType.embedding =>
+                          l10n.modelDetailSheetEmbeddingType,
+                        ModelType.image => l10n.modelSpecFormImageType,
+                        ModelType.video => l10n.modelSpecFormVideoMode,
+                        ModelType.other =>
+                          l10n.providerDetailPageOtherModelsGroupTitle,
+                      },
+                    ),
                 ],
-                index: spec.type == ModelType.embedding
-                    ? 1
-                    : spec.type == ModelType.image
-                    ? 2
-                    : 0,
-                onChanged: (index) {
-                  controller.setType(switch (index) {
-                    1 => ModelType.embedding,
-                    2 => ModelType.image,
-                    _ => ModelType.chat,
-                  });
-                },
+                index: types.indexOf(spec.type),
+                onChanged: (index) => controller.setType(types[index]),
               ),
             ),
+            if (media)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Text(
+                  spec.type == ModelType.video
+                      ? l10n.creationVideoTypeHelp
+                      : l10n.creationImageTypeHelp,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
           ],
         );
       },

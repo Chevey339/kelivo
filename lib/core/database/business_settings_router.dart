@@ -23,6 +23,19 @@ final class BusinessKeyRegistry {
   static const balanceRefreshOnReplyKey = 'balance_refresh_on_reply_v1';
   static const codexClientVersionCacheKey = 'codex_client_version_v1';
   static const modelListMetadataCacheKey = 'model_list_metadata_v1';
+  static const mobileSidebarStyleKey = 'mobile_sidebar_style_v1';
+  static const mobileSidebarBlockOrderKey = 'mobile_sidebar_block_order_v1';
+  static const mobileSidebarEntriesKey = 'mobile_sidebar_entries_v1';
+  static const mobileSidebarShowCustomizeKey =
+      'mobile_sidebar_show_customize_in_more_v1';
+  static const mobileSidebarHideSingleAssistantKey =
+      'mobile_sidebar_hide_assistant_when_single_v1';
+  static const desktopRailEntriesKey = 'desktop_rail_entries_v1';
+  static const mediaEntrySeenKey = 'media_entry_seen_v1';
+  static const creationComposerKey = 'creation_composer_v1';
+  static const creationAutoTitleKey = 'creation_auto_title_v1';
+  static const creationTopicViewKey = 'creation_topic_view_v1';
+  static const creationWaitGameKey = 'creation_wait_game_v1';
 
   static const localOnlyKeys = <String>{
     'window_width_v1',
@@ -56,6 +69,17 @@ final class BusinessKeyRegistry {
   };
 
   static const preferenceKeys = <String>{
+    mobileSidebarStyleKey,
+    mobileSidebarBlockOrderKey,
+    mobileSidebarEntriesKey,
+    mobileSidebarShowCustomizeKey,
+    mobileSidebarHideSingleAssistantKey,
+    desktopRailEntriesKey,
+    mediaEntrySeenKey,
+    creationComposerKey,
+    creationAutoTitleKey,
+    creationTopicViewKey,
+    creationWaitGameKey,
     'desktop_scheduled_tasks_v1',
     'scheduled_task_results_v1',
     'current_assistant_id_v1',
@@ -119,6 +143,10 @@ final class BusinessKeyRegistry {
     'use_dynamic_color_v1',
     'app_locale_v1',
     'title_model_v1',
+    'image_model_v1',
+    'video_model_v1',
+    'prompt_enhance_model_v1',
+    'prompt_enhance_prompt_v1',
     'title_generation_enabled_v1',
     'title_prompt_v1',
     'title_generation_thinking_enabled_v1',

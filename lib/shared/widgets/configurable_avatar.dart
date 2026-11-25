@@ -21,6 +21,7 @@ class ConfigurableAvatar extends StatelessWidget {
     this.avatar,
     required this.name,
     this.fallbackAsset,
+    this.matchBrandByName = true,
     this.size = 28,
     this.iconScale = .7,
     this.withBackground = true,
@@ -31,6 +32,7 @@ class ConfigurableAvatar extends StatelessWidget {
   final AvatarConfig? avatar;
   final String name;
   final String? fallbackAsset;
+  final bool matchBrandByName;
   final double size;
   final double iconScale;
   final bool withBackground;
@@ -92,7 +94,9 @@ class ConfigurableAvatar extends StatelessWidget {
   }
 
   Widget _fallback(BuildContext context) {
-    final asset = fallbackAsset ?? BrandAssets.assetForName(name);
+    final asset =
+        fallbackAsset ??
+        (matchBrandByName ? BrandAssets.assetForName(name) : null);
     if (asset != null) return _asset(context, asset);
     return Text(
       name.isEmpty ? '?' : name.characters.first.toUpperCase(),

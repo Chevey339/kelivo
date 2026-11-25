@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../models/message_part.dart';
 import '../../../models/message_part_snapshot.dart';
 import '../../../models/token_usage.dart';
+import '../../tools/generate_image_tool.dart';
 import '../generation/text_generation_result.dart';
 import 'stream_chunk.dart';
 import 'stream_text_buffer.dart';
@@ -230,6 +231,15 @@ class StreamChunkHandler {
       case ToolCallResult(:final id, :final output, :final metadata):
         _upsertTool(id, content: output ?? '', metadata: metadata);
         _flushTool(id);
+        if (_tools[id]?.name == GenerateImageTool.name) {
+          if (GenerateImageTool.attachment(metadata) case final image?) {
+            if (!_parts.whereType<ImagePart>().any(
+              (part) => part.generationItemId == image.generationItemId,
+            )) {
+              _addPart(image);
+            }
+          }
+        }
       case ServerToolStart(
         :final id,
         :final toolName,

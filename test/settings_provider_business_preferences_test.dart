@@ -187,6 +187,34 @@ void main() {
   );
 
   test(
+    'creation adapters show only fal by default and retain customized providers on reload',
+    () async {
+      const former = ['Replicate', 'ModelScope', 'BytePlus'];
+      expect(former.where(SettingsProvider.isBuiltInProvider), isEmpty);
+      expect(SettingsProvider.isBuiltInProvider('fal'), isTrue);
+      final custom = ProviderConfig.defaultsFor(
+        'ModelScope',
+      ).copyWith(models: ['my-model']);
+      final settings = SettingsProvider(BusinessPreferences(repository));
+      await settings.loaded;
+      expect(settings.providersOrder, isNot(contains('Replicate')));
+      await settings.setProviderConfig(
+        'Replicate',
+        ProviderConfig.defaultsFor('Replicate'),
+      );
+      await settings.setProviderConfig('ModelScope', custom);
+      final loaded = SettingsProvider(BusinessPreferences(repository));
+      await loaded.loaded;
+      expect(loaded.providerConfigs.containsKey('Replicate'), isFalse);
+      expect(loaded.providersOrder, contains('ModelScope'));
+      expect(loaded.getProviderConfig('ModelScope').models, ['my-model']);
+      expect(loaded.providersOrder, isNot(contains('BytePlus')));
+      settings.dispose();
+      loaded.dispose();
+    },
+  );
+
+  test(
     'migrated order-only provider state survives startup seeding and reload',
     () async {
       const legacyOrder = <String>[
@@ -212,6 +240,7 @@ void main() {
         'MaruCode',
         '砂糖酒馆',
         'Vercel',
+        'fal',
       ];
       await repository.replaceSnapshot(
         BusinessSettingsRouter.normalizeAndRoute({

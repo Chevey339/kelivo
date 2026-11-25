@@ -162,7 +162,7 @@ void main() {
 
   for (final version in [1, 2, 3]) {
     test(
-      'published v$version upgrades to complete v5 with retained text',
+      'published v$version upgrades to the current schema with retained text',
       () async {
         final file = await createDatabase(version: version);
         final before = sqlite.sqlite3.open(file.path);
@@ -181,7 +181,7 @@ void main() {
           file,
         );
         expect(outcome.fromVersion, version);
-        expect(outcome.toVersion, 5);
+        expect(outcome.toVersion, AppDatabase.currentSchemaVersion);
         expect(outcome.upgraded, isTrue);
         final raw = open(file);
         GenUiDerivedSchema.validate(raw);
@@ -219,7 +219,7 @@ void main() {
         try {
           await SchemaVerifier(GeneratedHelper()).migrateAndValidate(
             db,
-            5,
+            AppDatabase.currentSchemaVersion,
             options: const ValidationOptions(validateDropped: true),
           );
         } finally {
@@ -500,12 +500,12 @@ CREATE TABLE gen_ui_surface_state_rows (
         'CREATE TRIGGER future_owned_trigger AFTER UPDATE OF future '
         'ON gen_ui_surface_state_rows BEGIN INSERT INTO future_rows VALUES (new.future); END;',
       );
-      raw.userVersion = 6;
+      raw.userVersion = AppDatabase.currentSchemaVersion + 1;
       raw.close();
       await ChatDatabaseRepository.normalizeForwardCompatibleSnapshot(file);
       final after = open(file);
       GenUiDerivedSchema.validate(after);
-      expect(after.userVersion, 5);
+      expect(after.userVersion, AppDatabase.currentSchemaVersion);
       final row = after
           .select('SELECT * FROM gen_ui_surface_state_rows;')
           .single;
@@ -530,14 +530,15 @@ CREATE TABLE gen_ui_surface_state_rows (
       final file = await createDatabase();
       final raw = sqlite.sqlite3.open(file.path);
       raw.execute('DROP TABLE gen_ui_surface_state_rows;');
-      raw.userVersion = 6;
+      final futureVersion = AppDatabase.currentSchemaVersion + 1;
+      raw.userVersion = futureVersion;
       raw.close();
       final before = await file.readAsBytes();
       await expectLater(
         ChatDatabaseRepository.normalizeForwardCompatibleSnapshot(file),
         throwsStateError,
       );
-      expect(SchemaMigrations.readSchemaVersion(file), 6);
+      expect(SchemaMigrations.readSchemaVersion(file), futureVersion);
       expect(await file.readAsBytes(), before);
     },
   );

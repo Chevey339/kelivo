@@ -694,7 +694,6 @@ class HomeViewModel extends ChangeNotifier {
       quotes: input.quotes,
       imagePaths: List<String>.of(input.imagePaths),
       documents: List<DocumentAttachment>.of(input.documents),
-      allowImagesApiRouting: input.allowImagesApiRouting,
       uiContext: input.uiContext,
       draftSubmission: input.draftSubmission,
     );
@@ -746,7 +745,6 @@ class HomeViewModel extends ChangeNotifier {
   Future<bool> regenerateAtMessage(
     ChatMessage message, {
     bool assistantAsNewReply = false,
-    bool allowImagesApiRouting = true,
     bool omitImages = false,
     String? expectedContextState,
   }) async {
@@ -773,7 +771,6 @@ class HomeViewModel extends ChangeNotifier {
       conversation: conversation,
       assistantOverride: assistant,
       assistantAsNewReply: assistantAsNewReply,
-      allowImagesApiRouting: allowImagesApiRouting,
     );
 
     if (!result.success) {
@@ -791,9 +788,8 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   Future<bool> continueAssistantMessageAfterToolAnswer(
-    ChatMessage message, {
-    bool allowImagesApiRouting = true,
-  }) async {
+    ChatMessage message,
+  ) async {
     final conversation = currentConversation;
     if (conversation == null) {
       return false;
@@ -805,7 +801,6 @@ class HomeViewModel extends ChangeNotifier {
     final result = await _chatActions.continueAssistantMessageAfterToolAnswer(
       message: message,
       conversation: conversation,
-      allowImagesApiRouting: allowImagesApiRouting,
     );
 
     if (!result.success) {

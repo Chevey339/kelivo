@@ -31,7 +31,6 @@ import '../../../shared/widgets/optional_shader_mask.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
-// import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart' show sha256;
 import '../../home/widgets/file_processing_indicator.dart';
@@ -104,6 +103,7 @@ import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
 import '../../../shared/markdown/citation_syntax.dart';
 import 'chat_surface.dart';
+import 'chat_creation_images.dart';
 import 'collapsible_user_text.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
@@ -3385,6 +3385,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       reasoningSegments: effectiveReasoningSegments,
       sourceMap: mappedVisual.sourceMap,
     );
+    final inlineChatImages = context.select<SettingsProvider, bool>(
+      (s) => s.inlineChatImages,
+    );
+    final creationAttachments = widget.message.parts
+        .whereType<ImagePart>()
+        .where((part) => part.generationItemId != null)
+        .toList();
+    final imagePlacement = inlineChatImages
+        ? ChatImagePlacement.resolve(
+            context,
+            widget.message.id,
+            creationAttachments,
+            timelineProjection,
+          )
+        : null;
+    final imageOrdinals = imagePlacement?.atCall.keys.toSet() ?? const <int>{};
     final mediaPreview = _buildAttachmentPreview(
       context,
       parts: timelineProjection.fromParts
@@ -3392,7 +3408,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               for (final part in widget.message.parts)
                 if (part is FilePart) part,
             ]
-          : widget.message.parts,
+          : [
+              for (final part in widget.message.parts)
+                if (part is! ImagePart || part.generationItemId == null) part,
+            ],
       isDark: isDark,
       alignEnd: false,
     );
@@ -3495,6 +3514,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   null;
               final visibleBlocks = _timelineVisibility.project(
                 timelineProjection,
+                imageCallOrdinals: imageOrdinals,
                 showThinkingCards: showThinkingCards,
                 showToolCards: showToolCards,
                 isPendingApproval: isPending,
@@ -3572,7 +3592,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       ? 'text'
                       : block.isImage
                       ? block.imageKey
-                      : block.thinkingSteps.first.sourceOrdinal,
+                      : block.imageCallOrdinal == null
+                      ? block.thinkingSteps.first.sourceOrdinal
+                      : ('creation', block.imageCallOrdinal),
                 );
               }
 
@@ -3615,6 +3637,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   structureToken: (
                     widget.message.id,
                     visibleBlocks.length,
+                    inlineChatImages,
                     showThinkingCards,
                     showToolCards,
                   ),
@@ -3627,7 +3650,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   ),
                   estimateExtent: (index, width) {
                     final block = visibleBlocks[index];
-                    if (block.isImage) {
+                    if (block.isImage || block.imageCallOrdinal != null) {
                       return estimateTimelineImageHeight(
                         maxWidth: width,
                         aspectRatio: block.aspectRatio,
@@ -3643,6 +3666,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   },
                   itemBuilder: (context, index) {
                     final block = visibleBlocks[index];
+                    if (block.imageCallOrdinal case final ordinal?) {
+                      return ChatCreationImages.forSlots(
+                        messageId: widget.message.id,
+                        key: ValueKey(blockKey(index)),
+                        slots: imagePlacement!.atCall[ordinal]!,
+                        streaming: widget.message.isStreaming,
+                      );
+                    }
                     if (block.isImage) {
                       return _buildAssistantImageBlock(
                         context,
@@ -3722,6 +3753,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               }
               return widgets;
             }(),
+            if (imagePlacement != null)
+              ChatCreationImages.forSlots(
+                messageId: widget.message.id,
+                key: ValueKey(('creation-images', widget.message.id)),
+                slots: imagePlacement.footer,
+                streaming: widget.message.isStreaming,
+              )
+            else
+              ChatCreationImages(
+                key: ValueKey(('creation-images', widget.message.id)),
+                messageId: widget.message.id,
+                attachments: creationAttachments,
+                streaming: widget.message.isStreaming,
+              ),
             if (showProducedFiles &&
                 _producedWorkspaceParts(widget.toolParts).isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -5968,7 +6013,6 @@ class _ChainOfThoughtReasoningStepState
         const <SourceSpan>[];
     final label = ThinkingSheen(
       enabled: widget.step.loading,
-      color: fg.strong,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -6354,7 +6398,6 @@ class _ChainOfThoughtBrowserGroupState
             Flexible(
               child: ThinkingSheen(
                 enabled: running,
-                color: fg.strong,
                 child: AnimatedSwitcher(
                   duration: reduceMotion
                       ? Duration.zero
@@ -6606,7 +6649,6 @@ class _ChainOfThoughtBrowserGroupState
             Flexible(
               child: ThinkingSheen(
                 enabled: action.loading,
-                color: fg.strong,
                 child: Text(
                   action.failed
                       ? l.browserActionFailed(action.label(l))
@@ -6952,7 +6994,6 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
     );
     final label = ThinkingSheen(
       enabled: widget.part.loading && !_isAskUser,
-      color: fg.strong,
       child: Text(
         title,
         maxLines: 2,
@@ -7334,7 +7375,6 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       // Title: always show tool name; add "waiting" badge when pending
                       ThinkingSheen(
                         enabled: widget.part.loading && !isPendingApproval,
-                        color: fg.strong,
                         child: Text(
                           _titleFor(
                             context,
@@ -8667,7 +8707,6 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
             const SizedBox(width: 8),
             ThinkingSheen(
               enabled: loading,
-              color: fg.strong,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

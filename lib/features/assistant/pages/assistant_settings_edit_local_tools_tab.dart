@@ -9,6 +9,12 @@ class _LocalToolsTab extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final ap = context.watch<AssistantProvider>();
     final assistant = ap.getById(assistantId)!;
+    final imageEnabled = assistant.localToolIds.contains(
+      LocalToolNames.generateImage,
+    );
+    final imageModel = resolveDefaultImageModel(
+      context.watch<SettingsProvider>(),
+    );
     final timeEnabled = assistant.localToolIds.contains(
       LocalToolNames.timeInfo,
     );
@@ -66,6 +72,20 @@ class _LocalToolsTab extends StatelessWidget {
       children: [
         SectionCard(
           children: [
+            _LocalToolRow(
+              icon: Lucide.Palette,
+              title: l10n.creationLocalToolTitle,
+              subtitle: l10n.creationLocalToolHelp,
+              warning: imageModel == null
+                  ? l10n.creationLocalToolNeedsModel
+                  : null,
+              enabled: imageEnabled && imageModel != null,
+              onOpenSettings: () => configureChatImageModel(context),
+              settingsLabel: l10n.creationSelectDefaultImage,
+              onChanged: (value) =>
+                  toggleTool(LocalToolNames.generateImage, value),
+            ),
+            _iosDivider(context),
             if (LocalToolsService.isAvailableOnThisPlatform(
               LocalToolNames.browser,
             )) ...[
@@ -275,6 +295,8 @@ class _LocalToolRow extends StatelessWidget {
     required this.enabled,
     required this.onChanged,
     this.onOpenSettings,
+    this.warning,
+    this.settingsLabel,
   });
 
   final IconData icon;
@@ -283,6 +305,8 @@ class _LocalToolRow extends StatelessWidget {
   final bool enabled;
   final ValueChanged<bool> onChanged;
   final VoidCallback? onOpenSettings;
+  final String? warning;
+  final String? settingsLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -334,6 +358,16 @@ class _LocalToolRow extends StatelessWidget {
                             color: cs.onSurface.withValues(alpha: 0.62),
                           ),
                         ),
+                        if (warning case final text?) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            text,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.appColors.warning,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -341,7 +375,9 @@ class _LocalToolRow extends StatelessWidget {
                   if (onOpenSettings != null)
                     IconButton(
                       icon: const Icon(Lucide.Settings, size: 18),
-                      tooltip: AppLocalizations.of(context)!.phoneControlTitle,
+                      tooltip:
+                          settingsLabel ??
+                          AppLocalizations.of(context)!.phoneControlTitle,
                       onPressed: onOpenSettings,
                     ),
                   IosSwitch(value: enabled, onChanged: onChanged),

@@ -32,6 +32,7 @@ class _BackgroundTask {
     required this.scheduled,
     this.scheduledNotify = true,
     this.scheduledPreview = true,
+    this.keepAliveOnly = false,
   });
 
   final String id;
@@ -41,6 +42,7 @@ class _BackgroundTask {
   final DateTime startedAt;
   final bool scheduled;
   final bool scheduledNotify, scheduledPreview;
+  final bool keepAliveOnly;
   BackgroundTaskPhase phase = BackgroundTaskPhase.requesting;
   String toolName = '';
   int tokens = 0;
@@ -152,6 +154,7 @@ class MobileBackgroundCoordinator extends ChangeNotifier
     bool scheduled = false,
     bool scheduledNotify = true,
     bool scheduledPreview = true,
+    bool keepAliveOnly = false,
   }) async {
     if (!supported || _tasks.containsKey(id)) return;
     _tasks[id] = _BackgroundTask(
@@ -163,6 +166,7 @@ class MobileBackgroundCoordinator extends ChangeNotifier
       scheduled: scheduled,
       scheduledNotify: scheduledNotify,
       scheduledPreview: scheduledPreview,
+      keepAliveOnly: keepAliveOnly,
     );
     await initialize();
     await _sync();
@@ -196,16 +200,19 @@ class MobileBackgroundCoordinator extends ChangeNotifier
     if (task.interrupted) outcome = BackgroundTaskOutcome.interrupted;
     _cancelUpdateTimer();
     final snapshot = _snapshot(
-      terminal: {
-        ..._taskMap(task),
-        'outcome': outcome.name,
-        'detail': _outcomeText(outcome),
-        'finishedAt': DateTime.now().millisecondsSinceEpoch,
-      },
+      terminal: task.keepAliveOnly
+          ? null
+          : {
+              ..._taskMap(task),
+              'outcome': outcome.name,
+              'detail': _outcomeText(outcome),
+              'finishedAt': DateTime.now().millisecondsSinceEpoch,
+            },
     );
     await _enqueue(() async {
       final l10n = _l10n;
-      if (resultPersisted &&
+      if (!task.keepAliveOnly &&
+          resultPersisted &&
           (task.scheduled
               ? task.scheduledNotify
               : _settings.notificationsEnabled) &&

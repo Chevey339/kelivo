@@ -3343,12 +3343,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarImageProcessing => '正在处理图片';
 
   @override
-  String get chatInputBarImageMode => '绘图模式';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
-
-  @override
   String get chatInputBarQueuedPending => '排队中';
 
   @override
@@ -3639,7 +3633,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。创作话题的自动命名也用它。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -4389,6 +4383,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerBalanceInterval => '定时刷新';
+
+  @override
+  String get providerBalanceFalPermissionHint =>
+      '查询余额需要具有 billing:usage:read 权限的 fal 密钥。要单独使用账单密钥，可在下方添加 Authorization 请求头，值为 Key、一个空格和密钥。';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration => '生成后刷新';
 
   @override
   String get providerBalanceRefreshOnReply => '回复后刷新';
@@ -16755,6 +16756,1051 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get worldBookGroupClearSelection => '清空本组勾选';
+
+  @override
+  String get sidebarSettingsTitle => '侧边栏';
+
+  @override
+  String get sidebarCustomize => '自定义侧边栏';
+
+  @override
+  String get sidebarLayoutTitle => '布局';
+
+  @override
+  String get sidebarPresetCurrent => '现在的样子';
+
+  @override
+  String get sidebarPresetNavigation => '导航列表';
+
+  @override
+  String get sidebarPresetAssistantBottom => '助手在底部';
+
+  @override
+  String get sidebarPresetAllTop => '都放顶部';
+
+  @override
+  String get sidebarPresetCustom => '已自定义';
+
+  @override
+  String get sidebarReorderTitle => '调整位置';
+
+  @override
+  String get sidebarReorderHint => '拖到「对话列表」上面或下面';
+
+  @override
+  String get sidebarReorderHandle => '拖动排序';
+
+  @override
+  String get sidebarBlockUser => '用户栏';
+
+  @override
+  String get sidebarBlockSearch => '搜索框';
+
+  @override
+  String get sidebarBlockEntries => '入口';
+
+  @override
+  String get sidebarBlockAssistant => '助手';
+
+  @override
+  String get sidebarBlockConversations => '对话列表';
+
+  @override
+  String get sidebarBlockTop => '顶部';
+
+  @override
+  String get sidebarBlockBottom => '底部';
+
+  @override
+  String get sidebarDisplayAs => '显示为';
+
+  @override
+  String get sidebarStyleList => '列表';
+
+  @override
+  String get sidebarStyleIcons => '图标';
+
+  @override
+  String get sidebarVisibilityShow => '显示';
+
+  @override
+  String get sidebarMore => '更多';
+
+  @override
+  String get sidebarVisibilityHidden => '隐藏';
+
+  @override
+  String get sidebarLocationEntries => '入口区';
+
+  @override
+  String get sidebarLocationSearch => '搜索框右侧';
+
+  @override
+  String get sidebarLocationUserBar => '用户栏图标';
+
+  @override
+  String get sidebarLocationMore => '在「更多」里';
+
+  @override
+  String get sidebarLocationHidden => '已从侧边栏隐藏';
+
+  @override
+  String get sidebarLocationRail => '左侧图标栏';
+
+  @override
+  String get sidebarMenuShow => '显示在侧边栏';
+
+  @override
+  String get sidebarMenuMore => '收进「更多」';
+
+  @override
+  String get sidebarMenuHide => '从侧边栏隐藏';
+
+  @override
+  String get sidebarHideCustomize => '不在「更多」里显示';
+
+  @override
+  String get sidebarShowCustomizeInMore => '在「更多」里显示「自定义侧边栏」';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint => '调好后可以关掉，之后从这里改';
+
+  @override
+  String get sidebarHideSingleAssistant => '只有一个助手时隐藏助手行';
+
+  @override
+  String get sidebarHideSingleAssistantHint => '默认照常显示，和现在一样';
+
+  @override
+  String get sidebarRestoreDefaults => '恢复默认';
+
+  @override
+  String get sidebarOpenSettings => '打开侧边栏设置…';
+
+  @override
+  String get creationTitle => '创作';
+
+  @override
+  String get creationTopics => '话题';
+
+  @override
+  String get creationNewTopic => '新话题';
+
+  @override
+  String get creationNameAfterSending => '发送第一条提示词后自动命名';
+
+  @override
+  String get creationPromptTitle => '用提示词开头作标题';
+
+  @override
+  String get creationSearchTopics => '搜索话题和提示词';
+
+  @override
+  String get creationTopicsEmpty => '发出第一条提示词后，话题会出现在这里';
+
+  @override
+  String get creationNaming => '正在命名…';
+
+  @override
+  String get creationRenameTopic => '重命名';
+
+  @override
+  String get creationDeleteTopic => '删除话题';
+
+  @override
+  String get creationDeleteTopicBody => '删除这个话题和其中的所有作品？';
+
+  @override
+  String get creationImage => '图片';
+
+  @override
+  String get creationVideo => '视频';
+
+  @override
+  String get creationImagePrompt => '描述要创建的图像';
+
+  @override
+  String get creationVideoPrompt => '描述要生成的视频';
+
+  @override
+  String get creationNewImagePrompt => '描述要创建的图像，发送后新建话题';
+
+  @override
+  String get creationNewVideoPrompt => '描述要生成的视频，发送后新建话题';
+
+  @override
+  String get creationSelectModel => '选择模型';
+
+  @override
+  String get creationSearchModels => '搜索模型或供应商';
+
+  @override
+  String get creationNoModelTitle => '还没有能生成图片或视频的模型';
+
+  @override
+  String get creationNoModelBody =>
+      '创作使用「供应商」里图片或视频类型的模型。登录一个订阅就能出图，也可以在 fal 或其他供应商填入 API Key。';
+
+  @override
+  String get creationEmptyTitle => '从你的创意开始';
+
+  @override
+  String get creationEmptyBody => '描述想要的作品，发送第一条提示词后会新建一个话题，之后的修改也会留在这里。';
+
+  @override
+  String get creationAddReference => '添加参考图';
+
+  @override
+  String get creationReferenceTooLarge => '参考图总大小不能超过 20 MB。';
+
+  @override
+  String get creationApiProtocol => '创作接口协议';
+
+  @override
+  String get creationApiProtocolHelp => '自动使用供应商的接口。使用自定义中转时，可按中转文档选择协议。';
+
+  @override
+  String get creationAspectRatio => '画面比例';
+
+  @override
+  String get creationCountLabel => '张数';
+
+  @override
+  String get creationDuration => '时长';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String get creationResolution => '分辨率';
+
+  @override
+  String get creationFirstLastFrame => '首尾帧';
+
+  @override
+  String get creationFirstFrame => '首帧';
+
+  @override
+  String get creationLastFrame => '尾帧';
+
+  @override
+  String get creationBothFramesRequired => '请选择首帧和尾帧。';
+
+  @override
+  String get creationFirstFrameRequired => '首帧必填，尾帧可选。';
+
+  @override
+  String get creationFirstFrameOnly => '此模型只支持首帧。';
+
+  @override
+  String get creationImageModels => '图片模型';
+
+  @override
+  String get creationVideoModels => '视频模型';
+
+  @override
+  String get creationPlayVideo => '播放视频';
+
+  @override
+  String get creationPauseVideo => '暂停视频';
+
+  @override
+  String get creationMuteVideo => '静音';
+
+  @override
+  String get creationUnmuteVideo => '取消静音';
+
+  @override
+  String get creationOpenVideo => '用系统播放器打开';
+
+  @override
+  String get creationFullScreen => '全屏';
+
+  @override
+  String get creationExitFullScreen => '退出全屏';
+
+  @override
+  String get creationSaveVideo => '保存视频';
+
+  @override
+  String get creationParameters => '生成参数';
+
+  @override
+  String get creationAuto => '自动';
+
+  @override
+  String get creationGenerate => '生成';
+
+  @override
+  String get creationWaitingImage => '正在创建图像';
+
+  @override
+  String get creationWaitingVideo => '正在准备视频';
+
+  @override
+  String get creationDownloading => '正在下载';
+
+  @override
+  String get creationFailed => '生成失败';
+
+  @override
+  String get creationInterrupted => '应用关闭，任务中断';
+
+  @override
+  String get creationCancelled => '已取消';
+
+  @override
+  String get creationPartial => '部分作品下载失败';
+
+  @override
+  String get creationRetry => '再试一次';
+
+  @override
+  String get creationCopyPrompt => '复制提示词';
+
+  @override
+  String get creationSaveImage => '保存图片';
+
+  @override
+  String get creationCopyImage => '复制图片';
+
+  @override
+  String get creationShare => '分享';
+
+  @override
+  String get creationDeleteItem => '删除作品';
+
+  @override
+  String get creationDeleteItemBody => '删除这个作品？';
+
+  @override
+  String get creationActionFailed => '操作未完成';
+
+  @override
+  String get creationOptionSaved => '已保存';
+
+  @override
+  String get creationOptionCopied => '已复制';
+
+  @override
+  String get backupScopeCreations => '创作';
+
+  @override
+  String creationQueuePosition(int count) {
+    return '排队中 · 前面还有 $count 个任务';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    return '$count 张';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    return '$count 次生成';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    return '$count 个作品';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return '话题 $count';
+  }
+
+  @override
+  String get creationMoreOptions => '更多';
+
+  @override
+  String get creationImageSize => '尺寸';
+
+  @override
+  String get creationQuality => '质量';
+
+  @override
+  String get creationLowQuality => '低';
+
+  @override
+  String get creationMediumQuality => '中';
+
+  @override
+  String get creationHighQuality => '高';
+
+  @override
+  String get creationNegativePrompt => '负向提示词';
+
+  @override
+  String get creationSeed => '种子';
+
+  @override
+  String get creationTransparentBackground => '透明背景';
+
+  @override
+  String get creationOutputFormat => '输出格式';
+
+  @override
+  String get creationExtraJson => '额外参数（JSON）';
+
+  @override
+  String get creationExtraJsonHint => '每次请求都会带上这些值。可在「更多」中临时修改。';
+
+  @override
+  String get creationModelKnown => '默认值来自 Kelivo 内置的模型资料。改过的项只影响这个模型。';
+
+  @override
+  String get creationModelUnknown => 'Kelivo 没有这个模型的资料，先按常见参数填好了，可以对照平台文档修改。';
+
+  @override
+  String get creationMaxPerRequest => '单次最多生成';
+
+  @override
+  String get creationMaxPerRequestHelp => '超过此数量时会拆成多次请求，结果放在同一组。';
+
+  @override
+  String get creationReferenceLimit => '参考图';
+
+  @override
+  String get creationReferenceLimitHelp => '设为 0 时，创作页将隐藏添加参考图及编辑入口。';
+
+  @override
+  String get creationRatioHelp => '创作页只显示勾选的比例。选「自动」时由模型决定。';
+
+  @override
+  String get creationMediaOther => '其他';
+
+  @override
+  String get creationEnableOptionHelp => '在「更多」中显示此控件。';
+
+  @override
+  String get creationImageTypeHelp => '图像模型出现在创作页和「图像生成」工具中。';
+
+  @override
+  String get creationVideoTypeHelp => '视频模型出现在创作页中。';
+
+  @override
+  String get creationFalKeyHint => '在 fal.ai › Dashboard › API Keys 创建后粘贴到这里';
+
+  @override
+  String get creationFalCatalogHint => '点「获取」浏览 fal 在线模型目录，或点「＋」按端点 ID 手动添加。';
+
+  @override
+  String falUnsupportedInput(String field) {
+    return '此模型需要创作暂不支持的输入字段 $field。';
+  }
+
+  @override
+  String get falUnsupportedOutput => '此模型的返回结果无法保存为创作支持的图片或视频。';
+
+  @override
+  String get falCheckingModel => '正在核对模型…';
+
+  @override
+  String get falInvalidEndpointId => '请输入 fal 端点 ID，例如 fal-ai/flux/dev。';
+
+  @override
+  String get creationOptionalTitle => '为作品命名（可选）';
+
+  @override
+  String get falCatalogMore => '加载更多模型';
+
+  @override
+  String get falCatalogNoMatch => '没有匹配的图像或视频模型';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return '无法获取 fal 模型信息（$error）';
+  }
+
+  @override
+  String get creationFalModelId => '模型 ID';
+
+  @override
+  String get creationSelectPlatformImage => '选择图片';
+
+  @override
+  String get creationPlatformOptions => '模型特有参数';
+
+  @override
+  String get creationParameterRequired => '必填';
+
+  @override
+  String get creationBackground => '背景';
+
+  @override
+  String get creationOpaqueBackground => '不透明';
+
+  @override
+  String get creationTransparentOption => '透明';
+
+  @override
+  String get creationChatModelBadge => '聊天模型';
+
+  @override
+  String get creationCommonOptions => '通用参数';
+
+  @override
+  String get creationNoCommonOptions => '此模型没有可用的通用参数。';
+
+  @override
+  String get creationGallery => '全部作品';
+
+  @override
+  String get creationFilterAll => '全部';
+
+  @override
+  String get creationFilterImages => '图片';
+
+  @override
+  String get creationFilterVideos => '视频';
+
+  @override
+  String get creationFilterFavorites => '收藏';
+
+  @override
+  String get creationSearchGallery => '搜索提示词或话题';
+
+  @override
+  String get creationGalleryEmpty => '还没有作品';
+
+  @override
+  String get creationFavoritesEmpty => '还没有收藏';
+
+  @override
+  String get creationGalleryNoResults => '没有找到匹配的作品';
+
+  @override
+  String get creationShowInTopic => '在话题中查看';
+
+  @override
+  String get creationFavorite => '收藏';
+
+  @override
+  String get creationUnfavorite => '取消收藏';
+
+  @override
+  String get creationFavorited => '已收藏';
+
+  @override
+  String get creationUnfavorited => '已取消收藏';
+
+  @override
+  String get creationTopicDisplay => '话题显示方式';
+
+  @override
+  String get creationCoversAndTitles => '封面 + 标题';
+
+  @override
+  String get creationCoversOnly => '只看封面';
+
+  @override
+  String get creationTopicList => '列表';
+
+  @override
+  String get creationAutoTitle => '自动命名话题';
+
+  @override
+  String get creationAutoTitleHelp => '用标题总结模型根据第一条提示词起标题。';
+
+  @override
+  String get creationAutoTitleOffHelp => '直接用第一条提示词的开头作为标题。';
+
+  @override
+  String get creationCustomCount => '自定义';
+
+  @override
+  String get creationCustomCountMaximum => '最多 16';
+
+  @override
+  String creationRequestSplit(String model, int limit, int requests) {
+    return '$model 单次最多生成 $limit 张，会拆成 $requests 次请求并放在同一组。';
+  }
+
+  @override
+  String get creationNoModelPlaceholder => '先添加一个能生成图片或视频的模型';
+
+  @override
+  String get creationConnectChatGPT => '登录 ChatGPT';
+
+  @override
+  String get creationConnectGrok => '登录 Grok';
+
+  @override
+  String get creationConfigureFal => '添加 fal';
+
+  @override
+  String get creationOtherProviders => '其他供应商';
+
+  @override
+  String get creationChooseReferenceFile => '从文件选择…';
+
+  @override
+  String get creationChooseFromLibrary => '从相册选择';
+
+  @override
+  String get creationTakeReferencePhoto => '拍照';
+
+  @override
+  String get creationPasteReference => '从剪贴板粘贴';
+
+  @override
+  String get creationRecentImages => '最近的图片';
+
+  @override
+  String get creationReferenceDrop => '松开以添加为参考图';
+
+  @override
+  String get creationFirstFrameDrop => '松开以设为首帧';
+
+  @override
+  String get creationReferenceDropHint => '也可以直接把图片拖进页面。';
+
+  @override
+  String get creationNoClipboardImage => '剪贴板里没有图片';
+
+  @override
+  String get creationReferenceAdded => '已添加为参考图';
+
+  @override
+  String get creationReferenceAlreadyAdded => '所选图片已经在参考图里了';
+
+  @override
+  String creationReferenceLimitReached(int count) {
+    return '当前模型最多支持 $count 张参考图。';
+  }
+
+  @override
+  String creationReferenceUnsupported(String model) {
+    return '$model 不支持参考图';
+  }
+
+  @override
+  String get creationReferenceIgnored => '参考图会留在草稿里，换用支持参考图的模型即可使用。';
+
+  @override
+  String get creationRecentChat => '聊天';
+
+  @override
+  String get creationRecentCreation => '创作';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return '还可以选择 $count 张参考图';
+  }
+
+  @override
+  String get creationTapToSelect => '点图片选择';
+
+  @override
+  String creationSelectedImages(int count) {
+    return '已选 $count 张';
+  }
+
+  @override
+  String creationAddSelected(int count) {
+    return '添加（$count）';
+  }
+
+  @override
+  String get creationRecentEmpty => '还没有最近的图片';
+
+  @override
+  String get creationEditImage => '编辑图片';
+
+  @override
+  String get creationUseReference => '用作参考图';
+
+  @override
+  String get creationEditReference => '以这张图作为参考';
+
+  @override
+  String get creationEditPrompt => '要改什么';
+
+  @override
+  String get creationEditPromptExample => '例如：把背景换成海边，保留人物和光线';
+
+  @override
+  String get creationEditOriginalRatio => '原比例';
+
+  @override
+  String get creationEditNewGroup => '生成新的一组';
+
+  @override
+  String get creationEditHelp => '修改结果会作为新的一组出现在这个话题中。';
+
+  @override
+  String get creationEditStarted => '已开始编辑，结果会出现在这个话题底部。';
+
+  @override
+  String get creationEditedResult => '编辑结果';
+
+  @override
+  String get creationEditedFrom => '编辑自';
+
+  @override
+  String get creationRepeat => '再来一次';
+
+  @override
+  String get creationDeleteBatch => '删除这组作品';
+
+  @override
+  String creationDeleteBatchBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '将从此设备删除这一组及其中的 $count 个文件，无法恢复。',
+      zero: '确定从此设备删除这条生成记录吗？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationRequestDetails => '请求日志';
+
+  @override
+  String get creationNoRequestDetails => '没有可用的请求日志。';
+
+  @override
+  String creationReferenceSummary(int count, int limit) {
+    return '参考图 $count / $limit';
+  }
+
+  @override
+  String get creationPrevious => '上一件作品';
+
+  @override
+  String get creationNext => '下一件作品';
+
+  @override
+  String get creationWaitingSketch => '勾勒草图';
+
+  @override
+  String get creationWaitingDetails => '细化画面';
+
+  @override
+  String get creationWaitingFinish => '完成最后调整';
+
+  @override
+  String get creationWaitingVideoMotion => '规划画面运动';
+
+  @override
+  String get creationWaitingVideoFrames => '生成视频帧';
+
+  @override
+  String get creationWaitingVideoFinish => '整理视频画面';
+
+  @override
+  String get creationWaitingLong => '还需要一点时间';
+
+  @override
+  String get creationSuggestionPoster => '设计一张极简音乐会海报';
+
+  @override
+  String get creationSuggestionLandscape => '画一座清晨的山间小镇';
+
+  @override
+  String get creationSuggestionProduct => '用柔和日光拍一只陶瓷杯';
+
+  @override
+  String get creationSuggestionIllustration => '画一只星空下的狐狸';
+
+  @override
+  String get creationSuggestionRoom => '画一个暖木色的阅读角';
+
+  @override
+  String get creationSuggestionSticker => '做一套有趣的植物贴纸';
+
+  @override
+  String get creationSuggestionMotion => '缓慢推进镜头，拍摄雨中的花园';
+
+  @override
+  String get creationSuggestionOcean => '日落时海浪涌上沙滩';
+
+  @override
+  String get creationWaitingDraft => '正在生成初稿';
+
+  @override
+  String get creationWaitingScene => '正在布置场景';
+
+  @override
+  String get creationWaitingVideoRendering => '正在渲染动态';
+
+  @override
+  String get creationWaitingVideoComposite => '正在合成视频';
+
+  @override
+  String get creationWaitingNearlyDone => '即将完成';
+
+  @override
+  String creationUseGroupReferences(int count) {
+    return '全部用作参考图（$count）';
+  }
+
+  @override
+  String get creationDownloadFailed => '下载失败';
+
+  @override
+  String get creationAutomaticRetry => '自动重试';
+
+  @override
+  String get creationNoAutomaticRetry => '手动重试';
+
+  @override
+  String get creationRetryHistory => '重试记录';
+
+  @override
+  String get creationLoggedRequest => '请求信息';
+
+  @override
+  String get creationLoggedResponse => '返回信息';
+
+  @override
+  String get creationDefaultImage => '生图模型';
+
+  @override
+  String get creationDefaultImageHelp => '创作页图片模式和聊天里的「图像生成」工具使用的模型。';
+
+  @override
+  String get creationDefaultVideo => '视频模型';
+
+  @override
+  String get creationDefaultVideoHelp => '创作页视频模式使用的模型。';
+
+  @override
+  String get creationDefaultEnhance => '提示词增强模型';
+
+  @override
+  String get creationDefaultEnhanceHelp => '用于改写创作页的提示词。模型支持图片输入时，参考图会一起发送。';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return '用 $variable 插入当前创作提示词。';
+  }
+
+  @override
+  String get creationLocalToolTitle => '图像生成';
+
+  @override
+  String get creationLocalToolHelp => '让助手在对话里画图或改图，使用「默认模型」里的生图模型。';
+
+  @override
+  String creationStorageFileCount(int count) {
+    return '$count 个文件';
+  }
+
+  @override
+  String get creationSelectDefaultImage => '选择默认生图模型';
+
+  @override
+  String get creationConfigureImageProvider => '请先在供应商设置中添加或启用一个生图模型。';
+
+  @override
+  String get displayChatImagesAtToolCall => '在工具调用处显示生成图片';
+
+  @override
+  String get displayChatImageInfo => '显示生图信息';
+
+  @override
+  String get displayChatImageLink => '显示「在创作中查看」';
+
+  @override
+  String get creationLocalToolNeedsModel => '先在「默认模型 › 生图模型」里选一个模型。';
+
+  @override
+  String creationChatSource(String title) {
+    return '聊天 · $title';
+  }
+
+  @override
+  String get creationSendToChat => '发送到聊天';
+
+  @override
+  String get creationShowInConversation => '在对话中查看';
+
+  @override
+  String get creationShowInCreation => '在创作中查看';
+
+  @override
+  String get creationChatCancelled => '已取消图像创建';
+
+  @override
+  String get creationChatRegenerate => '重新生成';
+
+  @override
+  String get creationChatImageUnavailable => '图像不可用';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    return '已生成 $count 张 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => '提示词增强';
+
+  @override
+  String get creationEnhanceLoading => '正在改写提示词';
+
+  @override
+  String get creationEnhanceResult => '改写后的提示词';
+
+  @override
+  String get creationEnhanceOriginal => '原文';
+
+  @override
+  String get creationEnhanceAgain => '换一个';
+
+  @override
+  String get creationEnhanceApply => '替换';
+
+  @override
+  String get creationEnhanceNeedsModel => '请先在「默认模型」里选择提示词增强模型。';
+
+  @override
+  String get creationStorageHint => '创作保存的图像、视频、缩略图和参考图。';
+
+  @override
+  String get creationStorageDate => '清理截至该日期的创作';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return '删除截至 $date 已结束的生成记录及其中的图片、视频和参考图副本？聊天中由这些记录生成的图片也将无法查看。';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    return '已清理 $count 次生成记录';
+  }
+
+  @override
+  String get creationStorageClean => '按日期清理';
+
+  @override
+  String get creationDisplayAndGames => '显示方式和小游戏';
+
+  @override
+  String get creationWaitGame => '等待小游戏';
+
+  @override
+  String get creationGameRandom => '随机';
+
+  @override
+  String get creationGameOff => '关闭';
+
+  @override
+  String get creationGameSnake => '贪吃蛇';
+
+  @override
+  String get creationGameBrick => '打砖块';
+
+  @override
+  String get creationGameSnakeControls =>
+      '贪吃蛇。方向键、W A S D 或滑动控制方向。空格暂停或继续，Esc 退出。';
+
+  @override
+  String get creationGameBrickControls =>
+      '打砖块。拖动挡板，或按住左右方向键、A 或 D 移动。空格暂停或继续，Esc 退出。';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return '图像生成时玩$game';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return '视频生成时玩$game';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return '得分：$score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return '已暂停 · $score 分';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return '游戏结束 · $score 分';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return '生成好了 · $score 分';
+  }
+
+  @override
+  String get creationNoSelectableModels => '没有可用模型';
+
+  @override
+  String get creationNoMatchingTopics => '没有匹配的话题';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return '全部话题 $count';
+  }
+
+  @override
+  String get creationNoImageModels => '还没有能生成图片的模型';
+
+  @override
+  String get creationNoVideoModels => '还没有能生成视频的模型';
+
+  @override
+  String get creationFrameSources => '从最近的图片、文件或剪贴板添加';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model 只支持首帧';
+  }
+
+  @override
+  String get creationSubscriptionLogin => '订阅登录';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return '参考图最多 $count 张';
+  }
+
+  @override
+  String get creationTextOnlyImage => '文生图';
+
+  @override
+  String get creationTextOnlyVideo => '文生视频';
+
+  @override
+  String get creationCustomCountLabel => '自定义张数';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': '网络连接',
+      'rateLimited': '请求频率限制',
+      'server': '供应商错误',
+      'rejected': '请求被拒绝',
+      'login': '需要登录',
+      'unavailable': '模型或接口不可用',
+      'parameters': '参数无效',
+      'referenceTooLarge': '参考图过大',
+      'download': '下载失败',
+      'invalidResponse': '响应无效',
+      'other': '生成错误',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp => '这个任务在应用关闭时还没有完成，提示词和参数都保留着。';
+
+  @override
+  String get creationCancelledHelp => '提示词和参数都保留着，可以随时重新生成。';
+
+  @override
+  String get creationChatImageReady => '图像已生成';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -20096,12 +21142,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarImageProcessing => '正在处理图片';
 
   @override
-  String get chatInputBarImageMode => '绘图模式';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
-
-  @override
   String get chatInputBarQueuedPending => '排队中';
 
   @override
@@ -20392,7 +21432,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。创作话题的自动命名也用它。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -21142,6 +22182,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerBalanceInterval => '定时刷新';
+
+  @override
+  String get providerBalanceFalPermissionHint =>
+      '查询余额需要具有 billing:usage:read 权限的 fal 密钥。要单独使用账单密钥，可在下方添加 Authorization 请求头，值为 Key、一个空格和密钥。';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration => '生成后刷新';
 
   @override
   String get providerBalanceRefreshOnReply => '回复后刷新';
@@ -33508,6 +34555,1051 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get worldBookGroupClearSelection => '清空本组勾选';
+
+  @override
+  String get sidebarSettingsTitle => '侧边栏';
+
+  @override
+  String get sidebarCustomize => '自定义侧边栏';
+
+  @override
+  String get sidebarLayoutTitle => '布局';
+
+  @override
+  String get sidebarPresetCurrent => '现在的样子';
+
+  @override
+  String get sidebarPresetNavigation => '导航列表';
+
+  @override
+  String get sidebarPresetAssistantBottom => '助手在底部';
+
+  @override
+  String get sidebarPresetAllTop => '都放顶部';
+
+  @override
+  String get sidebarPresetCustom => '已自定义';
+
+  @override
+  String get sidebarReorderTitle => '调整位置';
+
+  @override
+  String get sidebarReorderHint => '拖到「对话列表」上面或下面';
+
+  @override
+  String get sidebarReorderHandle => '拖动排序';
+
+  @override
+  String get sidebarBlockUser => '用户栏';
+
+  @override
+  String get sidebarBlockSearch => '搜索框';
+
+  @override
+  String get sidebarBlockEntries => '入口';
+
+  @override
+  String get sidebarBlockAssistant => '助手';
+
+  @override
+  String get sidebarBlockConversations => '对话列表';
+
+  @override
+  String get sidebarBlockTop => '顶部';
+
+  @override
+  String get sidebarBlockBottom => '底部';
+
+  @override
+  String get sidebarDisplayAs => '显示为';
+
+  @override
+  String get sidebarStyleList => '列表';
+
+  @override
+  String get sidebarStyleIcons => '图标';
+
+  @override
+  String get sidebarVisibilityShow => '显示';
+
+  @override
+  String get sidebarMore => '更多';
+
+  @override
+  String get sidebarVisibilityHidden => '隐藏';
+
+  @override
+  String get sidebarLocationEntries => '入口区';
+
+  @override
+  String get sidebarLocationSearch => '搜索框右侧';
+
+  @override
+  String get sidebarLocationUserBar => '用户栏图标';
+
+  @override
+  String get sidebarLocationMore => '在「更多」里';
+
+  @override
+  String get sidebarLocationHidden => '已从侧边栏隐藏';
+
+  @override
+  String get sidebarLocationRail => '左侧图标栏';
+
+  @override
+  String get sidebarMenuShow => '显示在侧边栏';
+
+  @override
+  String get sidebarMenuMore => '收进「更多」';
+
+  @override
+  String get sidebarMenuHide => '从侧边栏隐藏';
+
+  @override
+  String get sidebarHideCustomize => '不在「更多」里显示';
+
+  @override
+  String get sidebarShowCustomizeInMore => '在「更多」里显示「自定义侧边栏」';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint => '调好后可以关掉，之后从这里改';
+
+  @override
+  String get sidebarHideSingleAssistant => '只有一个助手时隐藏助手行';
+
+  @override
+  String get sidebarHideSingleAssistantHint => '默认照常显示，和现在一样';
+
+  @override
+  String get sidebarRestoreDefaults => '恢复默认';
+
+  @override
+  String get sidebarOpenSettings => '打开侧边栏设置…';
+
+  @override
+  String get creationTitle => '创作';
+
+  @override
+  String get creationTopics => '话题';
+
+  @override
+  String get creationNewTopic => '新话题';
+
+  @override
+  String get creationNameAfterSending => '发送第一条提示词后自动命名';
+
+  @override
+  String get creationPromptTitle => '用提示词开头作标题';
+
+  @override
+  String get creationSearchTopics => '搜索话题和提示词';
+
+  @override
+  String get creationTopicsEmpty => '发出第一条提示词后，话题会出现在这里';
+
+  @override
+  String get creationNaming => '正在命名…';
+
+  @override
+  String get creationRenameTopic => '重命名';
+
+  @override
+  String get creationDeleteTopic => '删除话题';
+
+  @override
+  String get creationDeleteTopicBody => '删除这个话题和其中的所有作品？';
+
+  @override
+  String get creationImage => '图片';
+
+  @override
+  String get creationVideo => '视频';
+
+  @override
+  String get creationImagePrompt => '描述要创建的图像';
+
+  @override
+  String get creationVideoPrompt => '描述要生成的视频';
+
+  @override
+  String get creationNewImagePrompt => '描述要创建的图像，发送后新建话题';
+
+  @override
+  String get creationNewVideoPrompt => '描述要生成的视频，发送后新建话题';
+
+  @override
+  String get creationSelectModel => '选择模型';
+
+  @override
+  String get creationSearchModels => '搜索模型或供应商';
+
+  @override
+  String get creationNoModelTitle => '还没有能生成图片或视频的模型';
+
+  @override
+  String get creationNoModelBody =>
+      '创作使用「供应商」里图片或视频类型的模型。登录一个订阅就能出图，也可以在 fal 或其他供应商填入 API Key。';
+
+  @override
+  String get creationEmptyTitle => '从你的创意开始';
+
+  @override
+  String get creationEmptyBody => '描述想要的作品，发送第一条提示词后会新建一个话题，之后的修改也会留在这里。';
+
+  @override
+  String get creationAddReference => '添加参考图';
+
+  @override
+  String get creationReferenceTooLarge => '参考图总大小不能超过 20 MB。';
+
+  @override
+  String get creationApiProtocol => '创作接口协议';
+
+  @override
+  String get creationApiProtocolHelp => '自动使用供应商的接口。使用自定义中转时，可按中转文档选择协议。';
+
+  @override
+  String get creationAspectRatio => '画面比例';
+
+  @override
+  String get creationCountLabel => '张数';
+
+  @override
+  String get creationDuration => '时长';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String get creationResolution => '分辨率';
+
+  @override
+  String get creationFirstLastFrame => '首尾帧';
+
+  @override
+  String get creationFirstFrame => '首帧';
+
+  @override
+  String get creationLastFrame => '尾帧';
+
+  @override
+  String get creationBothFramesRequired => '请选择首帧和尾帧。';
+
+  @override
+  String get creationFirstFrameRequired => '首帧必填，尾帧可选。';
+
+  @override
+  String get creationFirstFrameOnly => '此模型只支持首帧。';
+
+  @override
+  String get creationImageModels => '图片模型';
+
+  @override
+  String get creationVideoModels => '视频模型';
+
+  @override
+  String get creationPlayVideo => '播放视频';
+
+  @override
+  String get creationPauseVideo => '暂停视频';
+
+  @override
+  String get creationMuteVideo => '静音';
+
+  @override
+  String get creationUnmuteVideo => '取消静音';
+
+  @override
+  String get creationOpenVideo => '用系统播放器打开';
+
+  @override
+  String get creationFullScreen => '全屏';
+
+  @override
+  String get creationExitFullScreen => '退出全屏';
+
+  @override
+  String get creationSaveVideo => '保存视频';
+
+  @override
+  String get creationParameters => '生成参数';
+
+  @override
+  String get creationAuto => '自动';
+
+  @override
+  String get creationGenerate => '生成';
+
+  @override
+  String get creationWaitingImage => '正在创建图像';
+
+  @override
+  String get creationWaitingVideo => '正在准备视频';
+
+  @override
+  String get creationDownloading => '正在下载';
+
+  @override
+  String get creationFailed => '生成失败';
+
+  @override
+  String get creationInterrupted => '应用关闭，任务中断';
+
+  @override
+  String get creationCancelled => '已取消';
+
+  @override
+  String get creationPartial => '部分作品下载失败';
+
+  @override
+  String get creationRetry => '再试一次';
+
+  @override
+  String get creationCopyPrompt => '复制提示词';
+
+  @override
+  String get creationSaveImage => '保存图片';
+
+  @override
+  String get creationCopyImage => '复制图片';
+
+  @override
+  String get creationShare => '分享';
+
+  @override
+  String get creationDeleteItem => '删除作品';
+
+  @override
+  String get creationDeleteItemBody => '删除这个作品？';
+
+  @override
+  String get creationActionFailed => '操作未完成';
+
+  @override
+  String get creationOptionSaved => '已保存';
+
+  @override
+  String get creationOptionCopied => '已复制';
+
+  @override
+  String get backupScopeCreations => '创作';
+
+  @override
+  String creationQueuePosition(int count) {
+    return '排队中 · 前面还有 $count 个任务';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    return '$count 张';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    return '$count 次生成';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    return '$count 个作品';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return '话题 $count';
+  }
+
+  @override
+  String get creationMoreOptions => '更多';
+
+  @override
+  String get creationImageSize => '尺寸';
+
+  @override
+  String get creationQuality => '质量';
+
+  @override
+  String get creationLowQuality => '低';
+
+  @override
+  String get creationMediumQuality => '中';
+
+  @override
+  String get creationHighQuality => '高';
+
+  @override
+  String get creationNegativePrompt => '负向提示词';
+
+  @override
+  String get creationSeed => '种子';
+
+  @override
+  String get creationTransparentBackground => '透明背景';
+
+  @override
+  String get creationOutputFormat => '输出格式';
+
+  @override
+  String get creationExtraJson => '额外参数（JSON）';
+
+  @override
+  String get creationExtraJsonHint => '每次请求都会带上这些值。可在「更多」中临时修改。';
+
+  @override
+  String get creationModelKnown => '默认值来自 Kelivo 内置的模型资料。改过的项只影响这个模型。';
+
+  @override
+  String get creationModelUnknown => 'Kelivo 没有这个模型的资料，先按常见参数填好了，可以对照平台文档修改。';
+
+  @override
+  String get creationMaxPerRequest => '单次最多生成';
+
+  @override
+  String get creationMaxPerRequestHelp => '超过此数量时会拆成多次请求，结果放在同一组。';
+
+  @override
+  String get creationReferenceLimit => '参考图';
+
+  @override
+  String get creationReferenceLimitHelp => '设为 0 时，创作页将隐藏添加参考图及编辑入口。';
+
+  @override
+  String get creationRatioHelp => '创作页只显示勾选的比例。选「自动」时由模型决定。';
+
+  @override
+  String get creationMediaOther => '其他';
+
+  @override
+  String get creationEnableOptionHelp => '在「更多」中显示此控件。';
+
+  @override
+  String get creationImageTypeHelp => '图像模型出现在创作页和「图像生成」工具中。';
+
+  @override
+  String get creationVideoTypeHelp => '视频模型出现在创作页中。';
+
+  @override
+  String get creationFalKeyHint => '在 fal.ai › Dashboard › API Keys 创建后粘贴到这里';
+
+  @override
+  String get creationFalCatalogHint => '点「获取」浏览 fal 在线模型目录，或点「＋」按端点 ID 手动添加。';
+
+  @override
+  String falUnsupportedInput(String field) {
+    return '此模型需要创作暂不支持的输入字段 $field。';
+  }
+
+  @override
+  String get falUnsupportedOutput => '此模型的返回结果无法保存为创作支持的图片或视频。';
+
+  @override
+  String get falCheckingModel => '正在核对模型…';
+
+  @override
+  String get falInvalidEndpointId => '请输入 fal 端点 ID，例如 fal-ai/flux/dev。';
+
+  @override
+  String get creationOptionalTitle => '为作品命名（可选）';
+
+  @override
+  String get falCatalogMore => '加载更多模型';
+
+  @override
+  String get falCatalogNoMatch => '没有匹配的图像或视频模型';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return '无法获取 fal 模型信息（$error）';
+  }
+
+  @override
+  String get creationFalModelId => '模型 ID';
+
+  @override
+  String get creationSelectPlatformImage => '选择图片';
+
+  @override
+  String get creationPlatformOptions => '模型特有参数';
+
+  @override
+  String get creationParameterRequired => '必填';
+
+  @override
+  String get creationBackground => '背景';
+
+  @override
+  String get creationOpaqueBackground => '不透明';
+
+  @override
+  String get creationTransparentOption => '透明';
+
+  @override
+  String get creationChatModelBadge => '聊天模型';
+
+  @override
+  String get creationCommonOptions => '通用参数';
+
+  @override
+  String get creationNoCommonOptions => '此模型没有可用的通用参数。';
+
+  @override
+  String get creationGallery => '全部作品';
+
+  @override
+  String get creationFilterAll => '全部';
+
+  @override
+  String get creationFilterImages => '图片';
+
+  @override
+  String get creationFilterVideos => '视频';
+
+  @override
+  String get creationFilterFavorites => '收藏';
+
+  @override
+  String get creationSearchGallery => '搜索提示词或话题';
+
+  @override
+  String get creationGalleryEmpty => '还没有作品';
+
+  @override
+  String get creationFavoritesEmpty => '还没有收藏';
+
+  @override
+  String get creationGalleryNoResults => '没有找到匹配的作品';
+
+  @override
+  String get creationShowInTopic => '在话题中查看';
+
+  @override
+  String get creationFavorite => '收藏';
+
+  @override
+  String get creationUnfavorite => '取消收藏';
+
+  @override
+  String get creationFavorited => '已收藏';
+
+  @override
+  String get creationUnfavorited => '已取消收藏';
+
+  @override
+  String get creationTopicDisplay => '话题显示方式';
+
+  @override
+  String get creationCoversAndTitles => '封面 + 标题';
+
+  @override
+  String get creationCoversOnly => '只看封面';
+
+  @override
+  String get creationTopicList => '列表';
+
+  @override
+  String get creationAutoTitle => '自动命名话题';
+
+  @override
+  String get creationAutoTitleHelp => '用标题总结模型根据第一条提示词起标题。';
+
+  @override
+  String get creationAutoTitleOffHelp => '直接用第一条提示词的开头作为标题。';
+
+  @override
+  String get creationCustomCount => '自定义';
+
+  @override
+  String get creationCustomCountMaximum => '最多 16';
+
+  @override
+  String creationRequestSplit(String model, int limit, int requests) {
+    return '$model 单次最多生成 $limit 张，会拆成 $requests 次请求并放在同一组。';
+  }
+
+  @override
+  String get creationNoModelPlaceholder => '先添加一个能生成图片或视频的模型';
+
+  @override
+  String get creationConnectChatGPT => '登录 ChatGPT';
+
+  @override
+  String get creationConnectGrok => '登录 Grok';
+
+  @override
+  String get creationConfigureFal => '添加 fal';
+
+  @override
+  String get creationOtherProviders => '其他供应商';
+
+  @override
+  String get creationChooseReferenceFile => '从文件选择…';
+
+  @override
+  String get creationChooseFromLibrary => '从相册选择';
+
+  @override
+  String get creationTakeReferencePhoto => '拍照';
+
+  @override
+  String get creationPasteReference => '从剪贴板粘贴';
+
+  @override
+  String get creationRecentImages => '最近的图片';
+
+  @override
+  String get creationReferenceDrop => '松开以添加为参考图';
+
+  @override
+  String get creationFirstFrameDrop => '松开以设为首帧';
+
+  @override
+  String get creationReferenceDropHint => '也可以直接把图片拖进页面。';
+
+  @override
+  String get creationNoClipboardImage => '剪贴板里没有图片';
+
+  @override
+  String get creationReferenceAdded => '已添加为参考图';
+
+  @override
+  String get creationReferenceAlreadyAdded => '所选图片已经在参考图里了';
+
+  @override
+  String creationReferenceLimitReached(int count) {
+    return '当前模型最多支持 $count 张参考图。';
+  }
+
+  @override
+  String creationReferenceUnsupported(String model) {
+    return '$model 不支持参考图';
+  }
+
+  @override
+  String get creationReferenceIgnored => '参考图会留在草稿里，换用支持参考图的模型即可使用。';
+
+  @override
+  String get creationRecentChat => '聊天';
+
+  @override
+  String get creationRecentCreation => '创作';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return '还可以选择 $count 张参考图';
+  }
+
+  @override
+  String get creationTapToSelect => '点图片选择';
+
+  @override
+  String creationSelectedImages(int count) {
+    return '已选 $count 张';
+  }
+
+  @override
+  String creationAddSelected(int count) {
+    return '添加（$count）';
+  }
+
+  @override
+  String get creationRecentEmpty => '还没有最近的图片';
+
+  @override
+  String get creationEditImage => '编辑图片';
+
+  @override
+  String get creationUseReference => '用作参考图';
+
+  @override
+  String get creationEditReference => '以这张图作为参考';
+
+  @override
+  String get creationEditPrompt => '要改什么';
+
+  @override
+  String get creationEditPromptExample => '例如：把背景换成海边，保留人物和光线';
+
+  @override
+  String get creationEditOriginalRatio => '原比例';
+
+  @override
+  String get creationEditNewGroup => '生成新的一组';
+
+  @override
+  String get creationEditHelp => '修改结果会作为新的一组出现在这个话题中。';
+
+  @override
+  String get creationEditStarted => '已开始编辑，结果会出现在这个话题底部。';
+
+  @override
+  String get creationEditedResult => '编辑结果';
+
+  @override
+  String get creationEditedFrom => '编辑自';
+
+  @override
+  String get creationRepeat => '再来一次';
+
+  @override
+  String get creationDeleteBatch => '删除这组作品';
+
+  @override
+  String creationDeleteBatchBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '将从此设备删除这一组及其中的 $count 个文件，无法恢复。',
+      zero: '确定从此设备删除这条生成记录吗？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationRequestDetails => '请求日志';
+
+  @override
+  String get creationNoRequestDetails => '没有可用的请求日志。';
+
+  @override
+  String creationReferenceSummary(int count, int limit) {
+    return '参考图 $count / $limit';
+  }
+
+  @override
+  String get creationPrevious => '上一件作品';
+
+  @override
+  String get creationNext => '下一件作品';
+
+  @override
+  String get creationWaitingSketch => '勾勒草图';
+
+  @override
+  String get creationWaitingDetails => '细化画面';
+
+  @override
+  String get creationWaitingFinish => '完成最后调整';
+
+  @override
+  String get creationWaitingVideoMotion => '规划画面运动';
+
+  @override
+  String get creationWaitingVideoFrames => '生成视频帧';
+
+  @override
+  String get creationWaitingVideoFinish => '整理视频画面';
+
+  @override
+  String get creationWaitingLong => '还需要一点时间';
+
+  @override
+  String get creationSuggestionPoster => '设计一张极简音乐会海报';
+
+  @override
+  String get creationSuggestionLandscape => '画一座清晨的山间小镇';
+
+  @override
+  String get creationSuggestionProduct => '用柔和日光拍一只陶瓷杯';
+
+  @override
+  String get creationSuggestionIllustration => '画一只星空下的狐狸';
+
+  @override
+  String get creationSuggestionRoom => '画一个暖木色的阅读角';
+
+  @override
+  String get creationSuggestionSticker => '做一套有趣的植物贴纸';
+
+  @override
+  String get creationSuggestionMotion => '缓慢推进镜头，拍摄雨中的花园';
+
+  @override
+  String get creationSuggestionOcean => '日落时海浪涌上沙滩';
+
+  @override
+  String get creationWaitingDraft => '正在生成初稿';
+
+  @override
+  String get creationWaitingScene => '正在布置场景';
+
+  @override
+  String get creationWaitingVideoRendering => '正在渲染动态';
+
+  @override
+  String get creationWaitingVideoComposite => '正在合成视频';
+
+  @override
+  String get creationWaitingNearlyDone => '即将完成';
+
+  @override
+  String creationUseGroupReferences(int count) {
+    return '全部用作参考图（$count）';
+  }
+
+  @override
+  String get creationDownloadFailed => '下载失败';
+
+  @override
+  String get creationAutomaticRetry => '自动重试';
+
+  @override
+  String get creationNoAutomaticRetry => '手动重试';
+
+  @override
+  String get creationRetryHistory => '重试记录';
+
+  @override
+  String get creationLoggedRequest => '请求信息';
+
+  @override
+  String get creationLoggedResponse => '返回信息';
+
+  @override
+  String get creationDefaultImage => '生图模型';
+
+  @override
+  String get creationDefaultImageHelp => '创作页图片模式和聊天里的「图像生成」工具使用的模型。';
+
+  @override
+  String get creationDefaultVideo => '视频模型';
+
+  @override
+  String get creationDefaultVideoHelp => '创作页视频模式使用的模型。';
+
+  @override
+  String get creationDefaultEnhance => '提示词增强模型';
+
+  @override
+  String get creationDefaultEnhanceHelp => '用于改写创作页的提示词。模型支持图片输入时，参考图会一起发送。';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return '用 $variable 插入当前创作提示词。';
+  }
+
+  @override
+  String get creationLocalToolTitle => '图像生成';
+
+  @override
+  String get creationLocalToolHelp => '让助手在对话里画图或改图，使用「默认模型」里的生图模型。';
+
+  @override
+  String creationStorageFileCount(int count) {
+    return '$count 个文件';
+  }
+
+  @override
+  String get creationSelectDefaultImage => '选择默认生图模型';
+
+  @override
+  String get creationConfigureImageProvider => '请先在供应商设置中添加或启用一个生图模型。';
+
+  @override
+  String get displayChatImagesAtToolCall => '在工具调用处显示生成图片';
+
+  @override
+  String get displayChatImageInfo => '显示生图信息';
+
+  @override
+  String get displayChatImageLink => '显示「在创作中查看」';
+
+  @override
+  String get creationLocalToolNeedsModel => '先在「默认模型 › 生图模型」里选一个模型。';
+
+  @override
+  String creationChatSource(String title) {
+    return '聊天 · $title';
+  }
+
+  @override
+  String get creationSendToChat => '发送到聊天';
+
+  @override
+  String get creationShowInConversation => '在对话中查看';
+
+  @override
+  String get creationShowInCreation => '在创作中查看';
+
+  @override
+  String get creationChatCancelled => '已取消图像创建';
+
+  @override
+  String get creationChatRegenerate => '重新生成';
+
+  @override
+  String get creationChatImageUnavailable => '图像不可用';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    return '已生成 $count 张 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => '提示词增强';
+
+  @override
+  String get creationEnhanceLoading => '正在改写提示词';
+
+  @override
+  String get creationEnhanceResult => '改写后的提示词';
+
+  @override
+  String get creationEnhanceOriginal => '原文';
+
+  @override
+  String get creationEnhanceAgain => '换一个';
+
+  @override
+  String get creationEnhanceApply => '替换';
+
+  @override
+  String get creationEnhanceNeedsModel => '请先在「默认模型」里选择提示词增强模型。';
+
+  @override
+  String get creationStorageHint => '创作保存的图像、视频、缩略图和参考图。';
+
+  @override
+  String get creationStorageDate => '清理截至该日期的创作';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return '删除截至 $date 已结束的生成记录及其中的图片、视频和参考图副本？聊天中由这些记录生成的图片也将无法查看。';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    return '已清理 $count 次生成记录';
+  }
+
+  @override
+  String get creationStorageClean => '按日期清理';
+
+  @override
+  String get creationDisplayAndGames => '显示方式和小游戏';
+
+  @override
+  String get creationWaitGame => '等待小游戏';
+
+  @override
+  String get creationGameRandom => '随机';
+
+  @override
+  String get creationGameOff => '关闭';
+
+  @override
+  String get creationGameSnake => '贪吃蛇';
+
+  @override
+  String get creationGameBrick => '打砖块';
+
+  @override
+  String get creationGameSnakeControls =>
+      '贪吃蛇。方向键、W A S D 或滑动控制方向。空格暂停或继续，Esc 退出。';
+
+  @override
+  String get creationGameBrickControls =>
+      '打砖块。拖动挡板，或按住左右方向键、A 或 D 移动。空格暂停或继续，Esc 退出。';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return '图像生成时玩$game';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return '视频生成时玩$game';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return '得分：$score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return '已暂停 · $score 分';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return '游戏结束 · $score 分';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return '生成好了 · $score 分';
+  }
+
+  @override
+  String get creationNoSelectableModels => '没有可用模型';
+
+  @override
+  String get creationNoMatchingTopics => '没有匹配的话题';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return '全部话题 $count';
+  }
+
+  @override
+  String get creationNoImageModels => '还没有能生成图片的模型';
+
+  @override
+  String get creationNoVideoModels => '还没有能生成视频的模型';
+
+  @override
+  String get creationFrameSources => '从最近的图片、文件或剪贴板添加';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model 只支持首帧';
+  }
+
+  @override
+  String get creationSubscriptionLogin => '订阅登录';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return '参考图最多 $count 张';
+  }
+
+  @override
+  String get creationTextOnlyImage => '文生图';
+
+  @override
+  String get creationTextOnlyVideo => '文生视频';
+
+  @override
+  String get creationCustomCountLabel => '自定义张数';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': '网络连接',
+      'rateLimited': '请求频率限制',
+      'server': '供应商错误',
+      'rejected': '请求被拒绝',
+      'login': '需要登录',
+      'unavailable': '模型或接口不可用',
+      'parameters': '参数无效',
+      'referenceTooLarge': '参考图过大',
+      'download': '下载失败',
+      'invalidResponse': '响应无效',
+      'other': '生成错误',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp => '这个任务在应用关闭时还没有完成，提示词和参数都保留着。';
+
+  @override
+  String get creationCancelledHelp => '提示词和参数都保留着，可以随时重新生成。';
+
+  @override
+  String get creationChatImageReady => '图像已生成';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -36859,12 +38951,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarImageProcessing => '正在處理圖片';
 
   @override
-  String get chatInputBarImageMode => '繪圖模式';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => '關閉繪圖模式';
-
-  @override
   String get chatInputBarQueuedPending => '排隊中';
 
   @override
@@ -37155,7 +39241,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用於總結對話標題，預設跟隨目前對話模型，也可指定其他模型。';
+      '用於總結對話標題，預設跟隨目前對話模型，也可指定其他模型。創作話題的自動命名也用它。';
 
   @override
   String get titleModelThinkingTitle => '是否開啟思考';
@@ -37905,6 +39991,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerBalanceInterval => '定時重新整理';
+
+  @override
+  String get providerBalanceFalPermissionHint =>
+      '查詢餘額需要具有 billing:usage:read 權限的 fal 金鑰。若要使用獨立的帳單金鑰，請在此新增 Authorization 標頭，值為 Key、一個空格和金鑰。';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration => '生成後重新整理';
 
   @override
   String get providerBalanceRefreshOnReply => '回覆後重新整理';
@@ -50312,4 +52405,1060 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get worldBookGroupClearSelection => '清空本組勾選';
+
+  @override
+  String get sidebarSettingsTitle => '側邊欄';
+
+  @override
+  String get sidebarCustomize => '自訂側邊欄';
+
+  @override
+  String get sidebarLayoutTitle => '版面配置';
+
+  @override
+  String get sidebarPresetCurrent => '目前樣式';
+
+  @override
+  String get sidebarPresetNavigation => '導覽清單';
+
+  @override
+  String get sidebarPresetAssistantBottom => '助手置於底部';
+
+  @override
+  String get sidebarPresetAllTop => '全部置於頂部';
+
+  @override
+  String get sidebarPresetCustom => '已自訂';
+
+  @override
+  String get sidebarReorderTitle => '調整區塊位置';
+
+  @override
+  String get sidebarReorderHint => '拖曳至「對話列表」上方或下方';
+
+  @override
+  String get sidebarReorderHandle => '拖曳排序';
+
+  @override
+  String get sidebarBlockUser => '使用者列';
+
+  @override
+  String get sidebarBlockSearch => '搜尋列';
+
+  @override
+  String get sidebarBlockEntries => '入口';
+
+  @override
+  String get sidebarBlockAssistant => '助手';
+
+  @override
+  String get sidebarBlockConversations => '對話列表';
+
+  @override
+  String get sidebarBlockTop => '頂部';
+
+  @override
+  String get sidebarBlockBottom => '底部';
+
+  @override
+  String get sidebarDisplayAs => '顯示為';
+
+  @override
+  String get sidebarStyleList => '清單';
+
+  @override
+  String get sidebarStyleIcons => '圖示';
+
+  @override
+  String get sidebarVisibilityShow => '顯示';
+
+  @override
+  String get sidebarMore => '更多';
+
+  @override
+  String get sidebarVisibilityHidden => '隱藏';
+
+  @override
+  String get sidebarLocationEntries => '入口區';
+
+  @override
+  String get sidebarLocationSearch => '搜尋列右側';
+
+  @override
+  String get sidebarLocationUserBar => '使用者列圖示';
+
+  @override
+  String get sidebarLocationMore => '在「更多」裡';
+
+  @override
+  String get sidebarLocationHidden => '已從側邊欄隱藏';
+
+  @override
+  String get sidebarLocationRail => '左側圖示列';
+
+  @override
+  String get sidebarMenuShow => '顯示在側邊欄';
+
+  @override
+  String get sidebarMenuMore => '收進「更多」';
+
+  @override
+  String get sidebarMenuHide => '從側邊欄隱藏';
+
+  @override
+  String get sidebarHideCustomize => '不在「更多」裡顯示';
+
+  @override
+  String get sidebarShowCustomizeInMore => '在「更多」裡顯示「自訂側邊欄」';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint => '之後仍可從這裡調整';
+
+  @override
+  String get sidebarHideSingleAssistant => '只有一個助手時隱藏助手列';
+
+  @override
+  String get sidebarHideSingleAssistantHint => '預設會照常顯示';
+
+  @override
+  String get sidebarRestoreDefaults => '恢復預設';
+
+  @override
+  String get sidebarOpenSettings => '開啟側邊欄設定…';
+
+  @override
+  String get creationTitle => '創作';
+
+  @override
+  String get creationTopics => '話題';
+
+  @override
+  String get creationNewTopic => '新話題';
+
+  @override
+  String get creationNameAfterSending => '傳送第一條提示詞後自動命名';
+
+  @override
+  String get creationPromptTitle => '以提示詞開頭作為標題';
+
+  @override
+  String get creationSearchTopics => '搜尋話題和提示詞';
+
+  @override
+  String get creationTopicsEmpty => '傳送第一條提示詞後，話題會出現在這裡';
+
+  @override
+  String get creationNaming => '正在命名…';
+
+  @override
+  String get creationRenameTopic => '重新命名';
+
+  @override
+  String get creationDeleteTopic => '刪除話題';
+
+  @override
+  String get creationDeleteTopicBody => '刪除這個話題和其中的所有作品？';
+
+  @override
+  String get creationImage => '圖片';
+
+  @override
+  String get creationVideo => '影片';
+
+  @override
+  String get creationImagePrompt => '描述要建立的圖像';
+
+  @override
+  String get creationVideoPrompt => '描述要產生的影片';
+
+  @override
+  String get creationNewImagePrompt => '描述要建立的圖像，傳送後新增話題';
+
+  @override
+  String get creationNewVideoPrompt => '描述要產生的影片，傳送後新增話題';
+
+  @override
+  String get creationSelectModel => '選擇模型';
+
+  @override
+  String get creationSearchModels => '搜尋模型或供應商';
+
+  @override
+  String get creationNoModelTitle => '尚無圖片或影片模型';
+
+  @override
+  String get creationNoModelBody =>
+      '創作功能會使用「供應商」中設定的圖片與影片模型。登入訂閱方案，或為 fal 或其他供應商輸入 API Key。';
+
+  @override
+  String get creationEmptyTitle => '從你的創意開始';
+
+  @override
+  String get creationEmptyBody => '描述你想創作的內容。送出第一則提示詞後，會為結果建立一個話題，之後的修改也會留在這裡。';
+
+  @override
+  String get creationAddReference => '新增參考圖';
+
+  @override
+  String get creationReferenceTooLarge => '參考圖片總大小必須為 20 MB 或以下。';
+
+  @override
+  String get creationApiProtocol => '創作 API 協定';
+
+  @override
+  String get creationApiProtocolHelp => '自動使用供應商的 API。使用自訂中轉時，可依中轉文件選擇協定。';
+
+  @override
+  String get creationAspectRatio => '畫面比例';
+
+  @override
+  String get creationCountLabel => '張數';
+
+  @override
+  String get creationDuration => '時長';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String get creationResolution => '解析度';
+
+  @override
+  String get creationFirstLastFrame => '首尾幀';
+
+  @override
+  String get creationFirstFrame => '首幀';
+
+  @override
+  String get creationLastFrame => '尾幀';
+
+  @override
+  String get creationBothFramesRequired => '請選擇首幀和尾幀。';
+
+  @override
+  String get creationFirstFrameRequired => '首幀必填，尾幀可選。';
+
+  @override
+  String get creationFirstFrameOnly => '此模型只支援首幀。';
+
+  @override
+  String get creationImageModels => '圖片模型';
+
+  @override
+  String get creationVideoModels => '影片模型';
+
+  @override
+  String get creationPlayVideo => '播放影片';
+
+  @override
+  String get creationPauseVideo => '暫停影片';
+
+  @override
+  String get creationMuteVideo => '靜音';
+
+  @override
+  String get creationUnmuteVideo => '取消靜音';
+
+  @override
+  String get creationOpenVideo => '用系統播放器開啟';
+
+  @override
+  String get creationFullScreen => '全螢幕';
+
+  @override
+  String get creationExitFullScreen => '退出全螢幕';
+
+  @override
+  String get creationSaveVideo => '儲存影片';
+
+  @override
+  String get creationParameters => '生成參數';
+
+  @override
+  String get creationAuto => '自動';
+
+  @override
+  String get creationGenerate => '生成';
+
+  @override
+  String get creationWaitingImage => '正在建立圖像';
+
+  @override
+  String get creationWaitingVideo => '正在準備影片';
+
+  @override
+  String get creationDownloading => '正在下載';
+
+  @override
+  String get creationFailed => '生成失敗';
+
+  @override
+  String get creationInterrupted => '應用程式關閉，任務中斷';
+
+  @override
+  String get creationCancelled => '已取消';
+
+  @override
+  String get creationPartial => '部分作品下載失敗';
+
+  @override
+  String get creationRetry => '再試一次';
+
+  @override
+  String get creationCopyPrompt => '複製提示詞';
+
+  @override
+  String get creationSaveImage => '儲存圖片';
+
+  @override
+  String get creationCopyImage => '複製圖片';
+
+  @override
+  String get creationShare => '分享';
+
+  @override
+  String get creationDeleteItem => '刪除作品';
+
+  @override
+  String get creationDeleteItemBody => '刪除這個作品？';
+
+  @override
+  String get creationActionFailed => '操作未完成';
+
+  @override
+  String get creationOptionSaved => '已儲存';
+
+  @override
+  String get creationOptionCopied => '已複製';
+
+  @override
+  String get backupScopeCreations => '創作';
+
+  @override
+  String creationQueuePosition(int count) {
+    return '排隊中 · 前面還有 $count 個任務';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    return '$count 張';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    return '$count 次生成';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    return '$count 個作品';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return '話題 $count';
+  }
+
+  @override
+  String get creationMoreOptions => '更多選項';
+
+  @override
+  String get creationImageSize => '圖片尺寸';
+
+  @override
+  String get creationQuality => '品質';
+
+  @override
+  String get creationLowQuality => '低';
+
+  @override
+  String get creationMediumQuality => '中';
+
+  @override
+  String get creationHighQuality => '高';
+
+  @override
+  String get creationNegativePrompt => '負向提示詞';
+
+  @override
+  String get creationSeed => '種子';
+
+  @override
+  String get creationTransparentBackground => '透明背景';
+
+  @override
+  String get creationOutputFormat => '輸出格式';
+
+  @override
+  String get creationExtraJson => '額外參數（JSON）';
+
+  @override
+  String get creationExtraJsonHint => '每次請求都會帶上這些值。可在「更多選項」中臨時修改。';
+
+  @override
+  String get creationModelKnown => '預設值來自 Kelivo 內建的模型資料。改動只影響這個模型。';
+
+  @override
+  String get creationModelUnknown => 'Kelivo 沒有這個模型的資料，已先按常見參數填好，可對照平台文件修改。';
+
+  @override
+  String get creationMaxPerRequest => '單次最多生成';
+
+  @override
+  String get creationMaxPerRequestHelp => '超過此數量時會拆成多次請求，結果放在同一組。';
+
+  @override
+  String get creationReferenceLimit => '參考圖';
+
+  @override
+  String get creationReferenceLimitHelp => '設為 0 時，創作頁將隱藏新增參考圖及編輯入口。';
+
+  @override
+  String get creationRatioHelp => '創作頁只顯示勾選的比例。選「自動」時由模型決定。';
+
+  @override
+  String get creationMediaOther => '其他選項';
+
+  @override
+  String get creationEnableOptionHelp => '在「更多選項」中顯示此控制項。';
+
+  @override
+  String get creationImageTypeHelp => '圖像模型會出現在創作頁和「圖像生成」工具中。';
+
+  @override
+  String get creationVideoTypeHelp => '影片模型會出現在創作頁中。';
+
+  @override
+  String get creationFalKeyHint => '在 fal.ai › Dashboard › API Keys 建立後貼到這裡';
+
+  @override
+  String get creationFalCatalogHint => '點「取得」瀏覽 fal 線上模型目錄，或點「＋」依端點 ID 手動新增。';
+
+  @override
+  String falUnsupportedInput(String field) {
+    return '此模型需要 $field，但創作功能無法提供。';
+  }
+
+  @override
+  String get falUnsupportedOutput => '此模型不會回傳創作功能可儲存的圖片或影片。';
+
+  @override
+  String get falCheckingModel => '正在檢查模型…';
+
+  @override
+  String get falInvalidEndpointId => '請輸入 fal 端點 ID，例如 fal-ai/flux/dev。';
+
+  @override
+  String get creationOptionalTitle => '為作品命名（選填）';
+
+  @override
+  String get falCatalogMore => '載入更多模型';
+
+  @override
+  String get falCatalogNoMatch => '沒有符合的圖像或影片模型';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return '無法取得 fal 模型資訊（$error）';
+  }
+
+  @override
+  String get creationFalModelId => '模型 ID';
+
+  @override
+  String get creationSelectPlatformImage => '選擇圖片';
+
+  @override
+  String get creationPlatformOptions => '模型特有參數';
+
+  @override
+  String get creationParameterRequired => '必填';
+
+  @override
+  String get creationBackground => '背景';
+
+  @override
+  String get creationOpaqueBackground => '不透明';
+
+  @override
+  String get creationTransparentOption => '透明';
+
+  @override
+  String get creationChatModelBadge => '聊天模型';
+
+  @override
+  String get creationCommonOptions => '通用參數';
+
+  @override
+  String get creationNoCommonOptions => '此模型沒有可用的通用參數。';
+
+  @override
+  String get creationGallery => '全部作品';
+
+  @override
+  String get creationFilterAll => '全部';
+
+  @override
+  String get creationFilterImages => '圖片';
+
+  @override
+  String get creationFilterVideos => '影片';
+
+  @override
+  String get creationFilterFavorites => '收藏';
+
+  @override
+  String get creationSearchGallery => '搜尋提示詞或話題';
+
+  @override
+  String get creationGalleryEmpty => '還沒有作品';
+
+  @override
+  String get creationFavoritesEmpty => '還沒有收藏';
+
+  @override
+  String get creationGalleryNoResults => '沒有找到符合的作品';
+
+  @override
+  String get creationShowInTopic => '在話題中查看';
+
+  @override
+  String get creationFavorite => '收藏';
+
+  @override
+  String get creationUnfavorite => '取消收藏';
+
+  @override
+  String get creationFavorited => '已收藏';
+
+  @override
+  String get creationUnfavorited => '已取消收藏';
+
+  @override
+  String get creationTopicDisplay => '話題顯示方式';
+
+  @override
+  String get creationCoversAndTitles => '封面 + 標題';
+
+  @override
+  String get creationCoversOnly => '只看封面';
+
+  @override
+  String get creationTopicList => '列表';
+
+  @override
+  String get creationAutoTitle => '自動命名話題';
+
+  @override
+  String get creationAutoTitleHelp => '使用標題總結模型，根據第一條提示詞為話題命名。';
+
+  @override
+  String get creationAutoTitleOffHelp => '直接用第一條提示詞的開頭作為標題。';
+
+  @override
+  String get creationCustomCount => '自訂';
+
+  @override
+  String get creationCustomCountMaximum => '最多 16';
+
+  @override
+  String creationRequestSplit(String model, int limit, int requests) {
+    return '$model 單次最多生成 $limit 張，會拆成 $requests 次請求並放在同一組。';
+  }
+
+  @override
+  String get creationNoModelPlaceholder => '先新增一個能生成圖片或影片的模型';
+
+  @override
+  String get creationConnectChatGPT => '登入 ChatGPT';
+
+  @override
+  String get creationConnectGrok => '登入 Grok';
+
+  @override
+  String get creationConfigureFal => '新增 fal';
+
+  @override
+  String get creationOtherProviders => '其他供應商';
+
+  @override
+  String get creationChooseReferenceFile => '從檔案選擇…';
+
+  @override
+  String get creationChooseFromLibrary => '從相簿選擇';
+
+  @override
+  String get creationTakeReferencePhoto => '拍照';
+
+  @override
+  String get creationPasteReference => '從剪貼簿貼上';
+
+  @override
+  String get creationRecentImages => '最近的圖片';
+
+  @override
+  String get creationReferenceDrop => '放開以新增為參考圖';
+
+  @override
+  String get creationFirstFrameDrop => '放開以設為首幀';
+
+  @override
+  String get creationReferenceDropHint => '也可以直接把圖片拖進頁面。';
+
+  @override
+  String get creationNoClipboardImage => '剪貼簿裡沒有圖片';
+
+  @override
+  String get creationReferenceAdded => '已新增為參考圖';
+
+  @override
+  String get creationReferenceAlreadyAdded => '所選圖片已在參考圖中';
+
+  @override
+  String creationReferenceLimitReached(int count) {
+    return '目前模型最多支援 $count 張參考圖。';
+  }
+
+  @override
+  String creationReferenceUnsupported(String model) {
+    return '$model 不支援參考圖';
+  }
+
+  @override
+  String get creationReferenceIgnored => '參考圖會留在草稿裡，換用支援參考圖的模型即可使用。';
+
+  @override
+  String get creationRecentChat => '聊天';
+
+  @override
+  String get creationRecentCreation => '創作';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return '還可選擇 $count 張參考圖';
+  }
+
+  @override
+  String get creationTapToSelect => '點選圖片即可選取';
+
+  @override
+  String creationSelectedImages(int count) {
+    return '已選 $count 張';
+  }
+
+  @override
+  String creationAddSelected(int count) {
+    return '新增（$count）';
+  }
+
+  @override
+  String get creationRecentEmpty => '還沒有最近的圖片';
+
+  @override
+  String get creationEditImage => '編輯圖片';
+
+  @override
+  String get creationUseReference => '用作參考圖';
+
+  @override
+  String get creationEditReference => '以這張圖作為參考';
+
+  @override
+  String get creationEditPrompt => '要改什麼';
+
+  @override
+  String get creationEditPromptExample => '例如：把背景換成海邊，保留人物和光線';
+
+  @override
+  String get creationEditOriginalRatio => '原比例';
+
+  @override
+  String get creationEditNewGroup => '產生新的一組';
+
+  @override
+  String get creationEditHelp => '修改結果會作為新的一組出現在這個話題中。';
+
+  @override
+  String get creationEditStarted => '已開始編輯，結果會出現在這個話題底部。';
+
+  @override
+  String get creationEditedResult => '編輯結果';
+
+  @override
+  String get creationEditedFrom => '編輯自';
+
+  @override
+  String get creationRepeat => '再來一次';
+
+  @override
+  String get creationDeleteBatch => '刪除群組';
+
+  @override
+  String creationDeleteBatchBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '要從此裝置刪除這個群組及其中的 $count 個檔案嗎？',
+      zero: '要從此裝置刪除這筆生成記錄嗎？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationRequestDetails => '請求日誌';
+
+  @override
+  String get creationNoRequestDetails => '沒有可用的請求日誌。';
+
+  @override
+  String creationReferenceSummary(int count, int limit) {
+    return '參考圖 $count / $limit';
+  }
+
+  @override
+  String get creationPrevious => '上一件作品';
+
+  @override
+  String get creationNext => '下一件作品';
+
+  @override
+  String get creationWaitingSketch => '勾勒草圖';
+
+  @override
+  String get creationWaitingDetails => '細化畫面';
+
+  @override
+  String get creationWaitingFinish => '完成最後調整';
+
+  @override
+  String get creationWaitingVideoMotion => '規劃畫面運動';
+
+  @override
+  String get creationWaitingVideoFrames => '產生影片幀';
+
+  @override
+  String get creationWaitingVideoFinish => '整理影片畫面';
+
+  @override
+  String get creationWaitingLong => '還需要一點時間';
+
+  @override
+  String get creationSuggestionPoster => '設計一張極簡音樂會海報';
+
+  @override
+  String get creationSuggestionLandscape => '畫一座清晨的山間小鎮';
+
+  @override
+  String get creationSuggestionProduct => '用柔和日光拍一隻陶瓷杯';
+
+  @override
+  String get creationSuggestionIllustration => '畫一隻星空下的狐狸';
+
+  @override
+  String get creationSuggestionRoom => '畫一個暖木色的閱讀角';
+
+  @override
+  String get creationSuggestionSticker => '做一套有趣的植物貼紙';
+
+  @override
+  String get creationSuggestionMotion => '緩慢推進鏡頭，拍攝雨中的花園';
+
+  @override
+  String get creationSuggestionOcean => '日落時海浪拍上沙灘';
+
+  @override
+  String get creationWaitingDraft => '正在生成初稿';
+
+  @override
+  String get creationWaitingScene => '正在佈置場景';
+
+  @override
+  String get creationWaitingVideoRendering => '正在渲染動態';
+
+  @override
+  String get creationWaitingVideoComposite => '正在合成影片';
+
+  @override
+  String get creationWaitingNearlyDone => '即將完成';
+
+  @override
+  String creationUseGroupReferences(int count) {
+    return '全部用作參考圖（$count）';
+  }
+
+  @override
+  String get creationDownloadFailed => '下載失敗';
+
+  @override
+  String get creationAutomaticRetry => '自動重試';
+
+  @override
+  String get creationNoAutomaticRetry => '手動重試';
+
+  @override
+  String get creationRetryHistory => '重試記錄';
+
+  @override
+  String get creationLoggedRequest => '請求資訊';
+
+  @override
+  String get creationLoggedResponse => '回應資訊';
+
+  @override
+  String get creationDefaultImage => '生圖模型';
+
+  @override
+  String get creationDefaultImageHelp => '創作頁圖片模式和聊天裡的「圖像生成」工具使用的模型。';
+
+  @override
+  String get creationDefaultVideo => '影片模型';
+
+  @override
+  String get creationDefaultVideoHelp => '創作頁影片模式使用的模型。';
+
+  @override
+  String get creationDefaultEnhance => '提示詞增強模型';
+
+  @override
+  String get creationDefaultEnhanceHelp => '用於改寫創作頁的提示詞。模型支援圖片輸入時，參考圖會一併傳送。';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return '用 $variable 插入目前創作提示詞。';
+  }
+
+  @override
+  String get creationLocalToolTitle => '圖像生成';
+
+  @override
+  String get creationLocalToolHelp => '讓助手在對話裡畫圖或改圖，使用「預設模型」裡的生圖模型。';
+
+  @override
+  String creationStorageFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 個檔案',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationSelectDefaultImage => '選擇預設生圖模型';
+
+  @override
+  String get creationConfigureImageProvider => '請先在供應商設定中新增或啟用一個生圖模型。';
+
+  @override
+  String get displayChatImagesAtToolCall => '在工具呼叫處顯示生成圖片';
+
+  @override
+  String get displayChatImageInfo => '顯示生圖資訊';
+
+  @override
+  String get displayChatImageLink => '顯示「在創作中查看」連結';
+
+  @override
+  String get creationLocalToolNeedsModel => '先在「預設模型 › 生圖模型」裡選一個模型。';
+
+  @override
+  String creationChatSource(String title) {
+    return '聊天 · $title';
+  }
+
+  @override
+  String get creationSendToChat => '傳送到聊天';
+
+  @override
+  String get creationShowInConversation => '在對話中查看';
+
+  @override
+  String get creationShowInCreation => '在創作中查看';
+
+  @override
+  String get creationChatCancelled => '已取消圖像建立';
+
+  @override
+  String get creationChatRegenerate => '重新生成';
+
+  @override
+  String get creationChatImageUnavailable => '圖像無法使用';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    return '已生成 $count 張 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => '增強提示詞';
+
+  @override
+  String get creationEnhanceLoading => '正在改寫提示詞…';
+
+  @override
+  String get creationEnhanceResult => '改寫後的提示詞';
+
+  @override
+  String get creationEnhanceOriginal => '原文';
+
+  @override
+  String get creationEnhanceAgain => '換一個';
+
+  @override
+  String get creationEnhanceApply => '替換';
+
+  @override
+  String get creationEnhanceNeedsModel => '請先在「預設模型」中選擇提示詞增強模型。';
+
+  @override
+  String get creationStorageHint => '創作儲存的圖像、影片、縮圖和參考圖。';
+
+  @override
+  String get creationStorageDate => '清理截至此日期的創作';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return '刪除截至 $date 已結束的生成記錄及其中的圖像、影片和參考圖副本？聊天中由這些記錄生成的圖像也將無法查看。';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已清理 $count 次生成記錄',
+      zero: '沒有可清理的生成記錄',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationStorageClean => '按日期清理';
+
+  @override
+  String get creationDisplayAndGames => '顯示方式和小遊戲';
+
+  @override
+  String get creationWaitGame => '等待小遊戲';
+
+  @override
+  String get creationGameRandom => '隨機';
+
+  @override
+  String get creationGameOff => '關閉';
+
+  @override
+  String get creationGameSnake => '貪吃蛇';
+
+  @override
+  String get creationGameBrick => '打磚塊';
+
+  @override
+  String get creationGameSnakeControls =>
+      '貪吃蛇。方向鍵、W A S D 或滑動控制方向。空格暫停或繼續，Esc 退出。';
+
+  @override
+  String get creationGameBrickControls =>
+      '打磚塊。拖動擋板，或按住左右方向鍵、A 或 D 移動。空格暫停或繼續，Esc 退出。';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return '圖像生成時玩$game';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return '影片生成時玩$game';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return '得分：$score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return '已暫停 · $score 分';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return '遊戲結束 · $score 分';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return '生成好了 · $score 分';
+  }
+
+  @override
+  String get creationNoSelectableModels => '沒有可用模型';
+
+  @override
+  String get creationNoMatchingTopics => '沒有符合的主題';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return '全部主題 $count';
+  }
+
+  @override
+  String get creationNoImageModels => '尚無圖片生成模型';
+
+  @override
+  String get creationNoVideoModels => '尚無影片生成模型';
+
+  @override
+  String get creationFrameSources => '從最近的圖片、檔案或剪貼簿新增';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model 僅支援首幀';
+  }
+
+  @override
+  String get creationSubscriptionLogin => '訂閱登入';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return '參考圖最多 $count 張';
+  }
+
+  @override
+  String get creationTextOnlyImage => '文生圖';
+
+  @override
+  String get creationTextOnlyVideo => '文生影片';
+
+  @override
+  String get creationCustomCountLabel => '自訂張數';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': '網路連線',
+      'rateLimited': '請求頻率限制',
+      'server': '供應商錯誤',
+      'rejected': '請求遭拒',
+      'login': '需要登入',
+      'unavailable': '模型或端點無法使用',
+      'parameters': '參數無效',
+      'referenceTooLarge': '參考圖過大',
+      'download': '下載失敗',
+      'invalidResponse': '回應無效',
+      'other': '生成錯誤',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp => '這個任務在應用程式關閉時尚未完成，提示詞和設定都保留著。';
+
+  @override
+  String get creationCancelledHelp => '提示詞和設定都保留著，可以隨時重新生成。';
+
+  @override
+  String get creationChatImageReady => '圖像已建立';
 }

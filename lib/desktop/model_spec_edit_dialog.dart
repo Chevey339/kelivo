@@ -9,6 +9,7 @@ import '../features/model/widgets/model_spec_form/basic_section.dart';
 import '../features/model/widgets/model_spec_form/builtin_tools_section.dart';
 import '../features/model/widgets/model_spec_form/limits_pricing_section.dart';
 import '../features/model/widgets/model_spec_form/modality_ability_section.dart';
+import '../features/model/widgets/model_spec_form/media_options_section.dart';
 import '../features/model/widgets/model_spec_form/model_spec_form_controller.dart';
 import '../features/model/widgets/model_spec_form/reasoning_section.dart';
 import '../features/model/widgets/model_spec_form/strategy_section.dart';
@@ -75,6 +76,7 @@ Future<bool?> _openDialog(
 enum _SpecSection {
   basic,
   modalities,
+  media,
   reasoning,
   strategy,
   limits,
@@ -112,6 +114,9 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
       modelKey: widget.modelKey,
       isNew: widget.isNew,
     );
+    if (!widget.isNew && _controller.spec.type.isMedia) {
+      _section = _SpecSection.media;
+    }
   }
 
   @override
@@ -121,6 +126,7 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
   }
 
   Future<void> _save() async {
+    if (_controller.saving) return;
     final l10n = AppLocalizations.of(context)!;
     final error = _controller.validate(l10n);
     if (error != null) {
@@ -128,12 +134,14 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
       return;
     }
     final settings = context.read<SettingsProvider>();
-    final ok = await _controller.save(settings);
-    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    bool stillEditing() => mounted && route?.isCurrent != false;
+    final ok = await _controller.save(settings, canSave: stillEditing);
+    if (!mounted || !stillEditing()) return;
     if (!ok) {
       showAppSnackBar(
         context,
-        message: l10n.modelDetailSheetSaveFailedMessage,
+        message: _controller.saveErrorMessage(l10n),
         type: NotificationType.error,
       );
       return;
@@ -221,7 +229,9 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
                     onSecondary: () => Navigator.of(context).maybePop(false),
                     primaryKey: const ValueKey('model-spec-confirm'),
                     primaryIcon: widget.isNew ? Lucide.Plus : Lucide.Check,
-                    primaryLabel: widget.isNew
+                    primaryLabel: _controller.saving
+                        ? l10n.falCheckingModel
+                        : widget.isNew
                         ? l10n.modelDetailSheetAddButton
                         : l10n.modelDetailSheetConfirmButton,
                     onPrimary: _save,
@@ -244,6 +254,7 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
       _SpecSection.modalities => ModalityAbilitySection(
         controller: _controller,
       ),
+      _SpecSection.media => MediaOptionsSection(controller: _controller),
       _SpecSection.reasoning => ReasoningSection(controller: _controller),
       _SpecSection.strategy => StrategySection(controller: _controller),
       _SpecSection.limits => LimitsPricingSection(controller: _controller),
@@ -253,9 +264,17 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
   }
 
   List<_SpecSection> _visibleSections(ModelSpec spec, bool showTools) {
+    if (spec.type.isMedia) {
+      return const [
+        _SpecSection.basic,
+        _SpecSection.media,
+        _SpecSection.advanced,
+      ];
+    }
     return [
       _SpecSection.basic,
       _SpecSection.modalities,
+      if (_controller.hasMediaSettings) _SpecSection.media,
       if (spec.type != ModelType.embedding) ...[
         _SpecSection.reasoning,
         _SpecSection.strategy,
@@ -277,6 +296,7 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
     return switch (section) {
       _SpecSection.basic => l10n.modelDetailSheetBasicTab,
       _SpecSection.modalities => l10n.modelSpecFormModalitiesSection,
+      _SpecSection.media => l10n.creationParameters,
       _SpecSection.reasoning => l10n.modelSpecFormReasoningSection,
       _SpecSection.strategy => l10n.modelSpecFormStrategySection,
       _SpecSection.limits => l10n.modelSpecFormLimitsPricingSection,

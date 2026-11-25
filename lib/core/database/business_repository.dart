@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import '../models/memory_entry.dart';
 import 'app_database.dart';
 import 'business_data.dart';
+import 'media_repository.dart';
 
 final class BusinessRepository {
   BusinessRepository(this._database);
@@ -13,6 +14,8 @@ final class BusinessRepository {
   static const migrationReceiptKey = 'business_migration_complete_v1';
 
   final AppDatabase _database;
+
+  Future<bool> get hasCreations => MediaRepository(_database).hasCreations;
 
   /// Used by cross-domain coordinators to fail closed unless both
   /// repositories are backed by the exact same Drift database instance.

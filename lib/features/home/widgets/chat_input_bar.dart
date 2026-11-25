@@ -49,7 +49,6 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
-import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/native_input_attachments.dart';
 import '../../../core/services/asr/asr_service_options.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
@@ -212,10 +211,6 @@ class ChatInputBarController {
     _state = null;
   }
 
-  bool get allowImagesApiRouting =>
-      _state?._allowImagesApiRouting ??
-      _pendingDraft?.allowImagesApiRouting ??
-      true;
   bool get isAttached => _state != null;
   bool get hasDraftMedia =>
       _state?._hasDraftMedia ??
@@ -421,7 +416,6 @@ class ChatInputBarController {
           if (!image.processing && !image.failed) image.path,
       ],
       documents: draft.documents,
-      allowImagesApiRouting: draft.allowImagesApiRouting,
       uiContext: draft.uiContext,
       quotes: draft.quotes,
     );
@@ -962,10 +956,6 @@ class _ChatInputBarState extends State<ChatInputBar>
   UiContextAttachment? _uiContext;
   bool _isSubmitting = false;
   int _submitSerial = 0;
-  String? _imageModeModelKey;
-  String? _lastImageModeModelKey;
-  String? _dismissedImageModeModelKey;
-  bool? _restoredRoutingChoice;
   final Set<String> _missingDocumentPaths = {};
 
   bool get _composerLocked =>
@@ -997,45 +987,6 @@ class _ChatInputBarState extends State<ChatInputBar>
         .toDouble();
     final base = theme.colorScheme.surface.withValues(alpha: baseAlpha);
     return Color.alphaBlend(overlayTint, base).withValues(alpha: targetOpacity);
-  }
-
-  bool _supportsImagesApiRouting(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
-    final providerKey = widget.chatModelProviderKey;
-    final modelId = widget.chatModelId;
-    if (providerKey == null || modelId == null) {
-      _imageModeModelKey = null;
-      return false;
-    }
-    final cfg = settings.getProviderConfig(providerKey);
-    final supported = ChatApiService.supportsOpenAIImagesApiRouting(
-      cfg,
-      modelId,
-    );
-    final nextKey = supported
-        ? '${widget.conversationId ?? ''}::$providerKey::$modelId'
-        : null;
-    if (nextKey != _lastImageModeModelKey) {
-      _dismissedImageModeModelKey = null;
-      _lastImageModeModelKey = nextKey;
-    }
-    _imageModeModelKey = nextKey;
-    if (_restoredRoutingChoice != null) {
-      _dismissedImageModeModelKey = _restoredRoutingChoice! ? null : nextKey;
-      _restoredRoutingChoice = null;
-    }
-    return supported;
-  }
-
-  bool get _imageModeActive {
-    final key = _imageModeModelKey;
-    return key != null && key != _dismissedImageModeModelKey;
-  }
-
-  bool get _allowImagesApiRouting {
-    if (_restoredRoutingChoice != null) return _restoredRoutingChoice!;
-    final key = _imageModeModelKey;
-    return key == null || key != _dismissedImageModeModelKey;
   }
 
   bool get _hasDraftMedia => _images.isNotEmpty || _docs.isNotEmpty;
@@ -1445,7 +1396,6 @@ class _ChatInputBarState extends State<ChatInputBar>
             image.path,
       ],
       documents: List<DocumentAttachment>.of(_docs),
-      allowImagesApiRouting: _allowImagesApiRouting,
       uiContext: _uiContext,
       quotes: _controller is QuoteEditingController
           ? (_controller as QuoteEditingController).quotes
@@ -1474,7 +1424,6 @@ class _ChatInputBarState extends State<ChatInputBar>
         ),
     ],
     documents: List.of(_docs),
-    allowImagesApiRouting: _allowImagesApiRouting,
     uiContext: _uiContext,
   );
 
@@ -1570,7 +1519,6 @@ class _ChatInputBarState extends State<ChatInputBar>
         ..clear()
         ..addAll(documents);
       _syncDocumentChecks(reset: resetHistory);
-      _restoredRoutingChoice = input.allowImagesApiRouting;
     });
     _pumpImageProcessingQueue();
   }
@@ -2455,7 +2403,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                 text: text,
                 imagePaths: submittedImages.map((image) => image.path).toList(),
                 documents: List<DocumentAttachment>.of(submittedDocuments),
-                allowImagesApiRouting: submittedDraft.allowImagesApiRouting,
                 draftSubmission: draftSubmission,
                 uiContext: submittedDraft.uiContext,
                 quotes: submittedDraft.quotes,
@@ -4608,7 +4555,6 @@ class _ChatInputBarState extends State<ChatInputBar>
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;
     final hasInput = hasText || hasImages || hasDocs || _uiContext != null;
-    _supportsImagesApiRouting(context);
     final bool isMobileLayout =
         MediaQuery.sizeOf(context).width < AppBreakpoints.tablet;
     final isDesktop = PlatformUtils.isDesktopTarget;
@@ -5227,28 +5173,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                         ),
                       ),
                     ),
-                    if (_imageModeActive)
-                      PositionedDirectional(
-                        top: -12,
-                        start: AppSpacing.sm,
-                        child: _ImageModePill(
-                          label: AppLocalizations.of(
-                            context,
-                          )!.chatInputBarImageMode,
-                          closeTooltip: AppLocalizations.of(
-                            context,
-                          )!.chatInputBarDisableImageModeTooltip,
-                          onClose: _composerLocked
-                              ? null
-                              : () {
-                                  final key = _imageModeModelKey;
-                                  if (key == null) return;
-                                  setState(() {
-                                    _dismissedImageModeModelKey = key;
-                                  });
-                                },
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -5432,95 +5356,6 @@ class _QueuedInputBanner extends StatelessWidget {
   }
 }
 
-class _ImageModePill extends StatelessWidget {
-  const _ImageModePill({
-    required this.label,
-    required this.closeTooltip,
-    required this.onClose,
-  });
-
-  final String label;
-  final String closeTooltip;
-  final VoidCallback? onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final bg = scheme.surface.withValues(alpha: isDark ? 0.34 : 0.58);
-    final border = isDark
-        ? scheme.onSurface.withValues(alpha: 0.14)
-        : scheme.primary.withValues(alpha: 0.36);
-    final fg = isDark ? scheme.onSurface : scheme.primary;
-    final iconColor = isDark ? scheme.primaryContainer : scheme.primary;
-    final radius = BorderRadius.circular(999);
-
-    return RepaintBoundary(
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: radius,
-              border: Border.all(color: border),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 172),
-              child: SizedBox(
-                height: 24,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 9, end: 3),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Lucide.Brush, size: 14, color: iconColor),
-                      const SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: fg,
-                            fontWeight: AppFontWeights.semibold,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                      ),
-                      Tooltip(
-                        message: closeTooltip,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: onClose,
-                          child: Padding(
-                            padding: const EdgeInsets.all(5),
-                            child: Icon(
-                              Lucide.X,
-                              size: 13,
-                              color: (isDark ? scheme.onSurfaceVariant : fg)
-                                  .withValues(
-                                    alpha: onClose == null ? 0.38 : 0.78,
-                                  ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Internal data model for responsive overflow actions on desktop
 class _OverflowAction {
   final double width;
   final Widget Function() builder;

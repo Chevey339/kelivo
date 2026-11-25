@@ -85,7 +85,6 @@ void main() {
           lastUserImagePaths: const [],
         ),
         userImagePaths: const [],
-        allowImagesApiRouting: false,
         providerKey: 'openai',
         modelId: modelId,
         assistant: null,

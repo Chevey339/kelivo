@@ -14,6 +14,8 @@ List<String> availableLocalToolIds() => [
 
 IconData localToolIcon(String id) {
   switch (id) {
+    case LocalToolNames.generateImage:
+      return Lucide.Palette;
     case LocalToolNames.timeInfo:
       return Lucide.clock;
     case LocalToolNames.clipboard:
@@ -53,6 +55,8 @@ IconData localToolIcon(String id) {
 
 String localToolTitle(AppLocalizations l10n, String id) {
   switch (id) {
+    case LocalToolNames.generateImage:
+      return l10n.creationLocalToolTitle;
     case LocalToolNames.timeInfo:
       return l10n.assistantEditLocalToolTimeInfoTitle;
     case LocalToolNames.clipboard:

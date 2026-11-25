@@ -3,6 +3,13 @@ import 'package:flutter/foundation.dart';
 import '../../models/model_spec.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
+import '../media/fal_model_catalog.dart';
+import '../media/gemini_media_models.dart';
+import '../media/ark_media_models.dart';
+import '../media/replicate_models.dart';
+import '../media/tokendance_media_protocol.dart';
+import '../media/openrouter_media_catalog.dart';
+import '../../models/media_creation.dart' show MediaMode;
 import '../model_catalog/catalog_entry.dart';
 import '../model_catalog/model_catalog_service.dart';
 import 'model_defaults_guesser.dart';
@@ -116,6 +123,11 @@ class ModelSpecResolver {
   final ModelCatalogService _catalog;
   final OllamaModelService _ollama;
   final ModelListMetadataCache _modelLists;
+
+  Map<String, OpenRouterMediaModel> cachedOpenRouterMedia(
+    ProviderConfig cfg,
+    MediaMode mode,
+  ) => _modelLists.openRouterCatalog(cfg, mode);
   final Map<(String, String), _MemoEntry> _memo = {};
   int _seenCatalogVersion = -1;
 
@@ -225,11 +237,21 @@ class ModelSpecResolver {
     final keyMetadata = upstreamId != modelKey
         ? _modelLists.lookup(cfg, modelKey)
         : null;
-    final guess = ModelDefaultsGuesser.guess(upstreamId);
+    final guessId =
+        isArkMediaHost(Uri.tryParse(cfg.baseUrl)?.host ?? '') ||
+            cfg.id.toLowerCase() == 'bytedance'
+        ? arkMediaFamily(upstreamId, modelKey, ov.displayName ?? displayName)
+        : upstreamId;
+    final guess = ModelDefaultsGuesser.guess(guessId);
     final vendor = VendorDefaults.forProvider(cfg, modelId: upstreamId);
     final sources = <ModelSpecField, SpecSource>{};
 
-    final type = _resolveType(guess: guess, match: match, sources: sources);
+    final type = _resolveType(
+      id: upstreamId,
+      guess: guess,
+      match: match,
+      sources: sources,
+    );
     final input = _resolveModalities(
       catalogValues: match?.model.inputModalities,
       guessValues: guess.input,
@@ -309,6 +331,117 @@ class ModelSpecResolver {
     sources[ModelSpecField.dynamicWebSearch] = SpecSource.guess;
     sources[ModelSpecField.remoteImageUrls] = SpecSource.guess;
     sources[ModelSpecField.promptCacheControl] = SpecSource.guess;
+    if (TokenDanceMediaProtocol.isHost(Uri.tryParse(cfg.baseUrl)?.host)) {
+      final protocol =
+          upstreamMetadata?.mediaProtocol ??
+          keyMetadata?.mediaProtocol ??
+          TokenDanceMediaProtocol.known(upstreamId);
+      if (protocol?.chatImage == true) {
+        base = base.copyWith(
+          type: ModelType.chat,
+          input: {...base.input, Modality.text, Modality.image}.toList(),
+          output: {...base.output, Modality.text, Modality.image}.toList(),
+        );
+      } else if (protocol?.mode case final mode?) {
+        final video = mode == MediaMode.video;
+        base = base.copyWith(
+          type: video ? ModelType.video : ModelType.image,
+          input: [
+            Modality.text,
+            if (protocol != TokenDanceMediaProtocol.openAiImage &&
+                !upstreamId.endsWith('-t2v'))
+              Modality.image,
+          ],
+          output: [video ? Modality.video : Modality.image],
+          abilities: const [],
+        );
+        sources[ModelSpecField.type] =
+            upstreamMetadata?.mediaProtocol != null ||
+                keyMetadata?.mediaProtocol != null
+            ? SpecSource.vendor
+            : SpecSource.guess;
+      } else if (protocol == TokenDanceMediaProtocol.unsupported &&
+          base.type == ModelType.chat) {
+        base = base.copyWith(
+          type: ModelType.other,
+          input: const [],
+          output: const [],
+          abilities: const [],
+        );
+        sources[ModelSpecField.type] = SpecSource.vendor;
+      }
+    }
+    final media =
+        upstreamMetadata?.openRouterMedia ?? keyMetadata?.openRouterMedia;
+    if (media != null &&
+        OpenRouterMediaModel.isHost(Uri.tryParse(cfg.baseUrl)?.host)) {
+      final video = media.mode == MediaMode.video;
+      final chat = media.fields['chat'] == true;
+      final chatInputs = media.fields['chatInputs'];
+      final chatOutputs = media.fields['chatOutputs'];
+      base = base.copyWith(
+        type: chat
+            ? ModelType.chat
+            : video
+            ? ModelType.video
+            : ModelType.image,
+        input: _protocolInput(
+          cfg,
+          upstreamId,
+          {
+            if (chat)
+              ...(chatInputs is List
+                  ? Modality.values.where((m) => chatInputs.contains(m.name))
+                  : base.input),
+            Modality.text,
+            if (media.capabilities.maxReferences > 0) Modality.image,
+          }.toList(),
+        ),
+        output: {
+          if (chat)
+            ...(chatOutputs is List
+                ? Modality.values.where((m) => chatOutputs.contains(m.name))
+                : base.output),
+          if (chat) Modality.text,
+          video ? Modality.video : Modality.image,
+        }.toList(),
+        abilities: chat ? base.abilities : const [],
+      );
+      sources[ModelSpecField.type] = SpecSource.vendor;
+    }
+    if (ReplicateMediaModel.isHost(Uri.tryParse(cfg.baseUrl)?.host)) {
+      final model = ReplicateMediaModel.find(upstreamId);
+      if (model != null) {
+        final video = model.mode == MediaMode.video;
+        base = base.copyWith(
+          type: video ? ModelType.video : ModelType.image,
+          input: [
+            Modality.text,
+            if (model.capabilities.maxReferences > 0) Modality.image,
+          ],
+          output: [video ? Modality.video : Modality.image],
+          abilities: const [],
+        );
+        sources[ModelSpecField.type] = SpecSource.vendor;
+      }
+    }
+    if (cfg.isFal) {
+      final fal = resolveFalModel(upstreamId, cfg.modelOverrides[modelKey]);
+      final video = fal?.video ?? type == ModelType.video;
+      base = base.copyWith(
+        displayName: displayName ?? fal?.name ?? modelKey,
+        type: video ? ModelType.video : ModelType.image,
+        input: [
+          Modality.text,
+          if ((fal?.capabilities.maxReferences ?? 1) > 0) Modality.image,
+        ],
+        output: [if (video) Modality.video else Modality.image],
+        abilities: const [],
+      );
+      sources[ModelSpecField.type] = fal == null
+          ? SpecSource.guess
+          : SpecSource.catalog;
+    }
     final discovered = _ollama.lookup(cfg, upstreamId);
     if (discovered != null) {
       base = discovered.applyTo(base);
@@ -399,21 +532,27 @@ class ModelSpecResolver {
   }
 
   static ModelType _resolveType({
+    required String id,
     required ModelGuess guess,
     required CatalogMatch? match,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
-    if (guess.type == ModelType.embedding) {
-      sources[ModelSpecField.type] = SpecSource.guess;
-      return ModelType.embedding;
-    }
     if (match != null) {
       final outs = match.model.outputModalities;
       sources[ModelSpecField.type] = SpecSource.catalog;
-      if (outs.contains('image') && !outs.contains('text')) {
+      if (outs.contains('video') &&
+          !outs.contains('text') &&
+          (guess.type == ModelType.chat || guess.type == ModelType.video)) {
+        return ModelType.video;
+      }
+      if (outs.contains('image') &&
+          !outs.contains('text') &&
+          (guess.type == ModelType.chat || guess.type == ModelType.image) &&
+          !id.toLowerCase().split('/').last.startsWith('gemini-') &&
+          !isGeminiImageModel(id)) {
         return ModelType.image;
       }
-      return ModelType.chat;
+      if (guess.type == ModelType.chat) return guess.type;
     }
     sources[ModelSpecField.type] = SpecSource.guess;
     return guess.type;

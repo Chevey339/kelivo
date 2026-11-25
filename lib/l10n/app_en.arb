@@ -1726,8 +1726,6 @@
   "audioClipPauseTooltip": "Pause",
   "audioClipPlaybackFailed": "Couldn't play this audio",
   "chatInputBarImageProcessing": "Processing image",
-  "chatInputBarImageMode": "Image mode",
-  "chatInputBarDisableImageModeTooltip": "Turn off image mode",
   "chatInputBarQueuedPending": "Queued to send",
   "chatInputBarQueuedCancel": "Cancel Queue",
   "chatInputBarInsertNewline": "Newline",
@@ -1879,7 +1877,7 @@
   "defaultModelPageChatModelTitle": "Chat Model",
   "defaultModelPageChatModelSubtitle": "Global default chat model",
   "defaultModelPageTitleModelTitle": "Title Summary Model",
-  "defaultModelPageTitleModelSubtitle": "Summarizes conversation titles using the current chat model by default, or a selected model.",
+  "defaultModelPageTitleModelSubtitle": "Summarizes conversation titles using the current chat model by default, or a selected model. Creation also uses it to name topics automatically.",
   "titleModelThinkingTitle": "Enable Thinking",
   "defaultModelPageSummaryModelTitle": "Summary Model",
   "defaultModelPageSummaryModelSubtitle": "Used for generating conversation summaries; prefer fast and cheap models",
@@ -2210,6 +2208,14 @@
   "providerBalanceInterval": "Timed refresh",
   "@providerBalanceInterval": {
     "description": "Short row label in automatic balance refresh settings for choosing how often to update the balance on a timer. Shown for both the global default and the provider override."
+  },
+  "providerBalanceFalPermissionHint": "Balance queries need a fal key with the billing:usage:read permission. To use a separate billing key, add an Authorization header here with the value Key followed by a space and the key.",
+  "@providerBalanceFalPermissionHint": {
+    "description": "Instruction above the fal balance-specific request headers. Keep the permission scope billing:usage:read, HTTP header Authorization, and literal Key prefix unchanged."
+  },
+  "providerBalanceRefreshAfterGeneration": "Refresh after generation",
+  "@providerBalanceRefreshAfterGeneration": {
+    "description": "Short row label in fal balance settings. Refreshes the account balance when an image or video generation saves new output."
   },
   "providerBalanceRefreshOnReply": "Refresh after replies",
   "@providerBalanceRefreshOnReply": {
@@ -11591,12 +11597,6 @@
   "@chatInputBarImageProcessing": {
     "description": "Tooltip over an image attachment thumbnail in the input bar while the image is still being processed."
   },
-  "@chatInputBarImageMode": {
-    "description": "Label on the chip indicating the composer is in image-generation mode."
-  },
-  "@chatInputBarDisableImageModeTooltip": {
-    "description": "Tooltip on the close button of the image-mode chip; turns image mode off."
-  },
   "@chatInputBarQueuedPending": {
     "description": "Status label on a queued input preview indicating the message is waiting to be sent."
   },
@@ -11856,7 +11856,7 @@
     "description": "Title of the model card for the model that summarizes conversation titles; also used as a task name in background-task error messages."
   },
   "@defaultModelPageTitleModelSubtitle": {
-    "description": "Subtitle explaining the title-summary model follows the current chat model by default or can be set to another model."
+    "description": "Subtitle of the title-summary model card explaining the current chat model fallback and its use when automatically naming creation topics."
   },
   "@titleModelThinkingTitle": {
     "description": "Label for a toggle controlling whether thinking/reasoning is enabled for the title-summary model."
@@ -23028,5 +23028,1458 @@
   "worldBookGroupClearSelection": "Clear group selection",
   "@worldBookGroupClearSelection": {
     "description": "Action in the chat World Book picker to deselect all books in this folder for the current chat or assistant."
+  },
+  "sidebarSettingsTitle": "Sidebar",
+  "@sidebarSettingsTitle": {
+    "description": "Title of the Sidebar page reached from Settings > Display and label of its navigation row."
+  },
+  "sidebarCustomize": "Customize sidebar",
+  "@sidebarCustomize": {
+    "description": "Action in mobile sidebar More and in desktop rail context menus. Opens sidebar layout and entry controls."
+  },
+  "sidebarLayoutTitle": "Layout",
+  "@sidebarLayoutTitle": {
+    "description": "Heading of the mobile Sidebar settings section that shows four layout presets."
+  },
+  "sidebarPresetCurrent": "Current layout",
+  "@sidebarPresetCurrent": {
+    "description": "Mobile sidebar layout preset matching the original Kelivo layout with icon entries and the user bar at the bottom."
+  },
+  "sidebarPresetNavigation": "Navigation list",
+  "@sidebarPresetNavigation": {
+    "description": "Mobile sidebar layout preset with a list of entry rows near the top."
+  },
+  "sidebarPresetAssistantBottom": "Assistant at bottom",
+  "@sidebarPresetAssistantBottom": {
+    "description": "Mobile sidebar layout preset with the assistant selector below the conversation list."
+  },
+  "sidebarPresetAllTop": "All at the top",
+  "@sidebarPresetAllTop": {
+    "description": "Mobile sidebar layout preset placing all fixed blocks above the scrolling conversation list."
+  },
+  "sidebarPresetCustom": "Custom layout",
+  "@sidebarPresetCustom": {
+    "description": "Status in Sidebar settings when the custom block order does not match a preset."
+  },
+  "sidebarReorderTitle": "Arrange blocks",
+  "@sidebarReorderTitle": {
+    "description": "Heading above the reorderable sidebar blocks."
+  },
+  "sidebarReorderHint": "Drag above or below the conversation list",
+  "@sidebarReorderHint": {
+    "description": "Instruction for moving fixed sidebar blocks around the non-draggable conversation list separator."
+  },
+  "sidebarReorderHandle": "Reorder",
+  "@sidebarReorderHandle": {
+    "description": "Accessible label for the reorder handle. Drag it or use Up and Down when focused."
+  },
+  "sidebarBlockUser": "User bar",
+  "@sidebarBlockUser": {
+    "description": "Name of the mobile sidebar block showing the user avatar, name, and settings."
+  },
+  "sidebarBlockSearch": "Search bar",
+  "@sidebarBlockSearch": {
+    "description": "Name of the mobile sidebar block containing the conversation search field."
+  },
+  "sidebarBlockEntries": "Entries",
+  "@sidebarBlockEntries": {
+    "description": "Name of the mobile sidebar block and settings section for configurable navigation actions."
+  },
+  "sidebarBlockAssistant": "Assistant",
+  "@sidebarBlockAssistant": {
+    "description": "Section title and mobile sidebar block name for the assistant switcher."
+  },
+  "sidebarBlockConversations": "Conversation list",
+  "@sidebarBlockConversations": {
+    "description": "Label of the fixed conversation list separator in the sidebar block reorder control."
+  },
+  "sidebarBlockTop": "Top",
+  "@sidebarBlockTop": {
+    "description": "Position tag for a mobile sidebar block above the conversation list."
+  },
+  "sidebarBlockBottom": "Bottom",
+  "@sidebarBlockBottom": {
+    "description": "Position tag for a mobile sidebar block below the conversation list."
+  },
+  "sidebarDisplayAs": "Display as",
+  "@sidebarDisplayAs": {
+    "description": "Label next to the List or Icons segmented control in the mobile Sidebar settings."
+  },
+  "sidebarStyleList": "List",
+  "@sidebarStyleList": {
+    "description": "Sidebar display style with navigation entries as full-width rows."
+  },
+  "sidebarStyleIcons": "Icons",
+  "@sidebarStyleIcons": {
+    "description": "Sidebar display style with navigation entries as icon buttons by the user bar or search field."
+  },
+  "sidebarVisibilityShow": "Show",
+  "@sidebarVisibilityShow": {
+    "description": "Short option to make a navigation entry visible directly in the sidebar."
+  },
+  "sidebarMore": "More",
+  "@sidebarMore": {
+    "description": "Label of the sidebar overflow section for navigation entries moved into an expandable list or menu."
+  },
+  "sidebarVisibilityHidden": "Hide",
+  "@sidebarVisibilityHidden": {
+    "description": "Short option to hide a navigation entry from both the sidebar and its More menu."
+  },
+  "sidebarLocationEntries": "Entry list",
+  "@sidebarLocationEntries": {
+    "description": "Subtitle for a visible sidebar action displayed as a row in the entry list."
+  },
+  "sidebarLocationSearch": "Beside search",
+  "@sidebarLocationSearch": {
+    "description": "Subtitle for the history action displayed beside the sidebar search field."
+  },
+  "sidebarLocationUserBar": "User bar icons",
+  "@sidebarLocationUserBar": {
+    "description": "Subtitle for a navigation action displayed as an icon in the mobile sidebar user bar."
+  },
+  "sidebarLocationMore": "In More",
+  "@sidebarLocationMore": {
+    "description": "Subtitle for a sidebar navigation action displayed in the More menu."
+  },
+  "sidebarLocationHidden": "Hidden from the sidebar",
+  "@sidebarLocationHidden": {
+    "description": "Subtitle for a navigation action hidden from the sidebar and its More menu."
+  },
+  "sidebarLocationRail": "Left icon rail",
+  "@sidebarLocationRail": {
+    "description": "Heading of the desktop sidebar customization panel and subtitle for a visible icon rail entry."
+  },
+  "sidebarMenuShow": "Show in sidebar",
+  "@sidebarMenuShow": {
+    "description": "Context menu action that moves a navigation entry into the directly visible sidebar."
+  },
+  "sidebarMenuMore": "Move to More",
+  "@sidebarMenuMore": {
+    "description": "Context menu action that moves a sidebar navigation entry into the More menu."
+  },
+  "sidebarMenuHide": "Hide from sidebar",
+  "@sidebarMenuHide": {
+    "description": "Context menu action that hides a navigation entry from the sidebar and More menu."
+  },
+  "sidebarHideCustomize": "Hide from More",
+  "@sidebarHideCustomize": {
+    "description": "Long-press action hiding the Customize sidebar shortcut from the More menu."
+  },
+  "sidebarShowCustomizeInMore": "Show Customize sidebar in More",
+  "@sidebarShowCustomizeInMore": {
+    "description": "Switch controlling the presence of the Customize sidebar shortcut in the mobile sidebar More entries."
+  },
+  "sidebarShowCustomizeInMoreHint": "You can always change it here",
+  "@sidebarShowCustomizeInMoreHint": {
+    "description": "Subtitle reassuring users that they can still reach Sidebar settings after hiding the shortcut."
+  },
+  "sidebarHideSingleAssistant": "Hide assistant row when there is only one",
+  "@sidebarHideSingleAssistant": {
+    "description": "Switch for hiding the assistant selector when the user has only one assistant."
+  },
+  "sidebarHideSingleAssistantHint": "The assistant row is shown by default",
+  "@sidebarHideSingleAssistantHint": {
+    "description": "Description of the normal behavior for the single-assistant selector."
+  },
+  "sidebarRestoreDefaults": "Restore defaults",
+  "@sidebarRestoreDefaults": {
+    "description": "Action in the desktop sidebar customization panel to restore the default navigation icon order and visibility."
+  },
+  "sidebarOpenSettings": "Open sidebar settings…",
+  "@sidebarOpenSettings": {
+    "description": "Action in the mobile long-press menu on Customize sidebar. Opens Settings > Display > Sidebar."
+  },
+  "creationTitle": "Create",
+  "@creationTitle": {
+    "description": "Title and Palette navigation entry for the image and video creation experience."
+  },
+  "creationTopics": "Topics",
+  "@creationTopics": {
+    "description": "Section and mobile tab for media creation topics grouped by creative project."
+  },
+  "creationNewTopic": "New topic",
+  "@creationNewTopic": {
+    "description": "Action and desktop header for starting a separate media creation topic."
+  },
+  "creationNameAfterSending": "Named after the first prompt",
+  "@creationNameAfterSending": {
+    "description": "Subtitle for a new media creation topic before its first generation."
+  },
+  "creationPromptTitle": "Uses the start of your prompt as the title",
+  "@creationPromptTitle": {
+    "description": "Subtitle for the new creation topic when automatic naming is disabled."
+  },
+  "creationSearchTopics": "Search topics and prompts",
+  "@creationSearchTopics": {
+    "description": "Search input hint in the creation topic rail and mobile creation home."
+  },
+  "creationTopicsEmpty": "Topics appear here after your first prompt",
+  "@creationTopicsEmpty": {
+    "description": "Empty state inside the topic sidebar before any creations have been made."
+  },
+  "creationNaming": "Naming topic…",
+  "@creationNaming": {
+    "description": "Status in the creation header while a model is naming a new topic."
+  },
+  "creationRenameTopic": "Rename topic",
+  "@creationRenameTopic": {
+    "description": "Action that renames a media creation topic."
+  },
+  "creationDeleteTopic": "Delete topic",
+  "@creationDeleteTopic": {
+    "description": "Destructive action and confirmation title for deleting a topic, its generation groups, and media files."
+  },
+  "creationDeleteTopicBody": "Delete this topic and all its creations?",
+  "@creationDeleteTopicBody": {
+    "description": "Confirmation body for deleting an entire media creation topic."
+  },
+  "creationImage": "Image",
+  "@creationImage": {
+    "description": "Image mode in the creation composer. Produces still images."
+  },
+  "creationVideo": "Video",
+  "@creationVideo": {
+    "description": "Video mode in the creation composer. Produces moving clips."
+  },
+  "creationImagePrompt": "Describe the image to create",
+  "@creationImagePrompt": {
+    "description": "Image composer text field hint inside an existing creation topic."
+  },
+  "creationVideoPrompt": "Describe the video to generate",
+  "@creationVideoPrompt": {
+    "description": "Video composer text field hint inside an existing creation topic."
+  },
+  "creationNewImagePrompt": "Describe an image to start a new topic",
+  "@creationNewImagePrompt": {
+    "description": "Image composer text field hint when sending will create a new topic."
+  },
+  "creationNewVideoPrompt": "Describe a video to start a new topic",
+  "@creationNewVideoPrompt": {
+    "description": "Video composer text field hint when sending will create a new topic."
+  },
+  "creationSelectModel": "Select model",
+  "@creationSelectModel": {
+    "description": "Tooltip and empty label of the model control in the creation composer."
+  },
+  "creationSearchModels": "Search models or providers",
+  "@creationSearchModels": {
+    "description": "Hint in the media model selection popover or sheet."
+  },
+  "creationNoModelTitle": "No image or video models yet",
+  "@creationNoModelTitle": {
+    "description": "Empty state title when no enabled provider has a model for the selected media mode."
+  },
+  "creationNoModelBody": "Create uses image and video models configured in Providers. Sign in with a subscription, or enter an API key for fal or another provider.",
+  "@creationNoModelBody": {
+    "description": "Empty state help for configuring media models."
+  },
+  "creationEmptyTitle": "Start with an idea",
+  "@creationEmptyTitle": {
+    "description": "Empty creation topic or workbench headline."
+  },
+  "creationEmptyBody": "Describe what to create. Sending the first prompt starts a topic for the result and later edits.",
+  "@creationEmptyBody": {
+    "description": "Empty creation workbench text explaining that the first prompt starts a topic and later edits are grouped there."
+  },
+  "creationAddReference": "Add reference image",
+  "creationReferenceTooLarge": "Reference images must total 20 MB or less.",
+  "@creationReferenceTooLarge": {
+    "description": "Message displayed by the creation composer if the selected reference images exceed the combined request budget of 20 MiB."
+  },
+  "@creationAddReference": {
+    "description": "Accessible label for the creation composer action that selects an image file as a reference."
+  },
+  "creationApiProtocol": "Creation API protocol",
+  "@creationApiProtocol": {
+    "description": "Provider model settings field that selects the wire protocol used for this model in the image or video creation workbench."
+  },
+  "creationApiProtocolHelp": "Auto uses the provider’s API. For a custom gateway, choose the protocol listed in its documentation.",
+  "@creationApiProtocolHelp": {
+    "description": "Help beneath the creation API protocol setting explaining when to override automatic routing for a third-party gateway."
+  },
+  "creationAspectRatio": "Aspect ratio",
+  "@creationAspectRatio": {
+    "description": "Heading of the media aspect ratio picker."
+  },
+  "creationCountLabel": "Image count",
+  "@creationCountLabel": {
+    "description": "Heading of the number of images picker."
+  },
+  "creationDuration": "Duration",
+  "@creationDuration": {
+    "description": "Title of the duration picker in the video creation composer."
+  },
+  "creationDurationSeconds": "{seconds, plural, one{1 second} other{{seconds} seconds}}",
+  "@creationDurationSeconds": {
+    "description": "Video clip duration shown in the composer or a generation group.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "creationResolution": "Resolution",
+  "@creationResolution": {
+    "description": "Title of the resolution picker in the video creation composer."
+  },
+  "creationFirstLastFrame": "First and last frames",
+  "@creationFirstLastFrame": {
+    "description": "Switch for choosing first and last video reference frames."
+  },
+  "creationFirstFrame": "First frame",
+  "@creationFirstFrame": {
+    "description": "Video composer toggle and slot label for the starting image."
+  },
+  "creationLastFrame": "Last frame",
+  "@creationLastFrame": {
+    "description": "Video composer slot label for the ending image."
+  },
+  "creationBothFramesRequired": "Choose both a first and a last frame.",
+  "@creationBothFramesRequired": {
+    "description": "Instruction beside the video frame slots for a model that requires both a start image and an end image."
+  },
+  "creationFirstFrameRequired": "Choose a first frame. The last frame is optional.",
+  "@creationFirstFrameRequired": {
+    "description": "Hint for video models that require a first frame when a last frame is attached."
+  },
+  "creationFirstFrameOnly": "This model supports a first frame.",
+  "@creationFirstFrameOnly": {
+    "description": "Hint for video models that accept only a first frame."
+  },
+  "creationImageModels": "Image models",
+  "@creationImageModels": {
+    "description": "Title of the image model picker in Creation."
+  },
+  "creationVideoModels": "Video models",
+  "@creationVideoModels": {
+    "description": "Title of the video model picker in Creation."
+  },
+  "creationPlayVideo": "Play video",
+  "@creationPlayVideo": {
+    "description": "Play button tooltip in the embedded generated video player."
+  },
+  "creationPauseVideo": "Pause video",
+  "@creationPauseVideo": {
+    "description": "Pause button tooltip in the embedded generated video player."
+  },
+  "creationMuteVideo": "Mute",
+  "@creationMuteVideo": {
+    "description": "Mute button tooltip in the embedded generated video player."
+  },
+  "creationUnmuteVideo": "Unmute",
+  "@creationUnmuteVideo": {
+    "description": "Unmute button tooltip in the embedded generated video player."
+  },
+  "creationOpenVideo": "Open in system player",
+  "@creationOpenVideo": {
+    "description": "Action on a video cover that opens the file in the operating system player."
+  },
+  "creationFullScreen": "Full screen",
+  "@creationFullScreen": {
+    "description": "Button tooltip to play a generated video in a full-window view."
+  },
+  "creationExitFullScreen": "Exit full screen",
+  "@creationExitFullScreen": {
+    "description": "Button tooltip to close the full-window generated video player."
+  },
+  "creationSaveVideo": "Save video",
+  "@creationSaveVideo": {
+    "description": "Menu action to save a generated video to a file or the photo library."
+  },
+  "creationParameters": "Generation options",
+  "@creationParameters": {
+    "description": "Compact mobile composer action opening all generation parameters."
+  },
+  "creationAuto": "Auto",
+  "@creationAuto": {
+    "description": "Default aspect ratio that lets a media provider pick image dimensions."
+  },
+  "creationGenerate": "Generate",
+  "@creationGenerate": {
+    "description": "Submit button in the creation composer."
+  },
+  "creationWaitingImage": "Creating image",
+  "@creationWaitingImage": {
+    "description": "First waiting-card headline for a running image generation."
+  },
+  "creationWaitingVideo": "Preparing video",
+  "@creationWaitingVideo": {
+    "description": "First waiting-card headline for a running video generation."
+  },
+  "creationDownloading": "Downloading",
+  "@creationDownloading": {
+    "description": "Status when media generation has completed and outputs are being saved."
+  },
+  "creationFailed": "Generation failed",
+  "@creationFailed": {
+    "description": "Status title for a failed media generation."
+  },
+  "creationInterrupted": "Generation interrupted when the app closed",
+  "@creationInterrupted": {
+    "description": "Status title for a media generation unfinished at the last app shutdown."
+  },
+  "creationCancelled": "Cancelled",
+  "@creationCancelled": {
+    "description": "Status title for a generation cancelled by the user."
+  },
+  "creationPartial": "Some results could not be saved",
+  "@creationPartial": {
+    "description": "Status title when some outputs of a media generation were saved and other outputs failed."
+  },
+  "creationRetry": "Try again",
+  "@creationRetry": {
+    "description": "Action that retries a failed, partial, interrupted, or cancelled media generation."
+  },
+  "creationCopyPrompt": "Copy prompt",
+  "@creationCopyPrompt": {
+    "description": "Copies the prompt of a media generation to the clipboard."
+  },
+  "creationSaveImage": "Save image",
+  "@creationSaveImage": {
+    "description": "Save a creation to a local file or the photo library."
+  },
+  "creationCopyImage": "Copy image",
+  "@creationCopyImage": {
+    "description": "Copies the generated image to the system clipboard."
+  },
+  "creationShare": "Share",
+  "@creationShare": {
+    "description": "Shares a generated image file."
+  },
+  "creationDeleteItem": "Delete creation",
+  "@creationDeleteItem": {
+    "description": "Action and confirmation title for deleting one generated image or video."
+  },
+  "creationDeleteItemBody": "Delete this creation?",
+  "@creationDeleteItemBody": {
+    "description": "Confirmation text for deleting one generated image or video."
+  },
+  "creationActionFailed": "Could not complete the action",
+  "@creationActionFailed": {
+    "description": "Fallback failure toast for a local creation action, such as saving or deleting a file."
+  },
+  "creationOptionSaved": "Saved",
+  "@creationOptionSaved": {
+    "description": "Toast after successfully saving a creation to a file or photo library."
+  },
+  "creationOptionCopied": "Copied",
+  "@creationOptionCopied": {
+    "description": "Toast after copying a prompt or creation image."
+  },
+  "backupScopeCreations": "Creations",
+  "@backupScopeCreations": {
+    "description": "Backup scope category for media creation topics, generation records, and generated files."
+  },
+  "creationQueuePosition": "Queued · {count} ahead",
+  "@creationQueuePosition": {
+    "description": "Waiting-card headline before a media generation starts. count is the number of jobs ahead in the queue.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationImagesCount": "{count, plural, one{1 image} other{{count} images}}",
+  "@creationImagesCount": {
+    "description": "Number of images requested in a creation batch. count is the image quantity.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationGenerationCount": "{count, plural, one{1 generation} other{{count} generations}}",
+  "@creationGenerationCount": {
+    "description": "Number of generations in one creation topic. count is the number of batches.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationWorksCount": "{count, plural, one{1 creation} other{{count} creations}}",
+  "@creationWorksCount": {
+    "description": "Number of saved outputs in a creation topic. count is the number of available media files.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationTopicCount": "Topics {count}",
+  "@creationTopicCount": {
+    "description": "Header above the media topic cards. count is the number of topics shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationMoreOptions": "More options",
+  "@creationMoreOptions": {
+    "description": "Tooltip and title for advanced controls in the creation composer."
+  },
+  "creationImageSize": "Image size",
+  "@creationImageSize": {
+    "description": "Image size control in the creation generation options."
+  },
+  "creationQuality": "Quality",
+  "@creationQuality": {
+    "description": "Image rendering quality control in the creation generation options."
+  },
+  "creationLowQuality": "Low",
+  "@creationLowQuality": {
+    "description": "Choice for a low rendering quality in the creation composer."
+  },
+  "creationMediumQuality": "Medium",
+  "@creationMediumQuality": {
+    "description": "Choice for medium rendering quality in the creation composer."
+  },
+  "creationHighQuality": "High",
+  "@creationHighQuality": {
+    "description": "Choice for high rendering quality in the creation composer."
+  },
+  "creationNegativePrompt": "Negative prompt",
+  "@creationNegativePrompt": {
+    "description": "Control for what the user wants to avoid in a generated image or video."
+  },
+  "creationSeed": "Seed",
+  "@creationSeed": {
+    "description": "Numeric seed input for repeatable image or video generation."
+  },
+  "creationTransparentBackground": "Transparent background",
+  "@creationTransparentBackground": {
+    "description": "Toggle requesting transparency in generated images."
+  },
+  "creationOutputFormat": "Output format",
+  "@creationOutputFormat": {
+    "description": "Choice of encoding for the generated image file."
+  },
+  "creationExtraJson": "Extra parameters (JSON)",
+  "@creationExtraJson": {
+    "description": "Text field label for a JSON object merged into the provider request."
+  },
+  "creationExtraJsonHint": "These values are sent with each request. You can override them in More options.",
+  "@creationExtraJsonHint": {
+    "description": "Description beneath the model editor's extra JSON input."
+  },
+  "creationModelKnown": "Defaults come from Kelivo’s built-in model data. Changes apply to this model only.",
+  "@creationModelKnown": {
+    "description": "Status banner in the generation options section when Kelivo knows the model schema."
+  },
+  "creationModelUnknown": "Kelivo filled in common parameters. You can adjust them using your provider’s documentation.",
+  "@creationModelUnknown": {
+    "description": "Status banner for a manually added media model without a built-in schema."
+  },
+  "creationMaxPerRequest": "Maximum per request",
+  "@creationMaxPerRequest": {
+    "description": "Model editor field for the number of images a single API request can produce."
+  },
+  "creationMaxPerRequestHelp": "Larger batches are split into multiple requests and kept in one group.",
+  "@creationMaxPerRequestHelp": {
+    "description": "Explains automatic batching in the media model options editor."
+  },
+  "creationReferenceLimit": "Reference images",
+  "@creationReferenceLimit": {
+    "description": "Model editor field for the maximum number of input images accepted by this model."
+  },
+  "creationReferenceLimitHelp": "Set to zero to hide reference images and editing for this model.",
+  "@creationReferenceLimitHelp": {
+    "description": "Explains the effect of zero reference images in the media model editor."
+  },
+  "creationRatioHelp": "Select the ratios available in Create. Auto lets the model decide.",
+  "@creationRatioHelp": {
+    "description": "Explains the selected aspect ratio choices in the media model editor."
+  },
+  "creationMediaOther": "Other options",
+  "@creationMediaOther": {
+    "description": "Heading for the extra capability switches in the media model editor."
+  },
+  "creationEnableOptionHelp": "Show this control in More options.",
+  "@creationEnableOptionHelp": {
+    "description": "Supporting text under capability switches when editing a media model."
+  },
+  "creationImageTypeHelp": "Image models appear in Create and in the Image Generation tool.",
+  "@creationImageTypeHelp": {
+    "description": "Help under the image model type. Ordinary chat model pickers exclude this model type."
+  },
+  "creationVideoTypeHelp": "Video models appear in Create.",
+  "@creationVideoTypeHelp": {
+    "description": "Help under the video model type. Ordinary chat model pickers exclude this model type."
+  },
+  "creationFalKeyHint": "Create a key in fal.ai › Dashboard › API Keys",
+  "@creationFalKeyHint": {
+    "description": "Placeholder in the API key field for the built-in fal provider."
+  },
+  "creationFalCatalogHint": "Use Fetch to browse fal’s live catalog, or use + to add a model by its endpoint ID.",
+  "@creationFalCatalogHint": {
+    "description": "Hint above the fal provider model list explaining live catalog discovery with Fetch and manual entry of a fal endpoint ID with the plus button."
+  },
+  "falUnsupportedInput": "This model requires {field}, which Creation cannot supply.",
+  "@falUnsupportedInput": {
+    "description": "Message when adding a fal endpoint whose required input is unavailable in Creation. The field is the API parameter name.",
+    "placeholders": {
+      "field": {
+        "type": "String",
+        "example": "audio_url"
+      }
+    }
+  },
+  "falUnsupportedOutput": "This model does not return an image or video that Creation can save.",
+  "@falUnsupportedOutput": {
+    "description": "Message when adding a fal endpoint that returns unsupported results, such as segmentation data or vector files."
+  },
+  "falCheckingModel": "Checking model…",
+  "@falCheckingModel": {
+    "description": "Save-button label while looking up the schema of a manually entered fal model ID."
+  },
+  "falInvalidEndpointId": "Enter a fal endpoint ID, such as fal-ai/flux/dev.",
+  "@falInvalidEndpointId": {
+    "description": "Validation error in the model editor when the fal endpoint ID is malformed. Keep the example ID unchanged."
+  },
+  "creationOptionalTitle": "Name this work (optional)",
+  "@creationOptionalTitle": {
+    "description": "Composer placeholder for models that use reference images without a text prompt. This optional title stays in the user’s workspace."
+  },
+  "falCatalogMore": "Load more models",
+  "@falCatalogMore": {
+    "description": "Button at the bottom of the fal catalog that loads the next page of matching endpoints."
+  },
+  "falCatalogNoMatch": "No matching image or video models",
+  "@falCatalogNoMatch": {
+    "description": "Empty search result in the fal model picker when the active catalog has no matching creation endpoints."
+  },
+  "falCatalogLoadFailed": "Could not load fal model data ({error})",
+  "@falCatalogLoadFailed": {
+    "description": "Network or catalog error in the fal model picker. The error placeholder contains the reason returned by the client.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "creationFalModelId": "model ID",
+  "@creationFalModelId": {
+    "description": "Placeholder segment in the built-in fal provider's request URL preview."
+  },
+  "creationSelectPlatformImage": "Choose image",
+  "@creationSelectPlatformImage": {
+    "description": "Button for the provider-specific file parameter in More options."
+  },
+  "creationPlatformOptions": "Model-specific options",
+  "@creationPlatformOptions": {
+    "description": "Section label for the schema-driven options in the creation composer."
+  },
+  "creationParameterRequired": "Required",
+  "@creationParameterRequired": {
+    "description": "Label for a provider-specific field that must be filled before generation."
+  },
+  "creationBackground": "Background",
+  "@creationBackground": {
+    "description": "Background choice group for image generation in the composer More options panel."
+  },
+  "creationOpaqueBackground": "Opaque",
+  "@creationOpaqueBackground": {
+    "description": "Choice requesting an opaque background for a generated image."
+  },
+  "creationTransparentOption": "Transparent",
+  "@creationTransparentOption": {
+    "description": "Choice requesting a transparent background for a generated image."
+  },
+  "creationChatModelBadge": "Chat model",
+  "@creationChatModelBadge": {
+    "description": "Badge in the Create model picker for a chat model that also generates images."
+  },
+  "creationCommonOptions": "Common options",
+  "@creationCommonOptions": {
+    "description": "Heading above the shared provider-independent controls in the composer More options panel."
+  },
+  "creationNoCommonOptions": "This model has no common options.",
+  "@creationNoCommonOptions": {
+    "description": "Message under Common options in the composer when the current model exposes only model-specific or JSON options."
+  },
+  "creationGallery": "All creations",
+  "@creationGallery": {
+    "description": "Gallery destination and header listing saved image and video creations."
+  },
+  "creationFilterAll": "All",
+  "@creationFilterAll": {
+    "description": "First filter in the Create gallery, showing every saved creation."
+  },
+  "creationFilterImages": "Images",
+  "@creationFilterImages": {
+    "description": "Filter for saved images in the Create gallery."
+  },
+  "creationFilterVideos": "Videos",
+  "@creationFilterVideos": {
+    "description": "Filter for saved videos in the Create gallery."
+  },
+  "creationFilterFavorites": "Favorites",
+  "@creationFilterFavorites": {
+    "description": "Filter for starred creations in the Create gallery."
+  },
+  "creationSearchGallery": "Search prompts or topics",
+  "@creationSearchGallery": {
+    "description": "Placeholder in the Create gallery search box."
+  },
+  "creationGalleryEmpty": "No creations yet",
+  "@creationGalleryEmpty": {
+    "description": "Empty Create gallery title before the user has generated media."
+  },
+  "creationFavoritesEmpty": "No favorites yet",
+  "@creationFavoritesEmpty": {
+    "description": "Empty message for the favorites filter in Create."
+  },
+  "creationGalleryNoResults": "No matching creations",
+  "@creationGalleryNoResults": {
+    "description": "Create gallery message when search or filtering returns no results."
+  },
+  "creationShowInTopic": "Show in topic",
+  "@creationShowInTopic": {
+    "description": "Lightbox action that opens the parent topic and scrolls to the selected item's batch."
+  },
+  "creationFavorite": "Favorite",
+  "@creationFavorite": {
+    "description": "Star the selected creation from its media card or lightbox."
+  },
+  "creationUnfavorite": "Remove favorite",
+  "@creationUnfavorite": {
+    "description": "Remove the star from the selected creation."
+  },
+  "creationFavorited": "Added to favorites",
+  "@creationFavorited": {
+    "description": "Confirmation after starring a creation."
+  },
+  "creationUnfavorited": "Removed from favorites",
+  "@creationUnfavorited": {
+    "description": "Confirmation after removing a creation's star."
+  },
+  "creationTopicDisplay": "Topic display",
+  "@creationTopicDisplay": {
+    "description": "Group heading for topic layout choices in the Create menu."
+  },
+  "creationCoversAndTitles": "Covers and titles",
+  "@creationCoversAndTitles": {
+    "description": "Topic display option showing artwork covers plus metadata."
+  },
+  "creationCoversOnly": "Covers only",
+  "@creationCoversOnly": {
+    "description": "Compact topic display option showing only covers."
+  },
+  "creationTopicList": "List",
+  "@creationTopicList": {
+    "description": "Topic display option with one compact row per topic."
+  },
+  "creationAutoTitle": "Name topics automatically",
+  "@creationAutoTitle": {
+    "description": "Toggle in the Create menu for naming a topic with the title summary model."
+  },
+  "creationAutoTitleHelp": "Use the title summary model to name a topic from its first prompt.",
+  "@creationAutoTitleHelp": {
+    "description": "Explains automatic naming beneath its toggle in the Create menu."
+  },
+  "creationAutoTitleOffHelp": "Use the beginning of the first prompt as the title.",
+  "@creationAutoTitleOffHelp": {
+    "description": "Explains the fallback when automatic naming is turned off."
+  },
+  "creationCustomCount": "Custom",
+  "@creationCustomCount": {
+    "description": "Choice after the standard quantities in the image count control."
+  },
+  "creationCustomCountMaximum": "Up to 16",
+  "@creationCustomCountMaximum": {
+    "description": "Caption next to the custom image count stepper."
+  },
+  "creationRequestSplit": "{model} produces up to {limit} images per request. {requests} requests will be grouped together.",
+  "@creationRequestSplit": {
+    "description": "Batch count panel information showing the model name, per-request limit, and planned request count.",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "requests": {
+        "type": "int"
+      }
+    }
+  },
+  "creationNoModelPlaceholder": "Add a model that can create media first",
+  "@creationNoModelPlaceholder": {
+    "description": "Disabled composer placeholder when there are no eligible models."
+  },
+  "creationConnectChatGPT": "Sign in to ChatGPT",
+  "@creationConnectChatGPT": {
+    "description": "Create empty-state button to open ChatGPT subscription sign-in."
+  },
+  "creationConnectGrok": "Sign in to Grok",
+  "@creationConnectGrok": {
+    "description": "Create empty-state button to open Grok subscription sign-in."
+  },
+  "creationConfigureFal": "Set up fal",
+  "@creationConfigureFal": {
+    "description": "Create empty-state button opening the built-in fal provider settings."
+  },
+  "creationOtherProviders": "Other providers",
+  "@creationOtherProviders": {
+    "description": "Create empty-state action opening the providers list."
+  },
+  "creationChooseReferenceFile": "Choose files…",
+  "@creationChooseReferenceFile": {
+    "description": "Desktop reference source option to pick one or more local images."
+  },
+  "creationChooseFromLibrary": "Choose from Photos",
+  "@creationChooseFromLibrary": {
+    "description": "Mobile action to pick reference images from the photo library."
+  },
+  "creationTakeReferencePhoto": "Take a photo",
+  "@creationTakeReferencePhoto": {
+    "description": "Mobile reference action to capture an image using the camera."
+  },
+  "creationPasteReference": "Paste image",
+  "@creationPasteReference": {
+    "description": "Reference source action that reads a local image from the clipboard."
+  },
+  "creationRecentImages": "Recent images",
+  "@creationRecentImages": {
+    "description": "Picker title for recent images from creations and chat."
+  },
+  "creationReferenceDrop": "Drop to add reference images",
+  "@creationReferenceDrop": {
+    "description": "Drag overlay when dropping images into the Create workbench."
+  },
+  "creationFirstFrameDrop": "Drop to set the first frame",
+  "@creationFirstFrameDrop": {
+    "description": "Drag overlay in video mode when dropping a first-frame image."
+  },
+  "creationReferenceDropHint": "You can also drop images onto Create.",
+  "@creationReferenceDropHint": {
+    "description": "Supporting text at the bottom of the desktop Add references menu."
+  },
+  "creationNoClipboardImage": "No image on the clipboard",
+  "@creationNoClipboardImage": {
+    "description": "Toast when the user invokes Paste image but the clipboard contains no supported image."
+  },
+  "creationReferenceAdded": "Added to references",
+  "@creationReferenceAdded": {
+    "description": "Toast after copying a creation or selected file into the current draft references."
+  },
+  "creationReferenceAlreadyAdded": "Already in your references",
+  "@creationReferenceAlreadyAdded": {
+    "description": "Toast in the creation composer when all selected pictures are already attached to this draft or frame."
+  },
+  "creationReferenceLimitReached": "This model accepts up to {count} reference images.",
+  "@creationReferenceLimitReached": {
+    "description": "Toast shown when adding more reference images than the model accepts. count is its total limit.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationReferenceUnsupported": "{model} does not support reference images",
+  "@creationReferenceUnsupported": {
+    "description": "Warning in a draft with saved references after switching to a model that cannot accept them.",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "creationReferenceIgnored": "Your references stay in the draft. A model that accepts them can use them.",
+  "@creationReferenceIgnored": {
+    "description": "Help beside dimmed reference thumbnails for a model without reference input."
+  },
+  "creationRecentChat": "Chat",
+  "@creationRecentChat": {
+    "description": "Recent image source filter and label for pictures from conversations."
+  },
+  "creationRecentCreation": "Create",
+  "@creationRecentCreation": {
+    "description": "Recent image source filter and label for pictures from generation history."
+  },
+  "creationReferenceSlotsAvailable": "Choose up to {count} more",
+  "@creationReferenceSlotsAvailable": {
+    "description": "Hint in the recent images picker. count is the number of free reference slots in this draft.",
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "creationTapToSelect": "Tap an image to select it",
+  "@creationTapToSelect": {
+    "description": "Footer hint in the recent images picker before the user has selected an image."
+  },
+  "creationSelectedImages": "{count} selected",
+  "@creationSelectedImages": {
+    "description": "Number of selected images in the recent image picker footer.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationAddSelected": "Add ({count})",
+  "@creationAddSelected": {
+    "description": "Confirm action in the recent image picker. count is the number of selected images.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationRecentEmpty": "No recent images",
+  "@creationRecentEmpty": {
+    "description": "Empty recent reference picker message when the selected source has no files."
+  },
+  "creationEditImage": "Edit image",
+  "@creationEditImage": {
+    "description": "Action and title for the creation image editor in the lightbox."
+  },
+  "creationUseReference": "Use as reference",
+  "@creationUseReference": {
+    "description": "Media action that appends an image to the open draft or sets its first frame."
+  },
+  "creationEditReference": "Editing with this image",
+  "@creationEditReference": {
+    "description": "Selected image caption in the lightbox editor."
+  },
+  "creationEditPrompt": "What should change?",
+  "@creationEditPrompt": {
+    "description": "Prompt field for editing a generated image."
+  },
+  "creationEditPromptExample": "For example, use a beach background and keep the person and lighting",
+  "@creationEditPromptExample": {
+    "description": "Example placeholder in the lightbox edit prompt field."
+  },
+  "creationEditOriginalRatio": "Original ratio",
+  "@creationEditOriginalRatio": {
+    "description": "Choice to match the original image's aspect ratio when editing."
+  },
+  "creationEditNewGroup": "Generate a new group",
+  "@creationEditNewGroup": {
+    "description": "Submits an edit as a new generation batch in the source topic."
+  },
+  "creationEditHelp": "The edit appears as a new group in this topic.",
+  "@creationEditHelp": {
+    "description": "Note below the lightbox edit options explaining where the result appears."
+  },
+  "creationEditStarted": "Editing started. The result will appear at the bottom of this topic.",
+  "@creationEditStarted": {
+    "description": "Toast after submitting an edit from the lightbox."
+  },
+  "creationEditedResult": "Edited result",
+  "@creationEditedResult": {
+    "description": "Metadata label in the creation lightbox marking an artwork generated by editing an earlier image."
+  },
+  "creationEditedFrom": "Edited from",
+  "@creationEditedFrom": {
+    "description": "Label identifying the source image for a generation produced by an edit."
+  },
+  "creationRepeat": "Generate again",
+  "@creationRepeat": {
+    "description": "Start a new batch using the same prompt, model parameters, and references."
+  },
+  "creationDeleteBatch": "Delete group",
+  "@creationDeleteBatch": {
+    "description": "Destructive action in the generation group menu and title of its confirmation dialog."
+  },
+  "creationDeleteBatchBody": "{count, plural, =0{Delete this generation record from this device?} one{Delete this group and its file from this device?} other{Delete this group and its {count} files from this device?}}",
+  "@creationDeleteBatchBody": {
+    "description": "Confirmation before deleting a generation group from this device. The count is the number of stored result files. A failed group can have none.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationRequestDetails": "Request details",
+  "@creationRequestDetails": {
+    "description": "Title and action for redacted diagnostics of a failed generation."
+  },
+  "creationNoRequestDetails": "No request details are available.",
+  "@creationNoRequestDetails": {
+    "description": "Shown when an older failed batch has no recorded protocol details."
+  },
+  "creationReferenceSummary": "References {count} / {limit}",
+  "@creationReferenceSummary": {
+    "description": "Label next to the reference strip. count is selected and limit is supported by the active model.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "creationPrevious": "Previous creation",
+  "@creationPrevious": {
+    "description": "Lightbox shortcut/button for navigating to the previous creation."
+  },
+  "creationNext": "Next creation",
+  "@creationNext": {
+    "description": "Lightbox shortcut/button for navigating to the next creation."
+  },
+  "creationWaitingSketch": "Sketching the composition",
+  "@creationWaitingSketch": {
+    "description": "Rotating creation status after an image is started."
+  },
+  "creationWaitingDetails": "Refining the details",
+  "@creationWaitingDetails": {
+    "description": "Rotating status during image generation after sketching."
+  },
+  "creationWaitingFinish": "Finishing the image",
+  "@creationWaitingFinish": {
+    "description": "Rotating status near the end of image generation."
+  },
+  "creationWaitingVideoMotion": "Planning the motion",
+  "@creationWaitingVideoMotion": {
+    "description": "Rotating status during video generation."
+  },
+  "creationWaitingVideoFrames": "Generating frames",
+  "@creationWaitingVideoFrames": {
+    "description": "Rotating status during video generation after planning."
+  },
+  "creationWaitingVideoFinish": "Finishing the video",
+  "@creationWaitingVideoFinish": {
+    "description": "Rotating status toward the end of video generation."
+  },
+  "creationWaitingLong": "Taking a little longer",
+  "@creationWaitingLong": {
+    "description": "Rotating status after media generation takes longer than estimated."
+  },
+  "creationSuggestionPoster": "Design a minimalist concert poster",
+  "@creationSuggestionPoster": {
+    "description": "Prompt suggestion in the empty Create workbench."
+  },
+  "creationSuggestionLandscape": "Paint a mountain village at dawn",
+  "@creationSuggestionLandscape": {
+    "description": "Prompt suggestion in the empty Create workbench."
+  },
+  "creationSuggestionProduct": "Photograph a ceramic cup in soft daylight",
+  "@creationSuggestionProduct": {
+    "description": "Prompt suggestion in the empty Create workbench."
+  },
+  "creationSuggestionIllustration": "Illustrate a fox under a starry sky",
+  "@creationSuggestionIllustration": {
+    "description": "Prompt suggestion in the empty Create workbench."
+  },
+  "creationSuggestionRoom": "Sketch a reading nook with warm wood",
+  "@creationSuggestionRoom": {
+    "description": "Prompt suggestion in the empty Create workbench."
+  },
+  "creationSuggestionSticker": "Make a set of playful plant stickers",
+  "@creationSuggestionSticker": {
+    "description": "Prompt suggestion in the empty Create workbench."
+  },
+  "creationSuggestionMotion": "A slow push in on a rainy garden",
+  "@creationSuggestionMotion": {
+    "description": "Video prompt suggestion in the empty workbench."
+  },
+  "creationSuggestionOcean": "Waves rolling onto a beach at sunset",
+  "@creationSuggestionOcean": {
+    "description": "Video prompt suggestion in the empty workbench."
+  },
+  "creationWaitingDraft": "Generating the first draft",
+  "@creationWaitingDraft": {
+    "description": "The rotating image waiting label at 20 seconds."
+  },
+  "creationWaitingScene": "Setting up the scene",
+  "@creationWaitingScene": {
+    "description": "The rotating image waiting label at 25 seconds."
+  },
+  "creationWaitingVideoRendering": "Rendering motion",
+  "@creationWaitingVideoRendering": {
+    "description": "The rotating video waiting label at 25 seconds."
+  },
+  "creationWaitingVideoComposite": "Compositing the video",
+  "@creationWaitingVideoComposite": {
+    "description": "The rotating video waiting label at 30 seconds."
+  },
+  "creationWaitingNearlyDone": "Almost done",
+  "@creationWaitingNearlyDone": {
+    "description": "The rotating waiting label at 35 seconds for images and video."
+  },
+  "creationUseGroupReferences": "Use all {count} as references",
+  "@creationUseGroupReferences": {
+    "description": "Action in the generation group menu adding its ready images to the current draft. count is the number of images in the group.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationDownloadFailed": "Download failed",
+  "@creationDownloadFailed": {
+    "description": "Placeholder inside a partial generation group for a result that could not be saved."
+  },
+  "creationAutomaticRetry": "Automatic retry",
+  "@creationAutomaticRetry": {
+    "description": "Badge in creation diagnostics for errors that allow automatic retries."
+  },
+  "creationNoAutomaticRetry": "Manual retry",
+  "@creationNoAutomaticRetry": {
+    "description": "Badge in creation diagnostics for errors that require a manual retry."
+  },
+  "creationRetryHistory": "Retry history",
+  "@creationRetryHistory": {
+    "description": "Heading of the list of automatic retry attempts in creation request details."
+  },
+  "creationLoggedRequest": "Request metadata",
+  "@creationLoggedRequest": {
+    "description": "Heading for the redacted request method, host, and route in creation request details."
+  },
+  "creationLoggedResponse": "Response metadata",
+  "@creationLoggedResponse": {
+    "description": "Heading for response status information in creation request details."
+  },
+  "creationDefaultImage": "Image generation model",
+  "@creationDefaultImage": {
+    "description": "Title of the default model card for image creation and the generate_image tool."
+  },
+  "creationDefaultImageHelp": "Used for images in Creation and the image generation tool in chat.",
+  "@creationDefaultImageHelp": {
+    "description": "Subtitle of the default image generation model card."
+  },
+  "creationDefaultVideo": "Video generation model",
+  "@creationDefaultVideo": {
+    "description": "Title of the default model card for video creation."
+  },
+  "creationDefaultVideoHelp": "Used in video mode in Creation.",
+  "@creationDefaultVideoHelp": {
+    "description": "Subtitle of the default video generation model card."
+  },
+  "creationDefaultEnhance": "Prompt enhancement model",
+  "@creationDefaultEnhance": {
+    "description": "Title of the default model card and prompt template editor for refining creation prompts."
+  },
+  "creationDefaultEnhanceHelp": "Refines prompts in Creation. Reference images are included if this model supports image input.",
+  "@creationDefaultEnhanceHelp": {
+    "description": "Subtitle of the default prompt enhancement model card."
+  },
+  "creationEnhanceTemplateVariable": "Use {variable} for the current creation prompt.",
+  "@creationEnhanceTemplateVariable": {
+    "description": "Help under the prompt enhancement template. The variable placeholder is the literal template marker {prompt}.",
+    "placeholders": {
+      "variable": {
+        "type": "String"
+      }
+    }
+  },
+  "creationLocalToolTitle": "Image generation",
+  "@creationLocalToolTitle": {
+    "description": "Assistant local tool name and chat tools menu label for generate_image."
+  },
+  "creationLocalToolHelp": "Let this assistant draw or edit images in chat using the default image generation model.",
+  "@creationLocalToolHelp": {
+    "description": "Help below the image generation toggle in the assistant local tools tab."
+  },
+  "creationStorageFileCount": "{count, plural, one{1 file} other{{count} files}}",
+  "@creationStorageFileCount": {
+    "description": "Count of files on disk within one generation in Storage > Creation, including artwork, references and thumbnails.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationSelectDefaultImage": "Choose a default image model",
+  "@creationSelectDefaultImage": {
+    "description": "Action in the chat tools panel and assistant settings that opens the default image model picker."
+  },
+  "creationConfigureImageProvider": "Add or enable an image model in Providers first.",
+  "@creationConfigureImageProvider": {
+    "description": "Notification when configuring the chat image tool and there are no eligible image models in any provider."
+  },
+  "displayChatImagesAtToolCall": "Show generated images at the tool call",
+  "@displayChatImagesAtToolCall": {
+    "description": "Chat item display setting. When on, each image result appears at its tool call in the reply. When off, images are grouped below the reply."
+  },
+  "displayChatImageInfo": "Show generated image details",
+  "@displayChatImageInfo": {
+    "description": "Chat item display switch for the image count, model name and aspect ratio below generated images."
+  },
+  "displayChatImageLink": "Show link to Creation",
+  "@displayChatImageLink": {
+    "description": "Chat item display switch for the link from a generated image to its source in Creation."
+  },
+  "creationLocalToolNeedsModel": "Choose an image generation model in Default models first.",
+  "@creationLocalToolNeedsModel": {
+    "description": "Warning below the assistant image generation toggle when no usable default image model is configured."
+  },
+  "creationChatSource": "Chat · {title}",
+  "@creationChatSource": {
+    "description": "Gallery source label for an image generated inside a chat. The title is the conversation name.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "creationSendToChat": "Send to chat",
+  "@creationSendToChat": {
+    "description": "Menu item on a creation image that switches to chat and adds the image to the composer."
+  },
+  "creationShowInConversation": "Show in conversation",
+  "@creationShowInConversation": {
+    "description": "Gallery viewer action that opens the chat and scrolls to the message that generated the artwork."
+  },
+  "creationShowInCreation": "Show in Creation",
+  "@creationShowInCreation": {
+    "description": "Link below a chat-generated image opening this item in the Creation gallery."
+  },
+  "creationChatCancelled": "Image creation cancelled",
+  "@creationChatCancelled": {
+    "description": "Status line when a local chat image generation was stopped."
+  },
+  "creationChatRegenerate": "Generate again",
+  "@creationChatRegenerate": {
+    "description": "Action that retries a cancelled chat image generation with its saved prompt."
+  },
+  "creationChatImageUnavailable": "Image unavailable",
+  "@creationChatImageUnavailable": {
+    "description": "Heading of the chat image generation failure card."
+  },
+  "creationChatResultCaption": "{count, plural, one{Generated 1 image} other{Generated {count} images}} · {model} · {ratio}",
+  "@creationChatResultCaption": {
+    "description": "Caption below a chat image gallery. Count is the number of available outputs, model is the image model display name, and ratio is the aspect ratio label.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "model": {
+        "type": "String"
+      },
+      "ratio": {
+        "type": "String"
+      }
+    }
+  },
+  "creationEnhance": "Enhance prompt",
+  "@creationEnhance": {
+    "description": "Tooltip and accessibility label for the wand button in the creation composer that rewrites its prompt."
+  },
+  "creationEnhanceLoading": "Rewriting prompt…",
+  "@creationEnhanceLoading": {
+    "description": "Heading at the top of the creation composer while an enhancement request is running."
+  },
+  "creationEnhanceResult": "Rewritten prompt",
+  "@creationEnhanceResult": {
+    "description": "Heading at the top of the creation composer when the model has rewritten the prompt."
+  },
+  "creationEnhanceOriginal": "Original",
+  "@creationEnhanceOriginal": {
+    "description": "Disclosure button in the creation composer that shows or hides the original prompt."
+  },
+  "creationEnhanceAgain": "Try another",
+  "@creationEnhanceAgain": {
+    "description": "Button in the prompt enhancement panel asking the same model to produce another rewrite."
+  },
+  "creationEnhanceApply": "Replace",
+  "@creationEnhanceApply": {
+    "description": "Button that replaces the text in the creation composer with the rewritten prompt."
+  },
+  "creationEnhanceNeedsModel": "Choose a prompt enhancement model in Default models.",
+  "@creationEnhanceNeedsModel": {
+    "description": "Snackbar shown when the prompt enhancement model is missing or unavailable."
+  },
+  "creationStorageHint": "Images, videos, thumbnails, and reference images stored by Creation.",
+  "@creationStorageHint": {
+    "description": "Description in the Creation category of Settings › Storage space."
+  },
+  "creationStorageDate": "Clear creations through this date",
+  "@creationStorageDate": {
+    "description": "Title of the date picker for bulk deletion of finished creations. The selected day is inclusive."
+  },
+  "creationStorageConfirm": "Delete finished generations through {date}, including their images, videos, and reference copies? Images from these generations will also be unavailable in chat.",
+  "@creationStorageConfirm": {
+    "description": "Destructive confirmation in Creation storage cleanup. Date is the locally formatted last day included in deletion.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "creationStorageRemoved": "{count, plural, =0{No generations to clear} one{Cleared 1 generation} other{Cleared {count} generations}}",
+  "@creationStorageRemoved": {
+    "description": "Snackbar after a Creation storage cleanup. Count is the number of generation batches deleted.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationStorageClean": "Clear by date",
+  "@creationStorageClean": {
+    "description": "Action in the Creation storage category that opens a date picker to delete older generation batches."
+  },
+  "creationDisplayAndGames": "Display and waiting games",
+  "@creationDisplayAndGames": {
+    "description": "Tooltip and mobile sheet title for the Creation topic-list menu with appearance and waiting-game preferences."
+  },
+  "creationWaitGame": "Waiting game",
+  "@creationWaitGame": {
+    "description": "Settings row and topic menu section label for choosing a game to play while a creation is generating."
+  },
+  "creationGameRandom": "Random",
+  "@creationGameRandom": {
+    "description": "Waiting-game option that chooses Snake or Brick Breaker for the current generation."
+  },
+  "creationGameOff": "Off",
+  "@creationGameOff": {
+    "description": "Waiting-game option that disables starting a game from waiting cards."
+  },
+  "creationGameSnake": "Snake",
+  "@creationGameSnake": {
+    "description": "Name of the Snake game available on Creation waiting cards and in the topic display menu."
+  },
+  "creationGameBrick": "Brick Breaker",
+  "@creationGameBrick": {
+    "description": "Name of the paddle-and-ball game available on Creation waiting cards and in the topic display menu."
+  },
+  "creationGameSnakeControls": "Snake. Use arrow keys, W A S D, or swipes to steer. Press Space to pause or resume and Escape to exit.",
+  "@creationGameSnakeControls": {
+    "description": "Screen reader description of the controls on an active Snake game board."
+  },
+  "creationGameBrickControls": "Brick Breaker. Drag the paddle or hold Left, Right, A, or D to move. Press Space to pause or resume and Escape to exit.",
+  "@creationGameBrickControls": {
+    "description": "Screen reader description of the controls on an active Brick Breaker game board."
+  },
+  "creationGameDuringImage": "Play {game} during image generation",
+  "@creationGameDuringImage": {
+    "description": "Accessibility label for starting a game on an image waiting card. Game is the localized game name.",
+    "placeholders": {
+      "game": {
+        "type": "String"
+      }
+    }
+  },
+  "creationGameDuringVideo": "Play {game} during video generation",
+  "@creationGameDuringVideo": {
+    "description": "Accessibility label for starting a game on a video waiting card. Game is the localized game name.",
+    "placeholders": {
+      "game": {
+        "type": "String"
+      }
+    }
+  },
+  "creationGameScore": "Score {score}",
+  "@creationGameScore": {
+    "description": "Screen reader announcement on the waiting-game board. Score is the player’s total points.",
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "creationGamePaused": "Paused · {score}",
+  "@creationGamePaused": {
+    "description": "Overlay on a paused waiting game. Score is the player’s total points.",
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "creationGameEnded": "Game over · {score}",
+  "@creationGameEnded": {
+    "description": "Overlay before returning to the waiting card after a game ends. Score is the player’s final points.",
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "creationGameCompleted": "Creation ready · {score}",
+  "@creationGameCompleted": {
+    "description": "Brief overlay when a creation finishes while its waiting game is active. Score is the player’s final points.",
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "creationNoSelectableModels": "No models available",
+  "@creationNoSelectableModels": {
+    "description": "Compact disabled model label in the Creation composer when no image or video models are available."
+  },
+  "creationNoMatchingTopics": "No matching topics",
+  "@creationNoMatchingTopics": {
+    "description": "Shown in the Creation topic list when a search has no matching titles or prompts."
+  },
+  "creationAllTopicCount": "All topics {count}",
+  "@creationAllTopicCount": {
+    "description": "Heading above the mobile Creation topic list. The count is the number of topics in the list.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationNoImageModels": "No image generation models yet",
+  "creationNoVideoModels": "No video generation models yet",
+  "@creationNoImageModels": {
+    "description": "Creation empty-state heading when the current image mode has no available model, but the other mode is configured."
+  },
+  "@creationNoVideoModels": {
+    "description": "Creation empty-state heading when the current video mode has no available model, but the other mode is configured."
+  },
+  "creationFrameSources": "Add from recent images, files, or the clipboard",
+  "@creationFrameSources": {
+    "description": "Second line beside the first and last video frame slots in the Creation composer."
+  },
+  "creationFrameModelFirstOnly": "{model} supports the first frame only",
+  "@creationFrameModelFirstOnly": {
+    "description": "First line beside the video frame slot when the selected model only accepts the first frame.",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "creationSubscriptionLogin": "Subscription",
+  "@creationSubscriptionLogin": {
+    "description": "Short provider group label for subscription sign-in in the Creation model picker."
+  },
+  "creationModelReferenceLimit": "Up to {count} references",
+  "@creationModelReferenceLimit": {
+    "description": "Second line of a Creation model choice, showing the number of reference images supported.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationTextOnlyImage": "Text to image",
+  "@creationTextOnlyImage": {
+    "description": "Subtitle of an image generation model that does not accept reference images."
+  },
+  "creationTextOnlyVideo": "Text to video",
+  "@creationTextOnlyVideo": {
+    "description": "Subtitle of a video generation model that does not accept a reference frame."
+  },
+  "creationCustomCountLabel": "Custom count",
+  "@creationCustomCountLabel": {
+    "description": "Label beside the custom output count stepper in the Creation composer."
+  },
+  "creationFailureCategory": "{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} unavailable{Model or endpoint unavailable} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} invalidResponse{Invalid response} other{Generation error}}",
+  "@creationFailureCategory": {
+    "description": "Category shown on a failed Creation job and in its request log. The kind is a stable error category. Use unavailable for a missing model or API endpoint.",
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "creationInterruptedHelp": "The app closed before this request finished. Your prompt and settings are saved.",
+  "@creationInterruptedHelp": {
+    "description": "Explanation on an interrupted generation card."
+  },
+  "creationCancelledHelp": "Your prompt and settings are saved. You can generate again at any time.",
+  "@creationCancelledHelp": {
+    "description": "Explanation below a cancelled generation."
+  },
+  "creationChatImageReady": "Image created",
+  "@creationChatImageReady": {
+    "description": "Status line above a chat image while the waiting game shows its completion banner before revealing the finished image."
   }
 }

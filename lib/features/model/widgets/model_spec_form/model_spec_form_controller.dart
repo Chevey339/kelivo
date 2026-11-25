@@ -1,8 +1,19 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart' show CancelToken;
+import '../../../../core/services/media/fal_model_discovery.dart';
+import '../../../provider/widgets/fal_catalog_notice.dart';
+
+import '../../../../core/services/media/fal_model_catalog.dart';
+
 import 'package:flutter/widgets.dart';
 
+import '../../../../core/models/media_creation.dart';
 import '../../../../core/models/model_spec.dart';
+import '../../../../core/services/media/adapters/native_image_size.dart';
+import '../../../../core/services/media/media_adapter_resolver.dart';
+import '../../../../core/services/media/media_model_overrides.dart';
+import '../../../../core/services/media/media_request.dart';
 import '../../../../core/models/image_generation_options.dart';
 import '../../../../core/models/request_budget.dart';
 import '../../../../core/models/avatar_config.dart';
@@ -32,6 +43,12 @@ class ModelSpecFormController extends ChangeNotifier {
        isNew = isNew {
     avatar = isNew ? null : config.modelAvatar(modelKey);
     final override = isNew ? null : config.modelOverrides[modelKey];
+    media = MediaModelOverrides.fromJson(
+      override is Map ? override['media'] : null,
+    );
+    mediaExtraController = TextEditingController(
+      text: _encodePatch(media.extra),
+    );
     requestBudget = RequestBudgetOverrides.fromJson(
       override is Map ? override['requestBudget'] : null,
     );
@@ -135,6 +152,77 @@ class ModelSpecFormController extends ChangeNotifier {
     _imageGenerationTouched = true;
     notifyListeners();
   }
+
+  late MediaModelOverrides media;
+  late final TextEditingController mediaExtraController;
+  bool _mediaTouched = false;
+
+  MediaMode get mediaMode =>
+      spec.type == ModelType.video ? MediaMode.video : MediaMode.image;
+  bool get hasMediaSettings =>
+      spec.type.isMedia ||
+      spec.type == ModelType.chat && spec.output.contains(Modality.image);
+  MediaApiProtocol get mediaProtocol =>
+      media.protocol.mode == mediaMode ? media.protocol : MediaApiProtocol.auto;
+  String get _mediaKey => isNew ? apiModelIdController.text.trim() : _modelKey;
+
+  ProviderConfig get _mediaPreviewConfig {
+    return _config.copyWith(
+      modelOverrides: {
+        ..._config.modelOverrides,
+        _mediaKey: {
+          ...draft.toJson(),
+          'apiModelId': apiModelIdController.text.trim(),
+          'name': displayNameController.text.trim(),
+        },
+      },
+    );
+  }
+
+  bool get hasMediaModelData => const MediaAdapterResolver().hasModelData(
+    _mediaPreviewConfig,
+    mediaMode,
+    _mediaKey,
+    protocol: mediaProtocol,
+  );
+
+  MediaCapabilities get mediaDefaults {
+    final config = _mediaPreviewConfig;
+    return const MediaAdapterResolver()
+            .resolve(
+              config,
+              mediaMode,
+              modelId: _mediaKey,
+              protocol: mediaProtocol,
+            )
+            ?.capabilities(config, _mediaKey) ??
+        const MediaCapabilities(aspectRatios: standardImageRatios);
+  }
+
+  MediaCapabilities get mediaCapabilities =>
+      media.apply(mediaDefaults, video: mediaMode == MediaMode.video);
+
+  void setMediaValue(String key, Object? value) {
+    media = MediaModelOverrides.fromJson({...media.toJson(), key: value});
+    _mediaTouched = true;
+    notifyListeners();
+  }
+
+  void resetMedia() {
+    media = const MediaModelOverrides();
+    mediaExtraController.clear();
+    _mediaTouched = true;
+    notifyListeners();
+  }
+
+  void mediaExtraChanged(String _) {
+    _mediaTouched = true;
+  }
+
+  bool get _validMediaExtra =>
+      !hasMediaSettings ||
+      mediaExtraController.text.trim().isEmpty ||
+      _tryParseJsonObject(mediaExtraController.text.trim()) != null;
 
   late ModelSpec base;
   late Map<ModelSpecField, SpecSource> sources;
@@ -578,10 +666,17 @@ class ModelSpecFormController extends ChangeNotifier {
     return BuiltInToolNames.parseFromOverride(draft.toJson()).contains(name);
   }
 
+  bool get _validModelId {
+    final id = apiModelIdController.text.trim();
+    return id.length >= 2 && (!config.isFal || isFalEndpointId(id));
+  }
+
   String? validate(AppLocalizations l10n) {
-    final apiModelId = apiModelIdController.text.trim();
-    if (apiModelId.isEmpty || apiModelId.length < 2) {
-      return l10n.modelDetailSheetInvalidIdError;
+    if (!_validMediaExtra) return l10n.modelSpecFormInvalidJson;
+    if (!_validModelId) {
+      return config.isFal
+          ? l10n.falInvalidEndpointId
+          : l10n.modelDetailSheetInvalidIdError;
     }
     if (_invalidNumber(contextWindowController.text) ||
         _invalidNumber(maxOutputController.text) ||
@@ -614,11 +709,51 @@ class ModelSpecFormController extends ChangeNotifier {
     return null;
   }
 
-  Future<bool> save(SettingsProvider settings) async {
-    if (!_hasValidDraft()) return false;
+  bool _saving = false;
+  bool get saving => _saving;
+  bool _disposed = false;
+  CancelToken? _falLookup;
+  Object? _falError;
+
+  String saveErrorMessage(AppLocalizations l10n) => _falError == null
+      ? l10n.modelDetailSheetSaveFailedMessage
+      : falCatalogErrorMessage(l10n, _falError!);
+
+  Future<bool> save(
+    SettingsProvider settings, {
+    FalModelDiscovery? falCatalog,
+    bool Function()? canSave,
+  }) async {
+    if (_saving || !_hasValidDraft()) return false;
+    _saving = true;
+    _falError = null;
     _commitIdentityFields();
 
     try {
+      final apiModelId = apiModelIdController.text.trim();
+      final savedOverride = isNew ? null : _config.modelOverrides[_modelKey];
+      Map<String, dynamic>? falEndpoint;
+      if (FalModelDiscovery.needsSchema(_config, apiModelId, savedOverride)) {
+        notifyListeners();
+        final token = _falLookup = CancelToken();
+        try {
+          falEndpoint = falCatalog == null
+              ? await FalModelDiscovery.fetchEndpoint(
+                  _config,
+                  apiModelId,
+                  token,
+                )
+              : await falCatalog.endpoint(apiModelId);
+        } catch (error) {
+          _falError = error;
+          return false;
+        }
+        if (_disposed ||
+            token.isCancelled ||
+            apiModelId != apiModelIdController.text.trim()) {
+          return false;
+        }
+      }
       var savedAvatar = avatar;
       if (_avatarTouched && savedAvatar?.type == AvatarType.file) {
         savedAvatar = AvatarConfig(
@@ -626,14 +761,26 @@ class ModelSpecFormController extends ChangeNotifier {
           value: await importAvatarFile(savedAvatar!.value),
         );
       }
+      if (_disposed || canSave?.call() == false) return false;
       final current = settings.providerConfigs[providerId] ?? _config;
-      final apiModelId = apiModelIdController.text.trim();
+      if (falEndpoint != null && current.baseUrl != _config.baseUrl) {
+        return false;
+      }
       final key = isNew ? _nextModelKey(current, apiModelId) : _modelKey;
       final payload = _payloadForSave(
         currentConfig: current,
         previous: current.modelOverrides[key],
         logicalKey: key,
       );
+      if (falEndpoint != null) {
+        payload['falEndpoint'] = falEndpoint;
+        if (falEndpoint['category'] is String) {
+          // A public endpoint has one output type, regardless of the form's initial tab.
+          payload.remove('type');
+          payload.remove('output');
+          payload.remove('input');
+        }
+      }
       if (_avatarTouched) {
         payload.remove('avatar');
         if (savedAvatar != null) payload['avatar'] = savedAvatar.toJson();
@@ -649,6 +796,13 @@ class ModelSpecFormController extends ChangeNotifier {
         final options = imageGeneration.toJson();
         if (options.isNotEmpty) payload['imageGeneration'] = options;
       }
+      if (_mediaTouched && hasMediaSettings) {
+        final data = media.toJson()..remove('extra');
+        final extra = _tryParseJsonObject(mediaExtraController.text.trim());
+        if (extra != null && extra.isNotEmpty) data['extra'] = extra;
+        payload.remove('media');
+        if (data.isNotEmpty) payload['media'] = data;
+      }
       final overrides = Map<String, dynamic>.from(current.modelOverrides);
       overrides[key] = payload;
       await settings.setProviderConfig(
@@ -663,12 +817,19 @@ class ModelSpecFormController extends ChangeNotifier {
     } catch (e, st) {
       FlutterLogger.log('[ModelSpecForm] save failed: $e\n$st', tag: 'Model');
       return false;
+    } finally {
+      _saving = false;
+      _falLookup = null;
+      if (!_disposed) notifyListeners();
     }
     return true;
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    _falLookup?.cancel();
+    mediaExtraController.dispose();
     apiModelIdController.dispose();
     displayNameController.dispose();
     contextWindowController.dispose();
@@ -786,8 +947,7 @@ class ModelSpecFormController extends ChangeNotifier {
   }
 
   bool _hasValidDraft() {
-    final apiModelId = apiModelIdController.text.trim();
-    if (apiModelId.isEmpty || apiModelId.length < 2) return false;
+    if (!_validMediaExtra || !_validModelId) return false;
     if (_invalidNumber(contextWindowController.text) ||
         _invalidNumber(maxOutputController.text) ||
         _invalidNumber(pricingInputController.text, decimal: true) ||

@@ -140,7 +140,6 @@ void main() {
     'responses',
     'claude',
     'gemini',
-    'images',
   ]) {
     test(
       '$variant wire preserves frozen media syntax without reads or image blocks',
@@ -160,10 +159,8 @@ void main() {
         );
         var requests = 0;
         Map<String, dynamic>? body;
-        String? requestPath;
         server.listen((request) async {
           requests++;
-          requestPath = request.uri.path;
           final raw = await utf8.decoder.bind(request).join();
           if (raw.isNotEmpty) body = jsonDecode(raw) as Map<String, dynamic>;
           request.response.headers.contentType = ContentType.json;
@@ -205,11 +202,6 @@ void main() {
                   },
                 ],
               },
-              'images' => {
-                'data': [
-                  {'url': 'https://example.invalid/result.png'},
-                ],
-              },
               _ => {
                 'choices': [
                   {
@@ -242,7 +234,6 @@ void main() {
         final model = switch (variant) {
           'claude' => 'claude-sonnet-4-6',
           'gemini' => 'gemini-2.5-flash',
-          'images' => 'gpt-image-2',
           _ => 'gpt-4o',
         };
         await ChatApiService.sendMessageStream(
@@ -284,7 +275,6 @@ void main() {
         expect(_strings(body), isNot(contains('image_url')));
         expect(_strings(body), isNot(contains('input_image')));
         expect(jsonEncode(body), isNot(contains('inlineData')));
-        if (variant == 'images') expect(requestPath, '/v1/images/generations');
       },
     );
   }

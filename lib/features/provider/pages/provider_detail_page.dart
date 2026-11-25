@@ -3,6 +3,8 @@ import '../utils/provider_test_failure.dart';
 import '../widgets/provider_test_details.dart';
 import '../utils/provider_url_editor.dart';
 import '../widgets/provider_input_row.dart';
+import '../widgets/fal_catalog_notice.dart';
+import '../widgets/fal_model_picker.dart';
 import '../widgets/provider_base_url_field.dart';
 import '../widgets/provider_icon_picker.dart';
 import '../widgets/provider_sponsor_card.dart';
@@ -115,7 +117,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _baseCtrl.text = _cfg.baseUrl;
     _baseEditor = ProviderUrlEditor(
       _baseCtrl,
-      autoVersionDisabled: _cfg.autoVersionDisabled,
+      autoVersionDisabled: _cfg.isFal || _cfg.autoVersionDisabled,
     );
     _pathCtrl.text = _cfg.chatPath ?? '/chat/completions';
     _useResp = _cfg.useResponseApi ?? false;
@@ -150,30 +152,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    bool isUserAdded(String key) {
-      const fixed = {
-        'KelivoIN',
-        'OpenAI',
-        'STA1N API',
-        '10dian-API',
-        'Gemini',
-        'SiliconFlow',
-        'OpenRouter',
-        'Vercel',
-        'DeepSeek',
-        'Tensdaq',
-        'AIhubmix',
-        '随想AI中转站',
-        'MaruCode',
-        '砂糖酒馆',
-        'Aliyun',
-        'Zhipu AI',
-        'Claude',
-        'Grok',
-        'ByteDance',
-      };
-      return !fixed.contains(key);
-    }
+    bool isUserAdded(String key) => !SettingsProvider.isBuiltInProvider(key);
 
     final page = Scaffold(
       appBar: AppBar(
@@ -764,7 +743,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         // Top iOS-style section card for key settings
         SectionCard(
           children: [
-            if (widget.keyName.toLowerCase() != 'kelivoin')
+            if (!_cfg.isFal && widget.keyName.toLowerCase() != 'kelivoin')
               _providerKindRow(context),
             _providerGroupRow(context, groupName: groupName),
             _iosRow(
@@ -839,7 +818,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   );
                 },
               ),
-            if (_kind == ProviderKind.openai)
+            if (_kind == ProviderKind.openai && !_cfg.isFal)
               _iosRow(
                 context,
                 label: l10n.providerDetailPageResponseApiTitle,
@@ -851,7 +830,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   },
                 ),
               ),
-            if (_kind == ProviderKind.openai && !_cfg.isOAuth)
+            if (_kind == ProviderKind.openai && !_cfg.isOAuth && !_cfg.isFal)
               _iosRowWithHelp(
                 context,
                 label: l10n.providerDetailPagePromptCacheKeyTitle,
@@ -1032,7 +1011,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               context,
               label: l10n.multiKeyPageKey,
               controller: _keyCtrl,
-              hint: l10n.providerDetailPageApiKeyExample,
+              hint: _cfg.isFal
+                  ? l10n.creationFalKeyHint
+                  : l10n.providerDetailPageApiKeyExample,
               obscure: !_showApiKey,
               enableSuggestions: false,
               mono: _showApiKey,
@@ -1065,6 +1046,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ),
         ],
         if (_kind == ProviderKind.openai &&
+            !_cfg.isFal &&
             widget.keyName.toLowerCase() != 'kelivoin' &&
             !_useResp) ...[
           const SizedBox(height: 12),
@@ -1170,6 +1152,13 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final hasFailedDetectedModels = _failedDetectedModels(models).isNotEmpty;
     return Stack(
       children: [
+        if (models.isEmpty && cfg.isFal)
+          const Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: FalCatalogNotice(),
+          ),
         if (models.isEmpty)
           Center(
             child: Column(
@@ -1190,6 +1179,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           )
         else
           ReorderableListView.builder(
+            header: cfg.isFal
+                ? const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: FalCatalogNotice(),
+                  )
+                : null,
             padding: EdgeInsets.fromLTRB(
               16,
               16,
@@ -3062,6 +3057,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       widget.keyName,
       defaultName: widget.displayName,
     );
+    if (cfg.isFal) {
+      await showFalModelPicker(context, cfg, desktop: false);
+      return;
+    }
     final controller = TextEditingController();
     List<dynamic> items = const [];
     bool loading = true;
@@ -3818,7 +3817,17 @@ class _ModelCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      ModelTagWrap(model: effective),
+                      if (effective.type.isMedia)
+                        ModelCapsulesRow(
+                          model: mediaCapsuleModel(
+                            context.watch<SettingsProvider>().getProviderConfig(
+                              providerKey,
+                            ),
+                            effective,
+                          ),
+                        )
+                      else
+                        ModelTagWrap(model: effective),
                     ],
                   ),
                 ),

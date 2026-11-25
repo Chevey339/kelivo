@@ -1,0 +1,1530 @@
+import 'creation_reference_actions.dart';
+import 'creation_menu.dart';
+import 'creation_picker.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/database/app_database.dart';
+import '../../../core/models/media_creation.dart';
+import '../../../core/models/provider_oauth.dart';
+import '../../../core/services/media/media_request.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../desktop/desktop_context_menu.dart';
+import '../../../desktop/desktop_settings_navigation_bus.dart';
+import '../../../icons/lucide_adapter.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/action_sheet.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/snackbar.dart';
+import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+import 'creation_controls.dart';
+import '../../provider/pages/provider_detail_page.dart';
+import '../../provider/pages/providers_page.dart';
+import '../../provider/widgets/oauth_login_panel.dart';
+import '../../home/widgets/model_icon.dart';
+import '../../provider/widgets/provider_avatar.dart';
+import '../providers/media_creation_controller.dart';
+import 'creation_lightbox.dart';
+import 'creation_gallery.dart';
+import 'creation_waiting_card.dart';
+
+class CreationTimeline extends StatefulWidget {
+  const CreationTimeline({
+    super.key,
+    required this.topicId,
+    required this.desktop,
+    this.highlightBatchId,
+  });
+
+  final String? topicId;
+  final String? highlightBatchId;
+  final bool desktop;
+
+  @override
+  State<CreationTimeline> createState() => _CreationTimelineState();
+}
+
+class _CreationTimelineState extends State<CreationTimeline>
+    with SingleTickerProviderStateMixin {
+  late final _highlightFade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
+  final _scroll = ItemScrollController();
+  final _positions = ItemPositionsListener.create();
+  String? _lastSeenRequest, _pendingSubmission;
+  bool _initialPlacement = true;
+  String? get topicId => widget.topicId;
+  bool get desktop => widget.desktop;
+  double _footerHeight = 0;
+  bool _followEnd = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final height = CreationDockInset.bottomOf(context, desktop ? 196 : 176);
+    if (_footerHeight > 0 && height > _footerHeight && topicId != null) {
+      final last = context
+          .read<MediaCreationController>()
+          .batchesFor(topicId!)
+          .length;
+      _followEnd = _positions.itemPositions.value.any(
+        (p) =>
+            p.index == last &&
+            p.itemTrailingEdge <= 1.01 &&
+            p.itemTrailingEdge > 0,
+      );
+    }
+    _footerHeight = height;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _positions.itemPositions.addListener(_placeTimeline);
+  }
+
+  @override
+  void didUpdateWidget(CreationTimeline previous) {
+    super.didUpdateWidget(previous);
+    if (previous.topicId != topicId ||
+        previous.highlightBatchId != widget.highlightBatchId) {
+      _initialPlacement = true;
+      _lastSeenRequest = null;
+      _pendingSubmission = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _highlightFade.dispose();
+    _positions.itemPositions.removeListener(_placeTimeline);
+    super.dispose();
+  }
+
+  void _placeTimeline() {
+    if (!mounted || !_scroll.isAttached || topicId == null) return;
+    final submitted = _pendingSubmission;
+    if (!_initialPlacement && submitted == null && !_followEnd) return;
+    final batches = context.read<MediaCreationController>().batchesFor(
+      topicId!,
+    );
+    final visible = _positions.itemPositions.value;
+    if (batches.isEmpty || visible.isEmpty || context.size == null) return;
+    if (submitted != null && !batches.any((b) => b.id == submitted)) return;
+    final highlight = _initialPlacement && submitted == null
+        ? widget.highlightBatchId
+        : null;
+    final found = highlight == null
+        ? -1
+        : batches.indexWhere((b) => b.id == highlight);
+    final last = batches.length;
+    final index = found < 0 ? last : found;
+    final current = visible.where((item) => item.index == index).firstOrNull;
+    final animate =
+        !_initialPlacement &&
+        !_followEnd &&
+        !MediaQuery.disableAnimationsOf(context);
+    if (_initialPlacement) {
+      setState(() => _initialPlacement = false);
+      if (found >= 0 && !MediaQuery.disableAnimationsOf(context)) {
+        _highlightFade.reverse(from: 1);
+      }
+    }
+    _followEnd = false;
+    _pendingSubmission = null;
+    final viewportHeight = context.size!.height;
+    if (current != null) {
+      // The position notification can still describe the previous dock height.
+      // The footer starts at the same place as the composer expands.
+      final footerBottom =
+          current.itemLeadingEdge + _footerHeight / viewportHeight;
+      final inPlace = index == last
+          ? footerBottom > 0 && footerBottom <= 1.001
+          : current.itemLeadingEdge >= -.001 && current.itemLeadingEdge <= .5;
+      if (inPlace) return;
+    }
+    final alignment = index == last
+        ? (1 - _footerHeight / viewportHeight).clamp(0.0, 1.0)
+        : .10;
+    if (animate) {
+      unawaited(
+        _scroll.scrollTo(
+          index: index,
+          alignment: alignment,
+          duration: const Duration(milliseconds: 260),
+          curve: handoffCurve,
+        ),
+      );
+    } else {
+      _scroll.jumpTo(index: index, alignment: alignment);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = context.watch<MediaCreationController>();
+    final batches = topicId == null
+        ? const <GenerationBatchRow>[]
+        : media.batchesFor(topicId!);
+    if (batches.isEmpty) {
+      return CreationEmptyState(desktop: desktop, topicId: topicId);
+    }
+    final requested = media.lastSubmission(topicId);
+    if (!_initialPlacement && requested != _lastSeenRequest) {
+      _pendingSubmission = requested;
+    }
+    _lastSeenRequest = requested;
+    if (_initialPlacement || _followEnd || _pendingSubmission != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _placeTimeline());
+    }
+    final highlight = widget.highlightBatchId;
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    return IgnorePointer(
+      ignoring: _initialPlacement,
+      child: Opacity(
+        opacity: _initialPlacement ? 0 : 1,
+        child: ScrollablePositionedList.builder(
+          key: ValueKey(topicId),
+          itemScrollController: _scroll,
+          itemPositionsListener: _positions,
+          padding: EdgeInsets.fromLTRB(
+            desktop ? 32 : 14,
+            12,
+            desktop ? 32 : 14,
+            0,
+          ),
+          itemCount: batches.length + 1,
+          itemBuilder: (context, sourceIndex) {
+            if (sourceIndex == batches.length) {
+              return SizedBox(height: _footerHeight);
+            }
+            final batch = batches[sourceIndex];
+            final showDate =
+                sourceIndex == 0 ||
+                !DateUtils.isSameDay(
+                  batch.createdAt,
+                  batches[sourceIndex - 1].createdAt,
+                );
+            final group = Align(
+              key: ValueKey(batch.id),
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 30),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (showDate) _DateDivider(date: batch.createdAt),
+                      _BatchGroup(
+                        batch: batch,
+                        desktop: desktop,
+                        results: _BatchResults(
+                          batch: batch,
+                          items: media.itemsFor(batch.id),
+                          desktop: desktop,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+            if (highlight == batch.id && !reduced) {
+              return AnimatedBuilder(
+                key: ValueKey(batch.id),
+                animation: _highlightFade,
+                child: group,
+                builder: (context, child) => ColoredBox(
+                  color: Theme.of(context).colorScheme.primary.withValues(
+                    alpha: .08 * _highlightFade.value,
+                  ),
+                  child: child,
+                ),
+              );
+            }
+            return _BatchEntrance(
+              key: ValueKey(batch.id),
+              createdAt: batch.createdAt,
+              child: group,
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _BatchEntrance extends StatefulWidget {
+  const _BatchEntrance({
+    super.key,
+    required this.createdAt,
+    required this.child,
+  });
+  final DateTime createdAt;
+  final Widget child;
+  @override
+  State<_BatchEntrance> createState() => _BatchEntranceState();
+}
+
+class _BatchEntranceState extends State<_BatchEntrance> {
+  late final bool _newBatch =
+      DateTime.now().difference(widget.createdAt) < const Duration(seconds: 2);
+  @override
+  Widget build(BuildContext context) {
+    final duration = handoffDuration(context, 360);
+    if (!_newBatch || duration == Duration.zero) return widget.child;
+    return widget.child
+        .animate()
+        .fadeIn(duration: duration, curve: handoffCurve)
+        .moveY(begin: 10, end: 0, duration: duration, curve: handoffCurve);
+  }
+}
+
+class CreationEmptyState extends StatelessWidget {
+  const CreationEmptyState({super.key, this.desktop = false, this.topicId});
+
+  final bool desktop;
+  final String? topicId;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final media = context.watch<MediaCreationController>();
+    final missing = media.model == null;
+    final video = media.mode == MediaMode.video;
+    final suggestions = video
+        ? [
+            l10n.creationSuggestionMotion,
+            l10n.creationSuggestionOcean,
+            l10n.creationSuggestionLandscape,
+            l10n.creationSuggestionProduct,
+          ]
+        : [
+            l10n.creationSuggestionPoster,
+            l10n.creationSuggestionLandscape,
+            l10n.creationSuggestionProduct,
+            l10n.creationSuggestionIllustration,
+            l10n.creationSuggestionRoom,
+            l10n.creationSuggestionSticker,
+          ];
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        desktop ? 32 : 16,
+        desktop ? 96 : 48,
+        desktop ? 32 : 16,
+        CreationDockInset.bottomOf(context, 155),
+      ),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                missing
+                    ? LucideIcons.keyRound300
+                    : video
+                    ? LucideIcons.video300
+                    : LucideIcons.palette300,
+                size: desktop ? 56 : 48,
+                color: cs.onSurface.withValues(alpha: .42),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                !missing
+                    ? l10n.creationEmptyTitle
+                    : media
+                          .modelsFor(video ? MediaMode.image : MediaMode.video)
+                          .isEmpty
+                    ? l10n.creationNoModelTitle
+                    : video
+                    ? l10n.creationNoVideoModels
+                    : l10n.creationNoImageModels,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Text(
+                  missing ? l10n.creationNoModelBody : l10n.creationEmptyBody,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 13,
+                    height: 1.6,
+                  ),
+                ),
+              ),
+              SizedBox(height: desktop ? 22 : 20),
+              if (missing)
+                Builder(
+                  builder: (context) {
+                    final subscriptions = <Widget>[
+                      if (!video)
+                        CreationAction(
+                          tone: CreationActionTone.tonal,
+                          pill: true,
+                          icon: const ProviderAvatar(
+                            providerKey: 'chatgpt',
+                            displayName: 'ChatGPT',
+                            size: 16,
+                          ),
+                          child: Text(l10n.creationConnectChatGPT),
+                          onPressed: () => _login(
+                            context,
+                            OAuthProvider.chatgpt,
+                            l10n.creationConnectChatGPT,
+                          ),
+                        ),
+                      CreationAction(
+                        tone: CreationActionTone.tonal,
+                        pill: true,
+                        icon: const ProviderAvatar(
+                          providerKey: 'grok',
+                          displayName: 'Grok',
+                          size: 16,
+                        ),
+                        child: Text(l10n.creationConnectGrok),
+                        onPressed: () => _login(
+                          context,
+                          OAuthProvider.grok,
+                          l10n.creationConnectGrok,
+                        ),
+                      ),
+                    ];
+                    final providers = <Widget>[
+                      CreationAction(
+                        tone: CreationActionTone.tonal,
+                        pill: true,
+                        icon: ProviderAvatar(
+                          providerKey: 'fal',
+                          displayName: 'fal',
+                          size: 16,
+                        ),
+                        child: Text(l10n.creationConfigureFal),
+                        onPressed: () => _provider(context, fal: true),
+                      ),
+                      CreationAction(
+                        pill: true,
+                        icon: const Icon(Lucide.Settings, size: 15),
+                        child: Text(l10n.creationOtherProviders),
+                        onPressed: () => _provider(context),
+                      ),
+                    ];
+                    Widget row(List<Widget> actions) => Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: actions,
+                    );
+                    return desktop
+                        ? row([...subscriptions, ...providers])
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              row(subscriptions),
+                              const SizedBox(height: 8),
+                              row(providers),
+                            ],
+                          );
+                  },
+                )
+              else
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final value in suggestions.take(desktop ? 6 : 4))
+                      CreationAction(
+                        tone: CreationActionTone.tonal,
+                        pill: true,
+                        onPressed: () => media.suggestPrompt(topicId, value),
+                        child: Text(value),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _login(
+    BuildContext context,
+    OAuthProvider provider,
+    String label,
+  ) async {
+    final panel = OAuthLoginPanel(provider: provider, autoStart: true);
+    if (desktop) {
+      await showCreationDialog<void>(
+        context,
+        maxWidth: 560,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: panel,
+        ),
+      );
+    } else {
+      await showCreationPicker<void>(
+        context,
+        desktop: false,
+        title: label,
+        builder: (_) => panel,
+      );
+    }
+  }
+
+  void _provider(BuildContext context, {bool fal = false}) {
+    if (desktop) {
+      final navigation = DesktopSettingsNavigationBus.instance;
+      if (fal) {
+        navigation.openFal();
+      } else {
+        navigation.openProviders();
+      }
+      return;
+    }
+    final page = fal
+        ? const ProviderDetailPage(keyName: 'fal', displayName: 'fal')
+        : const ProvidersPage();
+    Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => page));
+  }
+}
+
+class _DateDivider extends StatelessWidget {
+  const _DateDivider({required this.date});
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final now = DateTime.now();
+    final label = DateUtils.isSameDay(date, now)
+        ? l10n.sideDrawerDateToday
+        : DateUtils.isSameDay(date, DateTime(now.year, now.month, now.day - 1))
+        ? l10n.sideDrawerDateYesterday
+        : MaterialLocalizations.of(context).formatShortMonthDay(date);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Row(
+        children: [
+          Expanded(
+            child: Divider(
+              height: .5,
+              thickness: .5,
+              color: context.appColors.hairline,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
+                fontSize: 12,
+                fontWeight: AppFontWeights.semibold,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Divider(
+              height: .5,
+              thickness: .5,
+              color: context.appColors.hairline,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BatchGroup extends StatefulWidget {
+  const _BatchGroup({
+    required this.batch,
+    required this.desktop,
+    required this.results,
+  });
+  final GenerationBatchRow batch;
+  final bool desktop;
+  final Widget results;
+
+  @override
+  State<_BatchGroup> createState() => _BatchGroupState();
+}
+
+class _BatchGroupState extends State<_BatchGroup> {
+  bool _expanded = false, _hover = false, _focus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final batch = widget.batch;
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final media = context.read<MediaCreationController>();
+    final p = _parameters(batch);
+    final visible = !widget.desktop || _hover || _focus;
+    return MouseRegion(
+      onEnter: widget.desktop ? (_) => setState(() => _hover = true) : null,
+      onExit: widget.desktop ? (_) => setState(() => _hover = false) : null,
+      child: Focus(
+        skipTraversal: !widget.desktop,
+        onFocusChange: (f) => setState(() => _focus = f),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: () => setState(() => _expanded = !_expanded),
+                        child: Text(
+                          batch.prompt,
+                          maxLines: _expanded ? null : 2,
+                          overflow: _expanded ? null : TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14.5, height: 1.55),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: [
+                          Text(
+                            MaterialLocalizations.of(context).formatTimeOfDay(
+                              TimeOfDay.fromDateTime(batch.createdAt),
+                            ),
+                            style: TextStyle(
+                              color: cs.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
+                          ),
+                          _Tag(
+                            batch.modelId,
+                            leading: CurrentModelIcon(
+                              providerKey: batch.providerId,
+                              modelId: batch.modelId,
+                              withBackground: false,
+                              iconScale: 1,
+                              size: 15,
+                            ),
+                          ),
+                          if (p.ratio != 'auto') _Tag(p.ratio),
+                          if (batch.mode == MediaMode.image)
+                            _Tag(l10n.creationImagesCount(p.count)),
+                          if (p.duration case final duration?)
+                            _Tag(creationDurationLabel(l10n, duration)),
+                          if (p.resolution case final resolution?)
+                            _Tag(resolution),
+                          if (batch.parentItemId case final parent?)
+                            _EditedFromTag(
+                              item: media.item(parent),
+                              desktop: widget.desktop,
+                              draftTopicId: batch.topicId,
+                            ),
+                          if (_referenceCount(batch) case final count
+                              when count > 0)
+                            _Tag(
+                              l10n.creationImagesCount(count),
+                              leading: const Icon(Lucide.Image, size: 13),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (batch.status.isActive)
+                  CreationAction(
+                    small: true,
+                    onPressed: () => media.runner.cancel(batch.id),
+                    icon: const Icon(Lucide.Square, size: 13),
+                    child: Text(
+                      MaterialLocalizations.of(context).cancelButtonLabel,
+                    ),
+                  )
+                else
+                  CreationHoverActions(
+                    visible: visible,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 2,
+                      children: [
+                        if (widget.desktop) ...[
+                          IosIconButton(
+                            icon: Lucide.RotateCcw,
+                            size: 16,
+                            minSize: 28,
+                            tooltip: l10n.creationRepeat,
+                            onTap: _repeat,
+                          ),
+                          IosIconButton(
+                            icon: Lucide.Copy,
+                            size: 16,
+                            minSize: 28,
+                            tooltip: l10n.creationCopyPrompt,
+                            onTap: _copy,
+                          ),
+                        ],
+                        Builder(
+                          builder: (anchor) => IosIconButton(
+                            icon: Lucide.Ellipsis,
+                            size: 16,
+                            minSize: widget.desktop ? 28 : 36,
+                            tooltip: l10n.chatMessageWidgetMoreTooltip,
+                            onTap: () => _menu(anchor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            widget.results,
+            if (!batch.status.isActive &&
+                batch.status != GenerationStatus.succeeded)
+              _BatchFailure(batch: batch, desktop: widget.desktop),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.batch.prompt));
+    if (mounted) {
+      showAppSnackBar(
+        context,
+        type: NotificationType.success,
+        message: AppLocalizations.of(context)!.creationOptionCopied,
+      );
+    }
+  }
+
+  Future<void> _repeat() async {
+    final media = context.read<MediaCreationController>();
+    try {
+      await media.repeat(widget.batch);
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          type: NotificationType.error,
+          message: AppLocalizations.of(context)!.creationActionFailed,
+        );
+      }
+    }
+  }
+
+  Future<void> _menu(BuildContext anchor) async {
+    final l10n = AppLocalizations.of(context)!;
+    final batch = widget.batch;
+    final media = context.read<MediaCreationController>();
+    final images = media
+        .itemsFor(batch.id)
+        .where(
+          (item) =>
+              item.mode == MediaMode.image &&
+              item.status == GenerationItemStatus.ready,
+        )
+        .toList();
+    final choices = [
+      ActionSheetItem(
+        icon: Lucide.RotateCcw,
+        label: l10n.creationRepeat,
+        onTap: _repeat,
+      ),
+      ActionSheetItem(
+        icon: Lucide.Copy,
+        label: l10n.creationCopyPrompt,
+        onTap: _copy,
+      ),
+      if (images.isNotEmpty)
+        ActionSheetItem(
+          icon: LucideIcons.imagePlus,
+          label: l10n.creationUseGroupReferences(images.length),
+          onTap: () {
+            if (!mounted) return;
+            addCreationReferences(context, media, batch.topicId, [
+              for (final item in images) item.path,
+            ]);
+          },
+        ),
+      if (batch.status == GenerationStatus.failed ||
+          batch.status == GenerationStatus.partial)
+        ActionSheetItem(
+          icon: Lucide.FileText,
+          label: l10n.creationRequestDetails,
+          onTap: () => showCreationRequestDetails(
+            context,
+            batch,
+            desktop: widget.desktop,
+          ),
+        ),
+      ActionSheetItem(
+        icon: Lucide.Trash2,
+        label: l10n.creationDeleteBatch,
+        destructive: true,
+        onTap: _delete,
+      ),
+    ];
+    if (!widget.desktop) {
+      await showCreationActions(context, items: choices);
+      return;
+    }
+    await showCreationMenu(
+      anchor,
+      items: [
+        for (final item in choices)
+          DesktopContextMenuItem(
+            icon: item.icon,
+            label: item.label,
+            onTap: item.onTap,
+            danger: item.destructive,
+          ),
+      ],
+    );
+  }
+
+  Future<void> _delete() async {
+    final l10n = AppLocalizations.of(context)!;
+    final media = context.read<MediaCreationController>();
+    final count = media.itemsFor(widget.batch.id).length;
+    final confirmed = await showCreationDialog<bool>(
+      context,
+      maxWidth: 380,
+      child: Builder(
+        builder: (dialog) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.creationDeleteBatch,
+                style: Theme.of(dialog).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(l10n.creationDeleteBatchBody(count)),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  CreationAction(
+                    onPressed: () => Navigator.of(dialog).pop(false),
+                    child: Text(
+                      MaterialLocalizations.of(dialog).cancelButtonLabel,
+                    ),
+                  ),
+                  CreationAction(
+                    onPressed: () => Navigator.of(dialog).pop(true),
+                    child: Text(l10n.chatHistoryPageDelete),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await media.deleteBatch(widget.batch);
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          type: NotificationType.error,
+          message: l10n.creationActionFailed,
+        );
+      }
+    }
+  }
+}
+
+class _EditedFromTag extends StatelessWidget {
+  const _EditedFromTag({
+    required this.item,
+    required this.desktop,
+    required this.draftTopicId,
+  });
+
+  final GenerationItemRow? item;
+  final bool desktop;
+  final String? draftTopicId;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = item;
+    final l10n = AppLocalizations.of(context)!;
+    final time = source == null
+        ? null
+        : MaterialLocalizations.of(
+            context,
+          ).formatTimeOfDay(TimeOfDay.fromDateTime(source.createdAt));
+    final tag = _Tag(
+      time == null
+          ? l10n.creationEditedFrom
+          : '${l10n.creationEditedFrom} $time',
+      leading: source == null
+          ? null
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: SizedBox.square(
+                dimension: 16,
+                child: CreationMediaCover(source, thumbnail: true),
+              ),
+            ),
+    );
+    return source == null
+        ? tag
+        : IosCardPress(
+            focusable: true,
+            onTap: () => showCreationLightbox(
+              context,
+              source,
+              desktop: desktop,
+              draftTopicId: draftTopicId,
+            ),
+            borderRadius: BorderRadius.circular(7),
+            child: tag,
+          );
+  }
+}
+
+int _referenceCount(GenerationBatchRow batch) {
+  try {
+    return MediaRequest.fromBatch(batch).references.length;
+  } catch (_) {
+    return 0;
+  }
+}
+
+Future<void> showCreationRequestDetails(
+  BuildContext context,
+  GenerationBatchRow batch, {
+  required bool desktop,
+  Future<void> Function()? retry,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+  final media = context.read<MediaCreationController>();
+  final details = _requestDetails(batch);
+  const json = JsonEncoder.withIndent('  ');
+  final copyText = details.isEmpty
+      ? l10n.creationNoRequestDetails
+      : json.convert(details);
+  final cs = Theme.of(context).colorScheme;
+  final provider = media.settings.getProviderConfig(batch.providerId);
+  final model = ModelSpecResolver.instance.spec(provider, batch.modelId);
+  final kind = details['kind'];
+  final retryable =
+      details['automaticRetry'] != false &&
+      MediaFailureKind.values
+          .where((value) => value.name == kind)
+          .any((value) => MediaFailure(value, '').retryable);
+  Widget code(String title, Object data) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      const SizedBox(height: 4),
+      DecoratedBox(
+        decoration: BoxDecoration(
+          color: cs.onSurface.withValues(alpha: .05),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: SelectableText(
+            json.convert(data),
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+          ),
+        ),
+      ),
+    ],
+  );
+  final content = Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 10,
+    children: [
+      Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          if (kind is String)
+            _Tag(
+              l10n.creationFailureCategory(kind),
+              leading: const Icon(Lucide.CircleAlert, size: 12),
+            ),
+          _Tag(
+            retryable
+                ? l10n.creationAutomaticRetry
+                : l10n.creationNoAutomaticRetry,
+          ),
+          _Tag(model.displayName),
+          _Tag(provider.name),
+        ],
+      ),
+      Text(details['message']?.toString() ?? l10n.creationNoRequestDetails),
+      if (details['retries'] case final List retries)
+        code(l10n.creationRetryHistory, retries),
+      if (details['request'] case final Map request)
+        code(l10n.creationLoggedRequest, request),
+      if (details['response'] case final Map response)
+        code(l10n.creationLoggedResponse, response),
+    ],
+  );
+  Widget actions(BuildContext dialog) => Wrap(
+    alignment: WrapAlignment.end,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    spacing: 8,
+    runSpacing: 6,
+    children: [
+      CreationAction(
+        minHeight: desktop ? null : 44,
+        onPressed: () async {
+          await Clipboard.setData(ClipboardData(text: copyText));
+          if (dialog.mounted) {
+            showAppSnackBar(
+              dialog,
+              type: NotificationType.success,
+              message: l10n.creationOptionCopied,
+            );
+          }
+        },
+        child: Text(MaterialLocalizations.of(dialog).copyButtonLabel),
+      ),
+      CreationAction(
+        minHeight: desktop ? null : 44,
+        tone: CreationActionTone.tonal,
+        onPressed: () async {
+          Navigator.of(dialog).pop();
+          try {
+            if (retry == null) {
+              await media.retry(batch);
+            } else {
+              await retry();
+            }
+          } catch (_) {
+            if (context.mounted) {
+              showAppSnackBar(
+                context,
+                type: NotificationType.error,
+                message: l10n.creationActionFailed,
+              );
+            }
+          }
+        },
+        child: Text(creationRetryLabel(l10n, batch)),
+      ),
+    ],
+  );
+  if (!desktop) {
+    await showCreationPicker<void>(
+      context,
+      desktop: false,
+      title: l10n.creationRequestDetails,
+      builder: (dialog) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [content, const SizedBox(height: 12), actions(dialog)],
+      ),
+    );
+    return;
+  }
+  await showCreationDialog<void>(
+    context,
+    maxWidth: 560,
+    child: Builder(
+      builder: (dialog) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.creationRequestDetails,
+              style: Theme.of(dialog).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Flexible(child: SingleChildScrollView(child: content)),
+            const SizedBox(height: 8),
+            actions(dialog),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Map<String, Object?> _requestDetails(GenerationBatchRow batch) {
+  try {
+    if (jsonDecode(batch.errorJson ?? '{}')
+        case final Map<String, dynamic> value) {
+      if (value['kind'] == 'parameters' &&
+          const {404, 405}.contains(value['statusCode'])) {
+        return {...value, 'kind': MediaFailureKind.unavailable.name};
+      }
+      return value;
+    }
+  } on FormatException {
+    // The failure may have no structured details.
+  }
+  return const {};
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag(this.label, {this.leading});
+  final String label;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: context.appColors.surfaceFill,
+      borderRadius: BorderRadius.circular(7),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (leading != null) ...[leading!, const SizedBox(width: 4)],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: AppFontWeights.medium,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _BatchResults extends StatefulWidget {
+  const _BatchResults({
+    required this.batch,
+    required this.items,
+    required this.desktop,
+  });
+  final GenerationBatchRow batch;
+  final List<GenerationItemRow> items;
+  final bool desktop;
+
+  @override
+  State<_BatchResults> createState() => _BatchResultsState();
+}
+
+class _BatchResultsState extends State<_BatchResults> {
+  final _published = <int>{};
+  bool _observed = false;
+
+  @override
+  void didUpdateWidget(covariant _BatchResults oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.batch.id != widget.batch.id ||
+        !oldWidget.batch.status.isActive && widget.batch.status.isActive) {
+      _published.clear();
+      _observed = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = context.read<MediaCreationController>();
+    final batch = widget.batch;
+    final desktop = widget.desktop;
+    final params = _parameters(batch);
+    final visible = widget.items
+        .where((row) => row.status == GenerationItemStatus.ready)
+        .toList();
+    final remaining = (params.count - visible.length).clamp(0, 16);
+    final slots = media.runner.resultSlotsFor(batch.id);
+    final first = slots?.first ?? (visible.lastOrNull?.ordinal ?? -1) + 1;
+    final end = slots?.end ?? first + remaining;
+    if (!_observed && slots != null) {
+      for (var ordinal = first; ordinal < slots.next; ordinal++) {
+        _published.add(ordinal);
+      }
+    }
+    _observed = true;
+    _published.addAll(visible.map((item) => item.ordinal));
+    final waiting = [
+      if (batch.status.isActive)
+        for (var ordinal = first; ordinal < end; ordinal++)
+          if (!_published.contains(ordinal)) ordinal,
+    ];
+    final missing = batch.status == GenerationStatus.partial ? remaining : 0;
+    final total = waiting.length + visible.length + missing;
+    if (total == 0) return const SizedBox.shrink();
+    final requestedRatio =
+        params.ratio == 'auto' && batch.mode == MediaMode.video
+        ? 16 / 9
+        : _ratio(params.ratio);
+    final ratio = visible.isEmpty
+        ? requestedRatio
+        : _itemRatio(visible.first, requestedRatio);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = !desktop || constraints.maxWidth < 400;
+        final columns = total < 3
+            ? total
+            : compact
+            ? 2
+            : math.min(total, 4);
+        final limit = total == 1
+            ? ratio < 1
+                  ? math.min(400.0, 520 * ratio)
+                  : ratio == 1
+                  ? 400.0
+                  : ratio < 2
+                  ? 480.0
+                  : constraints.maxWidth
+            : total == 2 && ratio <= 1
+            ? 560.0
+            : constraints.maxWidth;
+        final width =
+            (math.min(limit, constraints.maxWidth) - (columns - 1) * 8) /
+            columns;
+        Widget slot(
+          int ordinal,
+          double aspectRatio, {
+          GenerationItemRow? item,
+        }) {
+          final result = item == null ? null : _artwork(context, item);
+          return SizedBox(
+            key: ValueKey((batch.id, ordinal)),
+            width: width,
+            child: AspectRatio(
+              aspectRatio: aspectRatio.clamp(.3, 4),
+              child: AnimatedBuilder(
+                animation: item == null ? media.runner : _idle,
+                child: result,
+                builder: (context, result) {
+                  final progress = item == null
+                      ? media.runner.progressFor(batch.id)
+                      : null;
+                  return CreationWaitingCard(
+                    batch: batch,
+                    ordinal: ordinal,
+                    progress: progress?.fraction,
+                    preview: ordinal == waiting.firstOrNull
+                        ? progress?.preview
+                        : null,
+                    queueAhead: item == null
+                        ? media.runner.queueAhead(batch.id)
+                        : 0,
+                    result: result,
+                  );
+                },
+              ),
+            ),
+          );
+        }
+
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final item in visible)
+              slot(item.ordinal, _itemRatio(item, requestedRatio), item: item),
+            for (var index = 0; index < missing; index++)
+              SizedBox(
+                width: width,
+                child: AspectRatio(
+                  aspectRatio: ratio.clamp(.3, 4),
+                  child: _DownloadFailure(batch: batch),
+                ),
+              ),
+            for (final ordinal in waiting) slot(ordinal, ratio),
+          ],
+        );
+      },
+    );
+  }
+
+  static const _idle = AlwaysStoppedAnimation<double>(0);
+
+  Widget _artwork(BuildContext context, GenerationItemRow item) {
+    final batch = widget.batch;
+    final desktop = widget.desktop;
+    return CreationArtworkTile(
+      key: ValueKey(item.id),
+      item: item,
+      desktop: desktop,
+      draftTopicId: batch.topicId,
+      onOpen: () => showCreationLightbox(
+        context,
+        item,
+        desktop: desktop,
+        draftTopicId: batch.topicId,
+      ),
+    );
+  }
+}
+
+String creationRetryLabel(AppLocalizations l10n, GenerationBatchRow batch) =>
+    _requestDetails(batch)['kind'] == MediaFailureKind.download.name
+    ? l10n.creationChatRegenerate
+    : l10n.creationRetry;
+
+class _DownloadFailure extends StatelessWidget {
+  const _DownloadFailure({required this.batch});
+
+  final GenerationBatchRow batch;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final media = context.read<MediaCreationController>();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.errorContainer.withValues(alpha: .4),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LucideIcons.cloudOff, color: colors.error, size: 22),
+                const SizedBox(height: 4),
+                Text(
+                  _requestDetails(batch)['kind'] ==
+                          MediaFailureKind.download.name
+                      ? l10n.creationDownloadFailed
+                      : l10n.creationPartial,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                CreationAction(
+                  onPressed: () async {
+                    try {
+                      await media.retry(batch);
+                    } catch (_) {
+                      if (context.mounted) {
+                        showAppSnackBar(
+                          context,
+                          type: NotificationType.error,
+                          message: l10n.creationActionFailed,
+                        );
+                      }
+                    }
+                  },
+                  child: Text(creationRetryLabel(l10n, batch)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BatchFailure extends StatelessWidget {
+  const _BatchFailure({required this.batch, required this.desktop});
+  final GenerationBatchRow batch;
+  final bool desktop;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final media = context.read<MediaCreationController>();
+    final title = switch (batch.status) {
+      GenerationStatus.interrupted => l10n.creationInterrupted,
+      GenerationStatus.cancelled => l10n.creationCancelled,
+      GenerationStatus.partial => l10n.creationPartial,
+      _ => l10n.creationFailed,
+    };
+    final danger =
+        batch.status == GenerationStatus.failed ||
+        batch.status == GenerationStatus.partial;
+    final details = _requestDetails(batch);
+    final kind = details['kind']?.toString();
+    final reason = danger
+        ? details['message']?.toString() ?? l10n.creationNoRequestDetails
+        : batch.status == GenerationStatus.cancelled
+        ? l10n.creationCancelledHelp
+        : l10n.creationInterruptedHelp;
+    final ink = danger ? cs.error : cs.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: danger
+              ? cs.error.withValues(alpha: .08)
+              : context.appColors.surfaceFill,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: ink.withValues(alpha: .14),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                danger
+                    ? Lucide.CircleAlert
+                    : batch.status == GenerationStatus.interrupted
+                    ? LucideIcons.circleX
+                    : Lucide.Square,
+                size: 18,
+                color: ink,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    danger && kind != null
+                        ? '$title · ${l10n.creationFailureCategory(kind)}'
+                        : title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    reason,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.5,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 5,
+                    children: [
+                      CreationAction(
+                        tone: CreationActionTone.tonal,
+                        small: true,
+                        icon: const Icon(Lucide.RotateCcw, size: 14),
+                        child: Text(creationRetryLabel(l10n, batch)),
+                        onPressed: () async {
+                          try {
+                            await media.retry(batch);
+                          } catch (_) {
+                            if (context.mounted) {
+                              showAppSnackBar(
+                                context,
+                                type: NotificationType.error,
+                                message: l10n.creationActionFailed,
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      if (danger)
+                        CreationAction(
+                          small: true,
+                          icon: const Icon(Lucide.FileText, size: 14),
+                          child: Text(l10n.creationRequestDetails),
+                          onPressed: () => showCreationRequestDetails(
+                            context,
+                            batch,
+                            desktop: desktop,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+({int count, String ratio, int? duration, String? resolution}) _parameters(
+  GenerationBatchRow row,
+) {
+  try {
+    final params = jsonDecode(row.paramsJson);
+    if (params is Map) {
+      return (
+        count: params['count'] is int
+            ? (params['count'] as int).clamp(1, 16)
+            : 1,
+        ratio: params['aspectRatio'] is String
+            ? params['aspectRatio'] as String
+            : 'auto',
+        duration: params['durationSec'] is int
+            ? params['durationSec'] as int
+            : null,
+        resolution: params['resolution'] is String
+            ? params['resolution'] as String
+            : null,
+      );
+    }
+  } on FormatException {
+    // Render an older or damaged row with ordinary tile dimensions.
+  }
+  return (count: 1, ratio: 'auto', duration: null, resolution: null);
+}
+
+double _ratio(String value) {
+  final parts = value.split(':').map(double.tryParse).toList();
+  if (parts.length != 2 ||
+      parts[0] == null ||
+      parts[1] == null ||
+      parts[0]! <= 0 ||
+      parts[1]! <= 0) {
+    return 1;
+  }
+  return parts[0]! / parts[1]!;
+}
+
+double _itemRatio(GenerationItemRow item, double fallback) =>
+    (item.width ?? 0) > 0 && (item.height ?? 0) > 0
+    ? item.width! / item.height!
+    : fallback;

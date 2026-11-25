@@ -260,7 +260,6 @@ void main() {
           ),
           prepared: prepared,
           userImagePaths: [],
-          allowImagesApiRouting: false,
           providerKey: 'test',
           modelId: 'model',
           assistant: assistant,

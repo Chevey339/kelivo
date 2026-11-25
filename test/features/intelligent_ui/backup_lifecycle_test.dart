@@ -31,6 +31,7 @@ const _config = WebDavConfig(
       BackupCategory.files,
       BackupCategory.skills,
       BackupCategory.workspaces,
+      BackupCategory.creations,
     },
   ),
 );
@@ -85,7 +86,7 @@ void main() {
       (await ChatDatabaseRepository.inspectPreparedSnapshot(
         file,
       )).schemaVersion,
-      5,
+      AppDatabase.currentSchemaVersion,
     );
     final database = AppDatabase.open(file: file, requireExisting: true);
     final repository = ChatDatabaseRepository(database, databaseFile: file);

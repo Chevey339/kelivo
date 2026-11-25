@@ -70,10 +70,12 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.onSidebarWidthChangeEnd,
     required this.buildAssistantBackground,
     this.appBarOverride,
+    this.onOpenCreation,
     required this.body,
   });
 
   final GlobalKey<ScaffoldState> scaffoldKey;
+  final VoidCallback? onOpenCreation;
   final ValueNotifier<int> assistantPickerCloseTick;
   final Set<String> loadingConversationIds;
   final String? conversationId;
@@ -254,6 +256,7 @@ class HomeDesktopScaffold extends StatelessWidget {
       embeddedWidth: width,
       userName: context.watch<UserProvider>().name,
       assistantName: _getAssistantName(context),
+      onOpenCreation: onOpenCreation,
       closePickerTicker: assistantPickerCloseTick,
       loadingConversationIds: loadingConversationIds,
       useDesktopTabs: _isDesktop && !topicsOnRight,

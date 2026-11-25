@@ -81,7 +81,7 @@ void main() {
       await loaded.settings.setModelEnabled('account', 'gpt-6-sol', false);
       await service.syncOutdatedModels(loaded.settings);
       var saved = loaded.settings.getProviderConfig('account');
-      expect(saved.enabledModels, ['gpt-6.1-sol']);
+      expect(saved.enabledModels, ['gpt-6.1-sol', codexImageModelId]);
       expect(saved.disabledModels, {'gpt-6-sol'});
       expect(saved.modelOverrides['gpt-6-sol']['temperature'], .7);
 
@@ -98,7 +98,10 @@ void main() {
         200,
       );
       await service.syncModels('account');
-      expect(reloaded.getProviderConfig('account').models, ['gpt-6.1-sol']);
+      expect(reloaded.getProviderConfig('account').models, [
+        'gpt-6.1-sol',
+        codexImageModelId,
+      ]);
       expect(reloaded.getProviderConfig('account').disabledModels, {
         'gpt-6-sol',
       });
@@ -106,9 +109,10 @@ void main() {
       response = catalog();
       await service.syncModels('account');
       saved = reloaded.getProviderConfig('account');
-      expect(saved.models, ['gpt-6-sol', 'gpt-6.1-sol']);
-      expect(saved.enabledModels, ['gpt-6.1-sol']);
+      expect(saved.models, ['gpt-6-sol', 'gpt-6.1-sol', codexImageModelId]);
+      expect(saved.enabledModels, ['gpt-6.1-sol', codexImageModelId]);
       await reloaded.setModelEnabled('account', 'gpt-6.1-sol', false);
+      await reloaded.setModelEnabled('account', codexImageModelId, false);
       await service.syncModels('account');
       expect(reloaded.getProviderConfig('account').enabledModels, isEmpty);
     },
@@ -163,8 +167,10 @@ void main() {
     'checks for a new release even when the startup roster is current',
     () async {
       final config = account(version: defaultCodexClientVersion).copyWith(
+        models: const ['gpt-6-sol', codexImageModelId],
         modelOverrides: const {
           'gpt-6-sol': {'oauthServiceTierSessionId': 'session'},
+          codexImageModelId: {'oauthServiceTierSessionId': 'session'},
         },
       );
       final loaded = await loadAccounts([config]);
@@ -266,7 +272,7 @@ void main() {
       expect(updated, unorderedEquals(['account', 'other', 'idle']));
       for (final id in ['account', 'other', 'idle']) {
         final saved = loaded.settings.getProviderConfig(id);
-        expect(saved.models, ['gpt-6-sol', 'gpt-6.2-sol']);
+        expect(saved.models, ['gpt-6-sol', 'gpt-6.2-sol', codexImageModelId]);
         expect(saved.oauthModelsClientVersion, '0.170.0');
       }
     },
@@ -316,8 +322,10 @@ void main() {
         const later = '0.171.0';
         final original = account(version: cachedCatalog ? earlier : null)
             .copyWith(
+              models: const ['gpt-6-sol', codexImageModelId],
               modelOverrides: const {
                 'gpt-6-sol': {'oauthServiceTierSessionId': 'session'},
+                codexImageModelId: {'oauthServiceTierSessionId': 'session'},
               },
             );
         final loaded = await loadAccounts([original, account(id: 'other')]);
@@ -374,7 +382,11 @@ void main() {
 
         final saved = loaded.settings.getProviderConfig('account');
         expect(earlierCalls, cachedCatalog ? 1 : 2);
-        expect(saved.models, ['fresh-after-rollback', 'gpt-6-sol']);
+        expect(saved.models, [
+          'fresh-after-rollback',
+          'gpt-6-sol',
+          codexImageModelId,
+        ]);
         expect(saved.oauthModelsClientVersion, earlier);
       },
     );
@@ -419,7 +431,7 @@ void main() {
         await sync;
         final saved = loaded.settings.getProviderConfig('account');
         expect(saved.oauthModelsClientVersion, defaultCodexClientVersion);
-        expect(saved.models, ['gpt-6-sol', 'gpt-6.1-sol']);
+        expect(saved.models, ['gpt-6-sol', 'gpt-6.1-sol', codexImageModelId]);
       },
     );
   }
@@ -460,11 +472,13 @@ void main() {
       final loginRequired = account(id: 'login-required');
       final loaded = await loadAccounts([
         account(id: 'current', version: defaultCodexClientVersion).copyWith(
+          models: const ['gpt-6-sol', codexImageModelId],
           modelOverrides: const {
             'gpt-6-sol': {
               'temperature': .7,
               'oauthServiceTierSessionId': 'session',
             },
+            codexImageModelId: {'oauthServiceTierSessionId': 'session'},
           },
         ),
         account(id: 'disabled').copyWith(enabled: false),
@@ -603,7 +617,7 @@ void main() {
       final saved = loaded.settings.providerConfigs['account']!;
       expect(calls, 1);
       expect(saved.name, 'Renamed');
-      expect(saved.enabledModels, ['gpt-6.1-sol']);
+      expect(saved.enabledModels, ['gpt-6.1-sol', codexImageModelId]);
       expect(saved.modelOverrides['gpt-6-sol']['name'], 'My Sol');
       expect(saved.modelOverrides['gpt-6-sol']['type'], 'image');
       expect(saved.modelOverrides['gpt-6-sol']['temperature'], .2);
@@ -689,6 +703,7 @@ void main() {
       expect(restored.settings.providerConfigs['account']!.models, [
         'gpt-6-sol',
         'restored-model',
+        codexImageModelId,
       ]);
       expect(
         restored.settings.providerConfigs['account']!.oauthModelsClientVersion,

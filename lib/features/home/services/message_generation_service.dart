@@ -1,4 +1,5 @@
 import '../../../core/services/tools/view_image_tool.dart';
+import '../../../core/services/tools/generate_image_tool.dart';
 import '../../../core/models/native_compaction.dart';
 import '../../../core/models/compression_config.dart';
 import '../../../core/models/carried_original.dart';
@@ -592,9 +593,7 @@ class MessageGenerationService {
       messages,
       imageSettings.excluded,
     );
-    final imageContext =
-        ChatApiService.supportsOpenAIImagesApiRouting(packed.cfg, modelId) ||
-            shouldUseZhipuLayoutParsing(packed.cfg, modelId)
+    final imageContext = shouldUseZhipuLayoutParsing(packed.cfg, modelId)
         ? null
         : await _imageContext(
             conversationId,
@@ -610,6 +609,9 @@ class MessageGenerationService {
         const [],
         parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
         allowRemoteImages: imageContext.allowsRemoteUserImages,
+        includeGeneratedReferences: packed.toolDefs.any(
+          GenerateImageTool.acceptsReferences,
+        ),
       );
     }
     final imagePreview = await imageContext?.preview();
@@ -850,9 +852,7 @@ class MessageGenerationService {
     );
     RequestImageContext? imageContext;
     if (currentConversation != null &&
-        (omitImages ||
-            (!ChatApiService.supportsOpenAIImagesApiRouting(cfg, modelId) &&
-                !shouldUseZhipuLayoutParsing(cfg, modelId)))) {
+        (omitImages || !shouldUseZhipuLayoutParsing(cfg, modelId))) {
       imageContext = await _imageContext(
         currentConversation.id,
         messages,
@@ -867,6 +867,9 @@ class MessageGenerationService {
         lastUserImagePaths,
         parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
         allowRemoteImages: imageContext.allowsRemoteUserImages,
+        includeGeneratedReferences: packed.toolDefs.any(
+          GenerateImageTool.acceptsReferences,
+        ),
       );
     } else {
       await messageBuilderService.inlineLocalImages(apiMessages);
@@ -896,9 +899,15 @@ class MessageGenerationService {
           )
         : null;
 
+    final currentImageIds = imageContext?.currentGenerationReferenceIds;
     return PreparedGeneration(
       apiMessages: apiMessages,
-      toolDefs: toolDefs,
+      toolDefs: currentImageIds == null || currentImageIds.isEmpty
+          ? toolDefs
+          : [
+              for (final tool in toolDefs)
+                GenerateImageTool.withCurrentAttachments(tool, currentImageIds),
+            ],
       onToolCall: onToolCall,
       hasBuiltInSearch: hasBuiltInSearch,
       lastUserImagePaths: lastUserImagePaths,
@@ -1181,7 +1190,6 @@ class MessageGenerationService {
     required ChatMessage assistantMessage,
     required PreparedGeneration prepared,
     required List<String> userImagePaths,
-    required bool allowImagesApiRouting,
     required String providerKey,
     required String modelId,
     required Assistant? assistant,
@@ -1210,7 +1218,6 @@ class MessageGenerationService {
             allowRemoteImages: prepared.imageContext!.allowsRemoteUserImages,
           ) ??
           userImagePaths,
-      allowImagesApiRouting: allowImagesApiRouting,
       providerKey: providerKey,
       modelId: modelId,
       assistant: assistant,

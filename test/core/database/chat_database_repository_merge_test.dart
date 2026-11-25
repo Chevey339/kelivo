@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'package:drift/drift.dart' show Value;
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/models/media_creation.dart';
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -714,6 +717,22 @@ void main() {
         messageId: 'imported-message',
         content: 'imported',
       );
+      await source.mediaRepository.enqueue(
+        GenerationBatchRowsCompanion.insert(
+          id: 'new-art',
+          conversationId: const Value('collision'),
+          messageId: const Value('imported-message'),
+          providerId: 'demo',
+          modelId: 'demo',
+          mode: MediaMode.image,
+          prompt: 'art',
+          paramsJson: '{}',
+          referencesJson: '[]',
+          status: GenerationStatus.failed,
+          source: GenerationSource.chat,
+          createdAt: DateTime.utc(2026),
+        ),
+      );
       await source.close();
       sourceClosed = true;
 
@@ -722,9 +741,23 @@ void main() {
       expect(remappedId, isNotNull);
       final remapped = await live.getConversation(remappedId!);
       expect(remapped?.title, 'Imported');
-      expect(remapped?.messageIds.single, startsWith('merge-'));
-      expect(remapped?.versionSelections.keys.single, startsWith('merge-'));
-      expect(await live.getToolEvents(remapped!.messageIds.single), const [
+      final incoming = ChatDatabaseRepository.open(file: sourceFile);
+      try {
+        await live.mediaRepository.importFrom(
+          incoming.mediaRepository,
+          overwrite: false,
+          remappedConversations: first.remappedConversationIds,
+          mergedMessages: first.mergedMessageIds,
+        );
+      } finally {
+        await incoming.close();
+      }
+      final importedArt = await live.mediaRepository.batch('new-art');
+      expect(importedArt?.conversationId, remappedId);
+      expect(importedArt?.messageId, remapped!.messageIds.single);
+      expect(remapped.messageIds.single, startsWith('merge-'));
+      expect(remapped.versionSelections.keys.single, startsWith('merge-'));
+      expect(await live.getToolEvents(remapped.messageIds.single), const [
         {'id': 'tool', 'content': 'imported'},
       ]);
 

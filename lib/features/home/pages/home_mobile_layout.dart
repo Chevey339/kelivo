@@ -53,6 +53,8 @@ class HomeMobileScaffold extends StatelessWidget {
     required this.onExitGlobalSearch,
     required this.onOpenGlobalSearchResult,
     this.appBarOverride,
+    this.onOpenCreation,
+    this.creationSelected = false,
     required this.body,
   });
 
@@ -85,6 +87,8 @@ class HomeMobileScaffold extends StatelessWidget {
   )
   onOpenGlobalSearchResult;
   final PreferredSizeWidget? appBarOverride;
+  final VoidCallback? onOpenCreation;
+  final bool creationSelected;
   final Widget body;
 
   @override
@@ -101,6 +105,8 @@ class HomeMobileScaffold extends StatelessWidget {
       drawer: SideDrawer(
         userName: context.watch<UserProvider>().name,
         assistantName: _getAssistantName(context),
+        onOpenCreation: onOpenCreation,
+        creationSelected: creationSelected,
         closePickerTicker: assistantPickerCloseTick,
         loadingConversationIds: loadingConversationIds,
         globalSearchMode: globalSearchMode,
@@ -133,7 +139,9 @@ class HomeMobileScaffold extends StatelessWidget {
           resizeToAvoidBottomInset: true,
           extendBodyBehindAppBar: true,
           backgroundColor: Colors.transparent,
-          appBar: appBarOverride ?? _buildAppBar(context, cs),
+          appBar: creationSelected
+              ? null
+              : appBarOverride ?? _buildAppBar(context, cs),
           body: body,
         ),
       ),

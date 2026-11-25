@@ -158,6 +158,7 @@ void main() {
   Future<void> pumpDrawer(
     WidgetTester tester,
     ChatService service, {
+    Size viewport = const Size(1200, 900),
     bool desktopTopicsOnly = true,
     bool desktopAssistantsOnly = false,
     bool globalSearchMode = false,
@@ -170,7 +171,7 @@ void main() {
     FutureOr<void> Function(String id, {bool closeDrawer})?
     onSelectConversation,
   }) async {
-    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.physicalSize = viewport;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -237,6 +238,35 @@ void main() {
     }
     await tester.pump(const Duration(milliseconds: 400));
   }
+
+  testWidgets('mobile assistant expansion animates only the list height', (
+    tester,
+  ) async {
+    final service = createService();
+    await tester.runAsync(service.init);
+    await pumpDrawer(
+      tester,
+      service,
+      desktopTopicsOnly: false,
+      viewport: const Size(360, 740),
+    );
+    final context = tester.element(find.byType(SideDrawer));
+    final name =
+        context.read<AssistantProvider>().currentAssistant?.name ?? 'Assistant';
+    await tester.tap(find.text(name).first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 70));
+    final scroller = find.byKey(const ValueKey('assistants-inline'));
+    final animation = find
+        .ancestor(of: scroller, matching: find.byType(AnimatedSize))
+        .first;
+    final midway = tester.getRect(animation);
+    await tester.pumpAndSettle();
+    final expanded = tester.getRect(animation);
+    expect(midway.width, expanded.width);
+    expect(midway.left, expanded.left);
+    expect(midway.height, lessThan(expanded.height));
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
   testWidgets(
     'entering selection does not recompute sidebar rows or bump revision',

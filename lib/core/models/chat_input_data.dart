@@ -19,7 +19,6 @@ class ChatInputData {
   final List<QuoteRef> quotes;
   final List<String> imagePaths; // absolute file paths or data URLs
   final List<DocumentAttachment> documents; // selected files
-  final bool allowImagesApiRouting;
   final DraftSubmission? draftSubmission;
   final UiContextAttachment? uiContext;
 
@@ -28,7 +27,6 @@ class ChatInputData {
     this.quotes = const [],
     this.imagePaths = const [],
     this.documents = const [],
-    this.allowImagesApiRouting = true,
     this.draftSubmission,
     this.uiContext,
   });

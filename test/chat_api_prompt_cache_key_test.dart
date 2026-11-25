@@ -333,36 +333,6 @@ void main() {
     });
   }
 
-  test('image generation ignores the conversation cache key setting', () async {
-    late Map<String, dynamic> body;
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    addTearDown(() => server.close(force: true));
-    server.listen((request) async {
-      body = (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
-          .cast<String, dynamic>();
-      expect(request.uri.path, '/v1/images/generations');
-      request.response.headers.contentType = ContentType.json;
-      request.response.write(
-        jsonEncode({
-          'data': [
-            {'url': 'https://example.test/generated.png'},
-          ],
-        }),
-      );
-      await request.response.close();
-    });
-    await ChatApiService.sendMessageStream(
-      config: _config(server),
-      modelId: 'gpt-image-2',
-      conversationId: 'chat-a',
-      messages: const [
-        {'role': 'user', 'content': 'draw a cat'},
-      ],
-      stream: false,
-    ).toList();
-    expect(body.containsKey('prompt_cache_key'), isFalse);
-  });
-
   test(
     'text-only requests add cache keys while still excluding custom bodies',
     () async {

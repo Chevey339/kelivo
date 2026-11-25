@@ -109,6 +109,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
     this.maxEdge,
     this.maxPixels,
     this.cacheRevision,
+    this.maxSourcePixels,
   });
 
   factory SafeResizeImage.wrap(
@@ -120,6 +121,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
     int? maxEdge,
     int? maxPixels,
     int? cacheRevision,
+    int? maxSourcePixels,
   }) {
     if (!_isSupportedBaseProvider(imageProvider)) {
       throw FlutterError(
@@ -136,6 +138,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
       maxEdge: maxEdge,
       maxPixels: maxPixels,
       cacheRevision: cacheRevision,
+      maxSourcePixels: maxSourcePixels,
     );
   }
 
@@ -151,6 +154,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
     int? maxEdge,
     int? maxPixels,
     int? cacheRevision,
+    int? maxSourcePixels,
   }) {
     if (_isSupportedBaseProvider(imageProvider)) {
       return SafeResizeImage.wrap(
@@ -162,6 +166,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
         maxEdge: maxEdge,
         maxPixels: maxPixels,
         cacheRevision: cacheRevision,
+        maxSourcePixels: maxSourcePixels,
       );
     }
     return SafeResizeImage(
@@ -173,6 +178,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
       maxEdge: maxEdge,
       maxPixels: maxPixels,
       cacheRevision: cacheRevision,
+      maxSourcePixels: maxSourcePixels,
     );
   }
 
@@ -182,6 +188,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
   /// Every decoded size then gets a fresh cache identity, including unmounted
   /// images that cannot be reached by evicting a currently displayed provider.
   final int? cacheRevision;
+  final int? maxSourcePixels;
   final int width;
   final int height;
   final SafeResizeFit fit;
@@ -207,6 +214,12 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
       return decode(
         buffer,
         getTargetSize: (intrinsicWidth, intrinsicHeight) {
+          final limit = key.maxSourcePixels;
+          if (limit != null &&
+              intrinsicHeight > 0 &&
+              intrinsicWidth > limit ~/ intrinsicHeight) {
+            throw StateError('Image exceeds the source pixel budget');
+          }
           final target = computeSafeResizeTarget(
             intrinsicWidth: intrinsicWidth,
             intrinsicHeight: intrinsicHeight,
@@ -256,6 +269,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
               maxEdge: maxEdge,
               maxPixels: maxPixels,
               cacheRevision: cacheRevision,
+              maxSourcePixels: maxSourcePixels,
             );
             if (completer == null) {
               result = SynchronousFuture<SafeResizeImageKey>(wrapped);
@@ -291,6 +305,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
         allowUpscaling == other.allowUpscaling &&
         maxEdge == other.maxEdge &&
         maxPixels == other.maxPixels &&
+        maxSourcePixels == other.maxSourcePixels &&
         cacheRevision == other.cacheRevision;
   }
 
@@ -303,6 +318,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
     allowUpscaling,
     maxEdge,
     maxPixels,
+    maxSourcePixels,
     cacheRevision,
   );
 }
@@ -336,10 +352,12 @@ class SafeResizeImageKey {
     required this.maxEdge,
     required this.maxPixels,
     this.cacheRevision,
+    this.maxSourcePixels,
   });
 
   final Object providerCacheKey;
   final int? cacheRevision;
+  final int? maxSourcePixels;
   final int width;
   final int height;
   final SafeResizeFit fit;
@@ -357,6 +375,7 @@ class SafeResizeImageKey {
         other.allowUpscaling == allowUpscaling &&
         other.maxEdge == maxEdge &&
         other.maxPixels == maxPixels &&
+        other.maxSourcePixels == maxSourcePixels &&
         other.cacheRevision == cacheRevision;
   }
 
@@ -369,6 +388,7 @@ class SafeResizeImageKey {
     allowUpscaling,
     maxEdge,
     maxPixels,
+    maxSourcePixels,
     cacheRevision,
   );
 }

@@ -1647,6 +1647,79 @@ void main() {
     expect(merged['reasoning']['canDisable'], false);
   });
 
+  test('Codex Images keeps the JSON body and injects OAuth headers', () async {
+    final service = ProviderOAuthService()..bind(settings);
+    final original = config(provider: OAuthProvider.chatgpt, expired: false);
+    await settings.setProviderConfig(original.id, original);
+    final client = service.authenticatedClient(
+      MockClient((request) async {
+        expect(
+          request.headers['authorization'],
+          'Bearer ${original.oauthCredentials!.accessToken}',
+        );
+        expect(request.url.path, '/backend-api/codex/images/generations');
+        expect(
+          request.body,
+          '{"model":"gpt-image-2","prompt":"A cat","size":"1536x1024"}',
+        );
+        return jsonResponse({'data': []});
+      }),
+      original,
+    );
+    addTearDown(client.close);
+    final response = await client.post(
+      Uri.parse('https://chatgpt.com/backend-api/codex/images/generations'),
+      body: '{"model":"gpt-image-2","prompt":"A cat","size":"1536x1024"}',
+      headers: {'content-type': 'application/json'},
+    );
+    expect(response.statusCode, 200);
+  });
+
+  test(
+    'Grok OAuth forwards media only to the allowed subscription endpoints',
+    () async {
+      final service = ProviderOAuthService()..bind(settings);
+      final original = config(provider: OAuthProvider.grok, expired: false);
+      await settings.setProviderConfig(original.id, original);
+      var count = 0;
+      final client = service.authenticatedClient(
+        MockClient((request) async {
+          count++;
+          expect(request.url.host, 'cli-chat-proxy.grok.com');
+          expect(
+            request.headers['authorization'],
+            'Bearer ${original.oauthCredentials!.accessToken}',
+          );
+          expect(jsonDecode(request.body), {
+            'model': 'grok-imagine-image',
+            'prompt': 'A cat',
+          });
+          return jsonResponse({'data': []});
+        }),
+        original,
+      );
+      addTearDown(client.close);
+      final url = Uri.parse(
+        'https://cli-chat-proxy.grok.com/v1/images/generations',
+      );
+      final response = await client.post(
+        url,
+        body: '{"model":"grok-imagine-image","prompt":"A cat"}',
+      );
+      expect(response.statusCode, 200);
+      for (final invalid in [
+        url.replace(host: 'example.test'),
+        url.replace(path: '/v1/responses'),
+      ]) {
+        await expectLater(
+          client.post(invalid, body: '{}'),
+          throwsA(isA<ProviderOAuthException>()),
+        );
+      }
+      expect(count, 1);
+    },
+  );
+
   test(
     'Grok sync keeps API models alongside Fast and sends its inference id',
     () async {
@@ -1717,6 +1790,7 @@ void main() {
         'grok-4.7-build-fast',
         'grok-build',
         'grok-4.20-0309-reasoning',
+        'grok-imagine-image',
       ]);
       expect(synced.modelOverrides['grok-4.7']['reasoning'], {
         'levels': ['low', 'high'],

@@ -50,6 +50,13 @@ class _ControlledChatService extends ChatService {
       _messagesByConversation[id] ?? const <ChatMessage>[];
 
   @override
+  Future<List<ChatMessage>> loadMessagesByIds(List<String> ids) async =>
+      _messagesByConversation.values
+          .expand((messages) => messages)
+          .where((message) => ids.contains(message.id))
+          .toList();
+
+  @override
   String? get currentConversationId => _trackedCurrentConversationId;
 
   @override
@@ -412,6 +419,61 @@ void main() {
     );
   }
 
+  testWidgets('show in conversation pulses once per explicit artwork jump', (
+    tester,
+  ) async {
+    final message = _message('conv-a', 1);
+    final service = _ControlledChatService({
+      'conv-a': [message],
+      'conv-b': [_message('conv-b', 0)],
+    });
+    final controller = await pumpHarness(
+      tester,
+      service,
+      timeline: (c) => SuperListView.builder(
+        controller: c.scrollController,
+        listController: c.scrollCtrl.messageListController,
+        itemCount: c.messages.length,
+        itemBuilder: (_, i) =>
+            SizedBox(height: 80, child: Text(c.messages[i].content)),
+      ),
+    );
+    await switchAndSettle(tester, controller, service, 'conv-b');
+    Future<void> openArtwork() async {
+      final switching = controller.currentConversation?.id != 'conv-a';
+      final pages = service.pageRequests.length;
+      final opened = controller.openCreationSource(
+        conversationId: 'conv-a',
+        messageId: message.id,
+        stillCurrent: () => true,
+      );
+      if (switching) {
+        for (var i = 0; i < 40 && service.pageRequests.length == pages; i++) {
+          await tester.pump(const Duration(milliseconds: 10));
+        }
+        service.completePage(service.pageRequests.last, [
+          message,
+        ], startIndex: 0);
+      }
+      await pumpUntilDone(tester, [opened.then<void>((_) {})]);
+      expect(await opened, isTrue);
+      expect(controller.spotlightMessageId, message.id);
+    }
+
+    await openArtwork();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(controller.spotlightOpacity.value, inExclusiveRange(0.0, 1.0));
+    await tester.pump(const Duration(seconds: 1));
+    expect(controller.spotlightMessageId, isNull);
+    await switchAndSettle(tester, controller, service, 'conv-b');
+    await switchAndSettle(tester, controller, service, 'conv-a');
+    expect(controller.spotlightMessageId, isNull);
+    await openArtwork();
+    await switchAndSettle(tester, controller, service, 'conv-b');
+    expect(controller.spotlightMessageId, isNull);
+  });
+
   testWidgets('switching conversations reveals a pending message jump', (
     tester,
   ) async {
@@ -441,6 +503,48 @@ void main() {
         await pumpUntilDone(tester, [jump]);
       }
     }, platform: TargetPlatform.iOS);
+  });
+
+  testWidgets('leaving an artwork jump cancels its outstanding history page', (
+    tester,
+  ) async {
+    final previous = _message('conv-a', 1);
+    final current = _message('conv-a', 2);
+    final service = _ControlledChatService({
+      'conv-a': [previous, current],
+    });
+    final controller = await pumpHarness(tester, service);
+    final switching = controller.switchConversationAnimated('conv-a');
+    for (var i = 0; i < 40 && service.pageRequests.isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    service.completePage(
+      service.pageRequests.single,
+      [current],
+      startIndex: 1,
+      totalSlotCount: 2,
+    );
+    await pumpUntilDone(tester, [switching]);
+    final jump = controller.openCreationSource(
+      conversationId: 'conv-a',
+      messageId: previous.id,
+      stillCurrent: () => true,
+    );
+    for (var i = 0; i < 40 && service.pageRequests.length == 1; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    expect(service.pageRequests, hasLength(2));
+    await controller.switchConversationAnimated('conv-a');
+    service.completePage(
+      service.pageRequests.last,
+      [previous],
+      startIndex: 0,
+      totalSlotCount: 2,
+    );
+    await pumpUntilDone(tester, [jump.then<void>((_) {})]);
+    expect(await jump, isFalse);
+    expect(controller.messages.single.id, current.id);
+    expect(controller.spotlightMessageId, isNull);
   });
 
   testWidgets(
@@ -688,6 +792,7 @@ void main() {
       final jump = controller.scrollToMessageId(
         'conv-a-message-10',
         useRikkaTransition: true,
+        spotlight: true,
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
@@ -699,6 +804,7 @@ void main() {
       ], startIndex: 10);
       await pumpUntilDone(tester, [jump]);
       expect(controller.messages.single.id, 'conv-a-message-0');
+      expect(controller.spotlightMessageId, isNull);
     }, platform: TargetPlatform.iOS);
   });
 

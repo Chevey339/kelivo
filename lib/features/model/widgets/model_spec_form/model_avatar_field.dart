@@ -52,8 +52,10 @@ class _ModelAvatarFieldState extends State<ModelAvatarField> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final config = widget.controller.config;
-    final modelAsset = BrandAssets.assetForName(
-      widget.controller.spec.upstreamId,
+    final spec = widget.controller.spec;
+    final modelAsset = BrandAssets.assetForModel(
+      spec.upstreamId,
+      displayName: spec.displayName,
     );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -70,7 +72,8 @@ class _ModelAvatarFieldState extends State<ModelAvatarField> {
                 avatar:
                     widget.controller.avatar ??
                     (modelAsset == null ? config.avatar : null),
-                name: widget.controller.spec.upstreamId,
+                name: spec.upstreamId,
+                matchBrandByName: false,
                 fallbackAsset:
                     modelAsset ??
                     BrandAssets.assetForName(config.name) ??
