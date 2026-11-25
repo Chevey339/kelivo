@@ -3,7 +3,6 @@ import 'package:markstream/markstream_core.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/models/assistant_regex.dart';
-import '../../../core/database/generation_run.dart';
 import '../../../shared/cache/byte_lru_cache.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../utils/protected_text.dart';
@@ -194,6 +193,7 @@ class ConversationFindService {
         }
       }
       yield matches;
+      if (isCurrent?.call() == false) return;
     }
   }
 
@@ -363,11 +363,8 @@ class ConversationFindService {
     );
     late final semantic = uiSearchableText(
       message,
-      row.surfaces.isEmpty &&
-              !message.isStreaming &&
-              message.generationState == GenerationRunState.completed
-          ? initialUiSearchText(message)
-          : row.surfaces,
+      row.surfaces,
+      projectMissingSurfaces: true,
     );
     late final surfaces = {
       for (final surface in semantic.surfaces) surface.surfaceKey: surface,

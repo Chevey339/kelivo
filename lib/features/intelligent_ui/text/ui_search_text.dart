@@ -1,6 +1,7 @@
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import '../host/ui_presented_fences.dart';
+import '../host/ui_source_map.dart' show UiSourceFence;
 import '../catalog/ui_budgets.dart';
 import '../protocol/ui_source_hash.dart';
 import '../protocol/ui_stream_parser.dart';
@@ -39,36 +40,36 @@ final class UiSearchSurfaceText {
 }
 
 /// Initial values only: searching must not make every slider drag reindex data.
-Map<String, UiSearchSurfaceText> initialUiSearchText(ChatMessage message) {
-  final result = <String, UiSearchSurfaceText>{};
-  for (final (:fence, :ordinal) in uiPresentedNativeFences(message)) {
-    if (ordinal >= UiBudgets.blocksPerMessage) continue;
-    if (!fence.node.closed) continue;
-    final controller = UiSurfaceController(
-      owner: UiSurfaceOwner(
-        revisionId: message.id,
-        surfaceKey: fence.surfaceKey,
-      ),
-      readOnly: true,
+Map<String, UiSearchSurfaceText> initialUiSearchText(ChatMessage message) => {
+  for (final (:fence, :ordinal) in uiPresentedNativeFences(message))
+    if (ordinal < UiBudgets.blocksPerMessage && fence.node.closed)
+      fence.surfaceKey: _initialSurfaceText(message.id, fence),
+};
+
+UiSearchSurfaceText _initialSurfaceText(
+  String revisionId,
+  UiSourceFence fence,
+) {
+  final controller = UiSurfaceController(
+    owner: UiSurfaceOwner(revisionId: revisionId, surfaceKey: fence.surfaceKey),
+    readOnly: true,
+  );
+  try {
+    controller.updateSource(
+      fence.body,
+      closed: true,
+      generation: UiGenerationStatus.complete,
     );
-    try {
-      controller.updateSource(
-        fence.body,
-        closed: true,
-        generation: UiGenerationStatus.complete,
-      );
-      result[fence.surfaceKey] = UiSearchSurfaceText(
-        sourceHash: uiSourceHash(controller.parsed.source),
-        text: uiSearchProjection.text(
-          controller.captureRead(),
-          mode: UiTextMode.search,
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
+    return UiSearchSurfaceText(
+      sourceHash: uiSourceHash(controller.parsed.source),
+      text: uiSearchProjection.text(
+        controller.captureRead(),
+        mode: UiTextMode.search,
+      ),
+    );
+  } finally {
+    controller.dispose();
   }
-  return result;
 }
 
 final class UiSearchText {
@@ -97,6 +98,7 @@ UiSearchText uiSearchableText(
   ChatMessage message,
   Map<String, UiSearchSurfaceText> cached, {
   String Function(String)? ordinaryText,
+  bool projectMissingSurfaces = false,
 }) {
   final out = StringBuffer();
   final ranges = <({int start, int end, String surfaceKey})>[];
@@ -110,22 +112,25 @@ UiSearchText uiSearchableText(
           source.substring(cursor, start),
     );
     final from = out.length;
-    final saved = cached[fence.surfaceKey];
-    out.write(
-      ordinal >= UiBudgets.blocksPerMessage
-          ? 'Additional interface shown as source.'
-          : saved != null &&
-                !message.isStreaming &&
-                message.generationState == GenerationRunState.completed &&
-                saved.sourceHash ==
-                    uiSourceHash(
-                      UiStreamParser()
-                          .update(fence.body, closed: fence.node.closed)
-                          .source,
-                    )
-          ? saved.text
-          : 'Interface is not complete.',
-    );
+    var label = 'Interface is not complete.';
+    if (ordinal >= UiBudgets.blocksPerMessage) {
+      label = 'Additional interface shown as source.';
+    } else if (!message.isStreaming &&
+        message.generationState == GenerationRunState.completed) {
+      final saved = cached[fence.surfaceKey];
+      if (saved != null &&
+          saved.sourceHash ==
+              uiSourceHash(
+                UiStreamParser()
+                    .update(fence.body, closed: fence.node.closed)
+                    .source,
+              )) {
+        label = saved.text;
+      } else if (projectMissingSurfaces && fence.node.closed) {
+        label = _initialSurfaceText(message.id, fence).text;
+      }
+    }
+    out.write(label);
     ranges.add((start: from, end: out.length, surfaceKey: fence.surfaceKey));
     cursor = end;
   }

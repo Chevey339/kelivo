@@ -246,18 +246,27 @@ final class UiSearchIndex {
   ) async {
     final ids = revisionIds.toSet().toList();
     final result = <String, Map<String, UiSearchSurfaceText>>{};
+    final table = db.genUiSurfaceStateRows;
     for (var start = 0; start < ids.length; start += 400) {
-      final rows = await (db.select(
-        db.genUiSurfaceStateRows,
-      )..where((s) => s.revisionId.isIn(ids.skip(start).take(400)))).get();
+      final rows =
+          await (db.selectOnly(table)
+                ..addColumns([
+                  table.revisionId,
+                  table.surfaceKey,
+                  table.sourceHash,
+                  table.searchText,
+                ])
+                ..where(
+                  table.revisionId.isIn(ids.skip(start).take(400)) &
+                      table.searchText.isNotValue(''),
+                ))
+              .get();
       for (final row in rows) {
-        if (row.searchText.isEmpty) continue;
-        result.putIfAbsent(
-          row.revisionId,
-          () => {},
-        )[row.surfaceKey] = UiSearchSurfaceText(
-          sourceHash: row.sourceHash,
-          text: row.searchText,
+        result.putIfAbsent(row.read(table.revisionId)!, () => {})[row.read(
+          table.surfaceKey,
+        )!] = UiSearchSurfaceText(
+          sourceHash: row.read(table.sourceHash)!,
+          text: row.read(table.searchText)!,
         );
       }
     }

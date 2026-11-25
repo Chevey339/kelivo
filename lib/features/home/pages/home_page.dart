@@ -260,7 +260,10 @@ class _HomePageState extends State<HomePage>
     if (id == null) return {};
     final service = _findPresentation = _findService();
     return service.search(
-      context.read<ChatService>().conversationFindCandidates(id),
+      context.read<ChatService>().conversationFindCandidates(
+        id,
+        isCurrent: current,
+      ),
       query,
       options,
       cache: _findCache,
@@ -2038,12 +2041,16 @@ class _HomePageState extends State<HomePage>
       String query,
       bool Function() isCurrent,
     ) {
-      if (!inConversation()) return const Stream.empty();
+      bool current() => isCurrent() && inConversation();
+      if (!current()) return const Stream.empty();
       return _findService().searchPreviews(
-        context.read<ChatService>().conversationFindCandidates(conversation),
+        context.read<ChatService>().conversationFindCandidates(
+          conversation,
+          isCurrent: current,
+        ),
         query,
         cache: _findCache,
-        isCurrent: () => isCurrent() && inConversation(),
+        isCurrent: current,
         liveCandidate: _findSnapshot,
       );
     }

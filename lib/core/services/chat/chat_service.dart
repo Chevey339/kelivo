@@ -1992,9 +1992,10 @@ class ChatService extends ChangeNotifier {
   }
 
   Stream<List<ConversationFindCandidate>> conversationFindCandidates(
-    String conversationId,
-  ) async* {
-    if (!_initialized) return;
+    String conversationId, {
+    bool Function()? isCurrent,
+  }) async* {
+    if (!_initialized || isCurrent?.call() == false) return;
     if (_temporaryConversationIds.contains(conversationId) ||
         _draftConversations.containsKey(conversationId)) {
       final selected = _collapseTitleVersions(
@@ -2007,12 +2008,16 @@ class ChatService extends ChangeNotifier {
         batch.add(ConversationFindCandidate(message));
         if (batch.length == ConversationFindCandidate.batchSize) {
           yield batch;
+          if (isCurrent?.call() == false) return;
           batch = [];
         }
       }
       if (batch.isNotEmpty) yield batch;
     } else {
-      yield* _repo.conversationFindCandidates(conversationId);
+      yield* _repo.conversationFindCandidates(
+        conversationId,
+        isCurrent: isCurrent,
+      );
     }
   }
 

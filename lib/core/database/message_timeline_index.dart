@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 
 /// A rebuildable index over message identity, not another source of history.
@@ -8,18 +10,24 @@ final class MessageTimelineIndex {
   MessageTimelineIndex(this.database);
 
   final GeneratedDatabase database;
-  Future<void>? _installation;
+  final _pendingInstallations = <Zone, Future<void>>{};
 
   static Future<void> install(GeneratedDatabase db) async {
     await db.transaction(() async {
       for (final sql in _schema) {
         await db.customStatement(sql);
       }
+      // The marker is private to the open connection and rolls back with the
+      // schema if the caller owns an outer transaction.
+      await db.customStatement(
+        'CREATE TEMP TABLE IF NOT EXISTS timeline_schema_ready (ready INTEGER)',
+      );
     });
   }
 
   /// External snapshots carry canonical rows, never a trusted ready index.
   static const discardStatements = <String>[
+    'DROP TABLE IF EXISTS temp.timeline_schema_ready',
     'DROP TRIGGER IF EXISTS timeline_message_insert',
     'DROP TRIGGER IF EXISTS timeline_message_delete',
     'DROP TRIGGER IF EXISTS timeline_message_update',
@@ -28,6 +36,7 @@ final class MessageTimelineIndex {
     'DROP TRIGGER IF EXISTS timeline_selection_update',
     'DROP TRIGGER IF EXISTS timeline_group_insert',
     'DROP TRIGGER IF EXISTS timeline_group_delete',
+    'DROP INDEX IF EXISTS idx_timeline_generation_target',
     'DROP TABLE IF EXISTS timeline_revision_rows',
     'DROP TABLE IF EXISTS timeline_group_rows',
     'DROP TABLE IF EXISTS timeline_selection_rows',
@@ -35,15 +44,12 @@ final class MessageTimelineIndex {
   ];
 
   Future<void> ensureConversation(String id) async {
-    final installation = _installation ??= install(database);
-    try {
-      await installation;
-    } catch (_) {
-      // A failed transaction leaves no installed index. Share an in-flight
-      // attempt, but let a later read retry after a transient storage failure.
-      if (identical(_installation, installation)) _installation = null;
-      rethrow;
-    }
+    // Drift binds a transaction to its zone. Sharing a pending installation
+    // with a different zone can make the transaction wait for itself.
+    final scope = Zone.current;
+    await (_pendingInstallations[scope] ??= _ensureInstalled().whenComplete(() {
+      _pendingInstallations.remove(scope);
+    }));
     final state = await database
         .customSelect(
           'SELECT ready FROM timeline_state WHERE conversation_id = ?',
@@ -113,6 +119,15 @@ FROM conversation_rows c,json_each(c.version_selections_json) j WHERE c.id = ?
     });
   }
 
+  Future<void> _ensureInstalled() async {
+    final ready = await database
+        .customSelect(
+          "SELECT 1 FROM sqlite_temp_master WHERE type='table' AND name='timeline_schema_ready'",
+        )
+        .getSingleOrNull();
+    if (ready == null) await install(database);
+  }
+
   /// The selected candidate if it still exists, otherwise the latest candidate.
   /// Both source branches use existing indexes, including a null-group anchor
   /// whose id is subsequently used as the group_id of another revision.
@@ -174,6 +189,10 @@ ON CONFLICT(conversation_id,group_id) DO UPDATE SET
 ''';
 
   static final _schema = <String>[
+    // Both search pages and ordinary timeline reads hydrate the latest run
+    // for each visible revision, including completed runs.
+    '''CREATE INDEX IF NOT EXISTS idx_timeline_generation_target
+      ON generation_run_rows(target_revision_id)''',
     '''CREATE TABLE IF NOT EXISTS timeline_state(
       conversation_id TEXT PRIMARY KEY REFERENCES conversation_rows(id) ON DELETE CASCADE,
       ready INTEGER NOT NULL, group_count INTEGER NOT NULL DEFAULT 0, message_count INTEGER NOT NULL DEFAULT 0

@@ -6,6 +6,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/gen_ui_derived_schema.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -150,6 +151,61 @@ void main() {
   Future<int> schemaVersion(AppDatabase database) async =>
       (await database.customSelect('PRAGMA schema_version').getSingle())
           .read<int>('schema_version');
+
+  test(
+    'minimap searches cold and partially indexed cards without rebuilding other conversations',
+    () async {
+      await repo.putConversation(Conversation(id: 'other', title: 'Other'));
+      await put('unrelated', _fence(_body), conversation: 'other');
+      final cards = [
+        'Alpha',
+        'Beta',
+        'Gamma',
+      ].map((label) => _fence('root = Text(text="$label 明白")')).join('\n\n');
+      await put('local', cards);
+      await put(
+        'unfinished',
+        _fence('root = Text(text="明白")'),
+        completed: false,
+      );
+      final states = db.genUiSurfaceStateRows;
+      await (db.delete(states)..where(
+            (s) =>
+                s.revisionId.equals('unrelated') |
+                (s.revisionId.equals('local') & s.surfaceKey.equals('0:1')),
+          ))
+          .go();
+      await (db.update(states)..where(
+            (s) => s.revisionId.equals('local') & s.surfaceKey.equals('0:2'),
+          ))
+          .write(
+            const GenUiSurfaceStateRowsCompanion(
+              sourceHash: Value('stale'),
+              searchText: Value('obsolete'),
+            ),
+          );
+      // This database has no global backfill receipt. A local search must be
+      // able to finish even when a global index build cannot write to it.
+      await db.customStatement("""
+      CREATE TRIGGER reject_global_backfill BEFORE INSERT ON chat_storage_meta_rows
+      WHEN NEW.key = '${GenUiDerivedSchema.searchBackfillKey}'
+      BEGIN SELECT RAISE(ABORT, 'unexpected global backfill'); END
+    """);
+      final previews = await const ConversationFindService()
+          .searchPreviews(repo.conversationFindCandidates('c'), '明白')
+          .expand((page) => page)
+          .toList();
+      expect(previews.map((p) => (p.hit.messageId, p.matchCount)), [
+        ('local', 3),
+      ]);
+      expect((await conversationFind('Beta')).single.surfaceKey, '0:1');
+      expect((await conversationFind('Gamma')).single.surfaceKey, '0:2');
+      expect(await conversationFind('obsolete'), isEmpty);
+      final remaining = await db.select(states).get();
+      expect(remaining.where((s) => s.revisionId == 'unrelated'), isEmpty);
+      expect(remaining.where((s) => s.revisionId == 'local'), hasLength(2));
+    },
+  );
 
   test('the first sidebar search after reopening reuses the index', () async {
     await put('r', _fence(_body));

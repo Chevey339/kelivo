@@ -32,7 +32,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/foundation.dart'
-    show debugPrint, visibleForTesting, listEquals;
+    show compute, debugPrint, visibleForTesting, listEquals;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
@@ -82,6 +82,16 @@ typedef ChatDatabaseSnapshotInfo = ({
 });
 
 typedef InstalledChatDatabaseInfo = ({int schemaVersion, String? databaseId});
+
+typedef _MessageDetails = ({
+  List<MessagePartRow> parts,
+  List<GenerationRunRow> runs,
+});
+typedef _FindPage = ({
+  List<MessageRow> messages,
+  _MessageDetails details,
+  Map<String, Map<String, UiSearchSurfaceText>> surfaces,
+});
 
 /// What crash recovery is allowed to do with the installed database.
 ///
@@ -3229,18 +3239,19 @@ ORDER BY m.message_order DESC LIMIT 20
   /// Read only this conversation's visible revisions, in timeline order.
   /// Visual substitutions and Unicode folds make raw-text LIKE filters lossy.
   Stream<List<ConversationFindCandidate>> conversationFindCandidates(
-    String conversationId,
-  ) async* {
+    String conversationId, {
+    bool Function()? isCurrent,
+  }) async* {
+    if (isCurrent?.call() == false) return;
     await _timelineIndex.ensureConversation(conversationId);
-    await _genUiSearch.ensure();
     const batchSize = ConversationFindCandidate.batchSize;
     (int, String)? cursor;
-    while (true) {
+    while (isCurrent?.call() != false) {
       final after = cursor;
-      final batch = await _db.transaction(() async {
+      final page = await _db.transaction<_FindPage?>(() async {
         final rows = await _db
             .customSelect(
-              'SELECT g.anchor_order,g.group_id,m.id FROM timeline_group_rows g '
+              'SELECT g.anchor_order,g.group_id AS cursor_group_id,m.* FROM timeline_group_rows g '
               'LEFT JOIN timeline_selection_rows s ON s.conversation_id=g.conversation_id AND s.group_id=g.group_id '
               'JOIN message_rows m ON m.id=${MessageTimelineIndex.selectedRevision('g')} '
               "WHERE g.conversation_id=? AND m.role IN ('user','assistant') "
@@ -3256,27 +3267,42 @@ ORDER BY m.message_order DESC LIMIT 20
               ],
             )
             .get();
-        if (rows.isEmpty) return <ConversationFindCandidate>[];
+        if (rows.isEmpty || isCurrent?.call() == false) return null;
         cursor = (
           rows.last.read<int>('anchor_order'),
-          rows.last.read<String>('group_id'),
+          rows.last.read<String>('cursor_group_id'),
         );
-        final ids = rows.map((r) => r.read<String>('id')).toList();
-        final messages = await getMessagesByIds(ids);
-        final surfaces = await _genUiSearch.read(ids);
-        return [
-          for (final message in messages)
-            ConversationFindCandidate(
-              message,
-              surfaces: surfaces[message.id] ?? const {},
-            ),
+        final messages = [
+          for (final row in rows) _db.messageRows.map(row.data),
         ];
+        final ids = [for (final message in messages) message.id];
+        return (
+          messages: messages,
+          details: await _readMessageDetails(ids),
+          surfaces: await _genUiSearch.read(ids),
+        );
       });
-      if (batch.isEmpty) return;
+      if (page == null || isCurrent?.call() == false) return;
+      // Release the database before decoding attachment and tool payloads.
+      // Missing card text is projected by the matcher for this page only.
+      final batch = await compute(_hydrateFindPage, page);
+      if (isCurrent?.call() == false) return;
       yield batch;
       if (batch.length < batchSize) return;
     }
   }
+
+  static List<ConversationFindCandidate> _hydrateFindPage(_FindPage page) => [
+    for (final message in _hydrateMessages(
+      page.messages,
+      page.details.parts,
+      page.details.runs,
+    ))
+      ConversationFindCandidate(
+        message,
+        surfaces: page.surfaces[message.id] ?? const {},
+      ),
+  ];
 
   Future<Set<String>> getMessageIdsForGroups(
     String conversationId,
@@ -8471,7 +8497,15 @@ ORDER BY m.message_order DESC LIMIT 20
     bool background = false,
   }) => _db.transaction(() async {
     if (rows.isEmpty) return const [];
-    final ids = rows.map((row) => row.id).toSet();
+    final details = await _readMessageDetails(
+      rows.map((row) => row.id).toSet(),
+    );
+    return background
+        ? _hydrateMessagesInBackground(rows, details.parts, details.runs)
+        : _hydrateMessages(rows, details.parts, details.runs);
+  });
+
+  Future<_MessageDetails> _readMessageDetails(Iterable<String> ids) async {
     final parts =
         await (_db.select(_db.messagePartRows)
               ..where((part) => part.revisionId.isIn(ids))
@@ -8486,10 +8520,8 @@ ORDER BY m.message_order DESC LIMIT 20
                 (run) => OrderingTerm.desc(run.id),
               ]))
             .get();
-    return background
-        ? _hydrateMessagesInBackground(rows, parts, runs)
-        : _hydrateMessages(rows, parts, runs);
-  });
+    return (parts: parts, runs: runs);
+  }
 
   static Future<List<ChatMessage>> _hydrateMessagesInBackground(
     List<MessageRow> rows,
