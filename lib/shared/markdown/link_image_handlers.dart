@@ -167,7 +167,7 @@ Future<FileSystemEntity?> _resolveVirtualEntryInChat(
       !Platform.isIOS) {
     final hostPath = p.posix.join('/tmp', link.relativePath);
     final file = File(hostPath);
-    if (file.existsSync()) return file;
+    if (!link.expectDirectory && file.existsSync()) return file;
     final dir = Directory(hostPath);
     if (dir.existsSync()) return dir;
   }
@@ -287,16 +287,54 @@ class KelivoLinkHandler implements LinkHandler {
     final baseFilePath = scope?.baseFilePath;
     final kelivoLink = KelivoLink.tryParse(url);
     if (kelivoLink != null) {
-      if (baseFilePath != null &&
-          kelivoLink.kind == KelivoLinkKind.workspaceFile) {
-        final resolver = _obtainFileLinkResolver(context);
-        final entry = resolver == null
-            ? null
-            : await _resolvePreviewWorkspaceEntry(
-                resolver,
-                kelivoLink,
-                baseFilePath,
-              );
+      if (baseFilePath != null) {
+        if (kelivoLink.kind == KelivoLinkKind.workspaceFile) {
+          final resolver = _obtainFileLinkResolver(context);
+          final entry = resolver == null
+              ? null
+              : await _resolvePreviewWorkspaceEntry(
+                  resolver,
+                  kelivoLink,
+                  baseFilePath,
+                );
+          if (!context.mounted) return;
+          await _openResolvedEntry(
+            context,
+            entry,
+            link: kelivoLink,
+            conversationId: scope?.conversationId,
+          );
+          return;
+        }
+        if (kelivoLink.kind == KelivoLinkKind.terminal) {
+          await openWorkspaceLinkedFile(
+            context,
+            url,
+            conversationId: scope?.conversationId,
+          );
+          return;
+        }
+        FileSystemEntity? entry;
+        if (kelivoLink.kind == KelivoLinkKind.skillFile) {
+          entry = await FileLinkResolver.resolveSkillEntry(kelivoLink);
+        } else {
+          final explicitConversationId =
+              kelivoLink.conversationId ?? scope?.conversationId;
+          if (explicitConversationId != null) {
+            final resolver = _obtainFileLinkResolver(context);
+            if (resolver != null) {
+              try {
+                entry = await resolver.resolveToHostEntry(
+                  kelivoLink,
+                  conversationId: explicitConversationId,
+                  binding: const WorkspaceBinding(),
+                );
+              } on FileLinkException {
+                entry = null;
+              }
+            }
+          }
+        }
         if (!context.mounted) return;
         await _openResolvedEntry(
           context,
@@ -309,6 +347,14 @@ class KelivoLinkHandler implements LinkHandler {
       await openWorkspaceLinkedFile(
         context,
         url,
+        conversationId: scope?.conversationId,
+      );
+      return;
+    }
+    if (url.length >= 9 && url.substring(0, 9).toLowerCase() == 'kelivo://') {
+      await _openResolvedEntry(
+        context,
+        null,
         conversationId: scope?.conversationId,
       );
       return;
@@ -622,6 +668,13 @@ class _MarkdownImageState extends State<_MarkdownImage> {
 
     final baseFilePath = _baseFilePath;
     if (kelivoLink == null && virtualLink == null) {
+      final trimmed = widget.url.trim();
+      if (trimmed.length >= 9 &&
+          trimmed.substring(0, 9).toLowerCase() == 'kelivo://') {
+        _failedClosed = true;
+        _file = null;
+        return;
+      }
       if (baseFilePath != null &&
           FileLinkResolver.isRelativeFileRef(widget.url)) {
         final injectedResolver = context.read<FileLinkResolver?>();
@@ -647,6 +700,11 @@ class _MarkdownImageState extends State<_MarkdownImage> {
     }
 
     final link = (kelivoLink ?? virtualLink)!;
+    if (link.expectDirectory) {
+      _failedClosed = true;
+      _file = null;
+      return;
+    }
     if (baseFilePath != null) {
       final injectedResolver = context.read<FileLinkResolver?>();
       final resolver = _obtainFileLinkResolver(context, injectedResolver);

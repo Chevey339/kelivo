@@ -176,6 +176,156 @@ void main() {
       expect(KelivoLink.tryParse('https://example.com'), isNull);
       expect(KelivoLink.tryParse(''), isNull);
     });
+
+    test(
+      'supports single trailing slash with expectDirectory and rejects //',
+      () {
+        final cases =
+            <
+              ({
+                String uri,
+                KelivoLinkKind kind,
+                String relativePath,
+                String? conversationId,
+                String? mountId,
+                bool expectDirectory,
+              })
+            >[
+              (
+                uri: 'kelivo://workspace',
+                kind: KelivoLinkKind.workspaceFile,
+                relativePath: '',
+                conversationId: null,
+                mountId: null,
+                expectDirectory: false,
+              ),
+              (
+                uri: 'kelivo://workspace/',
+                kind: KelivoLinkKind.workspaceFile,
+                relativePath: '',
+                conversationId: null,
+                mountId: null,
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://workspace/subdir/',
+                kind: KelivoLinkKind.workspaceFile,
+                relativePath: 'subdir',
+                conversationId: null,
+                mountId: null,
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://chat/outputs/',
+                kind: KelivoLinkKind.chatOutput,
+                relativePath: '',
+                conversationId: null,
+                mountId: null,
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://chat/attachments/',
+                kind: KelivoLinkKind.chatAttachment,
+                relativePath: '',
+                conversationId: null,
+                mountId: null,
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://chat/c1/outputs/',
+                kind: KelivoLinkKind.chatOutput,
+                relativePath: '',
+                conversationId: 'c1',
+                mountId: null,
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://chat/c1/attachments/',
+                kind: KelivoLinkKind.chatAttachment,
+                relativePath: '',
+                conversationId: 'c1',
+                mountId: null,
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://chat/c1/outputs/sub/',
+                kind: KelivoLinkKind.chatOutput,
+                relativePath: 'sub',
+                conversationId: 'c1',
+                mountId: null,
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://mounts/m1/',
+                kind: KelivoLinkKind.externalFile,
+                relativePath: '',
+                conversationId: null,
+                mountId: 'm1',
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://mounts/m1/sub/',
+                kind: KelivoLinkKind.externalFile,
+                relativePath: 'sub',
+                conversationId: null,
+                mountId: 'm1',
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://skills/s1/',
+                kind: KelivoLinkKind.skillFile,
+                relativePath: 's1',
+                conversationId: null,
+                mountId: null,
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://tmp/sub/',
+                kind: KelivoLinkKind.temporaryFile,
+                relativePath: 'sub',
+                conversationId: null,
+                mountId: null,
+                expectDirectory: true,
+              ),
+              (
+                uri: 'kelivo://session/sub/',
+                kind: KelivoLinkKind.chatFile,
+                relativePath: 'sub',
+                conversationId: null,
+                mountId: null,
+                expectDirectory: true,
+              ),
+            ];
+
+        for (final c in cases) {
+          final parsed = KelivoLink.tryParse(c.uri);
+          expect(parsed, isNotNull, reason: c.uri);
+          expect(parsed!.kind, c.kind, reason: c.uri);
+          expect(parsed.relativePath, c.relativePath, reason: c.uri);
+          expect(parsed.conversationId, c.conversationId, reason: c.uri);
+          expect(parsed.mountId, c.mountId, reason: c.uri);
+          expect(parsed.expectDirectory, c.expectDirectory, reason: c.uri);
+        }
+
+        const invalid = [
+          'kelivo://workspace//',
+          'kelivo://workspace/subdir//',
+          'kelivo://workspace/../',
+          'kelivo://workspace/%2e%2e/',
+          'kelivo://chat/',
+          'kelivo://chat/c1/',
+          'kelivo://chat/outputs//',
+          'kelivo://chat/c1/attachments//',
+          'kelivo://mounts/',
+          'kelivo://mounts/m1//',
+          'kelivo://skills/s1//',
+          'kelivo://tmp/sub//',
+        ];
+        for (final uri in invalid) {
+          expect(KelivoLink.tryParse(uri), isNull, reason: uri);
+        }
+      },
+    );
   });
 
   group('FileLinkResolver.resolveToHostFile', () {
@@ -564,6 +714,78 @@ void main() {
       },
     );
 
+    test(
+      'trailing-slash links resolve directories and reject files across resolvers',
+      () async {
+        final subdir = Directory(p.join(workspaceRoot.path, 'subdir'))
+          ..createSync();
+        final file = File(p.join(workspaceRoot.path, 'readme.md'))
+          ..writeAsStringSync('# hi');
+        final skillDir = Directory(p.join(appData.path, 'skills', 's1'))
+          ..createSync(recursive: true);
+        final skillFile = File(p.join(skillDir.path, 'SKILL.md'))
+          ..writeAsStringSync('# skill');
+        expect(file.existsSync(), isTrue);
+        expect(skillFile.existsSync(), isTrue);
+
+        // resolveToHostEntry
+        expect(
+          await resolver.resolveToHostEntry(
+            KelivoLink.tryParse('kelivo://workspace/subdir/')!,
+            conversationId: 'conv-1',
+            binding: binding(),
+          ),
+          isA<Directory>().having((d) => d.path, 'path', subdir.path),
+        );
+        expect(
+          await resolver.resolveToHostEntry(
+            KelivoLink.tryParse('kelivo://workspace/readme.md/')!,
+            conversationId: 'conv-1',
+            binding: binding(),
+          ),
+          isNull,
+        );
+        expect(
+          await resolver.resolveToHostFile(
+            KelivoLink.tryParse('kelivo://workspace/subdir/')!,
+            conversationId: 'conv-1',
+            binding: binding(),
+          ),
+          isNull,
+        );
+
+        // resolveToHostEntryInWorkspace
+        expect(
+          await resolver.resolveToHostEntryInWorkspace(
+            KelivoLink.tryParseVirtualPath('/workspace/subdir/')!,
+            workspaceId: workspace.id,
+          ),
+          isA<Directory>().having((d) => d.path, 'path', subdir.path),
+        );
+        expect(
+          await resolver.resolveToHostEntryInWorkspace(
+            KelivoLink.tryParseVirtualPath('/workspace/readme.md/')!,
+            workspaceId: workspace.id,
+          ),
+          isNull,
+        );
+
+        // resolveSkillEntry
+        expect(
+          await FileLinkResolver.resolveSkillEntry(
+            KelivoLink.tryParseVirtualPath('/skills/s1/')!,
+          ),
+          isA<Directory>().having((d) => d.path, 'path', skillDir.path),
+        );
+        expect(
+          await FileLinkResolver.resolveSkillEntry(
+            KelivoLink.tryParseVirtualPath('/skills/s1/SKILL.md/')!,
+          ),
+          isNull,
+        );
+      },
+    );
+
     test('terminal links do not resolve to a file', () async {
       final resolved = await resolver.resolveToHostFile(
         KelivoLink.tryParse('kelivo://terminal?cmd=pwd')!,
@@ -691,6 +913,41 @@ void main() {
 
     test('KelivoLink.tryParse remains strictly kelivo://-only', () {
       expect(KelivoLink.tryParse('/workspace/a.png'), isNull);
+    });
+
+    test('parses single trailing slash in virtual paths and rejects //', () {
+      const valid = [
+        ('/workspace/subdir/', KelivoLinkKind.workspaceFile, 'subdir'),
+        ('file:///workspace/subdir/', KelivoLinkKind.workspaceFile, 'subdir'),
+        ('/chat/outputs/', KelivoLinkKind.chatOutput, ''),
+        ('/chat/outputs/sub/', KelivoLinkKind.chatOutput, 'sub'),
+        ('/chat/attachments/', KelivoLinkKind.chatAttachment, ''),
+        ('/chat/attachments/sub/', KelivoLinkKind.chatAttachment, 'sub'),
+        ('/chat/sub/', KelivoLinkKind.chatFile, 'sub'),
+        ('/skills/s1/', KelivoLinkKind.skillFile, 's1'),
+        ('/tmp/sub/', KelivoLinkKind.temporaryFile, 'sub'),
+      ];
+      for (final (raw, kind, rel) in valid) {
+        final parsed = KelivoLink.tryParseVirtualPath(raw);
+        expect(parsed, isNotNull, reason: raw);
+        expect(parsed!.kind, kind, reason: raw);
+        expect(parsed.relativePath, rel, reason: raw);
+        expect(parsed.expectDirectory, isTrue, reason: raw);
+      }
+
+      const invalid = [
+        '/workspace//',
+        '/workspace/subdir//',
+        'file:///workspace/subdir//',
+        '/chat/outputs//',
+        '/chat/outputs/sub//',
+        '/skills/s1//',
+        '/tmp/sub//',
+        '/workspace_evil/subdir/',
+      ];
+      for (final raw in invalid) {
+        expect(KelivoLink.tryParseVirtualPath(raw), isNull, reason: raw);
+      }
     });
   });
 
@@ -943,6 +1200,10 @@ void main() {
       );
       expect(
         KelivoLink.tryParseVirtualPath('/workspace')?.toKelivoUri(),
+        'kelivo://workspace',
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/workspace/')?.toKelivoUri(),
         'kelivo://workspace/',
       );
       expect(
@@ -968,5 +1229,138 @@ void main() {
         'kelivo://tmp/plot.png',
       );
     });
+
+    test(
+      'KelivoLink.toKelivoUri round-trips all non-terminal kinds for empty and non-empty paths',
+      () {
+        final links = <KelivoLink>[
+          for (final expectDir in [false, true]) ...[
+            KelivoLink(
+              kind: KelivoLinkKind.workspaceFile,
+              relativePath: '',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.workspaceFile,
+              relativePath: 'sub dir/报告.md',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatFile,
+              relativePath: '',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatFile,
+              relativePath: 'notes/a.md',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatAttachment,
+              relativePath: '',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatAttachment,
+              relativePath: 'in/a.png',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatAttachment,
+              conversationId: 'c1',
+              relativePath: '',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatAttachment,
+              conversationId: 'c1',
+              relativePath: 'in/a.png',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatOutput,
+              relativePath: '',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatOutput,
+              relativePath: 'out/b.png',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatOutput,
+              conversationId: 'c1',
+              relativePath: '',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.chatOutput,
+              conversationId: 'c1',
+              relativePath: 'out/b.png',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.skillFile,
+              relativePath: '',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.skillFile,
+              relativePath: 'weather/SKILL.md',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.temporaryFile,
+              relativePath: '',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.temporaryFile,
+              relativePath: 'scratch/plot.png',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.externalFile,
+              mountId: 'm1',
+              relativePath: '',
+              expectDirectory: expectDir,
+            ),
+            KelivoLink(
+              kind: KelivoLinkKind.externalFile,
+              mountId: 'm1',
+              relativePath: 'docs/report.txt',
+              expectDirectory: expectDir,
+            ),
+          ],
+        ];
+
+        for (final link in links) {
+          final uri = link.toKelivoUri();
+          expect(uri, isNotNull, reason: '${link.kind} ${link.relativePath}');
+          final reparsed = KelivoLink.tryParse(uri!);
+          expect(reparsed, isNotNull, reason: uri);
+          expect(reparsed!.kind, link.kind, reason: uri);
+          expect(reparsed.relativePath, link.relativePath, reason: uri);
+          expect(reparsed.conversationId, link.conversationId, reason: uri);
+          expect(reparsed.mountId, link.mountId, reason: uri);
+          expect(reparsed.expectDirectory, link.expectDirectory, reason: uri);
+        }
+
+        expect(
+          const KelivoLink(
+            kind: KelivoLinkKind.terminal,
+            relativePath: '',
+          ).toKelivoUri(),
+          isNull,
+        );
+        expect(
+          const KelivoLink(
+            kind: KelivoLinkKind.externalFile,
+            relativePath: '',
+          ).toKelivoUri(),
+          isNull,
+        );
+      },
+    );
   });
 }

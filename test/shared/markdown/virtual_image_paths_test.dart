@@ -279,6 +279,102 @@ void main() {
   });
 
   testWidgets(
+    'chat trailing-slash directory links open FileBrowser and file-with-slash fails closed',
+    (tester) async {
+      final subdir = Directory(p.join(wsRoot.path, 'subdir'))..createSync();
+      File(p.join(subdir.path, 'child.txt')).writeAsStringSync('hello');
+      File(p.join(wsRoot.path, 'readme.md')).writeAsStringSync('# Readme');
+
+      await tester.pumpWidget(
+        buildChatMarkdown(
+          [
+            '[with-slash](/workspace/subdir/)',
+            '[file-slash](file:///workspace/subdir/)',
+            '[kelivo-slash](kelivo://workspace/subdir/)',
+            '[file-with-slash](/workspace/readme.md/)',
+            '[kelivo-file-slash](kelivo://workspace/readme.md/)',
+            '[double-slash](kelivo://workspace/subdir//)',
+          ].join('\n\n'),
+        ),
+      );
+      await tester.pump();
+
+      Future<void> tapAndExpectBrowser(String label) async {
+        await tester.tapAt(markdownGlyphCenter(tester, label));
+        await tester.pump();
+        for (var i = 0; i < 20; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump();
+          if (find.byType(FileBrowser).evaluate().isNotEmpty) break;
+        }
+        expect(launcher.launched, isEmpty, reason: label);
+        expect(find.byType(FileBrowser), findsOneWidget, reason: label);
+        expect(
+          tester.widget<FileBrowser>(find.byType(FileBrowser)).root.path,
+          subdir.path,
+        );
+        Navigator.of(tester.element(find.byType(FileBrowser))).pop();
+        await tester.pumpAndSettle();
+      }
+
+      await tapAndExpectBrowser('with-slash');
+      await tapAndExpectBrowser('file-slash');
+      await tapAndExpectBrowser('kelivo-slash');
+
+      for (final label in [
+        'file-with-slash',
+        'kelivo-file-slash',
+        'double-slash',
+      ]) {
+        await tester.tapAt(markdownGlyphCenter(tester, label));
+        await tester.pump();
+        for (var i = 0; i < 20; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+          if (find.text('File not available').evaluate().isNotEmpty) break;
+        }
+        expect(launcher.launched, isEmpty, reason: label);
+        expect(find.byType(FileBrowser), findsNothing, reason: label);
+        expect(find.text('File not available'), findsOneWidget, reason: label);
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+      }
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('chat fails closed on trailing-slash image references', (
+    tester,
+  ) async {
+    Directory(p.join(wsRoot.path, 'subdir')).createSync();
+    File(p.join(wsRoot.path, 'plot.png')).writeAsBytesSync(_pngBytes());
+
+    await tester.pumpWidget(
+      buildChatMarkdown(
+        [
+          '![dir-slash](/workspace/subdir/)',
+          '![kelivo-dir](kelivo://workspace/subdir/)',
+          '![file-slash](/workspace/plot.png/)',
+        ].join('\n\n'),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+
+    expect(find.byType(RawImage), findsNothing);
+    expect(find.byIcon(Lucide.ImageOff), findsNWidgets(3));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
     'desktop /tmp renders sanitized, padded, and percent-encoded paths',
     (tester) async {
       final stamp = DateTime.now().microsecondsSinceEpoch;

@@ -27,6 +27,7 @@ class KelivoLink {
     this.conversationId,
     this.mountId,
     this.terminalCommand,
+    this.expectDirectory = false,
   });
 
   final KelivoLinkKind kind;
@@ -34,6 +35,7 @@ class KelivoLink {
   final String? conversationId;
   final String? mountId;
   final String? terminalCommand;
+  final bool expectDirectory;
 
   /// Absolute guest path for the referenced entry in its owning mount/session.
   String? guestPath({String? mountRoot}) {
@@ -54,23 +56,25 @@ class KelivoLink {
   /// Canonical `kelivo://` URI for this link, or `null` when unavailable.
   String? toKelivoUri() {
     final encoded = encodePath(relativePath);
+    final suffix = expectDirectory ? '/' : '';
+    final pathSuffix = encoded.isEmpty ? suffix : '/$encoded$suffix';
     return switch (kind) {
-      KelivoLinkKind.workspaceFile => 'kelivo://workspace/$encoded',
-      KelivoLinkKind.chatFile => 'kelivo://session/$encoded',
+      KelivoLinkKind.workspaceFile => 'kelivo://workspace$pathSuffix',
+      KelivoLinkKind.chatFile => 'kelivo://session$pathSuffix',
       KelivoLinkKind.chatAttachment =>
-        conversationId != null
-            ? 'kelivo://chat/${Uri.encodeComponent(conversationId!)}/attachments/$encoded'
-            : 'kelivo://chat/attachments/$encoded',
+        conversationId != null && conversationId!.isNotEmpty
+            ? 'kelivo://chat/${Uri.encodeComponent(conversationId!)}/attachments$pathSuffix'
+            : 'kelivo://chat/attachments$pathSuffix',
       KelivoLinkKind.chatOutput =>
-        conversationId != null
-            ? 'kelivo://chat/${Uri.encodeComponent(conversationId!)}/outputs/$encoded'
-            : 'kelivo://chat/outputs/$encoded',
-      KelivoLinkKind.skillFile => 'kelivo://skills/$encoded',
-      KelivoLinkKind.temporaryFile => 'kelivo://tmp/$encoded',
+        conversationId != null && conversationId!.isNotEmpty
+            ? 'kelivo://chat/${Uri.encodeComponent(conversationId!)}/outputs$pathSuffix'
+            : 'kelivo://chat/outputs$pathSuffix',
+      KelivoLinkKind.skillFile => 'kelivo://skills$pathSuffix',
+      KelivoLinkKind.temporaryFile => 'kelivo://tmp$pathSuffix',
       KelivoLinkKind.externalFile =>
-        mountId == null
+        mountId == null || mountId!.isEmpty
             ? null
-            : 'kelivo://mounts/${Uri.encodeComponent(mountId!)}/$encoded',
+            : 'kelivo://mounts/${Uri.encodeComponent(mountId!)}$pathSuffix',
       KelivoLinkKind.terminal => null,
     };
   }
@@ -135,19 +139,23 @@ class KelivoLink {
       );
     }
 
-    final segments = _decodedRelativeSegments(rawPath);
-    if (segments == null) return null;
+    final parsed = _parseRelativeSegments(rawPath);
+    if (parsed == null) return null;
+    final segments = parsed.segments;
+    final expectDirectory = parsed.expectDirectory;
 
     switch (host) {
       case 'session':
         return KelivoLink(
           kind: KelivoLinkKind.chatFile,
           relativePath: segments.join('/'),
+          expectDirectory: expectDirectory,
         );
       case 'tmp':
         return KelivoLink(
           kind: KelivoLinkKind.temporaryFile,
           relativePath: segments.join('/'),
+          expectDirectory: expectDirectory,
         );
       case 'mounts':
         if (segments.isEmpty) return null;
@@ -155,11 +163,13 @@ class KelivoLink {
           kind: KelivoLinkKind.externalFile,
           mountId: segments.first,
           relativePath: segments.skip(1).join('/'),
+          expectDirectory: expectDirectory,
         );
       case 'workspace':
         return KelivoLink(
           kind: KelivoLinkKind.workspaceFile,
           relativePath: segments.join('/'),
+          expectDirectory: expectDirectory,
         );
       case 'chat':
         if (segments.isEmpty) return null;
@@ -169,36 +179,40 @@ class KelivoLink {
           return KelivoLink(
             kind: KelivoLinkKind.chatAttachment,
             relativePath: rest.join('/'),
+            expectDirectory: expectDirectory,
           );
         }
         if (folder == 'outputs') {
           return KelivoLink(
             kind: KelivoLinkKind.chatOutput,
             relativePath: rest.join('/'),
+            expectDirectory: expectDirectory,
           );
         }
         if (rest.isEmpty) return null;
         // kelivo://chat/<conversationId>/… — model-emitted or explicit id.
         if (!_isSafeSegment(folder)) return null;
         if (rest.first == 'attachments' || rest.first == 'outputs') {
-          if (rest.length < 2) return null;
           return KelivoLink(
             kind: rest.first == 'attachments'
                 ? KelivoLinkKind.chatAttachment
                 : KelivoLinkKind.chatOutput,
             relativePath: rest.sublist(1).join('/'),
             conversationId: folder,
+            expectDirectory: expectDirectory,
           );
         }
         return KelivoLink(
           kind: KelivoLinkKind.chatOutput,
           relativePath: rest.join('/'),
           conversationId: folder,
+          expectDirectory: expectDirectory,
         );
       case 'skills':
         return KelivoLink(
           kind: KelivoLinkKind.skillFile,
           relativePath: segments.join('/'),
+          expectDirectory: expectDirectory,
         );
       default:
         return null;
@@ -306,20 +320,37 @@ class KelivoLink {
       } else {
         continue;
       }
-      final segments = _decodedRelativeSegments(tail);
-      if (segments == null) return null;
-      return KelivoLink(kind: kind, relativePath: segments.join('/'));
+      final parsed = _parseRelativeSegments(tail);
+      if (parsed == null) return null;
+      return KelivoLink(
+        kind: kind,
+        relativePath: parsed.segments.join('/'),
+        expectDirectory: parsed.expectDirectory,
+      );
     }
     return null;
   }
 
   /// Decodes path segments and rejects `..`, `.`, empties, separators, and
   /// absolute-host / drive paths. [rawPath] is the `/...` portion before
-  /// query/fragment, not a normalized [Uri.path].
-  static List<String>? _decodedRelativeSegments(String? rawPath) {
-    if (rawPath == null || rawPath.isEmpty || rawPath == '/') return const [];
+  /// query/fragment, not a normalized [Uri.path]. Accepts at most one trailing
+  /// `/` (recording `expectDirectory = true`) and rejects double slashes (`//`).
+  static ({List<String> segments, bool expectDirectory})?
+  _parseRelativeSegments(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) {
+      return (segments: const [], expectDirectory: false);
+    }
+    if (rawPath == '/') {
+      return (segments: const [], expectDirectory: true);
+    }
     if (!rawPath.startsWith('/')) return null;
+    if (rawPath.endsWith('//')) return null;
+    var expectDirectory = false;
     var path = rawPath.substring(1);
+    if (path.endsWith('/')) {
+      expectDirectory = true;
+      path = path.substring(0, path.length - 1);
+    }
     if (path.startsWith('/') || path.startsWith(r'\')) return null;
     if (RegExp(r'^[a-zA-Z]:').hasMatch(path)) return null;
     if (path.isEmpty) return null;
@@ -332,7 +363,7 @@ class KelivoLink {
       if (part == null || !_isSafeSegment(part)) return null;
       decoded.add(part);
     }
-    return decoded;
+    return (segments: decoded, expectDirectory: expectDirectory);
   }
 
   /// Percent-decode one path segment. [Uri.decodeComponent] throws
@@ -436,7 +467,11 @@ class FileLinkResolver {
     } catch (_) {
       return null;
     }
-    return _entryUnderRoot(root, link.relativePath);
+    return _entryUnderRoot(
+      root,
+      link.relativePath,
+      expectDirectory: link.expectDirectory,
+    );
   }
 
   Future<File?> resolveToHostFileInWorkspace(
@@ -459,7 +494,11 @@ class FileLinkResolver {
     if (!_isSafeRelativePath(link.relativePath)) return null;
     try {
       final root = (await AppDirectories.getSkillsDirectory()).path;
-      return _entryUnderRoot(root, link.relativePath);
+      return _entryUnderRoot(
+        root,
+        link.relativePath,
+        expectDirectory: link.expectDirectory,
+      );
     } on FileLinkException {
       return null;
     }
@@ -670,7 +709,11 @@ class FileLinkResolver {
       case KelivoLinkKind.terminal:
         return null;
     }
-    return _entryUnderRoot(root, link.relativePath);
+    return _entryUnderRoot(
+      root,
+      link.relativePath,
+      expectDirectory: link.expectDirectory,
+    );
   }
 
   static bool _isSafeRelativePath(String relativePath) {
@@ -682,13 +725,20 @@ class FileLinkResolver {
     return relativePath.split('/').every(KelivoLink._isSafeSegment);
   }
 
-  static FileSystemEntity? _entryUnderRoot(String root, String relativePath) {
+  static FileSystemEntity? _entryUnderRoot(
+    String root,
+    String relativePath, {
+    bool expectDirectory = false,
+  }) {
     try {
       final canonicalRoot = Directory(root).resolveSymbolicLinksSync();
       final joined = p.join(p.canonicalize(root), relativePath);
       final type = FileSystemEntity.typeSync(joined);
       if (type == FileSystemEntityType.notFound) {
         throw const FileLinkException(FileLinkFailure.missing);
+      }
+      if (expectDirectory && type != FileSystemEntityType.directory) {
+        return null;
       }
       final canonical = type == FileSystemEntityType.directory
           ? Directory(joined).resolveSymbolicLinksSync()

@@ -28,10 +28,45 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
+// ignore: depend_on_referenced_packages
+import 'package:url_launcher_platform_interface/link.dart';
+// ignore: depend_on_referenced_packages
+import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import '../../../../support/business_test_harness.dart';
 import '../../../../support/file_browser_test_helpers.dart';
 import '../../../../support/markdown_render_helpers.dart';
+
+class _FakeUrlLauncher extends UrlLauncherPlatform {
+  final List<String> launched = <String>[];
+
+  @override
+  LinkDelegate? get linkDelegate => null;
+
+  @override
+  Future<bool> canLaunch(String url) async => true;
+
+  @override
+  Future<bool> launch(
+    String url, {
+    required bool useSafariVC,
+    required bool useWebView,
+    required bool enableJavaScript,
+    required bool enableDomStorage,
+    required bool universalLinksOnly,
+    required Map<String, String> headers,
+    String? webOnlyWindowName,
+  }) async {
+    launched.add(url);
+    return true;
+  }
+
+  @override
+  Future<bool> launchUrl(String url, LaunchOptions options) async {
+    launched.add(url);
+    return true;
+  }
+}
 
 const _pngBytes = <int>[
   0x89,
@@ -1181,6 +1216,139 @@ void main() {
       expect(find.byType(FileBrowser), findsNothing);
       expect(find.text('File not available'), findsOneWidget);
       await tester.pump(const Duration(seconds: 4));
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'markdown preview trailing-slash directory links use owning workspace and file-with-slash fails closed',
+    (tester) async {
+      final previousLauncher = UrlLauncherPlatform.instance;
+      final launcher = _FakeUrlLauncher();
+      UrlLauncherPlatform.instance = launcher;
+      addTearDown(() => UrlLauncherPlatform.instance = previousLauncher);
+
+      final wsARoot = Directory(p.join(tempDir.path, 'wsA_slash'))
+        ..createSync();
+      final wsBRoot = Directory(p.join(tempDir.path, 'wsB_slash'))
+        ..createSync();
+      final wsASubdir = Directory(p.join(wsARoot.path, 'subdir'))..createSync();
+      File(p.join(wsASubdir.path, 'a.txt')).writeAsStringSync('a');
+      File(p.join(wsARoot.path, 'readme.md')).writeAsStringSync('# A');
+      Directory(p.join(wsBRoot.path, 'subdir')).createSync();
+      Directory(p.join(wsBRoot.path, 'b_only_dir')).createSync();
+
+      final mdFile = File(p.join(wsARoot.path, 'docs', 'index.md'))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync(
+          [
+            '[with-slash](/workspace/subdir/)',
+            '[file-slash](file:///workspace/subdir/)',
+            '[kelivo-slash](kelivo://workspace/subdir/)',
+            '[file-with-slash](/workspace/readme.md/)',
+            '[b-slash](kelivo://workspace/b_only_dir/)',
+            '![dir-img](/workspace/subdir/)',
+          ].join('\n\n'),
+        );
+
+      late AppDatabase database;
+      late WorkspaceProvider workspaces;
+      await tester.runAsync(() async {
+        database = AppDatabase(NativeDatabase.memory());
+        await database.customSelect('SELECT 1;').getSingle();
+        workspaces = WorkspaceProvider(store: ExtensionEntityStore(database));
+        await workspaces.loaded;
+        await workspaces.create(
+          name: 'wsA',
+          kind: WorkspaceKind.linked,
+          hostPath: wsARoot.path,
+        );
+        await workspaces.create(
+          name: 'wsB',
+          kind: WorkspaceKind.linked,
+          hostPath: wsBRoot.path,
+        );
+      });
+      addTearDown(() async {
+        workspaces.dispose();
+        await database.close();
+      });
+
+      final chat = _FakeChatService(
+        Conversation(
+          id: 'conv-b',
+          title: 'Chat B',
+          extras: {WorkspaceBinding.keyId: workspaces.workspaces.last.id},
+        ),
+      );
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (_, child) => AppSnackBarOverlay(child: child!),
+            home: Scaffold(
+              body: MarkdownFilePreview(file: mdFile, autoLoad: false),
+            ),
+          ),
+        ),
+      );
+      await _loadMarkdownPreview(tester);
+      await _pumpAsyncUi(tester);
+
+      expect(find.byType(RawImage), findsNothing);
+      expect(find.byIcon(Lucide.ImageOff), findsOneWidget);
+
+      Future<void> tapAndExpectBrowser(String label) async {
+        await tester.tapAt(markdownGlyphCenter(tester, label));
+        await tester.pump();
+        for (var i = 0; i < 20; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump();
+          if (find.byType(FileBrowser).evaluate().isNotEmpty) break;
+        }
+        expect(launcher.launched, isEmpty, reason: label);
+        expect(find.byType(FileBrowser), findsOneWidget, reason: label);
+        expect(
+          tester.widget<FileBrowser>(find.byType(FileBrowser)).root.path,
+          wsASubdir.path,
+        );
+        Navigator.of(tester.element(find.byType(FileBrowser))).pop();
+        await tester.pumpAndSettle();
+      }
+
+      await tapAndExpectBrowser('with-slash');
+      await tapAndExpectBrowser('file-slash');
+      await tapAndExpectBrowser('kelivo-slash');
+
+      for (final label in ['file-with-slash', 'b-slash']) {
+        await tester.tapAt(markdownGlyphCenter(tester, label));
+        await tester.pump();
+        for (var i = 0; i < 20; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+          if (find.text('File not available').evaluate().isNotEmpty) break;
+        }
+        expect(launcher.launched, isEmpty, reason: label);
+        expect(find.byType(FileBrowser), findsNothing, reason: label);
+        expect(find.text('File not available'), findsOneWidget, reason: label);
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+      }
+
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
