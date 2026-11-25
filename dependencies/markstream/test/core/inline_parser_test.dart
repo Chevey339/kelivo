@@ -120,11 +120,151 @@ void main() {
     ]);
     expect(parser.parse(source).whereType<LinkNode>(), isEmpty);
   });
+  test('bare autolinks stop before CJK text and fullwidth punctuation', () {
+    const issue1555 =
+        '请读取 https://api-docs.deepseek.com/zh-cn/guides/document_parsing只告诉我这一页列出的上传用途（purpose）有哪些。';
+    final issueNodes = const InlineParser().parse(issue1555);
+    final issueLink = issueNodes.whereType<LinkNode>().single;
+    expect(
+      issueLink.destination,
+      'https://api-docs.deepseek.com/zh-cn/guides/document_parsing',
+    );
+    expect(issueNodes.map(textOf).join(), issue1555);
+    expect((issueNodes.last as TextNode).text, '只告诉我这一页列出的上传用途（purpose）有哪些。');
+
+    final cases = <String, List<String>>{
+      '看这里https://example.com/~user/path?a=1&b=2#sec-1_2中文': [
+        'https://example.com/~user/path?a=1&b=2#sec-1_2',
+      ],
+      'https://example.com/path~中文': ['https://example.com/path'],
+      '参考www.example.com/guide查看详情': ['http://www.example.com/guide'],
+      '詳細https://example.com/path日本語テスト': ['https://example.com/path'],
+      '참고https://example.com한국어': ['https://example.com'],
+      'https://example.com/path𠀀结尾': ['https://example.com/path'],
+      '🔗https://example.com/a😀说明': ['https://example.com/a'],
+      'https://example.com。': ['https://example.com'],
+      'https://example.com，中文': ['https://example.com'],
+      'https://a.example/one、https://b.example/two': [
+        'https://a.example/one',
+        'https://b.example/two',
+      ],
+      'https://example.com；https://example.com：说明': [
+        'https://example.com',
+        'https://example.com',
+      ],
+      'https://example.com？https://example.com！': [
+        'https://example.com',
+        'https://example.com',
+      ],
+      '（https://example.com）【https://example.com】「https://example.com」『https://example.com』《https://example.com》〈https://example.com〉':
+          List.filled(6, 'https://example.com'),
+      '“https://example.com”‘https://example.com’': [
+        'https://example.com',
+        'https://example.com',
+      ],
+      'https://example.com—补充 https://example.com… https://example.com·说明 https://example.com～':
+          List.filled(4, 'https://example.com'),
+      'https://example.com.中文 https://example.com,中文': [
+        'https://example.com',
+        'https://example.com',
+      ],
+      'https://example.com/a(b)).中文': ['https://example.com/a(b)'],
+      '(https://example.com/a.) (https://example.com/a(b).)': [
+        'https://example.com/a',
+        'https://example.com/a(b)',
+      ],
+      'https://en.wikipedia.org/wiki/C_(programming_language)介绍': [
+        'https://en.wikipedia.org/wiki/C_(programming_language)',
+      ],
+      '（https://en.wikipedia.org/wiki/C_(programming_language)）': [
+        'https://en.wikipedia.org/wiki/C_(programming_language)',
+      ],
+      '[https://example.com.]中文': ['https://example.com'],
+      'http://[::1]:8080/api中文': ['http://[::1]:8080/api'],
+      'https://zh.wikipedia.org/wiki/%E4%B8%AD%E6%96%87?q=1&b=2,3;c=4#sec-1_2词条': [
+        'https://zh.wikipedia.org/wiki/%E4%B8%AD%E6%96%87?q=1&b=2,3;c=4#sec-1_2',
+      ],
+      '联系foo@example.com谢谢 （a+b@example.org。）': [
+        'mailto:foo@example.com',
+        'mailto:a+b@example.org',
+      ],
+    };
+    for (final entry in cases.entries) {
+      final parsed = const InlineParser().parse(entry.key);
+      expect(
+        parsed.whereType<LinkNode>().map((n) => n.destination).toList(),
+        entry.value,
+        reason: entry.key,
+      );
+      expect(parsed.map(textOf).join(), entry.key, reason: entry.key);
+    }
+
+    for (final negative in [
+      'https://中文',
+      'http://。',
+      'www.中文',
+      'www.。',
+      'https://.中文',
+      'www..中文',
+      'www.,中文',
+    ]) {
+      expect(
+        const InlineParser().parse(negative).whereType<LinkNode>(),
+        isEmpty,
+        reason: negative,
+      );
+    }
+
+    final angleNodes = const InlineParser().parse(
+      '<https://zh.wikipedia.org/wiki/中文>说明',
+    );
+    expect(
+      angleNodes.whereType<LinkNode>().single.destination,
+      'https://zh.wikipedia.org/wiki/中文',
+    );
+    final explicitNodes = const InlineParser().parse(
+      '[词条](https://zh.wikipedia.org/wiki/中文)说明',
+    );
+    expect(
+      explicitNodes.whereType<LinkNode>().single.destination,
+      'https://zh.wikipedia.org/wiki/中文',
+    );
+  });
+  test(
+    'bare autolinks beside CJK remain consistent across streaming prefixes',
+    () {
+      const source =
+          '请读取 https://api-docs.deepseek.com/zh-cn/guides/document_parsing只告诉我这一页列出的上传用途（purpose）有哪些。';
+      const parser = MarkdownParser();
+      final incremental = IncrementalDocument(parser: parser);
+      const expectedUrl =
+          'https://api-docs.deepseek.com/zh-cn/guides/document_parsing';
+      final boundaryIndex = source.indexOf('只');
+
+      for (var end = 0; end <= source.length; end++) {
+        final prefix = source.substring(0, end);
+        final doc = incremental.update(prefix, streaming: true);
+        expect(
+          doc.toJson(),
+          parser.parse(prefix, streaming: true).toJson(),
+          reason: 'prefix length $end',
+        );
+        if (end > boundaryIndex) {
+          final links = doc.children.single.children
+              .whereType<LinkNode>()
+              .toList();
+          expect(links, hasLength(1), reason: 'prefix length $end');
+          expect(links.single.destination, expectedUrl);
+        }
+      }
+    },
+  );
   test('two-phase parser resolves references across nested blocks', () {
     const source =
         '[a *label*][ID] and [ID][] and [id]\n\n> [ID]: /path "title"\n\n[ID]: /ignored\n\nNext';
-    final doc = const MarkdownParser(options: ParserOptions.commonMark())
-        .parse(source);
+    final doc = const MarkdownParser(
+      options: ParserOptions.commonMark(),
+    ).parse(source);
     final links = doc.children.first.children.whereType<LinkNode>().toList();
     expect(links, hasLength(3));
     expect(
