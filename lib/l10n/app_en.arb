@@ -23629,6 +23629,34 @@
   "@falUnsupportedOutput": {
     "description": "Message when adding a fal endpoint that returns unsupported results, such as segmentation data or vector files."
   },
+  "falAdditionalSettings": "Additional Settings",
+  "@falAdditionalSettings": {
+    "description": "Heading above advanced controls from the selected fal model’s published input schema in Creation."
+  },
+  "falRefreshAdditionalSettings": "Refresh model settings",
+  "@falRefreshAdditionalSettings": {
+    "description": "Tooltip for reloading the selected fal model’s published parameter definitions."
+  },
+  "falNoPublishedSettings": "fal has not published settings for this endpoint.",
+  "@falNoPublishedSettings": {
+    "description": "Status under the Creation settings heading for a private or unlisted fal endpoint."
+  },
+  "falNoAdditionalSettings": "This model has no additional settings.",
+  "@falNoAdditionalSettings": {
+    "description": "Status after loading a fal schema with no model-specific controls beyond the standard Creation inputs."
+  },
+  "falWatermark": "Watermark",
+  "@falWatermark": {
+    "description": "Label for the fal watermark switch, which adds a visible provider watermark to generated images."
+  },
+  "falSyncMode": "Sync Mode",
+  "@falSyncMode": {
+    "description": "Label for the fal sync_mode switch, which returns generated media inline as data URIs."
+  },
+  "falSafetyChecker": "Enable Safety Checker",
+  "@falSafetyChecker": {
+    "description": "Label for the fal input/output content safety checker switch. The provider controls whether the account can disable checking."
+  },
   "falCheckingModel": "Checking model…",
   "@falCheckingModel": {
     "description": "Save-button label while looking up the schema of a manually entered fal model ID."

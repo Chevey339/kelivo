@@ -181,6 +181,7 @@ class MediaFileStore {
       final mime = info?.mime ?? videoMime ?? result.mime;
       final ext = switch (mime) {
         'video/mp4' => 'mp4',
+        'video/quicktime' => 'mov',
         'video/webm' => 'webm',
         _ => AppDirectories.extFromMime(mime),
       };
@@ -349,7 +350,9 @@ class MediaFileStore {
       final bytes = await handle.read(12);
       if (bytes.length < 12) return null;
       if (ascii.decode(bytes.sublist(4, 8), allowInvalid: true) == 'ftyp') {
-        return 'video/mp4';
+        return ascii.decode(bytes.sublist(8), allowInvalid: true) == 'qt  '
+            ? 'video/quicktime'
+            : 'video/mp4';
       }
       if (bytes[0] == 0x1a &&
           bytes[1] == 0x45 &&
@@ -527,9 +530,9 @@ class MediaFileStore {
     }
   }
 
-  static final _pendingOutput = RegExp(r'\.part(?:\.(?:mp4|webm))?$');
+  static final _pendingOutput = RegExp(r'\.part(?:\.(?:mp4|mov|webm))?$');
   static final _generatedOutput = RegExp(
-    r'^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\.(?:png|jpg|webp|gif|mp4|webm)$',
+    r'^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\.(?:png|jpg|webp|gif|mp4|mov|webm)$',
   );
 
   Future<void> discardInterruptedWrites(

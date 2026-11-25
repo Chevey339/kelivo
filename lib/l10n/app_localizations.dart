@@ -31854,6 +31854,48 @@ abstract class AppLocalizations {
   /// **'This model does not return an image or video that Creation can save.'**
   String get falUnsupportedOutput;
 
+  /// Heading above advanced controls from the selected fal model’s published input schema in Creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional Settings'**
+  String get falAdditionalSettings;
+
+  /// Tooltip for reloading the selected fal model’s published parameter definitions.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh model settings'**
+  String get falRefreshAdditionalSettings;
+
+  /// Status under the Creation settings heading for a private or unlisted fal endpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'fal has not published settings for this endpoint.'**
+  String get falNoPublishedSettings;
+
+  /// Status after loading a fal schema with no model-specific controls beyond the standard Creation inputs.
+  ///
+  /// In en, this message translates to:
+  /// **'This model has no additional settings.'**
+  String get falNoAdditionalSettings;
+
+  /// Label for the fal watermark switch, which adds a visible provider watermark to generated images.
+  ///
+  /// In en, this message translates to:
+  /// **'Watermark'**
+  String get falWatermark;
+
+  /// Label for the fal sync_mode switch, which returns generated media inline as data URIs.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Mode'**
+  String get falSyncMode;
+
+  /// Label for the fal input/output content safety checker switch. The provider controls whether the account can disable checking.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Safety Checker'**
+  String get falSafetyChecker;
+
   /// Save-button label while looking up the schema of a manually entered fal model ID.
   ///
   /// In en, this message translates to:

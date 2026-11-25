@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
+
+import 'package:dio/dio.dart' show CancelToken;
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +12,9 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../core/services/media/media_request.dart';
+import '../../../core/services/media/media_models.dart';
+import '../../../core/services/media/fal_model_discovery.dart';
+import '../../provider/widgets/fal_catalog_notice.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/plain_text_input.dart';
@@ -34,6 +42,7 @@ class CreationAdvancedOptions extends StatelessWidget {
     final caps = model.capabilities;
     final platformOptions = state.platformOptionsFor(topicId);
     final options = state.parameters;
+    final canFetch = state.canFetchFalSettings(model);
     final invalidJson = state.extraParameters == null;
 
     Widget choices(
@@ -48,6 +57,7 @@ class CreationAdvancedOptions extends StatelessWidget {
           values: values,
           value: options[key] is String ? options[key] as String : null,
           display: display,
+          automatic: 'auto',
           onChanged: (value) => state.setParameter(key, value),
         ),
       );
@@ -155,16 +165,26 @@ class CreationAdvancedOptions extends StatelessWidget {
               ],
             ),
           ),
-        if (platformOptions.isNotEmpty) ...[
+        if (canFetch || platformOptions.isNotEmpty) ...[
           const SizedBox(height: 14),
-          Text(
-            '${model.provider.name} · ${l10n.creationPlatformOptions}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: AppFontWeights.semibold,
-              color: colors.onSurfaceVariant,
+          if (canFetch)
+            _FalSettingsHeader(
+              key: ValueKey((
+                model.key,
+                model.spec.upstreamId,
+                model.provider.baseUrl,
+              )),
+              model: model,
+            )
+          else
+            Text(
+              '${model.provider.name} · ${l10n.creationPlatformOptions}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: AppFontWeights.semibold,
+                color: colors.onSurfaceVariant,
+              ),
             ),
-          ),
           for (final field in platformOptions)
             _PlatformInput(
               key: ValueKey(field.key),
@@ -198,6 +218,118 @@ class CreationAdvancedOptions extends StatelessWidget {
   }
 }
 
+class _FalSettingsHeader extends StatefulWidget {
+  const _FalSettingsHeader({super.key, required this.model});
+  final MediaModelChoice model;
+
+  @override
+  State<_FalSettingsHeader> createState() => _FalSettingsHeaderState();
+}
+
+class _FalSettingsHeaderState extends State<_FalSettingsHeader> {
+  CancelToken? _pending;
+  Object? _error;
+  bool _unlisted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final model = widget.model;
+    final override = model.provider.modelOverrides[model.spec.id];
+    final endpoint = override is Map ? override['falEndpoint'] : null;
+    _unlisted =
+        endpoint is Map &&
+        endpoint['id'] == model.spec.upstreamId &&
+        endpoint['unlisted'] == true;
+    if (!_unlisted &&
+        !FalModelDiscovery.hasAdditionalSettings(
+          model.spec.upstreamId,
+          override,
+        )) {
+      unawaited(_load());
+    }
+  }
+
+  Future<void> _load() async {
+    if (_pending != null) return;
+    final token = CancelToken();
+    setState(() {
+      _pending = token;
+      _error = null;
+    });
+    try {
+      final found = await context
+          .read<MediaCreationController>()
+          .refreshFalSettings(widget.model, token);
+      if (mounted && !token.isCancelled && found != null) _unlisted = !found;
+    } catch (error) {
+      if (mounted && !token.isCancelled) _error = error;
+    } finally {
+      if (mounted && !token.isCancelled) setState(() => _pending = null);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pending?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.falAdditionalSettings,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: AppFontWeights.semibold,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ),
+            if (_pending != null)
+              Semantics(
+                label: l10n.falCheckingModel,
+                child: const SizedBox.square(
+                  dimension: 30,
+                  child: Center(child: CupertinoActivityIndicator(radius: 7)),
+                ),
+              )
+            else
+              IosIconButton(
+                icon: Lucide.RefreshCw,
+                minSize: 30,
+                size: 15,
+                tooltip: l10n.falRefreshAdditionalSettings,
+                onTap: _load,
+              ),
+          ],
+        ),
+        if (_error case final error?)
+          Text(
+            falCatalogErrorMessage(l10n, error),
+            style: TextStyle(fontSize: 12, color: cs.error),
+          )
+        else if (_pending == null &&
+            (_unlisted || widget.model.capabilities.platformOptions.isEmpty))
+          Text(
+            _unlisted
+                ? l10n.falNoPublishedSettings
+                : l10n.falNoAdditionalSettings,
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+      ],
+    );
+  }
+}
+
 class _PlatformInput extends StatelessWidget {
   const _PlatformInput({super.key, required this.field, required this.topicId});
 
@@ -209,37 +341,96 @@ class _PlatformInput extends StatelessWidget {
     final state = context.watch<MediaCreationController>();
     final l10n = AppLocalizations.of(context)!;
     final key = field.key;
-    final value = state.parameters[key] ?? field.defaultValue;
-    void update(Object? value) =>
-        state.setParameter(key, value == field.defaultValue ? null : value);
+    final raw = state.parameters[field.storageKey];
+    final value = raw ?? field.defaultValue;
+    final title = switch (key) {
+      'watermark' when field.title != null => l10n.falWatermark,
+      'sync_mode' when field.title != null => l10n.falSyncMode,
+      'enable_safety_checker' when field.title != null => l10n.falSafetyChecker,
+      'background' when field.title != null => l10n.creationBackground,
+      _ => field.title ?? key.replaceAll('_', ' '),
+    };
+    void update(Object? value) => state.setParameter(
+      field.storageKey,
+      value == field.defaultValue ? null : value,
+    );
+    final structured = const {
+      MediaParameterType.array,
+      MediaParameterType.object,
+      MediaParameterType.json,
+    }.contains(field.type);
+    final invalid = !field.acceptsDraft(raw);
+    final hint = field.defaultValue == null
+        ? l10n.creationAuto
+        : structured
+        ? jsonEncode(field.defaultValue)
+        : field.defaultValue.toString();
     final input = switch (field.type) {
-      MediaParameterType.enumeration => _Choices(
+      MediaParameterType.boolean => Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: IosSwitch(
+          value: value == true,
+          onChanged: field.readOnly ? null : update,
+          semanticLabel: title,
+        ),
+      ),
+      _ when field.readOnly => Text(value?.toString() ?? l10n.creationAuto),
+      MediaParameterType.enumeration => _Choices<Object>(
         values: field.choices,
-        value: value is String ? value : null,
-        display: (value) => value,
+        value: value,
+        display: (v) => v.toString(),
         onChanged: update,
       ),
+      MediaParameterType.integer || MediaParameterType.number
+          when field.title != null &&
+              (field.storageKey != field.key ||
+                  field.minimum == null ||
+                  field.maximum == null ||
+                  field.exclusiveMinimum != null ||
+                  field.exclusiveMaximum != null ||
+                  field.multipleOf != null) =>
+        _OptionText(
+          value: raw?.toString() ?? '',
+          hint: hint,
+          keyboardType: TextInputType.numberWithOptions(
+            signed: true,
+            decimal: field.type == MediaParameterType.number,
+          ),
+          onChanged: update,
+        ),
       MediaParameterType.integer || MediaParameterType.number => _NumericOption(
         field: field,
         value: value is num ? value : null,
         onChanged: update,
       ),
-      MediaParameterType.boolean => Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: IosSwitch(
-          value: value == true,
-          onChanged: update,
-          semanticLabel: key,
-        ),
-      ),
       MediaParameterType.string => _OptionText(
-        value: value?.toString() ?? '',
+        value: raw?.toString() ?? '',
+        hint: hint,
+        onChanged: update,
+      ),
+      MediaParameterType.array ||
+      MediaParameterType.object ||
+      MediaParameterType.json => _OptionText(
+        value: raw == null
+            ? ''
+            : raw is String
+            ? raw
+            : jsonEncode(raw),
+        hint: field.defaultValue == null
+            ? switch (field.type) {
+                MediaParameterType.array => '[ ]',
+                MediaParameterType.object => '{ }',
+                _ => 'JSON',
+              }
+            : hint,
+        lines: 2,
+        mono: true,
         onChanged: update,
       ),
       MediaParameterType.image => _imageField(state, l10n),
     };
     return _Option(
-      label: key.replaceAll('_', ' '),
+      label: title,
       trailing: Text(
         field.required ? '$key · ${l10n.creationParameterRequired}' : key,
         style: TextStyle(
@@ -248,7 +439,35 @@ class _PlatformInput extends StatelessWidget {
           fontSize: 11,
         ),
       ),
-      child: input,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          input,
+          if (invalid)
+            Text(
+              structured
+                  ? l10n.modelSpecFormInvalidJson
+                  : l10n.modelSpecFormInvalidNumber,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          if (field.description case final description?
+              when description.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                description,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.35,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -351,21 +570,23 @@ class _NumericOption extends StatelessWidget {
   }
 }
 
-class _Choices extends StatelessWidget {
+class _Choices<T extends Object> extends StatelessWidget {
   const _Choices({
     required this.values,
     required this.value,
     required this.display,
+    this.automatic,
     required this.onChanged,
   });
-  final List<String> values;
-  final String? value;
-  final String Function(String) display;
-  final ValueChanged<String?> onChanged;
+  final List<T> values;
+  final T? value, automatic;
+  final String Function(T) display;
+  final ValueChanged<T?> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final index = values.indexOf(value ?? 'auto');
+    final selected = value ?? automatic;
+    final index = selected == null ? -1 : values.indexOf(selected);
     return SlidingSegmentedTabs(
       height: 36,
       fitLabels: true,
@@ -373,7 +594,7 @@ class _Choices extends StatelessWidget {
       index: index,
       tabs: [for (final v in values) SegmentedTab(label: display(v))],
       onChanged: (i) =>
-          onChanged(i == index || values[i] == 'auto' ? null : values[i]),
+          onChanged(i == index || values[i] == automatic ? null : values[i]),
     );
   }
 }

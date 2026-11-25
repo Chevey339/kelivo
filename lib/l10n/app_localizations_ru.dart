@@ -18548,6 +18548,29 @@ class AppLocalizationsRu extends AppLocalizations {
       'Эта модель не возвращает изображение или видео, которое Creation может сохранить.';
 
   @override
+  String get falAdditionalSettings => 'Дополнительные настройки';
+
+  @override
+  String get falRefreshAdditionalSettings => 'Обновить настройки модели';
+
+  @override
+  String get falNoPublishedSettings =>
+      'fal не опубликовал настройки для этой конечной точки.';
+
+  @override
+  String get falNoAdditionalSettings =>
+      'У этой модели нет дополнительных настроек.';
+
+  @override
+  String get falWatermark => 'Водяной знак';
+
+  @override
+  String get falSyncMode => 'Режим синхронизации';
+
+  @override
+  String get falSafetyChecker => 'Включить проверку безопасности';
+
+  @override
   String get falCheckingModel => 'Проверка модели…';
 
   @override

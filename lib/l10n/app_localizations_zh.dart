@@ -17196,6 +17196,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get falUnsupportedOutput => '此模型的返回结果无法保存为创作支持的图片或视频。';
 
   @override
+  String get falAdditionalSettings => '附加设置';
+
+  @override
+  String get falRefreshAdditionalSettings => '刷新模型参数';
+
+  @override
+  String get falNoPublishedSettings => 'fal 尚未公布此端点的参数。';
+
+  @override
+  String get falNoAdditionalSettings => '此模型没有其他可调参数。';
+
+  @override
+  String get falWatermark => '水印';
+
+  @override
+  String get falSyncMode => '同步模式';
+
+  @override
+  String get falSafetyChecker => '启用安全检查';
+
+  @override
   String get falCheckingModel => '正在核对模型…';
 
   @override
@@ -34993,6 +35014,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get falUnsupportedOutput => '此模型的返回结果无法保存为创作支持的图片或视频。';
+
+  @override
+  String get falAdditionalSettings => '附加设置';
+
+  @override
+  String get falRefreshAdditionalSettings => '刷新模型参数';
+
+  @override
+  String get falNoPublishedSettings => 'fal 尚未公布此端点的参数。';
+
+  @override
+  String get falNoAdditionalSettings => '此模型没有其他可调参数。';
+
+  @override
+  String get falWatermark => '水印';
+
+  @override
+  String get falSyncMode => '同步模式';
+
+  @override
+  String get falSafetyChecker => '启用安全检查';
 
   @override
   String get falCheckingModel => '正在核对模型…';
@@ -52843,6 +52885,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get falUnsupportedOutput => '此模型不會回傳創作功能可儲存的圖片或影片。';
+
+  @override
+  String get falAdditionalSettings => '其他設定';
+
+  @override
+  String get falRefreshAdditionalSettings => '重新整理模型設定';
+
+  @override
+  String get falNoPublishedSettings => 'fal 尚未公布此端點的設定。';
+
+  @override
+  String get falNoAdditionalSettings => '此模型沒有其他設定。';
+
+  @override
+  String get falWatermark => '浮水印';
+
+  @override
+  String get falSyncMode => '同步模式';
+
+  @override
+  String get falSafetyChecker => '啟用安全檢查';
 
   @override
   String get falCheckingModel => '正在檢查模型…';

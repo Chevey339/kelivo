@@ -16,22 +16,26 @@ class FalMediaAdapter implements MediaAdapter {
       resolveFalModel(apiModelId(provider, id), provider.modelOverrides[id]);
 
   @override
-  MediaCapabilities capabilities(ProviderConfig provider, String modelId) =>
-      knownModel(provider, modelId)?.capabilities ??
-      (mode == MediaMode.video
-          ? const MediaCapabilities(
-              aspectRatios: ['auto', '16:9', '9:16', '1:1'],
-              durations: [5, 10],
-              maxReferences: 1,
-              frameRoles: [MediaReferenceRole.firstFrame],
-            )
-          : const MediaCapabilities(
-              aspectRatios: standardImageRatios,
-              maxPerRequest: 4,
-              maxReferences: 1,
-              supportsSeed: true,
-              formats: ['jpeg', 'png'],
-            ));
+  MediaCapabilities capabilities(ProviderConfig provider, String modelId) {
+    final upstream = apiModelId(provider, modelId);
+    final overrides = provider.modelOverrides[modelId];
+    final model = resolveFalModel(upstream, overrides);
+    if (model != null) return model.withSavedSettings(upstream, overrides);
+    return mode == MediaMode.video
+        ? const MediaCapabilities(
+            aspectRatios: ['auto', '16:9', '9:16', '1:1'],
+            durations: [5, 10],
+            maxReferences: 1,
+            frameRoles: [MediaReferenceRole.firstFrame],
+          )
+        : const MediaCapabilities(
+            aspectRatios: standardImageRatios,
+            maxPerRequest: 4,
+            maxReferences: 1,
+            supportsSeed: true,
+            formats: ['jpeg', 'png'],
+          );
+  }
 
   @override
   Stream<MediaEvent> generate(
@@ -57,12 +61,13 @@ class FalMediaAdapter implements MediaAdapter {
               : 'image_size'
         : details.ratioField;
     final size = request.parameters['size'];
+    final kilo = size is String && size.endsWith('K')
+        ? double.tryParse(size.substring(0, size.length - 1))
+        : null;
     final imageSize = imageDimensions(
       request.aspectRatio,
-      size == '4K'
-          ? 4096
-          : size == '2K'
-          ? 2048
+      kilo != null && kilo.isFinite && kilo > 0 && kilo <= 16
+          ? (kilo * 1024).round()
           : 1024,
     );
     final update = <String, dynamic>{
@@ -101,9 +106,11 @@ class FalMediaAdapter implements MediaAdapter {
       if (details?.requiresPromptExpansion == true)
         'prompt_expansion_mode': 'balanced',
       for (final field in caps.platformOptions)
-        if (field.type != MediaParameterType.image &&
-            request.parameters[field.key] != null)
-          field.key: request.parameters[field.key],
+        if (!field.readOnly && field.type != MediaParameterType.image)
+          if (request.parameters.containsKey(field.storageKey))
+            field.key: request.parameters[field.storageKey]
+          else if (field.required && field.defaultValue != null)
+            field.key: field.defaultValue,
       for (final ref in request.references)
         if (ref.role == MediaReferenceRole.platform && ref.parameterKey != null)
           ref.parameterKey!: await mediaReferenceDataUri(ref),
@@ -167,6 +174,11 @@ class FalMediaAdapter implements MediaAdapter {
     );
     yield* pollMediaTask(
       context,
+      // Seedream's max_images is the number of files per generation; num_images
+      // controls the number of independent generations in the request.
+      filesPerGeneration: !video && body['max_images'] is int
+          ? body['max_images'] as int
+          : 1,
       accepted: MediaTaskAccepted(
         cancelUrl: cancellation,
         cancelHeaders: headers,
@@ -229,15 +241,27 @@ class FalMediaAdapter implements MediaAdapter {
 
   MediaResult? _result(Map? row, {required bool video}) {
     final raw = row?['url'];
-    final url = mediaResultUri(raw);
-    final mime =
+    if (raw is! String) return null;
+    String? encoded;
+    Uri? url;
+    var mime =
         row?['content_type'] as String? ?? (video ? 'video/mp4' : 'image/png');
-    final data = raw is String ? Uri.tryParse(raw)?.data : null;
-    if (url == null && (data == null || !data.isBase64)) return null;
+    if (raw.startsWith('data:')) {
+      final comma = raw.indexOf(',');
+      if (comma < 0 || comma + 1 == raw.length) return null;
+      // Parse the header only. The file store decodes the payload off the UI isolate.
+      final header = Uri.tryParse(raw.substring(0, comma + 1))?.data;
+      if (header == null || !header.isBase64) return null;
+      mime = header.mimeType;
+      encoded = raw.substring(comma + 1);
+    } else {
+      url = mediaResultUri(raw);
+      if (url == null) return null;
+    }
     return MediaResult(
-      mime: data?.mimeType ?? mime,
+      mime: mime,
       url: url,
-      base64: data?.contentText,
+      base64: encoded,
       width: (row?['width'] as num?)?.toInt(),
       height: (row?['height'] as num?)?.toInt(),
       durationMs: videoDurationMs(row?['duration']),

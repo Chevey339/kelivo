@@ -723,6 +723,24 @@ void main() {
     },
   );
 
+  test('QuickTime results keep the MOV container and MIME type', () async {
+    final client = MockClient((_) async => fail('inline movie'));
+    addTearDown(client.close);
+    final item = await files.store(
+      batchId: '45b9adc1-2a67-43c3-85df-3a7ab80ce22f',
+      ordinal: 0,
+      mode: MediaMode.video,
+      result: MediaResult(
+        mime: 'video/quicktime',
+        base64: base64Encode([0, 0, 0, 12, ...ascii.encode('ftypqt  ')]),
+      ),
+      downloadClient: client,
+      publish: (_) async {},
+    );
+    expect(item.mime, 'video/quicktime');
+    expect(item.path, endsWith('.mov'));
+  });
+
   test(
     'New API retries an interrupted result download without resubmitting its billable job',
     () async {

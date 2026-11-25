@@ -140,6 +140,11 @@ FalModel? resolveFalModel(String id, Object? override) {
       ? boundedInt(field(image)['minItems'], 1)
       : 0;
   final resolutions = values('resolution').whereType<String>().toList();
+  final automaticSizes = values('image_size')
+      .whereType<String>()
+      .where((value) => RegExp(r'^auto_\d+(?:\.\d+)?K$').hasMatch(value))
+      .map((value) => value.substring(5))
+      .toList();
   return FalModel(
     raw['name'] is String ? raw['name'] as String : id,
     MediaCapabilities(
@@ -164,7 +169,11 @@ FalModel? resolveFalModel(String id, Object? override) {
       ],
       durations: durationValues.keys.toList(),
       resolutions: video ? resolutions : const [],
-      sizes: video ? const [] : resolutions,
+      sizes: video
+          ? const []
+          : resolutions.isNotEmpty
+          ? resolutions
+          : automaticSizes,
       formats: values('output_format').whereType<String>().toList(),
       supportsSeed: fields.containsKey('seed'),
       supportsNegativePrompt: fields.containsKey('negative_prompt'),
@@ -216,6 +225,95 @@ class FalModel {
     this.durationAsString = false,
     this.requiresPromptExpansion = false,
   });
+
+  MediaCapabilities withSavedSettings(String id, Object? override) {
+    final endpoint = override is Map ? override['falEndpoint'] : null;
+    final options = endpoint is Map && endpoint['id'] == id
+        ? endpoint['additionalSettings']
+        : null;
+    if (options is! Map) return capabilities;
+    final builtIn = {
+      for (final option in capabilities.platformOptions) option.key: option,
+    };
+    final parameters = <MediaParameter>[];
+    final fields = endpoint['fields'];
+    for (final entry in options.entries) {
+      final key = entry.key;
+      final data = entry.value;
+      if (key is! String || data is! Map || key == ratioField) continue;
+      final original = builtIn.remove(key);
+      final type =
+          MediaParameterType.values
+              .where((t) => t.name == data['type'])
+              .firstOrNull ??
+          MediaParameterType.json;
+      final choices = data['choices'];
+      final declared = choices is List
+          ? choices.whereType<Object>().toList()
+          : const <Object>[];
+      // Some native endpoints document an enum as a string in OpenAPI.
+      final useNativeChoices =
+          type == MediaParameterType.string &&
+          original?.type == MediaParameterType.enumeration;
+      num? number(String name) => data[name] is num ? data[name] as num : null;
+      parameters.add(
+        MediaParameter(
+          key,
+          useNativeChoices ? MediaParameterType.enumeration : type,
+          title: data['title'] is String ? data['title'] as String : key,
+          description: data['description'] is String
+              ? data['description'] as String
+              : null,
+          storageKey: original?.storageKey ?? 'fal:$key',
+          choices: useNativeChoices ? original!.choices : declared,
+          defaultValue: data.containsKey('default')
+              ? data['default']
+              : original?.defaultValue,
+          minimum: number('minimum'),
+          maximum: number('maximum'),
+          exclusiveMinimum: number('exclusiveMinimum'),
+          exclusiveMaximum: number('exclusiveMaximum'),
+          multipleOf: number('multipleOf'),
+          step: number('multipleOf') ?? original?.step,
+          required:
+              fields is Map &&
+              fields[key] is Map &&
+              fields[key]['required'] == true,
+          readOnly: data['readOnly'] == true,
+          availableWithLastFrame: original?.availableWithLastFrame ?? true,
+        ),
+      );
+    }
+    // Typed image slots (e.g. masks) are already built from the input contract.
+    if (fields is Map) {
+      parameters.addAll(
+        builtIn.values.where((option) => fields.containsKey(option.key)),
+      );
+    }
+    List<String> choices(String key) {
+      final raw = fields is Map ? fields[key] : null;
+      return raw is Map && raw['choices'] is List
+          ? (raw['choices'] as List).whereType<String>().toList()
+          : const [];
+    }
+
+    final formats = choices('output_format');
+    final sizes = choices(
+      'image_size',
+    ).where((v) => v.startsWith('auto_')).map((v) => v.substring(5)).toList();
+    return MediaCapabilities.withModelSettings(
+      capabilities,
+      parameters,
+      formats: formats.isEmpty ? null : formats,
+      sizes: !video && ratioField == 'image_size' && sizes.isNotEmpty
+          ? sizes
+          : null,
+      supportsSeed: fields is Map ? fields.containsKey('seed') : null,
+      supportsNegativePrompt: fields is Map
+          ? fields.containsKey('negative_prompt')
+          : null,
+    );
+  }
 
   final String name;
   final MediaCapabilities capabilities;

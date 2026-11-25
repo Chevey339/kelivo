@@ -10,6 +10,7 @@ import '../api_key_manager.dart';
 import '../network/provider_http_client.dart';
 
 import 'fal_model_catalog.dart';
+import 'media_request.dart' show MediaParameter;
 
 /// A catalog endpoint whose required inputs or output cannot be used in Creation.
 class FalUnsupportedEndpoint implements Exception {
@@ -37,15 +38,23 @@ class FalCatalogEntry {
     output: [video ? Modality.video : Modality.image],
   );
 
-  static FalCatalogEntry? fromRow(Object? raw) {
-    if (raw case {
-      'endpoint_id': final String id,
-      'metadata': {
-        'category': final String category,
-        'display_name': final String name,
-        'status': 'active',
-      },
-    } when isFalEndpointId(id) && falCreationCategories.contains(category)) {
+  static FalCatalogEntry? fromRow(
+    Object? raw, {
+    bool includeDeprecated = false,
+  }) {
+    if (raw
+        case {
+          'endpoint_id': final String id,
+          'metadata': {
+            'category': final String category,
+            'display_name': final String name,
+            'status': final String status,
+          },
+        }
+        when (status == 'active' ||
+                includeDeprecated && status == 'deprecated') &&
+            isFalEndpointId(id) &&
+            falCreationCategories.contains(category)) {
       return FalCatalogEntry(id, name, category);
     }
     return null;
@@ -67,6 +76,13 @@ class FalModelDiscovery {
           ? ApiKeyManager().effectiveKeyForProvider(config)
           : '',
     );
+  }
+
+  static bool hasAdditionalSettings(String id, Object? overrides) {
+    final saved = overrides is Map ? overrides['falEndpoint'] : null;
+    return saved is Map &&
+        saved['id'] == id &&
+        saved['additionalSettings'] is Map;
   }
 
   static bool needsSchema(ProviderConfig config, String id, Object? overrides) {
@@ -175,19 +191,22 @@ class FalModelDiscovery {
     final data = await _get({'endpoint_id': id, 'expand': 'openapi-3.0'});
     for (final row in (data['models'] as List).whereType<Map>()) {
       if (row['endpoint_id'] != id) continue;
-      final model = FalCatalogEntry.fromRow(row);
+      final model = FalCatalogEntry.fromRow(row, includeDeprecated: true);
       final api = row['openapi'];
       if (model == null) throw const FalUnsupportedEndpoint();
       if (api is! Map || api['paths'] is! Map) {
         throw const FormatException('Missing fal endpoint schema');
       }
       final schema = _FalSchema(api);
+      final output = schema.output(model.video);
+      final inputs = schema.inputs(falModels[id]);
       return {
         'id': id,
         'name': model.name,
         'category': model.category,
-        'output': schema.output(model.video),
-        'fields': schema.inputs(),
+        'output': output,
+        'fields': inputs.fields,
+        'additionalSettings': inputs.settings,
       };
     }
     // An unlisted endpoint can still be added by its owner.
@@ -279,7 +298,64 @@ class _FalSchema {
     caseSensitive: false,
   );
 
-  Map<String, dynamic> inputs() {
+  static Map<String, dynamic> _setting(Map field, List<Map> variants) {
+    final types = {
+      for (final v in variants)
+        for (final type in v['type'] is List ? v['type'] as List : [v['type']])
+          if (type is String && type != 'null') type,
+    };
+    final alternatives = variants.where(
+      (v) =>
+          v['type'] != 'null' &&
+          (v.containsKey('type') ||
+              v.containsKey('enum') ||
+              v.containsKey('const')),
+    );
+    final choices = <Object>{
+      for (final v in alternatives)
+        for (final value in v['enum'] as List? ?? [v['const']])
+          if (value is String || value is num || value is bool) value as Object,
+    };
+    final enumerated =
+        choices.isNotEmpty &&
+        alternatives.every(
+          (v) => v.containsKey('enum') || v.containsKey('const'),
+        );
+    final type = enumerated
+        ? 'enumeration'
+        : types.length == 1
+        ? types.single
+        : 'json';
+    final fixed = field.containsKey('const');
+    final defaultValue = fixed ? field['const'] : field['default'];
+    Object? constraint(String name) =>
+        variants.map((v) => v[name]).whereType<num>().firstOrNull;
+    return {
+      'type': type,
+      if (enumerated) 'choices': choices.toList(),
+      if (field['title'] is String) 'title': field['title'],
+      if (field['description'] is String) 'description': field['description'],
+      if (defaultValue != null) 'default': defaultValue,
+      if (fixed || field['readOnly'] == true) 'readOnly': true,
+      for (final key in [
+        'minimum',
+        'maximum',
+        'multipleOf',
+        'exclusiveMinimum',
+        'exclusiveMaximum',
+      ])
+        if (constraint(key) case final bound?) key: bound,
+    };
+  }
+
+  ({Map<String, dynamic> fields, Map<String, dynamic> settings}) inputs(
+    FalModel? model,
+  ) {
+    final nativeOptions = {
+      for (final option
+          in model?.capabilities.platformOptions ?? const <MediaParameter>[])
+        option.key,
+    };
     for (final route in (api['paths'] as Map).values.whereType<Map>()) {
       final raw =
           route['post']?['requestBody']?['content']?['application/json']?['schema'];
@@ -290,10 +366,15 @@ class _FalSchema {
           .whereType<String>()
           .toSet();
       final fields = <String, dynamic>{};
-      for (final entry in props.entries) {
-        final key = entry.key as String;
-        if (!falInputFields.contains(key) && !required.contains(key)) continue;
-        final field = _resolve(entry.value);
+      final settings = <String, dynamic>{};
+      final order = {
+        if (schema['x-fal-order-properties'] case final List keys)
+          ...keys.whereType<String>(),
+        ...props.keys.whereType<String>(),
+      };
+      for (final key in order) {
+        if (props[key] is! Map) continue;
+        final field = _resolve(props[key]);
         final variants = _variants(field).toList();
         final string = variants.any((v) => v['type'] == 'string');
         final array = variants.any((v) => v['type'] == 'array');
@@ -301,8 +382,22 @@ class _FalSchema {
             !falInputFields.contains(key) &&
             string &&
             RegExp(r'(?:^|_)(?:image|frame)(?:_url)?$').hasMatch(key);
+        if (!falInputFields.contains(key) &&
+            !extraImage &&
+            (!required.contains(key) || nativeOptions.contains(key))) {
+          settings[key] = _setting(field, variants);
+          if (required.contains(key)) fields[key] = {'required': true};
+          continue;
+        }
         if (!falInputFields.contains(key) && !extraImage) {
           throw FalUnsupportedEndpoint(key);
+        }
+        // Audio is an ordinary fal switch. Size enums without a custom-dimensions
+        // variant have no equivalent in the aspect-ratio control.
+        if (key == 'generate_audio' ||
+            (key == 'image_size' &&
+                !variants.any((v) => v['type'] == 'object'))) {
+          settings[key] = _setting(field, variants);
         }
         final choices = <Object>{
           for (final v in variants)
@@ -342,7 +437,7 @@ class _FalSchema {
             'maxItems': max,
         };
       }
-      return fields;
+      return (fields: fields, settings: settings);
     }
     throw const FormatException('Missing fal input schema');
   }

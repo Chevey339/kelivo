@@ -18226,6 +18226,29 @@ class AppLocalizationsEn extends AppLocalizations {
       'This model does not return an image or video that Creation can save.';
 
   @override
+  String get falAdditionalSettings => 'Additional Settings';
+
+  @override
+  String get falRefreshAdditionalSettings => 'Refresh model settings';
+
+  @override
+  String get falNoPublishedSettings =>
+      'fal has not published settings for this endpoint.';
+
+  @override
+  String get falNoAdditionalSettings =>
+      'This model has no additional settings.';
+
+  @override
+  String get falWatermark => 'Watermark';
+
+  @override
+  String get falSyncMode => 'Sync Mode';
+
+  @override
+  String get falSafetyChecker => 'Enable Safety Checker';
+
+  @override
   String get falCheckingModel => 'Checking model…';
 
   @override

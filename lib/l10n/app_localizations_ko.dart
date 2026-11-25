@@ -17666,6 +17666,27 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 모델은 Creation에서 저장할 수 있는 이미지나 동영상을 반환하지 않습니다.';
 
   @override
+  String get falAdditionalSettings => '추가 설정';
+
+  @override
+  String get falRefreshAdditionalSettings => '모델 설정 새로고침';
+
+  @override
+  String get falNoPublishedSettings => 'fal에서 이 엔드포인트의 설정을 공개하지 않았습니다.';
+
+  @override
+  String get falNoAdditionalSettings => '이 모델에는 추가 설정이 없습니다.';
+
+  @override
+  String get falWatermark => '워터마크';
+
+  @override
+  String get falSyncMode => '동기화 모드';
+
+  @override
+  String get falSafetyChecker => '안전 검사 활성화';
+
+  @override
   String get falCheckingModel => '모델 확인 중…';
 
   @override

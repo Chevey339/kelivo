@@ -520,7 +520,8 @@ class MediaGenerationRunner extends ChangeNotifier {
               status: Value(GenerationStatus.downloading),
             ),
           );
-          for (final result in results.take(count)) {
+          if (results.length > count) job.endOrdinal += results.length - count;
+          for (final result in results) {
             try {
               _checkCancelled(job);
               await files.store(
@@ -572,7 +573,7 @@ class MediaGenerationRunner extends ChangeNotifier {
         raw.close();
       }
       _checkCancelled(job);
-      final success = saved >= job.request.count;
+      final success = saved >= job.request.count && failure == null;
       await _finish(
         job,
         success
@@ -638,8 +639,12 @@ class MediaGenerationRunner extends ChangeNotifier {
           _checkCancelled(job);
           final previous = _progress[job.id];
           switch (event) {
-            case MediaOutput(results: final values):
-              results = values;
+            case MediaOutput(results: final values, :final filesPerGeneration):
+              final limit =
+                  request.count * filesPerGeneration.clamp(1, maxCount);
+              results = values.length <= limit
+                  ? values
+                  : values.sublist(0, limit);
             case MediaTaskAccepted():
               break;
             case MediaProgress(:final fraction):

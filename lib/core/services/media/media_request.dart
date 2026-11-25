@@ -198,6 +198,42 @@ class MediaCapabilities {
     this.platformOptions = const [],
   });
 
+  MediaCapabilities.withModelSettings(
+    MediaCapabilities base,
+    this.platformOptions, {
+    List<String>? formats,
+    List<String>? sizes,
+    bool? supportsSeed,
+    bool? supportsNegativePrompt,
+  }) : aspectRatios = base.aspectRatios,
+       maxPerRequest = base.maxPerRequest,
+       customImageEndpoint = base.customImageEndpoint,
+       protocolFrameRoles = base.protocolFrameRoles,
+       fixedAspectRatio = base.fixedAspectRatio,
+       maxReferences = base.maxReferences,
+       nativeProgress = base.nativeProgress,
+       durations = base.durations,
+       durationsWithLastFrame = base.durationsWithLastFrame,
+       resolutions = base.resolutions,
+       resolutionsWithLastFrame = base.resolutionsWithLastFrame,
+       frameRoles = base.frameRoles,
+       ratiosByResolution = base.ratiosByResolution,
+       framesUseAutomaticRatio = base.framesUseAutomaticRatio,
+       requiresFirstFrame = base.requiresFirstFrame,
+       requiresLastFrame = base.requiresLastFrame,
+       minimumReferences = base.minimumReferences,
+       acceptsPrompt = base.acceptsPrompt,
+       requiresReference = base.requiresReference,
+       referenceBounds = base.referenceBounds,
+       maxCombinedInputsAndOutputs = base.maxCombinedInputsAndOutputs,
+       sizes = sizes ?? base.sizes,
+       qualities = base.qualities,
+       formats = formats ?? base.formats,
+       supportsNegativePrompt =
+           supportsNegativePrompt ?? base.supportsNegativePrompt,
+       supportsSeed = supportsSeed ?? base.supportsSeed,
+       supportsTransparent = base.supportsTransparent;
+
   final List<String> aspectRatios;
   final int maxPerRequest;
   // OpenAI-compatible relays can accept additional images, n, and optional
@@ -257,7 +293,17 @@ class MediaCapabilities {
       (hasLastFrame ? resolutionsWithLastFrame : null) ?? resolutions;
 }
 
-enum MediaParameterType { enumeration, integer, number, boolean, string, image }
+enum MediaParameterType {
+  enumeration,
+  integer,
+  number,
+  boolean,
+  string,
+  image,
+  array,
+  object,
+  json,
+}
 
 class MediaParameter {
   const MediaParameter(
@@ -270,15 +316,73 @@ class MediaParameter {
     this.step,
     this.defaultValue,
     this.required = false,
-  });
+    this.title,
+    this.description,
+    this.readOnly = false,
+    this.exclusiveMinimum,
+    this.exclusiveMaximum,
+    this.multipleOf,
+    String? storageKey,
+  }) : storageKey = storageKey ?? key;
 
-  final String key;
+  final String key, storageKey;
+  final String? title, description;
+  final bool readOnly;
+  final num? exclusiveMinimum, exclusiveMaximum, multipleOf;
   final MediaParameterType type;
-  final List<String> choices;
+  final List<Object> choices;
   final bool availableWithLastFrame;
   final num? minimum, maximum, step;
   final Object? defaultValue;
   final bool required;
+
+  Object? parseDraft(Object? raw) {
+    if (raw == null || readOnly) return null;
+    final value = switch (type) {
+      MediaParameterType.integer when raw is String => int.parse(raw.trim()),
+      MediaParameterType.number when raw is String => num.parse(raw.trim()),
+      MediaParameterType.array ||
+      MediaParameterType.object ||
+      MediaParameterType.json when raw is String => jsonDecode(raw),
+      _ => raw,
+    };
+    final valid = switch (type) {
+      MediaParameterType.enumeration => choices.contains(value),
+      MediaParameterType.boolean => value is bool,
+      MediaParameterType.integer => value is int,
+      MediaParameterType.number => value is num,
+      MediaParameterType.array => value is List,
+      MediaParameterType.object => value is Map,
+      MediaParameterType.json => true,
+      MediaParameterType.string || MediaParameterType.image => value is String,
+    };
+    if (!valid ||
+        value is num &&
+            (!value.isFinite ||
+                minimum != null && value < minimum! ||
+                maximum != null && value > maximum! ||
+                exclusiveMinimum != null && value <= exclusiveMinimum! ||
+                exclusiveMaximum != null && value >= exclusiveMaximum!)) {
+      throw FormatException('Invalid value for $key');
+    }
+    final increment = multipleOf;
+    if (value is num && increment != null && increment > 0) {
+      final units = value / increment;
+      if (!units.isFinite || (units - units.roundToDouble()).abs() > 1e-8) {
+        throw FormatException('Invalid increment for $key');
+      }
+    }
+    return value;
+  }
+
+  bool acceptsDraft(Object? raw) {
+    try {
+      parseDraft(raw);
+      return true;
+    } on FormatException {
+      return false;
+    }
+  }
 }
 
 class MediaResult {
@@ -324,8 +428,9 @@ class MediaPreview extends MediaEvent {
 }
 
 class MediaOutput extends MediaEvent {
-  const MediaOutput(this.results);
+  const MediaOutput(this.results, {this.filesPerGeneration = 1});
   final List<MediaResult> results;
+  final int filesPerGeneration;
 }
 
 class MediaTaskAccepted extends MediaEvent {

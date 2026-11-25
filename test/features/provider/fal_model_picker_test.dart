@@ -99,6 +99,7 @@ void main() {
                       'properties': {
                         'start_image_url': {'type': 'string'},
                         'end_image_url': {'type': 'string'},
+                        'with_sound': {'type': 'boolean', 'default': false},
                         'duration': {
                           'type': 'string',
                           'enum': ['3', '6'],
@@ -198,6 +199,11 @@ void main() {
         MediaMode.video,
       )!.capabilities;
       expect(caps.durations, [3, 6]);
+      final sound = caps.platformOptions.singleWhere(
+        (p) => p.key == 'with_sound',
+      );
+      expect(sound.defaultValue, false);
+      expect(sound.storageKey, 'fal:with_sound');
       expect(caps.requiresFirstFrame, isTrue);
       expect(caps.maxReferences, 2);
       expect(resolveMediaModel(restored, id, MediaMode.image), isNull);

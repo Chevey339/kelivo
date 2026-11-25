@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter/material.dart' show StringCharacters;
 import 'package:uuid/uuid.dart';
 
@@ -13,6 +14,9 @@ import '../../../core/models/model_spec.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/chat_api_helpers.dart' show apiModelId;
+import '../../../core/services/media/adapters/fal_media.dart';
+import '../../../core/services/media/fal_model_discovery.dart';
 import '../../../core/services/media/media_adapter_resolver.dart';
 import '../../../core/services/media/media_generation_runner.dart';
 import '../../../core/services/media/media_models.dart';
@@ -71,6 +75,7 @@ class MediaCreationController extends ChangeNotifier {
     required this.runner,
     required this.settings,
     required this.preferences,
+    this.fetchFalEndpoint = FalModelDiscovery.fetchEndpoint,
   }) {
     _options.addAll(_readOptions());
     _topicsSubscription = runner.repository.watchTopics().listen((topics) {
@@ -117,6 +122,12 @@ class MediaCreationController extends ChangeNotifier {
   final MediaGenerationRunner runner;
   final SettingsProvider settings;
   final BusinessPreferences preferences;
+  final Future<Map<String, dynamic>> Function(
+    ProviderConfig,
+    String,
+    CancelToken,
+  )
+  fetchFalEndpoint;
   late final StreamSubscription<List<GenerationTopicRow>> _topicsSubscription;
   late final StreamSubscription<List<GenerationBatchRow>> _batchesSubscription;
   late final StreamSubscription<List<GenerationItemRow>> _itemsSubscription;
@@ -329,6 +340,56 @@ class MediaCreationController extends ChangeNotifier {
         : ratios.firstOrNull ?? 'auto';
   }
 
+  bool canFetchFalSettings(MediaModelChoice choice) =>
+      choice.provider.usesOfficialFalQueue &&
+      runner.resolver.resolve(choice.provider, mode, modelId: choice.spec.id)
+          is FalMediaAdapter;
+
+  Future<bool?> refreshFalSettings(
+    MediaModelChoice choice,
+    CancelToken token,
+  ) async {
+    final provider = choice.provider;
+    final key = choice.spec.id;
+    final id = apiModelId(provider, key);
+    if (!canFetchFalSettings(choice)) return null;
+    final previous = provider.modelOverrides[key];
+    final original = previous is Map ? previous['falEndpoint'] : null;
+    final endpoint = await fetchFalEndpoint(provider, id, token);
+    if (_disposed || token.isCancelled || model?.key != choice.key) {
+      return null;
+    }
+    final latest = settings.getProviderConfig(provider.id);
+    if (!latest.enabled ||
+        !latest.isModelEnabled(key) ||
+        latest.baseUrl != provider.baseUrl ||
+        apiModelId(latest, key) != id) {
+      return null;
+    }
+    final override = latest.modelOverrides[key];
+    final stored = override is Map ? override['falEndpoint'] : null;
+    if (!identical(stored, original)) return null;
+    // Keep a usable cached contract if fal stops publishing this endpoint.
+    if (endpoint['unlisted'] == true &&
+        stored is Map &&
+        stored['output'] != null) {
+      return false;
+    }
+    await settings.setProviderConfig(
+      provider.id,
+      latest.copyWith(
+        modelOverrides: {
+          ...latest.modelOverrides,
+          key: {
+            if (override is Map) ...Map<String, dynamic>.from(override),
+            'falEndpoint': endpoint,
+          },
+        },
+      ),
+    );
+    return endpoint['unlisted'] != true;
+  }
+
   List<MediaParameter> platformOptionsFor(String? topicId) {
     final options =
         model?.capabilities.platformOptions ?? const <MediaParameter>[];
@@ -491,27 +552,42 @@ class MediaCreationController extends ChangeNotifier {
   bool canSubmit(String? topicId) {
     final selected = model;
     final caps = selected?.capabilities;
+    final options = parameters;
+    final extra = extraParameters;
     if (selected == null ||
         caps == null ||
         submitting(topicId) ||
         _deletingTopics.contains(topicId) ||
         ratiosFor(topicId).isEmpty ||
-        extraParameters == null ||
+        extra == null ||
         (caps.supportsSeed &&
-            parameters['seed'] != null &&
-            int.tryParse(parameters['seed'].toString()) == null)) {
+            options['seed'] != null &&
+            int.tryParse(options['seed'].toString()) == null)) {
       return false;
     }
     final defaults = MediaAdapterResolver.overrides(
       selected.provider,
       selected.spec.id,
     ).extra;
+    if (platformOptionsFor(topicId).any(
+      (field) =>
+          field.type != MediaParameterType.image &&
+          (!field.acceptsDraft(options[field.storageKey]) ||
+              field.required &&
+                  !field.readOnly &&
+                  options[field.storageKey] == null &&
+                  field.defaultValue == null &&
+                  defaults[field.key] == null &&
+                  extra[field.key] == null),
+    )) {
+      return false;
+    }
     if (caps.platformOptions.any(
       (field) =>
           field.type == MediaParameterType.image &&
           field.required &&
           platformImage(topicId, field.key) == null &&
-          extraParameters?[field.key] is! String &&
+          extra[field.key] is! String &&
           defaults[field.key] is! String,
     )) {
       return false;
@@ -641,9 +717,10 @@ class MediaCreationController extends ChangeNotifier {
         if (caps.supportsSeed && options['seed'] != null)
           'seed': int.parse(options['seed'].toString()),
         for (final field in platformOptionsFor(topicId))
-          if (field.type != MediaParameterType.image &&
-              options[field.key] != null)
-            field.key: options[field.key],
+          if (!field.readOnly &&
+              field.type != MediaParameterType.image &&
+              options[field.storageKey] != null)
+            field.storageKey: field.parseDraft(options[field.storageKey]),
         if (extraParameters case final extra? when extra.isNotEmpty)
           'extra': extra,
       },

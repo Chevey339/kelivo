@@ -18332,6 +18332,27 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bu model, Creation\'ın kaydedebileceği bir görsel veya video döndürmüyor.';
 
   @override
+  String get falAdditionalSettings => 'Ek Ayarlar';
+
+  @override
+  String get falRefreshAdditionalSettings => 'Model ayarlarını yenile';
+
+  @override
+  String get falNoPublishedSettings => 'fal bu uç nokta için ayar yayımlamadı.';
+
+  @override
+  String get falNoAdditionalSettings => 'Bu modelin ek ayarı yok.';
+
+  @override
+  String get falWatermark => 'Filigran';
+
+  @override
+  String get falSyncMode => 'Senkron Modu';
+
+  @override
+  String get falSafetyChecker => 'Güvenlik Denetleyicisini Etkinleştir';
+
+  @override
   String get falCheckingModel => 'Model kontrol ediliyor…';
 
   @override

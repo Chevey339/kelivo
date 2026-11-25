@@ -9,6 +9,7 @@ Stream<MediaEvent> pollMediaTask(
   required Future<Map<String, dynamic>> Function() poll,
   required FutureOr<List<MediaResult>?> Function(Map<String, dynamic>) result,
   MediaTaskAccepted accepted = const MediaTaskAccepted(),
+  int filesPerGeneration = 1,
   double? Function(Map<String, dynamic>)? progress,
   Map<String, dynamic>? initial,
 }) async* {
@@ -46,7 +47,7 @@ Stream<MediaEvent> pollMediaTask(
       // result fetch must never submit another generation.
       final output = await withinDeadline(() async => result(current));
       if (output != null) {
-        yield MediaOutput(output);
+        yield MediaOutput(output, filesPerGeneration: filesPerGeneration);
         return;
       }
       final fraction = progress?.call(current);
