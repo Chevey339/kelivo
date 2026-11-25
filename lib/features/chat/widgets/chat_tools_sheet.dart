@@ -343,7 +343,7 @@ class _ToolsGroup extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
-          child: expanded
+          child: expanded && children.isNotEmpty
               ? Padding(
                   padding: const EdgeInsets.fromLTRB(
                     childInset,

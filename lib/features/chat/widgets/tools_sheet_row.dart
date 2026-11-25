@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -53,9 +55,47 @@ class ToolsSheetRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final onColor = selected ? cs.primary : cs.onSurface;
     final hasSubtitle = subtitle != null && subtitle!.isNotEmpty;
+    final hasDetail = detail != null && detail!.isNotEmpty;
     final subtitleScale = hasSubtitle && subtitleMaxLines > 1
         ? MediaQuery.textScalerOf(context).scale(13) / 13
         : 1.0;
+    final titleContent = hasSubtitle
+        ? Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: AppFontWeights.medium,
+                  color: onColor,
+                ),
+              ),
+              Text(
+                subtitle!,
+                maxLines: subtitleMaxLines,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: subtitleMaxLines > 1 ? 1.2 : null,
+                  color: cs.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          )
+        : Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: AppFontWeights.medium,
+              color: onColor,
+            ),
+          );
     return SizedBox(
       height:
           (hasSubtitle ? 56.0 : 48.0) * (subtitleScale > 1 ? subtitleScale : 1),
@@ -71,56 +111,41 @@ class ToolsSheetRow extends StatelessWidget {
             leading ?? Icon(icon, size: 20, color: onColor),
             const SizedBox(width: 10),
             Expanded(
-              child: hasSubtitle
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: AppFontWeights.medium,
-                            color: onColor,
-                          ),
-                        ),
-                        Text(
-                          subtitle!,
-                          maxLines: subtitleMaxLines,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            height: subtitleMaxLines > 1 ? 1.2 : null,
-                            color: cs.onSurface.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
+              child: hasDetail
+                  ? LayoutBuilder(
+                      builder: (context, constraints) {
+                        final gap = constraints.maxWidth > 8 ? 8.0 : 0.0;
+                        final detailMaxWidth = math.max(
+                          0.0,
+                          (constraints.maxWidth - gap) * 0.5,
+                        );
+                        return Row(
+                          children: [
+                            Expanded(child: titleContent),
+                            SizedBox(width: gap),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: detailMaxWidth,
+                              ),
+                              child: Text(
+                                detail!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color:
+                                      detailColor ??
+                                      cs.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     )
-                  : Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: AppFontWeights.medium,
-                        color: onColor,
-                      ),
-                    ),
+                  : titleContent,
             ),
-            if (detail != null && detail!.isNotEmpty) ...[
-              Text(
-                detail!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: detailColor ?? cs.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-              const SizedBox(width: 6),
-            ],
+            if (hasDetail) const SizedBox(width: 6),
             trailing ??
                 (selected
                     ? Icon(Lucide.Check, size: 18, color: cs.primary)

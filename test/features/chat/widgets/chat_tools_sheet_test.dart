@@ -20,12 +20,14 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/chat/widgets/chat_tools_sheet.dart';
+import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
 import 'package:Kelivo/features/provider/pages/providers_page.dart';
 import 'package:Kelivo/desktop/tools_popover.dart';
 import 'package:Kelivo/features/home/services/local_tool_labels.dart';
 import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_settings_page.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
@@ -111,12 +113,25 @@ class _FakeMcpProvider extends McpProvider {
   _FakeMcpProvider({required super.preferences});
 
   List<McpServerConfig> fakeServers = const <McpServerConfig>[];
+  Map<String, McpStatus> fakeStatuses = const <String, McpStatus>{};
+  Map<String, String> fakeErrors = const <String, String>{};
 
   @override
   List<McpServerConfig> get servers => fakeServers;
 
   @override
-  McpStatus statusFor(String id) => McpStatus.connected;
+  McpServerConfig? getById(String id) {
+    for (final s in fakeServers) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  @override
+  McpStatus statusFor(String id) => fakeStatuses[id] ?? McpStatus.connected;
+
+  @override
+  String? errorFor(String id) => fakeErrors[id];
 
   @override
   List<McpServerConfig> get connectedServers => fakeServers;
@@ -199,6 +214,8 @@ void main() {
   Future<AppLocalizations> pumpSheet(
     WidgetTester tester, {
     List<McpServerConfig> servers = const [],
+    Map<String, McpStatus> serverStatuses = const <String, McpStatus>{},
+    Map<String, String> serverErrors = const <String, String>{},
     Conversation? conversation,
     _FakeChatService? chat,
     bool desktop = false,
@@ -206,6 +223,8 @@ void main() {
     double textScale = 1.0,
   }) async {
     mcp.fakeServers = servers;
+    mcp.fakeStatuses = serverStatuses;
+    mcp.fakeErrors = serverErrors;
     tester.view.physicalSize = viewSize;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -985,12 +1004,10 @@ void main() {
     'MCP conversation header deduplicates selection label and fits at 1.3x scale',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      // Keep workspace folded under 1.3x Ahem test font so ToolPermissionRow's
-      // monospace detail string does not mask MCP/local sheet layout checks.
       await tester.runAsync(
         () => uiPreferences.setStringList(
           'display_chat_tools_expanded_groups_v1',
-          ['local', 'mcp'],
+          ['local', 'mcp', 'workspace'],
         ),
       );
       await tester.runAsync(
@@ -1066,7 +1083,297 @@ void main() {
       expect(inheritButton, findsOneWidget);
       expect(clearButton, findsOneWidget);
       expect(tester.takeException(), isNull);
+
+      final permissionRow = find.byKey(WorkspaceSection.permissionKey);
+      await tester.scrollUntilVisible(
+        permissionRow,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(permissionRow, findsOneWidget);
+      expect(tester.takeException(), isNull);
       semantics.dispose();
     },
   );
+
+  for (final viewSize in const [Size(390, 844), Size(360, 720)]) {
+    testWidgets(
+      'default-open sheet fits bound workspace long cwd and MCP status rows at 1.3x (${viewSize.width.toInt()}x${viewSize.height.toInt()})',
+      (tester) async {
+        const longCwd = 'packages/feature_module/sub_directory/deep';
+        final semantics = tester.ensureSemantics();
+        final workspace = (await tester.runAsync(
+          () => workspaces.create(
+            name: 'Workspace With A Very Long Repository Name',
+          ),
+        ))!;
+        await tester.runAsync(
+          () => assistants.updateAssistant(
+            assistants
+                .getById(assistantId)!
+                .copyWith(mcpServerIds: ['s1'], allowConversationMcp: true),
+          ),
+        );
+        final conversation = Conversation(
+          id: 'default-open-${viewSize.width.toInt()}',
+          title: 'Default open',
+          assistantId: assistantId,
+          extras: WorkspaceBinding(
+            workspaceId: workspace.id,
+            cwd: longCwd,
+          ).applyTo({}),
+        );
+        final l10n = await pumpSheet(
+          tester,
+          conversation: conversation,
+          servers: [
+            _server('s1', 'Alpha Server With Long Title'),
+            _server('s2', 'Beta OAuth Server With Long Title'),
+          ],
+          serverStatuses: const {
+            's1': McpStatus.error,
+            's2': McpStatus.needsAuthorization,
+          },
+          serverErrors: const {'s1': 'Connection refused'},
+          viewSize: viewSize,
+          textScale: 1.3,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+
+        final mcpHeader = find.ancestor(
+          of: find.text(l10n.mcpAssistantSheetTitle),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Semantics && widget.properties.expanded != null,
+          ),
+        );
+        expect(
+          tester.getSemantics(mcpHeader).flagsCollection.isExpanded,
+          Tristate.isTrue,
+        );
+        expect(find.byKey(const ValueKey('mcp-reconnect-s1')), findsOneWidget);
+        expect(find.byKey(const ValueKey('mcp-reconnect-s2')), findsOneWidget);
+        expect(find.byType(WorkspaceSection), findsOneWidget);
+
+        final cwdRow = find.byKey(WorkspaceSection.cwdKey);
+        await tester.scrollUntilVisible(
+          cwdRow,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        final cwdDetail = find.descendant(
+          of: cwdRow,
+          matching: find.text(longCwd),
+        );
+        expect(cwdDetail, findsOneWidget);
+        final cwdText = tester.widget<Text>(cwdDetail);
+        expect(cwdText.maxLines, 1);
+        expect(cwdText.overflow, TextOverflow.ellipsis);
+        final cwdRowRect = tester.getRect(cwdRow);
+        final cwdDetailRect = tester.getRect(cwdDetail);
+        final cwdLabelRect = tester.getRect(
+          find.descendant(
+            of: cwdRow,
+            matching: find.text(l10n.workspaceEntryCwd),
+          ),
+        );
+        expect(cwdLabelRect.right, lessThanOrEqualTo(cwdDetailRect.left));
+        expect(cwdDetailRect.right, lessThanOrEqualTo(cwdRowRect.right - 12.0));
+        expect(cwdDetailRect.width, lessThan(cwdRowRect.width * 0.5));
+
+        final permRow = find.byKey(WorkspaceSection.permissionKey);
+        await tester.scrollUntilVisible(
+          permRow,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        final permDetail = find.descendant(
+          of: permRow,
+          matching: find.text(l10n.toolPermissionRequestApproval),
+        );
+        expect(permDetail, findsOneWidget);
+        final permRowRect = tester.getRect(permRow);
+        final permDetailRect = tester.getRect(permDetail);
+        final permLabelRect = tester.getRect(
+          find.descendant(
+            of: permRow,
+            matching: find.text(l10n.toolPermissionTitle),
+          ),
+        );
+        expect(permLabelRect.right, lessThanOrEqualTo(permDetailRect.left));
+        expect(
+          permDetailRect.right,
+          lessThanOrEqualTo(permRowRect.right - 12.0),
+        );
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  }
+
+  testWidgets('bound workspace with long cwd fits without overflow at 1.0x', (
+    tester,
+  ) async {
+    const longCwd = 'packages/feature_module/sub_directory/deep';
+    final workspace = (await tester.runAsync(
+      () => workspaces.create(name: 'Repo'),
+    ))!;
+    final l10n = await pumpSheet(
+      tester,
+      conversation: Conversation(
+        id: 'long-cwd-1x',
+        title: 'Long cwd',
+        assistantId: assistantId,
+        extras: WorkspaceBinding(
+          workspaceId: workspace.id,
+          cwd: longCwd,
+        ).applyTo({}),
+      ),
+      viewSize: const Size(390, 844),
+      textScale: 1.0,
+    );
+    await tester.pumpAndSettle();
+
+    final cwdRow = find.byKey(WorkspaceSection.cwdKey);
+    await tester.scrollUntilVisible(
+      cwdRow,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    final cwdDetail = find.descendant(of: cwdRow, matching: find.text(longCwd));
+    expect(cwdDetail, findsOneWidget);
+    final cwdText = tester.widget<Text>(cwdDetail);
+    expect(cwdText.maxLines, 1);
+    expect(cwdText.overflow, TextOverflow.ellipsis);
+    final cwdRowRect = tester.getRect(cwdRow);
+    final cwdDetailRect = tester.getRect(cwdDetail);
+    final cwdLabelRect = tester.getRect(
+      find.descendant(of: cwdRow, matching: find.text(l10n.workspaceEntryCwd)),
+    );
+    expect(cwdLabelRect.right, lessThanOrEqualTo(cwdDetailRect.left));
+    expect(cwdDetailRect.right, lessThanOrEqualTo(cwdRowRect.right - 12.0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ToolsSheetRow balances label and detail without wasting width', (
+    tester,
+  ) async {
+    const longLabel =
+        'Very Long MCP Server Name That Should Use Remaining Space';
+    const shortDetail = '1/2';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 310,
+              child: ToolsSheetRow(
+                icon: Lucide.HardDrive,
+                label: longLabel,
+                detail: shortDetail,
+                trailing: IosSwitch(
+                  value: true,
+                  semanticLabel: longLabel,
+                  onChanged: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    final rowRect = tester.getRect(find.byType(ToolsSheetRow));
+    final labelRect = tester.getRect(find.text(longLabel));
+    final detailRect = tester.getRect(find.text(shortDetail));
+    expect(labelRect.right, lessThanOrEqualTo(detailRect.left));
+    expect(labelRect.width, greaterThan(rowRect.width * 0.5));
+    expect(detailRect.width, lessThan(80.0));
+
+    const shortLabel = 'Cwd';
+    const longDetail = 'packages/feature_module/sub_directory/deep/nested/path';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+          child: Scaffold(
+            body: Center(
+              child: Builder(
+                builder: (context) => SizedBox(
+                  width: 280,
+                  child: ToolsSheetRow(
+                    icon: Lucide.Folder,
+                    label: shortLabel,
+                    subtitle:
+                        'Two line subtitle explaining permission behavior',
+                    subtitleMaxLines: 2,
+                    detail: longDetail,
+                    trailing: ToolsSheetRow.chevron(context),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    final narrowRowRect = tester.getRect(find.byType(ToolsSheetRow));
+    final shortLabelRect = tester.getRect(find.text(shortLabel));
+    final longDetailFinder = find.text(longDetail);
+    final longDetailText = tester.widget<Text>(longDetailFinder);
+    expect(longDetailText.maxLines, 1);
+    expect(longDetailText.overflow, TextOverflow.ellipsis);
+    final longDetailRect = tester.getRect(longDetailFinder);
+    expect(shortLabelRect.right, lessThanOrEqualTo(longDetailRect.left));
+    expect(longDetailRect.right, lessThanOrEqualTo(narrowRowRect.right - 12.0));
+  });
+
+  testWidgets('all expanded groups share a uniform 4px top gap', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => uiPreferences.setStringList(
+        'display_chat_tools_expanded_groups_v1',
+        ['local', 'mcp', 'workspace'],
+      ),
+    );
+    final l10n = await pumpSheet(tester, servers: [_server('s1', 'Alpha')]);
+    await tester.pumpAndSettle();
+
+    Finder headerFor(String title) => find.ancestor(
+      of: find.text(title),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Semantics && widget.properties.expanded != null,
+      ),
+    );
+
+    final localRow = find.byKey(
+      ChatToolsSheet.localToolKey(availableLocalToolIds().first),
+    );
+    final localTopGap =
+        tester.getRect(localRow).top -
+        tester.getRect(headerFor(l10n.assistantEditPageLocalToolsTab)).bottom;
+    final mcpTopGap =
+        tester.getRect(find.byKey(ChatToolsSheet.mcpServerKey('s1'))).top -
+        tester.getRect(headerFor(l10n.mcpAssistantSheetTitle)).bottom;
+    final workspaceTopGap =
+        tester.getRect(find.byKey(WorkspaceSection.bindKey)).top -
+        tester.getRect(headerFor(l10n.workspacesTitle)).bottom;
+
+    expect(localTopGap, 4.0);
+    expect(mcpTopGap, 4.0);
+    expect(workspaceTopGap, 4.0);
+    expect(tester.takeException(), isNull);
+  });
 }
