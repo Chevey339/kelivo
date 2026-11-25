@@ -13,12 +13,14 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
+import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/code_file_preview.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/file_preview.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +30,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../../support/business_test_harness.dart';
+import '../../../../support/file_browser_test_helpers.dart';
 import '../../../../support/markdown_render_helpers.dart';
 
 const _pngBytes = <int>[
@@ -996,6 +999,188 @@ void main() {
 
       expect(find.byType(RawImage), findsNothing);
       expect(find.byIcon(Lucide.ImageOff), findsNWidgets(2));
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('markdown preview fails closed on host /tmp image paths', (
+    tester,
+  ) async {
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final fileName = 'kelivo_preview_tmp_iso_$stamp.png';
+    final hostTmpFile = File('/tmp/$fileName')
+      ..writeAsBytesSync(_pngBytesOf(width: 16, height: 16));
+    addTearDown(() {
+      if (hostTmpFile.existsSync()) hostTmpFile.deleteSync();
+    });
+
+    final wsRoot = Directory(p.join(tempDir.path, 'ws_tmp_iso'))..createSync();
+    final mdFile = File(p.join(wsRoot.path, 'note.md'))
+      ..writeAsStringSync(
+        [
+          '![plain](/tmp/$fileName)',
+          '![zw](\u200B/tmp/$fileName)',
+          '![uri](file:///tmp/$fileName)',
+        ].join('\n\n'),
+      );
+
+    late AppDatabase database;
+    late WorkspaceProvider workspaces;
+    await tester.runAsync(() async {
+      database = AppDatabase(NativeDatabase.memory());
+      await database.customSelect('SELECT 1;').getSingle();
+      workspaces = WorkspaceProvider(store: ExtensionEntityStore(database));
+      await workspaces.loaded;
+      await workspaces.create(
+        name: 'ws',
+        kind: WorkspaceKind.linked,
+        hostPath: wsRoot.path,
+      );
+    });
+    addTearDown(() async {
+      workspaces.dispose();
+      await database.close();
+    });
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: MarkdownFilePreview(file: mdFile, autoLoad: false),
+          ),
+        ),
+      ),
+    );
+    await _loadMarkdownPreview(tester);
+    await _pumpAsyncUi(tester);
+
+    expect(find.byType(RawImage), findsNothing);
+    expect(find.byIcon(Lucide.ImageOff), findsNWidgets(3));
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, skip: Platform.isAndroid || Platform.isIOS || Platform.isWindows);
+
+  testWidgets(
+    'markdown preview tapping /workspace and relative directory links opens FileBrowser',
+    (tester) async {
+      final wsARoot = Directory(p.join(tempDir.path, 'wsA_dirs'))..createSync();
+      final wsBRoot = Directory(p.join(tempDir.path, 'wsB_dirs'))..createSync();
+      final wsSubdir = Directory(p.join(wsARoot.path, 'subdir'))..createSync();
+      File(p.join(wsSubdir.path, 'a.txt')).writeAsStringSync('a');
+      final relSubdir = Directory(p.join(wsARoot.path, 'docs', 'reldir'))
+        ..createSync(recursive: true);
+      File(p.join(relSubdir.path, 'b.txt')).writeAsStringSync('b');
+      Directory(p.join(wsBRoot.path, 'b_only_dir')).createSync();
+
+      final mdFile = File(p.join(wsARoot.path, 'docs', 'index.md'))
+        ..writeAsStringSync(
+          '[ws-dir](/workspace/subdir)\n\n'
+          '[rel-dir](reldir/)\n\n'
+          '[b-dir](/workspace/b_only_dir)',
+        );
+
+      late AppDatabase database;
+      late WorkspaceProvider workspaces;
+      await tester.runAsync(() async {
+        database = AppDatabase(NativeDatabase.memory());
+        await database.customSelect('SELECT 1;').getSingle();
+        workspaces = WorkspaceProvider(store: ExtensionEntityStore(database));
+        await workspaces.loaded;
+        await workspaces.create(
+          name: 'wsA',
+          kind: WorkspaceKind.linked,
+          hostPath: wsARoot.path,
+        );
+        await workspaces.create(
+          name: 'wsB',
+          kind: WorkspaceKind.linked,
+          hostPath: wsBRoot.path,
+        );
+      });
+      addTearDown(() async {
+        workspaces.dispose();
+        await database.close();
+      });
+
+      final chat = _FakeChatService(
+        Conversation(
+          id: 'conv-b',
+          title: 'Chat B',
+          extras: {WorkspaceBinding.keyId: workspaces.workspaces.last.id},
+        ),
+      );
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (_, child) => AppSnackBarOverlay(child: child!),
+            home: Scaffold(
+              body: MarkdownFilePreview(file: mdFile, autoLoad: false),
+            ),
+          ),
+        ),
+      );
+      await _loadMarkdownPreview(tester);
+      await _pumpAsyncUi(tester);
+
+      Future<void> tapAndExpectBrowser(String label, Directory expected) async {
+        await tester.tapAt(markdownGlyphCenter(tester, label));
+        await tester.pump();
+        for (var i = 0; i < 20; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump();
+          if (find.byType(FileBrowser).evaluate().isNotEmpty) break;
+        }
+        expect(find.byType(FileBrowser), findsOneWidget);
+        await waitForFileBrowserOperation(
+          tester,
+          tester
+              .state<FileBrowserState>(find.byType(FileBrowser))
+              .refreshEntries(),
+        );
+        await tester.pump();
+        expect(
+          tester.widget<FileBrowser>(find.byType(FileBrowser)).root.path,
+          expected.path,
+        );
+        Navigator.of(tester.element(find.byType(FileBrowser))).pop();
+        await tester.pumpAndSettle();
+      }
+
+      await tapAndExpectBrowser('ws-dir', wsSubdir);
+      await tapAndExpectBrowser('rel-dir', relSubdir);
+
+      await tester.tapAt(markdownGlyphCenter(tester, 'b-dir'));
+      await tester.pump();
+      for (var i = 0; i < 20; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump(const Duration(milliseconds: 20));
+        if (find.text('File not available').evaluate().isNotEmpty) break;
+      }
+      expect(find.byType(FileBrowser), findsNothing);
+      expect(find.text('File not available'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

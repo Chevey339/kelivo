@@ -8,6 +8,7 @@ import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/markdown_file_preview.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -18,6 +19,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:path/path.dart' as p;
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
 // ignore: depend_on_referenced_packages
 import 'package:url_launcher_platform_interface/link.dart';
@@ -25,6 +28,7 @@ import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import '../../support/business_test_harness.dart';
+import '../../support/file_browser_test_helpers.dart';
 import '../../support/markdown_render_helpers.dart';
 
 class _FakeChat extends ChatService {
@@ -71,10 +75,28 @@ class _FakeUrlLauncher extends UrlLauncherPlatform {
   }
 }
 
-List<int> _pngBytes() {
-  final img = image_lib.Image(width: 8, height: 8, numChannels: 4)
+List<int> _pngBytes({int width = 8, int height = 8}) {
+  final img = image_lib.Image(width: width, height: height, numChannels: 4)
     ..clear(image_lib.ColorRgba8(40, 140, 220, 255));
   return image_lib.encodePng(img);
+}
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.path);
+
+  final String path;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
+
+  @override
+  Future<String?> getApplicationCachePath() async => p.join(path, 'cache');
+
+  @override
+  Future<String?> getTemporaryPath() async => p.join(path, 'tmp');
 }
 
 void main() {
@@ -219,4 +241,163 @@ void main() {
     expect(find.byType(MarkdownFilePreview), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('tapping /workspace directory link in chat opens FileBrowser', (
+    tester,
+  ) async {
+    final subdir = Directory(p.join(wsRoot.path, 'subdir'))..createSync();
+    File(p.join(subdir.path, 'child.txt')).writeAsStringSync('hello');
+
+    await tester.pumpWidget(
+      buildChatMarkdown('[open-subdir](/workspace/subdir)'),
+    );
+    await tester.pump();
+
+    await tester.tapAt(markdownGlyphCenter(tester, 'open-subdir'));
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+      if (find.byType(FileBrowser).evaluate().isNotEmpty) break;
+    }
+
+    expect(launcher.launched, isEmpty);
+    expect(find.byType(FileBrowser), findsOneWidget);
+    await waitForFileBrowserOperation(
+      tester,
+      tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries(),
+    );
+    await tester.pump();
+
+    final browser = tester.widget<FileBrowser>(find.byType(FileBrowser));
+    expect(browser.root.path, subdir.path);
+    expect(find.text('child.txt'), findsOneWidget);
+    expect(find.text('File not available'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'desktop /tmp renders sanitized, padded, and percent-encoded paths',
+    (tester) async {
+      final stamp = DateTime.now().microsecondsSinceEpoch;
+      final plainName = 'kelivo_tmp_plain_$stamp.png';
+      final spaceName = 'kelivo tmp space $stamp.png';
+      final encodedName = 'kelivo%20tmp%20space%20$stamp.png';
+      final plainFile = File('/tmp/$plainName')
+        ..writeAsBytesSync(_pngBytes(width: 12, height: 12));
+      final spaceFile = File('/tmp/$spaceName')
+        ..writeAsBytesSync(_pngBytes(width: 14, height: 14));
+      addTearDown(() {
+        if (plainFile.existsSync()) plainFile.deleteSync();
+        if (spaceFile.existsSync()) spaceFile.deleteSync();
+      });
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: MarkdownWithCodeHighlight(
+                  text: [
+                    '![zw](\u200B/tmp/$plainName)',
+                    '![pad]( /tmp/$plainName )',
+                    '![enc](/tmp/$encodedName)',
+                    '![uri](file:///tmp/$plainName)',
+                  ].join('\n\n'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      for (var i = 0; i < 30; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+        final decoded = tester
+            .widgetList<RawImage>(find.byType(RawImage))
+            .where((img) => img.image != null)
+            .toList();
+        if (decoded.length == 4) break;
+      }
+
+      final decoded = tester
+          .widgetList<RawImage>(find.byType(RawImage))
+          .where((img) => img.image != null)
+          .toList();
+      expect(decoded, hasLength(4));
+      expect(find.byIcon(Lucide.ImageOff), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    skip: Platform.isAndroid || Platform.isIOS || Platform.isWindows,
+  );
+
+  testWidgets(
+    'chat mode prioritizes session tmp over host /tmp when both exist',
+    (tester) async {
+      final appData = Directory(p.join(tempDir.path, 'app'))..createSync();
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(appData.path);
+      addTearDown(() => PathProviderPlatform.instance = previousPathProvider);
+
+      final stamp = DateTime.now().microsecondsSinceEpoch;
+      final fileName = 'kelivo_tmp_precedence_$stamp.png';
+      final hostFile = File('/tmp/$fileName')
+        ..writeAsBytesSync(_pngBytes(width: 10, height: 10));
+      addTearDown(() {
+        if (hostFile.existsSync()) hostFile.deleteSync();
+      });
+
+      final sessionTmpFile =
+          File(p.join(appData.path, 'sessions', 'conv-1', 'tmp', fileName))
+            ..parent.createSync(recursive: true)
+            ..writeAsBytesSync(_pngBytes(width: 24, height: 24));
+      expect(sessionTmpFile.existsSync(), isTrue);
+
+      await tester.pumpWidget(
+        buildChatMarkdown(
+          [
+            '![plain](/tmp/$fileName)',
+            '![zw](\u200B/tmp/$fileName)',
+            '![uri](file:///tmp/$fileName)',
+          ].join('\n\n'),
+        ),
+      );
+
+      for (var i = 0; i < 30; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+        final decoded = tester
+            .widgetList<RawImage>(find.byType(RawImage))
+            .where((img) => img.image != null)
+            .toList();
+        if (decoded.length == 3) break;
+      }
+
+      final decoded = tester
+          .widgetList<RawImage>(find.byType(RawImage))
+          .where((img) => img.image != null)
+          .toList();
+      expect(decoded, hasLength(3));
+      expect(
+        decoded.map((img) => img.image!.height).toList(),
+        everyElement(24),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    skip: Platform.isAndroid || Platform.isIOS || Platform.isWindows,
+  );
 }

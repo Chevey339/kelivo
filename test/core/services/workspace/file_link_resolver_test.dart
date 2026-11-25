@@ -874,5 +874,99 @@ void main() {
         isNull,
       );
     }, skip: Platform.isWindows ? 'requires symlink privileges' : false);
+
+    test(
+      'resolveRelativeEntryToFile resolves relative directories and blocks escapes',
+      () {
+        final wsRoot = Directory(p.join(tempDir.path, 'ws_dir'))..createSync();
+        final docsDir = Directory(p.join(wsRoot.path, 'docs'))..createSync();
+        final subDir = Directory(p.join(docsDir.path, 'subdir'))..createSync();
+        final md = File(p.join(docsDir.path, 'readme.md'))
+          ..writeAsStringSync('#');
+
+        expect(
+          FileLinkResolver.resolveRelativeEntryToFile(
+            'subdir/',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          ),
+          isA<Directory>().having((d) => d.path, 'path', subDir.path),
+        );
+        expect(
+          FileLinkResolver.resolveRelativeEntryToFile(
+            'subdir',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          ),
+          isA<Directory>().having((d) => d.path, 'path', subDir.path),
+        );
+        expect(
+          FileLinkResolver.resolveRelativeEntryToFile(
+            './',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          ),
+          isA<Directory>().having((d) => d.path, 'path', docsDir.path),
+        );
+        // Trailing slash requires a directory, not a file.
+        expect(
+          FileLinkResolver.resolveRelativeEntryToFile(
+            'readme.md/',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          ),
+          isNull,
+        );
+        expect(
+          FileLinkResolver.resolveRelativeEntryToFile(
+            'subdir//',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          ),
+          isNull,
+        );
+        expect(
+          FileLinkResolver.resolveRelativeEntryToFile(
+            '../../',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          ),
+          isNull,
+        );
+      },
+    );
+
+    test('KelivoLink.toKelivoUri round-trips virtual links', () {
+      expect(
+        KelivoLink.tryParseVirtualPath('/workspace/a b/图.png')?.toKelivoUri(),
+        'kelivo://workspace/a%20b/${Uri.encodeComponent('图.png')}',
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/workspace')?.toKelivoUri(),
+        'kelivo://workspace/',
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/chat/outputs/out.png')?.toKelivoUri(),
+        'kelivo://chat/outputs/out.png',
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath(
+          '/chat/attachments/in.png',
+        )?.toKelivoUri(),
+        'kelivo://chat/attachments/in.png',
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/chat/note.md')?.toKelivoUri(),
+        'kelivo://session/note.md',
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/skills/s1/SKILL.md')?.toKelivoUri(),
+        'kelivo://skills/s1/SKILL.md',
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/tmp/plot.png')?.toKelivoUri(),
+        'kelivo://tmp/plot.png',
+      );
+    });
   });
 }

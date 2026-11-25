@@ -51,6 +51,30 @@ class KelivoLink {
     return root == null ? null : p.posix.join(root, relativePath);
   }
 
+  /// Canonical `kelivo://` URI for this link, or `null` when unavailable.
+  String? toKelivoUri() {
+    final encoded = encodePath(relativePath);
+    return switch (kind) {
+      KelivoLinkKind.workspaceFile => 'kelivo://workspace/$encoded',
+      KelivoLinkKind.chatFile => 'kelivo://session/$encoded',
+      KelivoLinkKind.chatAttachment =>
+        conversationId != null
+            ? 'kelivo://chat/${Uri.encodeComponent(conversationId!)}/attachments/$encoded'
+            : 'kelivo://chat/attachments/$encoded',
+      KelivoLinkKind.chatOutput =>
+        conversationId != null
+            ? 'kelivo://chat/${Uri.encodeComponent(conversationId!)}/outputs/$encoded'
+            : 'kelivo://chat/outputs/$encoded',
+      KelivoLinkKind.skillFile => 'kelivo://skills/$encoded',
+      KelivoLinkKind.temporaryFile => 'kelivo://tmp/$encoded',
+      KelivoLinkKind.externalFile =>
+        mountId == null
+            ? null
+            : 'kelivo://mounts/${Uri.encodeComponent(mountId!)}/$encoded',
+      KelivoLinkKind.terminal => null,
+    };
+  }
+
   static const String scheme = 'kelivo';
 
   /// Percent-encodes each path segment with [Uri.encodeComponent].
@@ -430,16 +454,20 @@ class FileLinkResolver {
     }
   }
 
-  static Future<File?> resolveSkillFile(KelivoLink link) async {
+  static Future<FileSystemEntity?> resolveSkillEntry(KelivoLink link) async {
     if (link.kind != KelivoLinkKind.skillFile) return null;
     if (!_isSafeRelativePath(link.relativePath)) return null;
     try {
       final root = (await AppDirectories.getSkillsDirectory()).path;
-      final entry = _entryUnderRoot(root, link.relativePath);
-      return entry is File ? entry : null;
+      return _entryUnderRoot(root, link.relativePath);
     } on FileLinkException {
       return null;
     }
+  }
+
+  static Future<File?> resolveSkillFile(KelivoLink link) async {
+    final entry = await resolveSkillEntry(link);
+    return entry is File ? entry : null;
   }
 
   static final RegExp _schemeOrDrivePrefix = RegExp(
@@ -458,10 +486,28 @@ class FileLinkResolver {
     return path.isNotEmpty;
   }
 
-  /// Resolves a relative reference against [baseFilePath]'s parent directory,
-  /// confining both the base directory and the symlink-resolved target strictly
-  /// inside [boundaryRoot] (or `File(baseFilePath).parent` when omitted).
+  /// Resolves a relative file reference against [baseFilePath]'s parent
+  /// directory, confining both the base directory and the symlink-resolved
+  /// target strictly inside [boundaryRoot] (or `File(baseFilePath).parent`
+  /// when omitted).
   static File? resolveRelativeToFile(
+    String rawRef, {
+    required String baseFilePath,
+    String? boundaryRoot,
+  }) {
+    final entry = resolveRelativeEntryToFile(
+      rawRef,
+      baseFilePath: baseFilePath,
+      boundaryRoot: boundaryRoot,
+    );
+    return entry is File ? entry : null;
+  }
+
+  /// Resolves a relative file or directory reference against [baseFilePath]'s
+  /// parent directory, confining both the base directory and the
+  /// symlink-resolved target strictly inside [boundaryRoot] (or
+  /// `File(baseFilePath).parent` when omitted).
+  static FileSystemEntity? resolveRelativeEntryToFile(
     String rawRef, {
     required String baseFilePath,
     String? boundaryRoot,
@@ -472,7 +518,12 @@ class FileLinkResolver {
     );
     if (raw.isEmpty) return null;
 
-    final normalizedRef = raw.replaceAll(r'\', '/');
+    var normalizedRef = raw.replaceAll(r'\', '/');
+    final expectDirectory =
+        normalizedRef.endsWith('/') && normalizedRef.length > 1;
+    if (expectDirectory) {
+      normalizedRef = normalizedRef.substring(0, normalizedRef.length - 1);
+    }
     final rawParts = normalizedRef.split('/');
     final decodedSegments = <String>[];
     for (final rawPart in rawParts) {
@@ -509,15 +560,28 @@ class FileLinkResolver {
         p.joinAll([baseDir.path, ...decodedSegments]),
       );
       final type = FileSystemEntity.typeSync(joined);
-      if (type != FileSystemEntityType.file) return null;
-      final canonicalTarget = p.canonicalize(
-        File(joined).resolveSymbolicLinksSync(),
-      );
-      if (!p.equals(canonicalBoundary, canonicalTarget) &&
-          !p.isWithin(canonicalBoundary, canonicalTarget)) {
-        return null;
+      if (type == FileSystemEntityType.file) {
+        if (expectDirectory) return null;
+        final canonicalTarget = p.canonicalize(
+          File(joined).resolveSymbolicLinksSync(),
+        );
+        if (!p.equals(canonicalBoundary, canonicalTarget) &&
+            !p.isWithin(canonicalBoundary, canonicalTarget)) {
+          return null;
+        }
+        return File(joined);
       }
-      return File(joined);
+      if (type == FileSystemEntityType.directory) {
+        final canonicalTarget = p.canonicalize(
+          Directory(joined).resolveSymbolicLinksSync(),
+        );
+        if (!p.equals(canonicalBoundary, canonicalTarget) &&
+            !p.isWithin(canonicalBoundary, canonicalTarget)) {
+          return null;
+        }
+        return Directory(joined);
+      }
+      return null;
     } on FileSystemException {
       return null;
     }
