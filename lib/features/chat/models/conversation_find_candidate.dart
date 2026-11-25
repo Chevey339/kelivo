@@ -56,9 +56,8 @@ final class ConversationFindPrefilter {
       return true;
     }
     // A UTF-16 code unit takes at most three UTF-8 bytes on disk.
-    if (message.parts case [
-      TextPart(:final text),
-    ] when text.length > maxSqlTextBytes ~/ 3) {
+    final text = message.parts.whereType<TextPart>().singleOrNull?.text;
+    if (text != null && text.length > maxSqlTextBytes ~/ 3) {
       return literals.every(text.contains) ||
           projectionMarkers.any(text.contains);
     }

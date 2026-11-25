@@ -84,13 +84,10 @@ typedef ChatDatabaseSnapshotInfo = ({
 
 typedef InstalledChatDatabaseInfo = ({int schemaVersion, String? databaseId});
 
-typedef _MessageDetails = ({
-  List<MessagePartRow> parts,
-  List<GenerationRunRow> runs,
-});
 typedef _FindPage = ({
   List<MessageRow> messages,
-  _MessageDetails details,
+  List<MessagePartRow> parts,
+  List<GenerationRunRow> runs,
   Map<String, Map<String, UiSearchSurfaceText>> surfaces,
   ConversationFindPrefilter? prefilter,
 });
@@ -3326,12 +3323,18 @@ ORDER BY m.message_order DESC LIMIT 20
           final headers = await (_db.select(
             _db.messageRows,
           )..where((m) => m.id.isIn(ids))).get();
+          if (!current()) return null;
           final byId = {for (final row in headers) row.id: row};
           messages = [for (final id in ids) byId[id]!];
         }
+        final parts = await _readMessageParts(ids);
+        if (!current()) return null;
+        final runs = await _readGenerationRuns(ids);
+        if (!current()) return null;
         return (
           messages: messages,
-          details: await _readMessageDetails(ids),
+          parts: parts,
+          runs: runs,
           surfaces: await _genUiSearch.read(ids),
           prefilter: prefilter,
         );
@@ -3359,11 +3362,12 @@ ORDER BY m.message_order DESC LIMIT 20
         : """instr(lower(p.payload), ?) OR instr(p.payload, char(0))
              OR p.payload GLOB '*[^a-zA-Z0-9 .,!?\t\r\n\u0080-\u{10ffff}]*'
              ${filter.foldSources.isEmpty ? '' : 'OR p.payload GLOB ?'}""";
+    // Only text parts contribute body text. Retained messages still load all
+    // parts so the matcher can resolve citations and display order.
     return """
       m.is_streaming OR coalesce(m.translation, '') != ''
-      OR EXISTS (SELECT 1 FROM message_part_rows p WHERE p.revision_id=m.id AND
-        CASE WHEN p.kind='reasoning' THEN 0
-             WHEN p.kind != 'text' OR length(CAST(p.payload AS BLOB)) > ${ConversationFindPrefilter.maxSqlTextBytes}
+      OR EXISTS (SELECT 1 FROM message_part_rows p WHERE p.revision_id=m.id AND p.kind='text' AND
+        CASE WHEN octet_length(p.payload) > ${ConversationFindPrefilter.maxSqlTextBytes}
                OR (p.ordinal > 0 AND EXISTS (SELECT 1 FROM message_part_rows prior
                  WHERE prior.revision_id=p.revision_id AND prior.ordinal<p.ordinal AND prior.kind='text'))
              THEN 1 ELSE ($possible) END)
@@ -3373,8 +3377,8 @@ ORDER BY m.message_order DESC LIMIT 20
   static List<ConversationFindCandidate> _hydrateFindPage(_FindPage page) => [
     for (final message in _hydrateMessages(
       page.messages,
-      page.details.parts,
-      page.details.runs,
+      page.parts,
+      page.runs,
     ))
       if (page.prefilter?.mayMatchLargeBody(message) != false)
         ConversationFindCandidate(
@@ -8576,31 +8580,29 @@ ORDER BY m.message_order DESC LIMIT 20
     bool background = false,
   }) => _db.transaction(() async {
     if (rows.isEmpty) return const [];
-    final details = await _readMessageDetails(
-      rows.map((row) => row.id).toSet(),
-    );
+    final ids = rows.map((row) => row.id).toSet();
+    final parts = await _readMessageParts(ids);
+    final runs = await _readGenerationRuns(ids);
     return background
-        ? _hydrateMessagesInBackground(rows, details.parts, details.runs)
-        : _hydrateMessages(rows, details.parts, details.runs);
+        ? _hydrateMessagesInBackground(rows, parts, runs)
+        : _hydrateMessages(rows, parts, runs);
   });
 
-  Future<_MessageDetails> _readMessageDetails(Iterable<String> ids) async {
-    final parts =
-        await (_db.select(_db.messagePartRows)
-              ..where((part) => part.revisionId.isIn(ids))
-              ..orderBy([(part) => OrderingTerm.asc(part.ordinal)]))
-            .get();
-    final runs =
-        await (_db.select(_db.generationRunRows)
-              ..where((run) => run.targetRevisionId.isIn(ids))
-              ..orderBy([
-                (run) => OrderingTerm.desc(run.createdAt),
-                (run) => OrderingTerm.desc(run.updatedAt),
-                (run) => OrderingTerm.desc(run.id),
-              ]))
-            .get();
-    return (parts: parts, runs: runs);
-  }
+  Future<List<MessagePartRow>> _readMessageParts(Iterable<String> ids) =>
+      (_db.select(_db.messagePartRows)
+            ..where((part) => part.revisionId.isIn(ids))
+            ..orderBy([(part) => OrderingTerm.asc(part.ordinal)]))
+          .get();
+
+  Future<List<GenerationRunRow>> _readGenerationRuns(Iterable<String> ids) =>
+      (_db.select(_db.generationRunRows)
+            ..where((run) => run.targetRevisionId.isIn(ids))
+            ..orderBy([
+              (run) => OrderingTerm.desc(run.createdAt),
+              (run) => OrderingTerm.desc(run.updatedAt),
+              (run) => OrderingTerm.desc(run.id),
+            ]))
+          .get();
 
   static Future<List<ChatMessage>> _hydrateMessagesInBackground(
     List<MessageRow> rows,

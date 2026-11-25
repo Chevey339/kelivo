@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart'
+    show ApplyInterceptor, QueryExecutor, QueryInterceptor;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/app_database.dart';
@@ -13,6 +15,20 @@ import 'package:Kelivo/features/chat/models/conversation_find_candidate.dart';
 import 'package:Kelivo/features/chat/services/conversation_find_service.dart';
 import 'package:Kelivo/features/chat/services/conversation_find_worker.dart';
 
+class _SelectObserver extends QueryInterceptor {
+  void Function(String)? onSelect;
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    onSelect?.call(statement);
+    return executor.runSelect(statement, args);
+  }
+}
+
 void main() {
   test(
     'preview prefilter preserves rendered hits, counts, order and spans',
@@ -23,17 +39,21 @@ void main() {
       ChatMessage msg(
         String id,
         String body, {
+        String role = 'assistant',
         List<MessagePart>? parts,
         String? translation,
       }) => ChatMessage(
         id: id,
         conversationId: 'c',
-        role: 'assistant',
+        role: role,
         content: body,
         parts: parts,
         translation: translation,
       );
       final largeCss = '```css\n${'.button { color: red; }\n' * 900}```';
+      const image = ImagePart(uri: '/images/明白.png');
+      const file = FilePart(uri: '/files/note', name: '明白.txt');
+      const tool = ToolCallPart('{"name":"read_file","content":"明白"}');
       final messages = [
         msg('plain', '已经明白。明白。 Foobar'),
         msg('markdown', '明**白** fo**ob**ar'),
@@ -62,6 +82,35 @@ void main() {
         msg('stream', 'ordinary prose'),
         msg('large-miss', largeCss),
         msg('large-hit', '$largeCss\n\n明白'),
+        msg('attachments', '', role: 'user', parts: const [image, file]),
+        msg('tool-miss', '', parts: const [TextPart('ordinary prose'), tool]),
+        msg(
+          'large-attached-miss',
+          '',
+          parts: [image, TextPart(largeCss), tool],
+        ),
+        msg(
+          'large-reasoning-miss',
+          '',
+          parts: [const ReasoningPart('明白'), TextPart(largeCss)],
+        ),
+        msg('tool-hit', '', parts: const [tool, TextPart('已经明白。')]),
+        msg(
+          'split-file',
+          '',
+          role: 'user',
+          parts: const [TextPart('明'), file, TextPart('白')],
+        ),
+        msg(
+          'citation',
+          '',
+          parts: const [
+            TextPart('See [cite:doc].'),
+            ToolCallPart(
+              '{"name":"search_web","content":"{\\"items\\":[{\\"id\\":\\"doc\\",\\"index\\":7}]}"}',
+            ),
+          ],
+        ),
       ];
       await repo.putMigrationBatch(
         conversations: [Conversation(id: 'c', title: 'find')],
@@ -115,6 +164,15 @@ void main() {
       expect(hanCandidates, isNot(contains('hidden')));
       expect(hanCandidates, contains('large-hit'));
       expect(hanCandidates, isNot(contains('large-miss')));
+      expect(hanCandidates, containsAll(['tool-hit', 'split-file']));
+      for (final miss in [
+        'attachments',
+        'tool-miss',
+        'large-attached-miss',
+        'large-reasoning-miss',
+      ]) {
+        expect(hanCandidates, isNot(contains(miss)));
+      }
       for (final q in [
         '明白',
         'FOOBAR',
@@ -122,6 +180,7 @@ void main() {
         'ffi',
         'KELVIN',
         'привет',
+        '7',
         '。',
       ]) {
         final all = await results(finder, q, optimized: false);
@@ -300,6 +359,56 @@ void main() {
       expect(pages, 1);
     },
   );
+
+  test('cancelling a preview skips the remaining reads in its page', () async {
+    final observer = _SelectObserver();
+    final db = AppDatabase(NativeDatabase.memory().interceptWith(observer));
+    final repo = ChatDatabaseRepository(db);
+    addTearDown(repo.close);
+    await repo.putMigrationBatch(
+      conversations: [Conversation(id: 'c', title: 'find')],
+      messages: [
+        (
+          message: ChatMessage(
+            id: 'm',
+            conversationId: 'c',
+            role: 'user',
+            content: '明白',
+          ),
+          messageOrder: 0,
+        ),
+      ],
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
+    );
+    for (final table in [
+      'message_rows',
+      'message_part_rows',
+      'generation_run_rows',
+    ]) {
+      final worker = ConversationFindWorker();
+      addTearDown(worker.close);
+      final readsAfterCancel = <String>[];
+      observer.onSelect = (sql) {
+        if (!worker.isCurrent) {
+          readsAfterCancel.add(sql);
+        } else if (sql.contains('FROM "$table"')) {
+          worker.close();
+        }
+      };
+      final pages = await repo
+          .conversationFindCandidates(
+            'c',
+            prefilter: const ConversationFindService().previewPrefilter('明白'),
+            worker: worker,
+          )
+          .toList();
+      observer.onSelect = null;
+      expect(worker.isCurrent, isFalse, reason: table);
+      expect(pages, isEmpty, reason: table);
+      expect(readsAfterCancel, isEmpty, reason: table);
+    }
+  });
 
   test('timeline page reads look up generation runs by message id', () async {
     final db = AppDatabase(NativeDatabase.memory());
