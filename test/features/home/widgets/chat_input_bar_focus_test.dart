@@ -144,6 +144,89 @@ void main() {
       }, variant: desktopPlatforms);
     }
 
+    testWidgets(
+      'desktop hides cursor while unfocused or hidden and restores on resume '
+      '(${longDraft ? 'long' : 'short'} draft)',
+      (tester) async {
+        addTearDown(() {
+          switch (tester.binding.lifecycleState) {
+            case null:
+            case AppLifecycleState.resumed:
+              return;
+            case AppLifecycleState.paused:
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.hidden,
+              );
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.inactive,
+              );
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.resumed,
+              );
+            case AppLifecycleState.hidden:
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.inactive,
+              );
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.resumed,
+              );
+            case AppLifecycleState.inactive:
+            case AppLifecycleState.detached:
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.resumed,
+              );
+          }
+        });
+        final source = longDraft ? 'draft text\n' * 500 : 'draft text';
+        final controller = TextEditingController(text: source);
+        final focusNode = FocusNode();
+        addTearDown(controller.dispose);
+        addTearDown(focusNode.dispose);
+        await pumpBar(tester, controller, focusNode);
+
+        focusNode.requestFocus();
+        await tester.pumpAndSettle();
+        const selection = TextSelection(baseOffset: 1, extentOffset: 4);
+        controller.selection = selection;
+        await tester.pump();
+
+        bool cursorShown() => longDraft
+            ? tester.widget<CodeEditor>(find.byType(CodeEditor)).showCursor ??
+                  true
+            : tester.widget<EditableText>(find.byType(EditableText)).showCursor;
+
+        expect(cursorShown(), isTrue);
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(cursorShown(), isFalse, reason: 'inactive');
+        expect(controller.selection, selection);
+
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+        tester.binding.scheduleWarmUpFrame();
+        expect(cursorShown(), isFalse, reason: 'hidden');
+        expect(controller.selection, selection);
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pump();
+        expect(cursorShown(), isFalse, reason: 'returning inactive');
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(cursorShown(), isTrue);
+        expect(focusNode.hasPrimaryFocus, isTrue);
+        expect(controller.selection, selection);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+      variant: desktopPlatforms,
+    );
+
     testWidgets('desktop padding focuses the ${longDraft ? 'long' : 'short'} '
         'draft editor', (tester) async {
       final controller = TextEditingController(

@@ -1,20 +1,26 @@
 import '../services/conversation_find_service.dart';
 import 'conversation_find_highlights.dart';
+
 import 'package:Kelivo/desktop/desktop_overlay_backdrop.dart';
+
 import '../utils/message_reasoning_source.dart';
 import '../../intelligent_ui/host/ui_copy_actions.dart';
 import '../../intelligent_ui/host/ui_user_message_content.dart';
+
 import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_source_map.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_host_scope.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_generation_state.dart';
 import 'package:markstream/markstream_core.dart' show SourceSpan;
 import 'package:markstream/markstream.dart' show SelectableSpanAdapter;
+
 import 'tool_permission_widgets.dart';
 import '../../provider/widgets/oauth_message_recovery.dart';
 import 'response_truncation_notice.dart';
+
 import 'dart:async';
 import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/foundation.dart'
@@ -24,16 +30,25 @@ import 'package:flutter/foundation.dart'
         visibleForTesting,
         mapEquals,
         ValueListenable;
+
 import 'dart:math' as math;
+
 import 'package:flutter/services.dart';
+
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/optional_shader_mask.dart';
+
 import 'package:provider/provider.dart';
+
 import 'dart:io';
+
 import 'package:open_filex/open_filex.dart';
+
 // import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
+
 import 'package:crypto/crypto.dart' show sha256;
+
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../browser/browser_navigation.dart';
@@ -41,7 +56,9 @@ import '../../browser/widgets/browser_page_card.dart';
 import '../../browser/widgets/browser_favicon.dart';
 import '../../../core/services/browser/browser_service.dart';
 import '../../browser/models/browser_tool_presentation.dart';
+
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -50,7 +67,9 @@ import '../../../icons/reasoning_icons.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/providers/assistant_provider.dart';
+
 import 'package:intl/intl.dart';
+
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/safe_resize_image.dart';
 import '../../../utils/utf16_safe_cut.dart';
@@ -69,16 +88,22 @@ import 'quote_source_highlight.dart';
 import 'plain_message_text.dart';
 import 'quote_source_anchor.dart';
 import 'quote_interaction_scope.dart';
+
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
+
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/scroll_layout_anchor.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
+
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../theme/chat_bubble_style.dart';
+
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
@@ -1412,10 +1437,20 @@ class ChatMessageWidget extends StatefulWidget {
   State<ChatMessageWidget> createState() => _ChatMessageWidgetState();
 }
 
-class _ChatMessageWidgetState extends State<ChatMessageWidget> {
+bool _isReasoningTimerLifecycleActive(AppLifecycleState? state) =>
+    state != AppLifecycleState.hidden &&
+    state != AppLifecycleState.paused &&
+    state != AppLifecycleState.detached;
+
+class _ChatMessageWidgetState extends State<ChatMessageWidget>
+    with WidgetsBindingObserver {
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
   final ScrollController _reasoningScroll = ScrollController();
   bool _tickActive = false;
+  bool _tickerEnabled = true;
+  late bool _lifecycleVisible = _isReasoningTimerLifecycleActive(
+    WidgetsBinding.instance.lifecycleState,
+  );
   // Local expand state for inline <think> card (defaults to expanded)
   bool? _inlineThinkExpanded;
   bool _inlineThinkManuallyToggled = false;
@@ -1463,6 +1498,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _syncTicker();
 
     // Determine initial state for inline <think> card BEFORE first paint to avoid
@@ -1494,9 +1530,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final visible = _isReasoningTimerLifecycleActive(state);
+    if (_lifecycleVisible == visible) return;
+    final resumed = !_lifecycleVisible && visible;
+    _lifecycleVisible = visible;
+    if (resumed && _tickActive && _tickerEnabled) _reasoningTick.value++;
+    _syncTicker();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _reconcileUiOwner();
+    final enabled = TickerMode.valuesOf(context).enabled;
+    final resumed = !_tickerEnabled && enabled;
+    _tickerEnabled = enabled;
+    if (resumed && _tickActive && _lifecycleVisible) _reasoningTick.value++;
+    _syncTicker();
   }
 
   void _reconcileUiOwner() => UiRuntimeScope.maybeOf(context)?.reconcile(
@@ -1564,11 +1615,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         widget.reasoningStartAt != null &&
         widget.reasoningFinishedAt == null;
     _tickActive = loading;
-    if (loading) {
+    if (loading && _tickerEnabled && _lifecycleVisible) {
       _reasoningTimer ??= Timer.periodic(const Duration(milliseconds: 100), (
         _,
       ) {
-        if (mounted && _tickActive) _reasoningTick.value++;
+        if (mounted && _tickActive && _tickerEnabled && _lifecycleVisible) {
+          _reasoningTick.value++;
+        }
       });
     } else {
       _reasoningTimer?.cancel();
@@ -1743,6 +1796,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     try {
       _userMenuOverlay?.remove();
     } catch (_) {}
@@ -5835,7 +5889,9 @@ class _ChainOfThoughtReasoningStep extends StatefulWidget {
 
 class _ChainOfThoughtReasoningStepState
     extends State<_ChainOfThoughtReasoningStep>
-    with _StoredTimelineState<_ChainOfThoughtReasoningStep> {
+    with
+        _StoredTimelineState<_ChainOfThoughtReasoningStep>,
+        WidgetsBindingObserver {
   @override
   Object get storageId => ('reasoning-expanded', widget.sourceOrdinal);
   @override
@@ -5847,6 +5903,10 @@ class _ChainOfThoughtReasoningStepState
 
   final ValueNotifier<int> _elapsedTick = ValueNotifier<int>(0);
   Timer? _elapsedTimer;
+  bool _tickerEnabled = true;
+  late bool _lifecycleVisible = _isReasoningTimerLifecycleActive(
+    WidgetsBinding.instance.lifecycleState,
+  );
   final ScrollController _scroll = ScrollController();
   bool _followBottom = true;
   bool _hasOverflow = false;
@@ -5881,9 +5941,11 @@ class _ChainOfThoughtReasoningStepState
   }
 
   void _syncElapsedTimer() {
-    if (widget.step.loading) {
+    if (widget.step.loading && _tickerEnabled && _lifecycleVisible) {
       _elapsedTimer ??= Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (mounted) _elapsedTick.value++;
+        if (mounted && _tickerEnabled && _lifecycleVisible) {
+          _elapsedTick.value++;
+        }
       });
     } else {
       _elapsedTimer?.cancel();
@@ -5892,8 +5954,33 @@ class _ChainOfThoughtReasoningStepState
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final visible = _isReasoningTimerLifecycleActive(state);
+    if (_lifecycleVisible == visible) return;
+    final resumed = !_lifecycleVisible && visible;
+    _lifecycleVisible = visible;
+    if (resumed && widget.step.loading && _tickerEnabled) {
+      _elapsedTick.value++;
+    }
+    _syncElapsedTimer();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled = TickerMode.valuesOf(context).enabled;
+    final resumed = !_tickerEnabled && enabled;
+    _tickerEnabled = enabled;
+    if (resumed && widget.step.loading && _lifecycleVisible) {
+      _elapsedTick.value++;
+    }
+    _syncElapsedTimer();
+  }
+
+  @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scroll.addListener(_updateFollowBottom);
     _syncElapsedTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -5934,6 +6021,7 @@ class _ChainOfThoughtReasoningStepState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _elapsedTimer?.cancel();
     _elapsedTick.dispose();
     _scroll.dispose();
@@ -8567,10 +8655,15 @@ class _ReasoningSection extends StatefulWidget {
   State<_ReasoningSection> createState() => _ReasoningSectionState();
 }
 
-class _ReasoningSectionState extends State<_ReasoningSection> {
+class _ReasoningSectionState extends State<_ReasoningSection>
+    with WidgetsBindingObserver {
   // Use ValueNotifier to only update elapsed time display, not rebuild entire widget
   final ValueNotifier<int> _elapsedTick = ValueNotifier<int>(0);
   Timer? _elapsedTimer;
+  bool _tickerEnabled = true;
+  late bool _lifecycleVisible = _isReasoningTimerLifecycleActive(
+    WidgetsBinding.instance.lifecycleState,
+  );
   final ScrollController _scroll = ScrollController();
   bool _hasOverflow = false;
 
@@ -8587,9 +8680,14 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
   }
 
   void _syncElapsedTimer() {
-    if (widget.loading && widget.finishedAt == null) {
+    if (widget.loading &&
+        widget.finishedAt == null &&
+        _tickerEnabled &&
+        _lifecycleVisible) {
       _elapsedTimer ??= Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (mounted) _elapsedTick.value++;
+        if (mounted && _tickerEnabled && _lifecycleVisible) {
+          _elapsedTick.value++;
+        }
       });
     } else {
       _elapsedTimer?.cancel();
@@ -8598,8 +8696,39 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final visible = _isReasoningTimerLifecycleActive(state);
+    if (_lifecycleVisible == visible) return;
+    final resumed = !_lifecycleVisible && visible;
+    _lifecycleVisible = visible;
+    if (resumed &&
+        widget.loading &&
+        widget.finishedAt == null &&
+        _tickerEnabled) {
+      _elapsedTick.value++;
+    }
+    _syncElapsedTimer();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled = TickerMode.valuesOf(context).enabled;
+    final resumed = !_tickerEnabled && enabled;
+    _tickerEnabled = enabled;
+    if (resumed &&
+        widget.loading &&
+        widget.finishedAt == null &&
+        _lifecycleVisible) {
+      _elapsedTick.value++;
+    }
+    _syncElapsedTimer();
+  }
+
+  @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.loading) _syncElapsedTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOverflow();
@@ -8625,6 +8754,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _elapsedTimer?.cancel();
     _elapsedTick.dispose();
     _scroll.dispose();

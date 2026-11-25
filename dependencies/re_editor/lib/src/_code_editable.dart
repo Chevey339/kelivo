@@ -23,6 +23,7 @@ class _CodeEditable extends StatefulWidget {
   final Color? cursorLineColor;
   final Color? chunkIndicatorColor;
   final double cursorWidth;
+  final bool showCursor;
   final bool showCursorWhenReadOnly;
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
@@ -64,6 +65,7 @@ class _CodeEditable extends StatefulWidget {
     this.cursorLineColor,
     this.chunkIndicatorColor,
     required this.cursorWidth,
+    required this.showCursor,
     required this.showCursorWhenReadOnly,
     required this.padding,
     required this.margin,
@@ -158,6 +160,11 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
       _highlighter.theme = widget.codeTheme;
     }
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.showCursor != widget.showCursor ||
+        oldWidget.readOnly != widget.readOnly ||
+        oldWidget.showCursorWhenReadOnly != widget.showCursorWhenReadOnly) {
+      _updateCursorState();
+    }
   }
 
   @override
@@ -393,7 +400,9 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
   }
 
   void _updateCursorState() {
-    if (widget.focusNode.hasFocus && (!widget.readOnly || widget.showCursorWhenReadOnly)) {
+    if (widget.showCursor &&
+        widget.focusNode.hasFocus &&
+        (!widget.readOnly || widget.showCursorWhenReadOnly)) {
       _cursorController.startBlink();
     } else {
       _cursorController.stopBlink();
