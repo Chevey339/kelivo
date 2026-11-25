@@ -202,9 +202,11 @@ void main() {
     Conversation? conversation,
     _FakeChatService? chat,
     bool desktop = false,
+    Size viewSize = const Size(800, 1600),
+    double textScale = 1.0,
   }) async {
     mcp.fakeServers = servers;
-    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.physicalSize = viewSize;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -229,6 +231,14 @@ void main() {
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          builder: textScale == 1.0
+              ? null
+              : (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: TextScaler.linear(textScale)),
+                  child: child!,
+                ),
           home: AppSnackBarOverlay(
             child: Scaffold(
               body: desktop
@@ -738,8 +748,9 @@ void main() {
           await tester.pumpAndSettle();
         }
         expect(find.byKey(inheritKey), desktop ? findsOneWidget : findsNothing);
-        expect(find.textContaining(l10n.mcpSelectionInherited), findsWidgets);
+        expect(find.textContaining(l10n.mcpSelectionInherited), findsOneWidget);
         if (!desktop) {
+          expect(find.text(l10n.mcpSelectionInherited), findsNothing);
           expect(
             find.text('${l10n.mcpSelectionInherited} · 1/2'),
             findsOneWidget,
@@ -756,8 +767,9 @@ void main() {
         expect(chat.conversation!.mcpServerIds, ['s1', 's2']);
         expect(ConversationMcpSettings.isOverridden(chat.conversation), isTrue);
         expect(assistants.getById(assistantId)!.mcpServerIds, ['s1']);
-        expect(find.textContaining(l10n.mcpSelectionCustom), findsWidgets);
+        expect(find.textContaining(l10n.mcpSelectionCustom), findsOneWidget);
         if (!desktop) {
+          expect(find.text(l10n.mcpSelectionCustom), findsNothing);
           expect(find.text('${l10n.mcpSelectionCustom} · 2/2'), findsOneWidget);
         }
 
@@ -833,6 +845,11 @@ void main() {
         expect(assistants.getById(assistantId)!.mcpServerIds, ['s1']);
         if (!desktop) {
           expect(
+            find.textContaining(l10n.mcpSelectionInherited),
+            findsOneWidget,
+          );
+          expect(find.text(l10n.mcpSelectionInherited), findsNothing);
+          expect(
             find.text('${l10n.mcpSelectionInherited} · 1/2'),
             findsOneWidget,
           );
@@ -877,4 +894,179 @@ void main() {
     expect(find.byType(WorkspaceSection), findsOneWidget);
     expect(find.text(workspace.name), findsOneWidget);
   });
+
+  for (final layered in [false, true]) {
+    testWidgets(
+      'expanded group rows are inset from group headers when layered=$layered',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await tester.runAsync(() => settings.setUseLayeredSheetTiles(layered));
+        final l10n = await pumpSheet(tester, servers: [_server('s1', 'Alpha')]);
+        await tester.pumpAndSettle();
+
+        Finder headerFor(String title) => find.ancestor(
+          of: find.text(title),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Semantics && widget.properties.expanded != null,
+          ),
+        );
+
+        void expectInsetHierarchy(String title, Finder child) {
+          final header = headerFor(title);
+          expect(header, findsOneWidget);
+          expect(child, findsOneWidget);
+          final headerRect = tester.getRect(header);
+          final childRect = tester.getRect(child);
+          expect(childRect.left - headerRect.left, 12.0);
+          expect(headerRect.right - childRect.right, 12.0);
+          expect(childRect.top, greaterThanOrEqualTo(headerRect.bottom + 4.0));
+        }
+
+        final localChild = find.byKey(
+          ChatToolsSheet.localToolKey(LocalToolNames.timeInfo),
+        );
+        final mcpChild = find.byKey(ChatToolsSheet.mcpServerKey('s1'));
+        final workspaceChild = find.byKey(WorkspaceSection.bindKey);
+
+        // Local starts collapsed; MCP and workspace start expanded.
+        expect(localChild, findsNothing);
+        expect(
+          tester
+              .getSemantics(headerFor(l10n.assistantEditPageLocalToolsTab))
+              .flagsCollection
+              .isExpanded,
+          Tristate.isFalse,
+        );
+        expectInsetHierarchy(l10n.mcpAssistantSheetTitle, mcpChild);
+        expectInsetHierarchy(l10n.workspacesTitle, workspaceChild);
+
+        // Expanding local reveals inset child rows.
+        await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
+        await tester.pumpAndSettle();
+        expectInsetHierarchy(l10n.assistantEditPageLocalToolsTab, localChild);
+
+        // Collapsing and re-expanding MCP and workspace toggles their rows.
+        await tester.tap(find.text(l10n.mcpAssistantSheetTitle));
+        await tester.pumpAndSettle();
+        expect(mcpChild, findsNothing);
+        expect(
+          tester
+              .getSemantics(headerFor(l10n.mcpAssistantSheetTitle))
+              .flagsCollection
+              .isExpanded,
+          Tristate.isFalse,
+        );
+        await tester.tap(find.text(l10n.mcpAssistantSheetTitle));
+        await tester.pumpAndSettle();
+        expectInsetHierarchy(l10n.mcpAssistantSheetTitle, mcpChild);
+
+        await tester.scrollUntilVisible(
+          find.text(l10n.workspacesTitle),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(find.text(l10n.workspacesTitle));
+        await tester.pumpAndSettle();
+        expect(workspaceChild, findsNothing);
+        await tester.tap(find.text(l10n.workspacesTitle));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(workspaceChild);
+        await tester.pumpAndSettle();
+        expectInsetHierarchy(l10n.workspacesTitle, workspaceChild);
+
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  }
+
+  testWidgets(
+    'MCP conversation header deduplicates selection label and fits at 1.3x scale',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      // Keep workspace folded under 1.3x Ahem test font so ToolPermissionRow's
+      // monospace detail string does not mask MCP/local sheet layout checks.
+      await tester.runAsync(
+        () => uiPreferences.setStringList(
+          'display_chat_tools_expanded_groups_v1',
+          ['local', 'mcp'],
+        ),
+      );
+      await tester.runAsync(
+        () => assistants.updateAssistant(
+          assistants
+              .getById(assistantId)!
+              .copyWith(mcpServerIds: ['s1'], allowConversationMcp: true),
+        ),
+      );
+      final conversation = Conversation(
+        id: 'custom-scale',
+        title: 'Custom',
+        assistantId: assistantId,
+      );
+      final l10n = await pumpSheet(
+        tester,
+        conversation: conversation,
+        servers: [_server('s1', 'Alpha'), _server('s2', 'Beta')],
+        viewSize: const Size(390, 844),
+        textScale: 1.3,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text(l10n.mcpAssistantSheetTitle),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      final mcpHeader = find.ancestor(
+        of: find.text(l10n.mcpAssistantSheetTitle),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.expanded != null,
+        ),
+      );
+      expect(
+        tester.getSemantics(mcpHeader).flagsCollection.isExpanded,
+        Tristate.isTrue,
+      );
+
+      final inheritButton = find.byKey(
+        const ValueKey('chat-tools-mcp-inherit'),
+      );
+      final clearButton = find.byKey(const ValueKey('chat-tools-mcp-clear'));
+      expect(find.textContaining(l10n.mcpSelectionInherited), findsOneWidget);
+      expect(find.text(l10n.mcpSelectionInherited), findsNothing);
+      expect(find.text('${l10n.mcpSelectionInherited} · 1/2'), findsOneWidget);
+      expect(inheritButton, findsNothing);
+      expect(clearButton, findsOneWidget);
+
+      await tester.ensureVisible(clearButton);
+      await tester.pumpAndSettle();
+      final mcpHeaderRect = tester.getRect(mcpHeader);
+      final clearRect = tester.getRect(clearButton);
+      expect(clearRect.top, greaterThanOrEqualTo(mcpHeaderRect.bottom));
+      expect(clearRect.right, lessThanOrEqualTo(mcpHeaderRect.right - 12.0));
+
+      final beta = find.byKey(ChatToolsSheet.mcpServerKey('s2'));
+      await tester.ensureVisible(beta);
+      await tester.pumpAndSettle();
+      final mcpRectAfterScroll = tester.getRect(mcpHeader);
+      final betaRect = tester.getRect(beta);
+      expect(betaRect.left - mcpRectAfterScroll.left, 12.0);
+      expect(mcpRectAfterScroll.right - betaRect.right, 12.0);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(beta);
+      await tester.pumpAndSettle();
+      expect(find.textContaining(l10n.mcpSelectionCustom), findsOneWidget);
+      expect(find.text(l10n.mcpSelectionCustom), findsNothing);
+      expect(find.text('${l10n.mcpSelectionCustom} · 2/2'), findsOneWidget);
+      expect(inheritButton, findsOneWidget);
+      expect(clearButton, findsOneWidget);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
 }
