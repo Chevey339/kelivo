@@ -4385,6 +4385,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerBalanceInterval => '定时刷新';
 
   @override
+  String get providerBalanceFalPermissionHint =>
+      '查询余额需要具有 billing:usage:read 权限的 fal 密钥。要单独使用账单密钥，可在下方添加 Authorization 请求头，值为 Key、一个空格和密钥。';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration => '生成后刷新';
+
+  @override
   String get providerBalanceRefreshOnReply => '回复后刷新';
 
   @override
@@ -22155,6 +22162,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerBalanceInterval => '定时刷新';
+
+  @override
+  String get providerBalanceFalPermissionHint =>
+      '查询余额需要具有 billing:usage:read 权限的 fal 密钥。要单独使用账单密钥，可在下方添加 Authorization 请求头，值为 Key、一个空格和密钥。';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration => '生成后刷新';
 
   @override
   String get providerBalanceRefreshOnReply => '回复后刷新';
@@ -39937,6 +39951,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerBalanceInterval => '定時重新整理';
+
+  @override
+  String get providerBalanceFalPermissionHint =>
+      '查詢餘額需要具有 billing:usage:read 權限的 fal 金鑰。若要使用獨立的帳單金鑰，請在此新增 Authorization 標頭，值為 Key、一個空格和金鑰。';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration => '生成後重新整理';
 
   @override
   String get providerBalanceRefreshOnReply => '回覆後重新整理';

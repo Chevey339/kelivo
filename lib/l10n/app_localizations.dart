@@ -8305,6 +8305,18 @@ abstract class AppLocalizations {
   /// **'Timed refresh'**
   String get providerBalanceInterval;
 
+  /// Instruction above the fal balance-specific request headers. Keep the permission scope billing:usage:read, HTTP header Authorization, and literal Key prefix unchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance queries need a fal key with the billing:usage:read permission. To use a separate billing key, add an Authorization header here with the value Key followed by a space and the key.'**
+  String get providerBalanceFalPermissionHint;
+
+  /// Short row label in fal balance settings. Refreshes the account balance when an image or video generation saves new output.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh after generation'**
+  String get providerBalanceRefreshAfterGeneration;
+
   /// Short row label in automatic balance refresh settings. Updates the balance after each completed model reply. Shown for both the global default and the provider override.
   ///
   /// In en, this message translates to:

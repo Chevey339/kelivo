@@ -7,6 +7,7 @@ import 'package:Kelivo/core/services/media/fal_model_discovery.dart';
 import 'package:Kelivo/core/services/media/media_models.dart';
 import 'package:Kelivo/features/provider/widgets/fal_model_picker.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/configurable_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -95,7 +96,8 @@ void main() {
           return _page([_row('studio/next', 'text-to-image')]);
         }
         return _page([
-          _row('studio/first', 'text-to-image'),
+          _row('fal-ai/flux/schnell', 'text-to-image'),
+          _row('fal-ai/nano-banana/edit', 'image-to-image'),
           _row('studio/audio', 'text-to-audio'),
         ], next: 'page-two');
       });
@@ -117,6 +119,24 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      ConfigurableAvatar avatarFor(String id) =>
+          tester.widget<ConfigurableAvatar>(
+            find.descendant(
+              of: find.byKey(ValueKey(id)),
+              matching: find.byType(ConfigurableAvatar),
+            ),
+          );
+      expect(
+        avatarFor('fal-ai/flux/schnell').fallbackAsset,
+        'assets/icons/flux.svg',
+      );
+      expect(
+        avatarFor('fal-ai/nano-banana/edit').fallbackAsset,
+        'assets/icons/gemini-color.svg',
+      );
+      expect(avatarFor('fal-ai/nano-banana/edit').withBackground, isFalse);
+      expect(find.byTooltip('Output Modes: Image'), findsNWidgets(2));
+      expect(find.byTooltip('Input Modes: Image'), findsOneWidget);
       expect(find.text('studio/audio'), findsNothing);
       await tester.tap(find.text('Load more models'));
       await tester.pumpAndSettle();
@@ -130,6 +150,10 @@ void main() {
       stale.complete(_page([_row('studio/obsolete', 'text-to-image')]));
       await tester.pumpAndSettle();
       expect(find.text('studio/obsolete'), findsNothing);
+      expect(avatarFor(id).fallbackAsset, isNull);
+      expect(avatarFor(id).name, 'new-release');
+      expect(find.byTooltip('Output Modes: Video'), findsOneWidget);
+      expect(find.byTooltip('Output Modes: Image'), findsNothing);
       expect(settings.getProviderConfig('fal').models, ['personal/existing']);
       expect(
         calls.any((uri) => uri.queryParameters.containsKey('expand')),

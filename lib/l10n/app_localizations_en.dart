@@ -4570,6 +4570,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerBalanceInterval => 'Timed refresh';
 
   @override
+  String get providerBalanceFalPermissionHint =>
+      'Balance queries need a fal key with the billing:usage:read permission. To use a separate billing key, add an Authorization header here with the value Key followed by a space and the key.';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration =>
+      'Refresh after generation';
+
+  @override
   String get providerBalanceRefreshOnReply => 'Refresh after replies';
 
   @override

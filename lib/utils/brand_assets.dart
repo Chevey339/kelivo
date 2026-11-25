@@ -45,6 +45,10 @@ class BrandAssets {
   static String? _modelAsset(String name) {
     final key = name.trim().toLowerCase();
     if (key.isEmpty) return null;
+    // Catalog searches can expose thousands of ephemeral model names.
+    if (_modelCache.length >= 512 && !_modelCache.containsKey(key)) {
+      _modelCache.remove(_modelCache.keys.first);
+    }
     return _modelCache.putIfAbsent(key, () {
       final parts = key.split('/');
       // e.g. fal-ai/nano-banana/edit: "edit" is not a brand, but the
@@ -76,6 +80,7 @@ class BrandAssets {
   };
 
   static final _mediaModelAssets = {
+    RegExp(r'(?:^|[ ._-])flux(?=$|[ ._-]|[0-9])'): 'flux.svg',
     RegExp(r'(?:^|[ ._-])dall[-· .]?e(?=$|[ ._-]|[0-9])'): 'openai.svg',
     RegExp(r'(?:^|[ ._-])(?:imagen|veo)(?=$|[ ._-]|[0-9])'): 'google-color.svg',
     RegExp(r'(?:^|[ ._-])happyhorse(?=$|[ ._-]|[0-9])'):
@@ -288,6 +293,7 @@ class BrandAssets {
       label: 'Kling',
       asset: 'assets/icons/kling-color.svg',
     ),
+    BrandIconOption(id: 'flux', label: 'FLUX', asset: 'assets/icons/flux.svg'),
     BrandIconOption(id: 'krea', label: 'Krea', asset: 'assets/icons/krea.svg'),
     BrandIconOption(id: 'xai', label: 'xAI', asset: 'assets/icons/xai.svg'),
     BrandIconOption(
@@ -487,6 +493,7 @@ class BrandAssets {
   static const Set<String> _darkAdaptiveAssets = <String>{
     'openai.svg',
     'krea.svg',
+    'flux.svg',
     'anthropic.svg',
     'grok.svg',
     'xai.svg',

@@ -1364,6 +1364,8 @@
   "providerBalanceScopeProvider": "이 공급자",
   "providerBalanceScopeGlobal": "전역 기본값",
   "providerBalanceInterval": "정기 새로고침",
+  "providerBalanceFalPermissionHint": "잔액 조회에는 billing:usage:read 권한이 있는 fal 키가 필요합니다. 별도의 결제 키를 사용하려면 여기에 Authorization 헤더를 추가하고 값을 Key, 공백, 키 순서로 입력하세요.",
+  "providerBalanceRefreshAfterGeneration": "생성 후 새로고침",
   "providerBalanceRefreshOnReply": "응답 후 새로고침",
   "providerBalanceFollowDefault": "기본값 · {value}",
   "providerBalanceRefreshOff": "끔",

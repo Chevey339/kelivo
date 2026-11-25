@@ -1559,6 +1559,8 @@
   "providerBalanceScopeProvider": "此供应商",
   "providerBalanceScopeGlobal": "全局默认",
   "providerBalanceInterval": "定时刷新",
+  "providerBalanceFalPermissionHint": "查询余额需要具有 billing:usage:read 权限的 fal 密钥。要单独使用账单密钥，可在下方添加 Authorization 请求头，值为 Key、一个空格和密钥。",
+  "providerBalanceRefreshAfterGeneration": "生成后刷新",
   "providerBalanceRefreshOnReply": "回复后刷新",
   "providerBalanceFollowDefault": "默认 · {value}",
   "providerBalanceRefreshOff": "关闭",

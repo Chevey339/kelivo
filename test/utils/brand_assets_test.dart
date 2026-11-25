@@ -16,6 +16,10 @@ void main() {
         'openai/dall-e-3': 'openai.svg',
         'dashscope/wan2.6-image': 'alibabacloud-color.svg',
         'fal-ai/nano-banana/edit': 'gemini-color.svg',
+        'google/nano-banana-2.1/edit': 'gemini-color.svg',
+        'openai/gpt-image-2.5/sunburst/edit': 'openai.svg',
+        'fal-ai/flux/schnell': 'flux.svg',
+        'FLUX.1 [schnell]': 'flux.svg',
         'Nano Banana Pro': 'gemini-color.svg',
         'DALL·E 2': 'openai.svg',
         'imagen-4.0-generate-001': 'google-color.svg',
@@ -28,6 +32,12 @@ void main() {
           'assets/icons/${entry.value}',
         );
       }
+      expect(BrandAssets.assetForModel('studio/influx'), isNull);
+      expect(BrandAssets.assetNeedsDarkInvert('assets/icons/flux.svg'), isTrue);
+      expect(
+        BrandAssets.selectableAssetOrNull('assets/icons/flux.svg'),
+        'assets/icons/flux.svg',
+      );
       expect(BrandAssets.assetForName('swan-song'), isNull);
       expect(BrandAssets.assetForName('imagenation'), isNull);
       expect(

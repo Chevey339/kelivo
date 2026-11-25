@@ -11,10 +11,13 @@ import '../../../core/services/media/fal_model_catalog.dart';
 import '../../../core/services/media/fal_model_discovery.dart';
 import '../../../core/services/network/provider_http_client.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/configurable_avatar.dart';
 import '../../../shared/widgets/form_sheet.dart';
+import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_semantic_colors.dart';
+import '../../../utils/brand_assets.dart';
 import '../../media/widgets/creation_controls.dart';
 
 Future<void> showFalModelPicker(
@@ -285,9 +288,17 @@ class _FalModelPickerState extends State<FalModelPicker> {
                         : () => _toggle(model),
                     child: Row(
                       children: [
-                        Icon(
-                          model.video ? LucideIcons.video : LucideIcons.image,
-                          size: 19,
+                        ConfigurableAvatar(
+                          avatar: widget.config.modelAvatar(model.id),
+                          name: model.name,
+                          fallbackAsset: BrandAssets.assetForModel(
+                            model.id,
+                            displayName: model.name,
+                          ),
+                          matchBrandByName: false,
+                          withBackground: false,
+                          size: 22,
+                          iconScale: 1,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -309,6 +320,8 @@ class _FalModelPickerState extends State<FalModelPicker> {
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        ModelCapsulesRow(model: model.spec),
                         const SizedBox(width: 8),
                         if (_pending.contains(model.id))
                           const CupertinoActivityIndicator()

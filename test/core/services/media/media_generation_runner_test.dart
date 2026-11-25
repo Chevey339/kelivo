@@ -416,11 +416,16 @@ void main() {
         }),
       );
       addTearDown(runner.dispose);
+      final saved = <String>[];
+      final subscription = runner.mediaOutputsSaved.listen(saved.add);
+      addTearDown(subscription.cancel);
       final ticket = await runner.enqueue(
         provider: provider('diagnostics'),
         request: request,
       );
       expect(await ticket.completed, GenerationStatus.failed);
+      await Future<void>.delayed(Duration.zero);
+      expect(saved, isEmpty);
       final error = (await repository.batch(ticket.batchId))!.errorJson!;
       expect(error, isNot(contains('fixture-key')));
       expect(error, isNot(contains('An orange cat')));
@@ -466,11 +471,16 @@ void main() {
         }),
       );
       addTearDown(runner.dispose);
+      final saved = <String>[];
+      final subscription = runner.mediaOutputsSaved.listen(saved.add);
+      addTearDown(subscription.cancel);
       final ticket = await runner.enqueue(
         provider: provider('first'),
         request: request,
       );
       expect(await ticket.completed, GenerationStatus.succeeded);
+      await Future<void>.delayed(Duration.zero);
+      expect(saved, ['first']);
       expect(counts, [10, 10, 2]);
       expect(delays, [const Duration(seconds: 3)]);
       final stored = await repository.itemsForBatch(ticket.batchId);

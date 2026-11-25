@@ -4600,6 +4600,14 @@ class AppLocalizationsTr extends AppLocalizations {
   String get providerBalanceInterval => 'Zamanlı yenileme';
 
   @override
+  String get providerBalanceFalPermissionHint =>
+      'Bakiye sorguları için billing:usage:read iznine sahip bir fal anahtarı gerekir. Ayrı bir faturalandırma anahtarı kullanmak için buraya Authorization başlığı ekleyin; değeri Key, bir boşluk ve anahtar olsun.';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration =>
+      'Oluşturma sonrası yenile';
+
+  @override
   String get providerBalanceRefreshOnReply => 'Yanıtlardan sonra yenile';
 
   @override

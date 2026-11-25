@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/models/media_creation.dart';
 import '../../../../core/services/media/media_request.dart';
 import '../../../../core/services/media/media_model_overrides.dart';
+import '../../../../desktop/widgets/desktop_select_dropdown.dart';
 import '../../../../shared/widgets/action_sheet.dart';
 import '../../../../core/services/media/adapters/native_image_size.dart'
     show standardImageRatios, imageFormats;
@@ -17,6 +18,7 @@ import '../../../../shared/widgets/ios_tactile.dart';
 import '../../../../shared/widgets/section_card.dart';
 import '../../../../theme/app_font_weights.dart';
 import '../../../../theme/app_semantic_colors.dart';
+import '../../../../utils/platform_utils.dart';
 import 'model_spec_form_controller.dart';
 
 class MediaOptionsSection extends StatelessWidget {
@@ -96,43 +98,7 @@ class MediaOptionsSection extends StatelessWidget {
             _Field(
               title: l10n.creationApiProtocol,
               help: l10n.creationApiProtocolHelp,
-              child: Builder(
-                builder: (anchorContext) {
-                  final selected = controller.mediaProtocol;
-                  String label(MediaApiProtocol p) =>
-                      p == MediaApiProtocol.auto ? l10n.creationAuto : p.label;
-                  return Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: CreationAction(
-                      icon: const Icon(LucideIcons.chevronDown, size: 14),
-                      child: Text(label(selected)),
-                      onPressed: () {
-                        final box =
-                            anchorContext.findRenderObject() as RenderBox;
-                        showAdaptiveActionMenu(
-                          anchorContext,
-                          anchor: box.localToGlobal(Offset(0, box.size.height)),
-                          title: l10n.creationApiProtocol,
-                          items: [
-                            for (final protocol in MediaApiProtocol.values)
-                              if (protocol.mode == null ||
-                                  protocol.mode == controller.mediaMode)
-                                ActionSheetItem(
-                                  icon: LucideIcons.plug,
-                                  label: label(protocol),
-                                  checked: protocol == selected,
-                                  onTap: () => controller.setMediaValue(
-                                    'protocol',
-                                    protocol.name,
-                                  ),
-                                ),
-                          ],
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
+              child: _protocolSelector(context, l10n),
             ),
           if (!defaults.fixedAspectRatio)
             _Field(
@@ -310,6 +276,51 @@ class MediaOptionsSection extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _protocolSelector(BuildContext context, AppLocalizations l10n) {
+    final selected = controller.mediaProtocol;
+    final protocols = MediaApiProtocol.values.where(
+      (protocol) =>
+          protocol.mode == null || protocol.mode == controller.mediaMode,
+    );
+    String label(MediaApiProtocol protocol) =>
+        protocol == MediaApiProtocol.auto ? l10n.creationAuto : protocol.label;
+    void select(MediaApiProtocol protocol) =>
+        controller.setMediaValue('protocol', protocol.name);
+    if (PlatformUtils.isDesktopTarget) {
+      return SizedBox(
+        width: double.infinity,
+        child: DesktopSelectDropdown<MediaApiProtocol>(
+          value: selected,
+          options: [
+            for (final protocol in protocols)
+              DesktopSelectOption(value: protocol, label: label(protocol)),
+          ],
+          semanticLabel: l10n.creationApiProtocol,
+          triggerFillColor: context.appColors.surfaceFill,
+          wrapTriggerLabel: true,
+          onSelected: select,
+        ),
+      );
+    }
+    return CreationAction(
+      icon: const Icon(LucideIcons.chevronDown, size: 14),
+      onPressed: () => showMobileActionSheet(
+        context,
+        title: l10n.creationApiProtocol,
+        items: [
+          for (final protocol in protocols)
+            ActionSheetItem(
+              icon: LucideIcons.plug,
+              label: label(protocol),
+              checked: protocol == selected,
+              onTap: () => select(protocol),
+            ),
+        ],
+      ),
+      child: Text(label(selected)),
     );
   }
 }

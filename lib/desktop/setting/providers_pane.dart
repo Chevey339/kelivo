@@ -3221,44 +3221,43 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                 ),
                                 const SizedBox(height: 4),
                               ],
-                              if (!cfgNow.isFal)
-                                row(
-                                  l10n.providerDetailPageBalanceInfo,
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: IosSwitch(
-                                      key: const ValueKey(
-                                        'provider-balance-enabled',
-                                      ),
-                                      value: balanceEnabledNow,
-                                      onChanged: (v) async {
-                                        final old = spWatch.getProviderConfig(
-                                          widget.providerKey,
-                                          defaultName: widget.displayName,
-                                        );
-                                        await spWatch.setProviderConfig(
-                                          widget.providerKey,
-                                          old.copyWith(balanceEnabled: v),
-                                        );
-                                        if (mounted) setState(() {});
-                                      },
+                              row(
+                                l10n.providerDetailPageBalanceInfo,
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: IosSwitch(
+                                    key: const ValueKey(
+                                      'provider-balance-enabled',
                                     ),
+                                    value: balanceEnabledNow,
+                                    onChanged: (v) async {
+                                      final old = spWatch.getProviderConfig(
+                                        widget.providerKey,
+                                        defaultName: widget.displayName,
+                                      );
+                                      await spWatch.setProviderConfig(
+                                        widget.providerKey,
+                                        old.copyWith(balanceEnabled: v),
+                                      );
+                                      if (mounted) setState(() {});
+                                    },
                                   ),
                                 ),
+                              ),
                               ProviderBalanceRefreshSettings(
                                 providerKey: widget.providerKey,
                                 providerDisplayName: widget.displayName,
                                 desktopRow: row,
                               ),
-                              if (!cfgNow.isFal)
-                                AnimatedCrossFade(
-                                  firstChild: const SizedBox.shrink(),
-                                  secondChild: Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
+                              AnimatedCrossFade(
+                                firstChild: const SizedBox.shrink(),
+                                secondChild: Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (!cfgNow.isFal)
                                         row(
                                           l10n.providerDetailPageBalanceApiPathLabel,
                                           TextField(
@@ -3294,50 +3293,47 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                             },
                                           ),
                                         ),
-                                        const SizedBox(height: 12),
-                                        ProviderBalanceRequestEditor(
-                                          method: cfgNow.balanceMethod,
-                                          headers: cfgNow.balanceHeaders,
-                                          bodyController: _balanceBodyCtrl,
-                                          onMethodChanged: (value) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceMethod: value,
-                                              ),
-                                            );
-                                          },
-                                          onHeadersChanged: (headers) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceHeaders: headers,
-                                              ),
-                                            );
-                                          },
-                                          onBodyChanged: (_) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceBody:
-                                                    _balanceBodyCtrl.text,
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                        const SizedBox(height: 4),
+                                      const SizedBox(height: 12),
+                                      ProviderBalanceRequestEditor(
+                                        fal: cfgNow.isFal,
+                                        method: cfgNow.balanceMethod,
+                                        headers: cfgNow.balanceHeaders,
+                                        bodyController: _balanceBodyCtrl,
+                                        onMethodChanged: (value) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(balanceMethod: value),
+                                          );
+                                        },
+                                        onHeadersChanged: (headers) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              balanceHeaders: headers,
+                                            ),
+                                          );
+                                        },
+                                        onBodyChanged: (_) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              balanceBody:
+                                                  _balanceBodyCtrl.text,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(height: 4),
+                                      if (!cfgNow.isFal)
                                         row(
                                           l10n.providerDetailPageBalanceResultPathLabel,
                                           TextField(
@@ -3374,70 +3370,68 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                             },
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        row(
-                                          l10n.providerDetailPageBalanceTitle,
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.end,
-                                            children: [
-                                              Flexible(
-                                                child: Align(
-                                                  alignment:
-                                                      Alignment.centerRight,
-                                                  child: ConstrainedBox(
-                                                    constraints:
-                                                        const BoxConstraints(
-                                                          minWidth: 72,
-                                                          maxWidth: 120,
-                                                        ),
-                                                    child: ProviderBalanceBadge(
-                                                      providerKey:
-                                                          widget.providerKey,
-                                                      displayName:
-                                                          widget.displayName,
-                                                      color: cs.primary,
-                                                      showManualResultWhenDisabled:
-                                                          true,
-                                                    ),
+                                      const SizedBox(height: 4),
+                                      row(
+                                        l10n.providerDetailPageBalanceTitle,
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            Flexible(
+                                              child: Align(
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: ConstrainedBox(
+                                                  constraints:
+                                                      const BoxConstraints(
+                                                        minWidth: 72,
+                                                        maxWidth: 120,
+                                                      ),
+                                                  child: ProviderBalanceBadge(
+                                                    providerKey:
+                                                        widget.providerKey,
+                                                    displayName:
+                                                        widget.displayName,
+                                                    color: cs.primary,
+                                                    showManualResultWhenDisabled:
+                                                        true,
                                                   ),
                                                 ),
                                               ),
-                                              const SizedBox(width: 4),
-                                              Tooltip(
-                                                message: _balanceLoading
-                                                    ? l10n.providerDetailPageBalanceQuerying
-                                                    : l10n.providerDetailPageBalanceQueryButton,
-                                                child: _IconBtn(
-                                                  icon: _balanceLoading
-                                                      ? lucide.Lucide.Loader
-                                                      : lucide.Lucide.RefreshCw,
-                                                  color: cs.primary,
-                                                  onTap: () =>
-                                                      _queryProviderBalance(
-                                                        context,
-                                                      ),
-                                                ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Tooltip(
+                                              message: _balanceLoading
+                                                  ? l10n.providerDetailPageBalanceQuerying
+                                                  : l10n.providerDetailPageBalanceQueryButton,
+                                              child: _IconBtn(
+                                                icon: _balanceLoading
+                                                    ? lucide.Lucide.Loader
+                                                    : lucide.Lucide.RefreshCw,
+                                                color: cs.primary,
+                                                onTap: () =>
+                                                    _queryProviderBalance(
+                                                      context,
+                                                    ),
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(height: 8),
-                                        ProviderBalanceResetButton(
-                                          onConfirmed: () =>
-                                              _resetProviderBalance(
-                                                providerKey,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ProviderBalanceResetButton(
+                                        onConfirmed: () =>
+                                            _resetProviderBalance(providerKey),
+                                      ),
+                                    ],
                                   ),
-                                  crossFadeState: balanceEnabledNow
-                                      ? CrossFadeState.showSecond
-                                      : CrossFadeState.showFirst,
-                                  duration: const Duration(milliseconds: 180),
-                                  sizeCurve: Curves.easeOutCubic,
                                 ),
+                                crossFadeState: balanceEnabledNow
+                                    ? CrossFadeState.showSecond
+                                    : CrossFadeState.showFirst,
+                                duration: const Duration(milliseconds: 180),
+                                sizeCurve: Curves.easeOutCubic,
+                              ),
                               const SizedBox(height: 4),
                               if (_isAihubmix(cfgNow))
                                 row(

@@ -101,6 +101,87 @@ void main() {
       },
     );
 
+    test(
+      'fal uses account billing, handles empty credit and accepts a separate billing key',
+      () async {
+        final official = ProviderConfig.defaultsFor(
+          'fal',
+        ).copyWith(apiKey: 'inference-fixture', balanceEnabled: true);
+        expect(
+          ProviderBalanceService.balanceUri(official).toString(),
+          'https://api.fal.ai/v1/account/billing?expand=credits',
+        );
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        final relay = official.copyWith(
+          baseUrl: 'http://127.0.0.1:${server.port}/relay',
+        );
+        final auth = <String?>[];
+        final replies = [
+          (
+            200,
+            {
+              'credits': {'current_balance': 0, 'currency': 'USD'},
+            },
+          ),
+          (
+            200,
+            {
+              'credits': {'current_balance': 24.5, 'currency': 'USD'},
+            },
+          ),
+          (
+            403,
+            {
+              'error': {'message': 'Access denied'},
+            },
+          ),
+          (200, {'credits': {}}),
+        ];
+        server.listen((request) async {
+          final (code, body) = replies[auth.length];
+          auth.add(request.headers.value('Authorization'));
+          expect(request.method, 'GET');
+          expect(request.uri.path, '/relay/v1/account/billing');
+          expect(request.uri.queryParameters, {'expand': 'credits'});
+          request.response.statusCode = code;
+          request.response.write(jsonEncode(body));
+          await request.response.close();
+        });
+        expect(await ProviderBalanceService.fetchBalance(relay), '0.00 USD');
+        expect(
+          await ProviderBalanceService.fetchBalance(
+            relay.copyWith(
+              balanceHeaders: const [
+                {'name': 'Authorization', 'value': 'Key billing-fixture'},
+              ],
+            ),
+          ),
+          '24.50 USD',
+        );
+        await expectLater(
+          ProviderBalanceService.fetchBalance(relay),
+          throwsA(
+            isA<ProviderBalanceException>().having(
+              (e) => e.message,
+              'status',
+              contains('403'),
+            ),
+          ),
+        );
+        await expectLater(
+          ProviderBalanceService.fetchBalance(relay),
+          throwsA(isA<ProviderBalanceException>()),
+        );
+        expect(auth, [
+          'Key inference-fixture',
+          'Key billing-fixture',
+          'Key inference-fixture',
+          'Key inference-fixture',
+        ]);
+      },
+    );
+
     for (final kind in ProviderKind.values) {
       test(
         '${kind.name} requests configured balance path with bearer auth',

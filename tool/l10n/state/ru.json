@@ -1364,6 +1364,8 @@
   "providerBalanceScopeProvider": "0db11511aac075b75af9083aeee017623465b3a065f7c467bf0a7f726bb201aa",
   "providerBalanceScopeGlobal": "d795b08a6aee4071ddb5c23c108e20519739c9f4963bd4023f69219f9e8d067d",
   "providerBalanceInterval": "de7e80080ddc8ec9d2d292db47899191ea6f8e346b147e1fb62c65c74f0b0390",
+  "providerBalanceFalPermissionHint": "1cf9b6914806881ae763a8606f70e815927ef93ff9efb94346586a19068d8de1",
+  "providerBalanceRefreshAfterGeneration": "19985ad7d2d9f43be04cafbb301963a79216cc051813cf451efa84abb5bd9f4b",
   "providerBalanceRefreshOnReply": "129046cbfaf3b53645857245d926ba85594fe4fef215ce941f68ad1521c0a795",
   "providerBalanceFollowDefault": "4db9b1cf426c677ec10bcd1ee9987af010c5bf41ccde9c90f2644269347442df",
   "providerBalanceRefreshOff": "2bb00a406ac84cc14428323f4116100a2fa3a4ade35328bf7e2ac1dcca906a5c",

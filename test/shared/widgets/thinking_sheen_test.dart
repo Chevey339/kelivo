@@ -32,12 +32,49 @@ void main() {
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.binding.hasScheduledFrame, isFalse);
     await tester.pumpWidget(effects(reduceMotion: true));
-    final paused = tester.widget<ShaderMask>(find.byType(ShaderMask));
+    expect(find.byType(ShaderMask), findsNothing);
     await tester.pump(const Duration(seconds: 1));
-    expect(tester.widget<ShaderMask>(find.byType(ShaderMask)), same(paused));
+    expect(find.text('Thinking'), findsOneWidget);
     expect(tester.binding.hasScheduledFrame, isFalse);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets(
+    'the sweep fits the label in a tight chat row in both directions',
+    (tester) async {
+      for (final direction in TextDirection.values) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: direction,
+              child: const Center(
+                child: SizedBox(
+                  width: 400,
+                  child: Row(
+                    children: [
+                      Expanded(child: ThinkingSheen(child: Text('Creating'))),
+                      Text('Cancel'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        final mask = tester.getRect(find.byType(ShaderMask));
+        expect(mask, tester.getRect(find.text('Creating')));
+        expect(mask.width, lessThan(200));
+        final cancel = tester.getRect(find.text('Cancel'));
+        expect(
+          direction == TextDirection.ltr
+              ? mask.right <= cancel.left
+              : mask.left >= cancel.right,
+          isTrue,
+        );
+      }
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   test('sheen palette stays opaque so srcIn keeps the child alpha', () {
     const color = Color(0xC7556688);

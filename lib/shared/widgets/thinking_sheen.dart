@@ -1,26 +1,6 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../animations/status_animation.dart';
-
-class ThinkingSheenParams {
-  const ThinkingSheenParams({
-    required this.speed,
-    required this.spread,
-    required this.intensity,
-  });
-
-  final double speed;
-  final double spread;
-  final double intensity;
-}
-
-const thinkingSheenDefaults = ThinkingSheenParams(
-  speed: 1.05,
-  spread: 0.52,
-  intensity: 0.68,
-);
 
 class ThinkingSheenPalette {
   const ThinkingSheenPalette({required this.base, required this.highlight});
@@ -42,65 +22,56 @@ class ThinkingSheenPalette {
     );
   }
 
-  factory ThinkingSheenPalette.fromTheme(BuildContext context, {Color? color}) {
+  factory ThinkingSheenPalette.fromTheme(BuildContext context) {
     final theme = Theme.of(context);
     return ThinkingSheenPalette.fromColor(
-      color ?? theme.colorScheme.secondary,
+      theme.colorScheme.secondary,
       isDark: theme.brightness == Brightness.dark,
     );
   }
 }
 
 class ThinkingSheen extends StatelessWidget {
-  const ThinkingSheen({
-    super.key,
-    required this.child,
-    this.enabled = true,
-    this.color,
-    this.params = thinkingSheenDefaults,
-    this.palette,
-    this.paused = false,
-  });
+  const ThinkingSheen({super.key, required this.child, this.enabled = true});
 
   final Widget child;
   final bool enabled;
-  final Color? color;
-  final ThinkingSheenParams params;
-  final ThinkingSheenPalette? palette;
-  final bool paused;
 
   @override
   Widget build(BuildContext context) {
-    if (!enabled) return child;
-    final colors =
-        palette ?? ThinkingSheenPalette.fromTheme(context, color: color);
-    final base = _opaque(colors.base);
-    final peak = _opaque(
-      Color.lerp(base, colors.highlight, 0.42 + params.intensity * 0.58)!,
-    );
-    final mid = _opaque(Color.lerp(base, peak, 0.5)!);
-    return RepaintBoundary(
-      child: StatusAnimation(
-        duration: _scaledDuration(
-          const Duration(milliseconds: 2400),
-          params.speed,
-        ),
-        paused: paused,
-        initialValue: 0.42,
-        builder: (context, progress) => AnimatedBuilder(
-          animation: progress,
-          builder: (context, child) => ShaderMask(
-            blendMode: BlendMode.srcIn,
-            shaderCallback: (bounds) => LinearGradient(
-              begin: const Alignment(-1.0, -0.18),
-              end: const Alignment(1.0, 0.18),
-              colors: [base, base, mid, peak, mid, base, base],
-              stops: _sheenStops(params.spread),
-              transform: _SlideGradientTransform(progress.value),
-            ).createShader(bounds),
+    if (!enabled || MediaQuery.maybeDisableAnimationsOf(context) == true) {
+      return child;
+    }
+    final palette = ThinkingSheenPalette.fromTheme(context);
+    final base = palette.base;
+    final peak = Color.lerp(base, palette.highlight, 0.8144)!;
+    final mid = Color.lerp(base, peak, 0.5)!;
+    final colors = [base, base, mid, peak, mid, base, base];
+
+    // Keep the moving highlight on the label even inside a full-width row.
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      widthFactor: 1,
+      heightFactor: 1,
+      child: RepaintBoundary(
+        child: StatusAnimation(
+          duration: const Duration(milliseconds: 2286),
+          initialValue: 0.42,
+          builder: (context, progress) => AnimatedBuilder(
+            animation: progress,
+            builder: (context, child) => ShaderMask(
+              blendMode: BlendMode.srcIn,
+              shaderCallback: (bounds) => LinearGradient(
+                begin: const Alignment(-1.0, -0.18),
+                end: const Alignment(1.0, 0.18),
+                colors: colors,
+                stops: const [0, .24, .4116, .5, .5884, .76, 1],
+                transform: _SlideGradientTransform(progress.value),
+              ).createShader(bounds),
+              child: child,
+            ),
             child: child,
           ),
-          child: child,
         ),
       ),
     );
@@ -120,25 +91,6 @@ class _SlideGradientTransform extends GradientTransform {
       0,
     );
   }
-}
-
-List<double> _sheenStops(double spread) {
-  final outer = spread.clamp(0.2, 0.9) / 2;
-  final inner = outer * 0.34;
-  return [
-    0,
-    (0.5 - outer).clamp(0.02, 0.42),
-    (0.5 - inner).clamp(0.16, 0.48),
-    0.5,
-    (0.5 + inner).clamp(0.52, 0.84),
-    (0.5 + outer).clamp(0.58, 0.98),
-    1,
-  ];
-}
-
-Duration _scaledDuration(Duration base, double speed) {
-  final millis = (base.inMilliseconds / speed.clamp(0.35, 3)).round();
-  return Duration(milliseconds: math.max(420, millis));
 }
 
 Color _opaque(Color color) => color.withValues(alpha: 1);

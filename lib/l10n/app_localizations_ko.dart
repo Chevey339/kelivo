@@ -4461,6 +4461,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get providerBalanceInterval => '정기 새로고침';
 
   @override
+  String get providerBalanceFalPermissionHint =>
+      '잔액 조회에는 billing:usage:read 권한이 있는 fal 키가 필요합니다. 별도의 결제 키를 사용하려면 여기에 Authorization 헤더를 추가하고 값을 Key, 공백, 키 순서로 입력하세요.';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration => '생성 후 새로고침';
+
+  @override
   String get providerBalanceRefreshOnReply => '응답 후 새로고침';
 
   @override

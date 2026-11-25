@@ -844,7 +844,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   },
                 ),
               ),
-            if (!_cfg.isFal) _buildBalanceEntry(context),
+            _buildBalanceEntry(context),
             if (_kind == ProviderKind.google)
               _iosRow(
                 context,

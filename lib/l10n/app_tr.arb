@@ -1364,6 +1364,8 @@
   "providerBalanceScopeProvider": "Bu sağlayıcı",
   "providerBalanceScopeGlobal": "Genel varsayılanlar",
   "providerBalanceInterval": "Zamanlı yenileme",
+  "providerBalanceFalPermissionHint": "Bakiye sorguları için billing:usage:read iznine sahip bir fal anahtarı gerekir. Ayrı bir faturalandırma anahtarı kullanmak için buraya Authorization başlığı ekleyin; değeri Key, bir boşluk ve anahtar olsun.",
+  "providerBalanceRefreshAfterGeneration": "Oluşturma sonrası yenile",
   "providerBalanceRefreshOnReply": "Yanıtlardan sonra yenile",
   "providerBalanceFollowDefault": "Varsayılan · {value}",
   "providerBalanceRefreshOff": "Kapalı",

@@ -71,6 +71,10 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final fal = context
+        .read<SettingsProvider>()
+        .getProviderConfig(widget.providerKey)
+        .isFal;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -97,18 +101,20 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
           ),
           if (_balanceEnabled) ...[
             const SizedBox(height: 12),
-            _inputRow(
-              context,
-              label: l10n.providerDetailPageBalanceApiPathLabel,
-              child: TextField(
-                key: const ValueKey('provider-balance-api-path'),
-                controller: _balanceApiPathCtrl,
-                onChanged: (_) => _saveBalance(),
-                decoration: _balanceInputDecoration(context),
+            if (!fal)
+              _inputRow(
+                context,
+                label: l10n.providerDetailPageBalanceApiPathLabel,
+                child: TextField(
+                  key: const ValueKey('provider-balance-api-path'),
+                  controller: _balanceApiPathCtrl,
+                  onChanged: (_) => _saveBalance(),
+                  decoration: _balanceInputDecoration(context),
+                ),
               ),
-            ),
             const SizedBox(height: 12),
             ProviderBalanceRequestEditor(
+              fal: fal,
               method: _balanceMethod,
               headers: _balanceHeaders,
               bodyController: _balanceBodyCtrl,
@@ -123,16 +129,17 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
               onBodyChanged: (_) => _saveBalance(),
             ),
             const SizedBox(height: 12),
-            _inputRow(
-              context,
-              label: l10n.providerDetailPageBalanceResultPathLabel,
-              child: TextField(
-                key: const ValueKey('provider-balance-result-path'),
-                controller: _balanceResultPathCtrl,
-                onChanged: (_) => _saveBalance(),
-                decoration: _balanceInputDecoration(context),
+            if (!fal)
+              _inputRow(
+                context,
+                label: l10n.providerDetailPageBalanceResultPathLabel,
+                child: TextField(
+                  key: const ValueKey('provider-balance-result-path'),
+                  controller: _balanceResultPathCtrl,
+                  onChanged: (_) => _saveBalance(),
+                  decoration: _balanceInputDecoration(context),
+                ),
               ),
-            ),
             const SizedBox(height: 10),
             Row(
               children: [

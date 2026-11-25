@@ -61,6 +61,10 @@ class MediaGenerationRunner extends ChangeNotifier {
   final _active = <String, _MediaJob>{};
   final _progress = <String, MediaRunProgress>{};
   final _retrying = <String>{};
+  final _mediaOutputsSaved = StreamController<String>.broadcast();
+
+  /// One provider notification per completed batch that saved new output.
+  Stream<String> get mediaOutputsSaved => _mediaOutputsSaved.stream;
   bool _disposed = false;
   bool _closing = false;
   Future<void>? _shutdownTask;
@@ -760,6 +764,12 @@ class MediaGenerationRunner extends ChangeNotifier {
       };
       await _background.finish(job.backgroundId, outcome);
     }
+    if (!_disposed &&
+        (status == GenerationStatus.succeeded ||
+            status == GenerationStatus.partial) &&
+        job.nextOrdinal > job.firstOrdinal) {
+      _mediaOutputsSaved.add(job.provider.id);
+    }
     job.result.complete(status);
   }
 
@@ -784,6 +794,7 @@ class MediaGenerationRunner extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    unawaited(_mediaOutputsSaved.close());
     unawaited(shutdown());
     super.dispose();
   }

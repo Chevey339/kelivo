@@ -1364,6 +1364,8 @@
   "providerBalanceScopeProvider": "Этот провайдер",
   "providerBalanceScopeGlobal": "Глобальные настройки по умолчанию",
   "providerBalanceInterval": "Обновление по таймеру",
+  "providerBalanceFalPermissionHint": "Для запроса баланса нужен ключ fal с разрешением billing:usage:read. Чтобы использовать отдельный ключ для биллинга, добавьте сюда заголовок Authorization со значением Key, пробелом и ключом.",
+  "providerBalanceRefreshAfterGeneration": "Обновлять после генерации",
   "providerBalanceRefreshOnReply": "Обновлять после ответов",
   "providerBalanceFollowDefault": "По умолчанию · {value}",
   "providerBalanceRefreshOff": "Выкл.",

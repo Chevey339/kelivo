@@ -92,7 +92,6 @@ class ContextTaskBar extends StatelessWidget {
                   Flexible(
                     child: ThinkingSheen(
                       enabled: running,
-                      color: color,
                       child: Text(
                         label,
                         style: TextStyle(

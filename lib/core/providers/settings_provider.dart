@@ -623,6 +623,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _balanceRefreshOnReply = _defaultBalanceRefreshOnReply;
   int get balanceRefreshInterval => _balanceRefreshInterval;
   bool get balanceRefreshOnReply => _balanceRefreshOnReply;
+  StreamSubscription<String>? _mediaBalanceSubscription;
   ProviderBalanceRefresh? _balanceRefresh;
   ProviderBalanceRefresh get balanceRefresh =>
       _balanceRefresh ??= ProviderBalanceRefresh(this);
@@ -733,8 +734,12 @@ class SettingsProvider extends ChangeNotifier {
   SettingsProvider(
     this._preferences, {
     this.onProviderModelsRetired,
+    Stream<String>? mediaOutputsSaved,
     this.backupPasswordStore = const BackupSecurePasswordStore(),
   }) {
+    _mediaBalanceSubscription = mediaOutputsSaved?.listen(
+      refreshBalanceAfterReply,
+    );
     ProviderOAuthService.instance.bind(this);
     _appLocaleTag = _readAppLocaleTag(_preferences);
     _loaded = _load();
@@ -3512,6 +3517,7 @@ class SettingsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    unawaited(_mediaBalanceSubscription?.cancel());
     _balanceRefresh?.dispose();
     _backupEncryptionPassword = null;
     ProviderOAuthService.instance.unbind(this);
@@ -7110,6 +7116,15 @@ class ProviderConfig {
   final String? oauthModelsClientVersion;
   bool get isOAuth => oauthProvider != null;
   bool get isFal => id == 'fal';
+
+  bool get usesOfficialFalQueue {
+    if (!isFal) return false;
+    final base = Uri.tryParse(baseUrl);
+    return base?.scheme == 'https' &&
+        base?.host == 'queue.fal.run' &&
+        base?.port == 443;
+  }
+
   final String baseUrl;
   final bool autoVersionDisabled;
   final ProviderKind?

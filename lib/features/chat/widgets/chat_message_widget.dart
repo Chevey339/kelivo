@@ -6013,7 +6013,6 @@ class _ChainOfThoughtReasoningStepState
         const <SourceSpan>[];
     final label = ThinkingSheen(
       enabled: widget.step.loading,
-      color: fg.strong,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -6399,7 +6398,6 @@ class _ChainOfThoughtBrowserGroupState
             Flexible(
               child: ThinkingSheen(
                 enabled: running,
-                color: fg.strong,
                 child: AnimatedSwitcher(
                   duration: reduceMotion
                       ? Duration.zero
@@ -6651,7 +6649,6 @@ class _ChainOfThoughtBrowserGroupState
             Flexible(
               child: ThinkingSheen(
                 enabled: action.loading,
-                color: fg.strong,
                 child: Text(
                   action.failed
                       ? l.browserActionFailed(action.label(l))
@@ -6997,7 +6994,6 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
     );
     final label = ThinkingSheen(
       enabled: widget.part.loading && !_isAskUser,
-      color: fg.strong,
       child: Text(
         title,
         maxLines: 2,
@@ -7379,7 +7375,6 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       // Title: always show tool name; add "waiting" badge when pending
                       ThinkingSheen(
                         enabled: widget.part.loading && !isPendingApproval,
-                        color: fg.strong,
                         child: Text(
                           _titleFor(
                             context,
@@ -8712,7 +8707,6 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
             const SizedBox(width: 8),
             ThinkingSheen(
               enabled: loading,
-              color: fg.strong,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

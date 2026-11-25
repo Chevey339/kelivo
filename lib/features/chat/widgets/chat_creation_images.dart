@@ -343,9 +343,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
                       children: [
                         Expanded(
                           child: ThinkingSheen(
-                            enabled:
-                                active &&
-                                !MediaQuery.disableAnimationsOf(context),
+                            enabled: active,
                             child: Text(
                               active
                                   ? l10n.creationWaitingImage

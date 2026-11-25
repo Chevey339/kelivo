@@ -11,10 +11,18 @@ import 'fal_model_catalog.dart';
 
 /// Only models selected by the user keep their compact input description.
 class FalCatalogEntry {
-  const FalCatalogEntry(this.id, this.name, this.category);
+  FalCatalogEntry(this.id, this.name, this.category);
 
   final String id, name, category;
   bool get video => category.endsWith('-to-video');
+
+  late final spec = ModelSpec(
+    id: id,
+    displayName: name,
+    type: video ? ModelType.video : ModelType.image,
+    input: [Modality.text, if (category.startsWith('image-')) Modality.image],
+    output: [video ? Modality.video : Modality.image],
+  );
 
   static FalCatalogEntry? fromRow(Object? raw) {
     if (raw case {
@@ -40,14 +48,11 @@ class FalModelDiscovery {
     http.Client client,
     ProviderConfig config,
   ) {
-    final base = Uri.tryParse(config.baseUrl);
-    final official =
-        base?.scheme == 'https' &&
-        base?.host == 'queue.fal.run' &&
-        base?.port == 443;
     return FalModelDiscovery(
       client,
-      apiKey: official ? ApiKeyManager().effectiveKeyForProvider(config) : '',
+      apiKey: config.usesOfficialFalQueue
+          ? ApiKeyManager().effectiveKeyForProvider(config)
+          : '',
     );
   }
 
@@ -81,16 +86,7 @@ class FalModelDiscovery {
     do {
       final page = await search('', cursor: cursor);
       for (final entry in page.models) {
-        models[entry.id] = ModelSpec(
-          id: entry.id,
-          displayName: entry.name,
-          type: entry.video ? ModelType.video : ModelType.image,
-          input: [
-            Modality.text,
-            if (entry.category.startsWith('image-')) Modality.image,
-          ],
-          output: [entry.video ? Modality.video : Modality.image],
-        );
+        models[entry.id] = entry.spec;
       }
       cursor = page.nextCursor;
     } while (cursor != null && cursors.add(cursor));

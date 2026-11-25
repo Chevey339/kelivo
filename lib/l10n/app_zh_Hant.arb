@@ -1364,6 +1364,8 @@
   "providerBalanceScopeProvider": "此供應商",
   "providerBalanceScopeGlobal": "全域預設",
   "providerBalanceInterval": "定時重新整理",
+  "providerBalanceFalPermissionHint": "查詢餘額需要具有 billing:usage:read 權限的 fal 金鑰。若要使用獨立的帳單金鑰，請在此新增 Authorization 標頭，值為 Key、一個空格和金鑰。",
+  "providerBalanceRefreshAfterGeneration": "生成後重新整理",
   "providerBalanceRefreshOnReply": "回覆後重新整理",
   "providerBalanceFollowDefault": "預設 · {value}",
   "providerBalanceRefreshOff": "關閉",

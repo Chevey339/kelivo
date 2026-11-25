@@ -4628,6 +4628,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerBalanceInterval => 'Обновление по таймеру';
 
   @override
+  String get providerBalanceFalPermissionHint =>
+      'Для запроса баланса нужен ключ fal с разрешением billing:usage:read. Чтобы использовать отдельный ключ для биллинга, добавьте сюда заголовок Authorization со значением Key, пробелом и ключом.';
+
+  @override
+  String get providerBalanceRefreshAfterGeneration =>
+      'Обновлять после генерации';
+
+  @override
   String get providerBalanceRefreshOnReply => 'Обновлять после ответов';
 
   @override

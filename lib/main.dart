@@ -896,6 +896,7 @@ class MyApp extends StatelessWidget {
             );
             final settings = SettingsProvider(
               businessPreferences,
+              mediaOutputsSaved: mediaRunner.mediaOutputsSaved,
               backupPasswordStore: BackupSecurePasswordStore(
                 namespace: Platform.isWindows
                     ? businessPreferences.getString(

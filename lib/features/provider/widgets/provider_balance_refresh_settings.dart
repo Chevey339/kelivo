@@ -66,7 +66,9 @@ class _ProviderBalanceRefreshSettingsState
     final interval = global
         ? settings.balanceRefreshInterval
         : config.balanceRefreshInterval;
-    final replyTitle = l10n.providerBalanceRefreshOnReply;
+    final replyTitle = !global && config.isFal
+        ? l10n.providerBalanceRefreshAfterGeneration
+        : l10n.providerBalanceRefreshOnReply;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
