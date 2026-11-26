@@ -153,11 +153,14 @@ void main() {
   });
 
   tearDown(() async {
-    browser.dispose();
-    await Future<void>.delayed(Duration.zero);
-    PathProviderPlatform.instance = originalPaths;
-    SandboxPathResolver.debugSetDirs();
-    await directory.delete(recursive: true);
+    try {
+      await browser.flush();
+    } finally {
+      browser.dispose();
+      PathProviderPlatform.instance = originalPaths;
+      SandboxPathResolver.debugSetDirs();
+      await directory.delete(recursive: true);
+    }
   });
 
   Future<void> enable() =>
