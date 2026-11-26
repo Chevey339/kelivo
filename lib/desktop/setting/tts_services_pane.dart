@@ -904,11 +904,13 @@ Future<TtsServiceOptions?> _showNetworkDialog(
   TtsServiceOptions? initial,
 ) async {
   final l10n = AppLocalizations.of(context)!;
-  NetworkTtsKind kind = initial?.kind ?? NetworkTtsKind.openai;
+  NetworkTtsKind kind = initial?.kind ?? NetworkTtsKind.openaiRealtime;
   final nameCtl = TextEditingController(text: initial?.name ?? '');
   // Common fields
   final apiKeyCtl = TextEditingController(
-    text: (initial is OpenAiTtsOptions)
+    text: (initial is OpenAiRealtimeTtsOptions)
+        ? initial.apiKey
+        : (initial is OpenAiTtsOptions)
         ? initial.apiKey
         : (initial is DeepSeekTtsOptions)
         ? initial.apiKey
@@ -937,7 +939,9 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         : '',
   );
   final baseCtl = TextEditingController(
-    text: (initial is OpenAiTtsOptions)
+    text: (initial is OpenAiRealtimeTtsOptions)
+        ? initial.websocketUrl
+        : (initial is OpenAiTtsOptions)
         ? initial.baseUrl
         : (initial is DeepSeekTtsOptions)
         ? initial.baseUrl
@@ -966,7 +970,9 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         : '',
   );
   final modelCtl = TextEditingController(
-    text: (initial is OpenAiTtsOptions)
+    text: (initial is OpenAiRealtimeTtsOptions)
+        ? initial.model
+        : (initial is OpenAiTtsOptions)
         ? initial.model
         : (initial is GeminiTtsOptions)
         ? initial.model
@@ -989,7 +995,9 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         : '',
   );
   final voiceCtl = TextEditingController(
-    text: (initial is OpenAiTtsOptions)
+    text: (initial is OpenAiRealtimeTtsOptions)
+        ? initial.voice
+        : (initial is OpenAiTtsOptions)
         ? initial.voice
         : (initial is DeepSeekTtsOptions)
         ? initial.voiceId
@@ -1087,7 +1095,9 @@ Future<TtsServiceOptions?> _showNetworkDialog(
     text: initial is QwenAudioTtsOptions ? initial.region : 'cn-beijing',
   );
   final instructionCtl = TextEditingController(
-    text: initial is MimoTtsOptions
+    text: initial is OpenAiRealtimeTtsOptions
+        ? initial.instruction
+        : initial is MimoTtsOptions
         ? initial.instruction
         : initial is StepTtsOptions
         ? initial.instruction
@@ -1182,6 +1192,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                               value: kind,
                               labelFor: networkTtsKindDisplayName,
                               options: const [
+                                NetworkTtsKind.openaiRealtime,
                                 NetworkTtsKind.openai,
                                 NetworkTtsKind.deepseek,
                                 NetworkTtsKind.gemini,
@@ -1257,6 +1268,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                             _InputRow(
                               label: kind == NetworkTtsKind.qwenAudio
                                   ? l10n.ttsServicesFieldWorkspaceIdLabel
+                                  : kind == NetworkTtsKind.openaiRealtime
+                                  ? l10n.asrServicesEndpointLabel
                                   : l10n.ttsServicesFieldBaseUrlLabel,
                               controller: baseCtl,
                               hint: kind == NetworkTtsKind.qwenAudio
@@ -1325,6 +1338,14 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                     l10n.ttsServicesFieldChooseReferenceAudioButton,
                                   ),
                                 ),
+                              ),
+                            ],
+                            if (kind == NetworkTtsKind.openaiRealtime) ...[
+                              const SizedBox(height: 6),
+                              _InputRow(
+                                label: l10n.ttsServicesFieldInstructionLabel,
+                                controller: instructionCtl,
+                                maxLines: 3,
                               ),
                             ],
                             if (kind == NetworkTtsKind.minimax) ...[
@@ -1610,6 +1631,16 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                       !isValidAzureTtsEndpoint(base))) {
                                 return;
                               }
+                              if (kind == NetworkTtsKind.openaiRealtime &&
+                                  !isValidOpenAiRealtimeTtsEndpoint(base)) {
+                                showAppSnackBar(
+                                  ctx2,
+                                  message:
+                                      l10n.asrServicesWebSocketEndpointInvalid,
+                                  type: NotificationType.error,
+                                );
+                                return;
+                              }
                               if ((kind == NetworkTtsKind.fishAudio ||
                                       isMimoVoiceClone) &&
                                   rawVoice.isEmpty) {
@@ -1650,7 +1681,18 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                   return;
                                 }
                               }
-                              if (kind == NetworkTtsKind.openai) {
+                              if (kind == NetworkTtsKind.openaiRealtime) {
+                                result = OpenAiRealtimeTtsOptions(
+                                  id: initial?.id,
+                                  enabled: true,
+                                  name: name,
+                                  apiKey: apiKey,
+                                  websocketUrl: base,
+                                  model: model,
+                                  voice: voice,
+                                  instruction: instructionCtl.text.trim(),
+                                );
+                              } else if (kind == NetworkTtsKind.openai) {
                                 result = OpenAiTtsOptions(
                                   id: initial?.id,
                                   enabled: true,
@@ -1932,8 +1974,10 @@ Future<TtsServiceOptions?> _showNetworkDialog(
 
 String _defaultBaseUrl(NetworkTtsKind k) {
   switch (k) {
+    case NetworkTtsKind.openaiRealtime:
+      return OpenAiRealtimeTtsOptions.defaultWebsocketUrl;
     case NetworkTtsKind.openai:
-      return 'https://api.openai.com/v1';
+      return OpenAiTtsOptions.defaultBaseUrl;
     case NetworkTtsKind.deepseek:
       return DeepSeekTtsOptions.defaultBaseUrl;
     case NetworkTtsKind.gemini:
@@ -1963,8 +2007,10 @@ String _defaultBaseUrl(NetworkTtsKind k) {
 
 String _defaultModel(NetworkTtsKind k) {
   switch (k) {
+    case NetworkTtsKind.openaiRealtime:
+      return OpenAiRealtimeTtsOptions.defaultModel;
     case NetworkTtsKind.openai:
-      return 'gpt-4o-mini-tts';
+      return OpenAiTtsOptions.defaultModel;
     case NetworkTtsKind.gemini:
       return 'gemini-3.1-flash-tts-preview';
     case NetworkTtsKind.deepseek:
@@ -1993,6 +2039,8 @@ String _defaultModel(NetworkTtsKind k) {
 
 String _defaultVoice(NetworkTtsKind k) {
   switch (k) {
+    case NetworkTtsKind.openaiRealtime:
+      return OpenAiRealtimeTtsOptions.defaultVoice;
     case NetworkTtsKind.openai:
       return 'alloy';
     case NetworkTtsKind.deepseek:
@@ -2025,6 +2073,7 @@ String _defaultVoice(NetworkTtsKind k) {
 String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
   switch (k) {
     case NetworkTtsKind.deepseek:
+    case NetworkTtsKind.openaiRealtime:
     case NetworkTtsKind.openai:
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.gemini:

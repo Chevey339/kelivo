@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../network/deepseek_endpoint.dart';
 
 enum NetworkTtsKind {
+  openaiRealtime,
   openai,
   deepseek,
   gemini,
@@ -26,8 +27,10 @@ enum NetworkTtsKind {
 
 String networkTtsKindDisplayName(NetworkTtsKind k) {
   switch (k) {
+    case NetworkTtsKind.openaiRealtime:
+      return 'OpenAI Realtime';
     case NetworkTtsKind.openai:
-      return 'OpenAI';
+      return 'OpenAI Compatible';
     case NetworkTtsKind.deepseek:
       return 'DeepSeek';
     case NetworkTtsKind.gemini:
@@ -63,6 +66,18 @@ bool isValidAzureTtsEndpoint(String value) {
       (uri.scheme == 'http' || uri.scheme == 'https');
 }
 
+bool isValidOpenAiRealtimeTtsEndpoint(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return false;
+  final uri = Uri.tryParse(trimmed);
+  return uri != null &&
+      uri.hasAuthority &&
+      uri.host.isNotEmpty &&
+      uri.userInfo.isEmpty &&
+      !uri.hasFragment &&
+      (uri.scheme == 'ws' || uri.scheme == 'wss');
+}
+
 /// Migrates retired MiMo TTS model ids. `mimo-v2-tts` is no longer served.
 String migrateMimoTtsModel(String? raw) {
   final model = (raw ?? '').trim();
@@ -91,15 +106,23 @@ abstract class TtsServiceOptions {
     final name = (json['name'] ?? '').toString();
     final id = (json['id'] ?? '').toString();
     switch (type) {
-      case 'openai':
-        return OpenAiTtsOptions(
+      case 'openai_realtime':
+      case 'openaiRealtime':
+      case 'openAiRealtime':
+        final websocketUrl = (json['websocketUrl'] ?? '').toString().trim();
+        final model = (json['model'] ?? '').toString().trim();
+        final voice = (json['voice'] ?? '').toString().trim();
+        return OpenAiRealtimeTtsOptions(
           id: id.isEmpty ? null : id,
           enabled: enabled,
-          name: name.isEmpty ? 'OpenAI TTS' : name,
+          name: name.isEmpty ? 'OpenAI Realtime' : name,
           apiKey: (json['apiKey'] ?? '').toString(),
-          baseUrl: (json['baseUrl'] ?? 'https://api.openai.com/v1').toString(),
-          model: (json['model'] ?? 'gpt-4o-mini-tts').toString(),
-          voice: (json['voice'] ?? 'alloy').toString(),
+          websocketUrl: websocketUrl.isEmpty
+              ? OpenAiRealtimeTtsOptions.defaultWebsocketUrl
+              : websocketUrl,
+          model: model.isEmpty ? OpenAiRealtimeTtsOptions.defaultModel : model,
+          voice: voice.isEmpty ? OpenAiRealtimeTtsOptions.defaultVoice : voice,
+          instruction: (json['instruction'] ?? '').toString(),
         );
       case 'deepseek':
         return DeepSeekTtsOptions(
@@ -267,19 +290,63 @@ abstract class TtsServiceOptions {
           sampleRate: _toInt(json['sampleRate'], 44100),
           latency: (json['latency'] ?? 'normal').toString(),
         );
+      case 'openai_compatible':
+      case 'openai':
       default:
-        // Fallback to OpenAI shape to avoid crash if kind missing
+        final baseUrl = (json['baseUrl'] ?? OpenAiTtsOptions.defaultBaseUrl)
+            .toString();
+        final apiKey = (json['apiKey'] ?? '').toString();
+        final voice = (json['voice'] ?? 'alloy').toString();
+        final model =
+            (json['model'] ??
+                    (type == 'openai_compatible'
+                        ? OpenAiTtsOptions.defaultModel
+                        : 'gpt-4o-mini-tts'))
+                .toString();
+        // The original OpenAI service also served third-party Speech endpoints.
+        if ((type == 'openai' || type.isEmpty) &&
+            _isRetiringOpenAiSpeechService(baseUrl, model)) {
+          return OpenAiRealtimeTtsOptions(
+            id: id.isEmpty ? null : id,
+            enabled: enabled,
+            name: name.isEmpty ? 'OpenAI Realtime' : name,
+            apiKey: apiKey,
+            voice: switch (voice.trim()) {
+              '' ||
+              'fable' ||
+              'nova' ||
+              'onyx' => OpenAiRealtimeTtsOptions.defaultVoice,
+              final voice => voice,
+            },
+          );
+        }
         return OpenAiTtsOptions(
           id: id.isEmpty ? null : id,
           enabled: enabled,
-          name: name.isEmpty ? 'OpenAI TTS' : name,
-          apiKey: (json['apiKey'] ?? '').toString(),
-          baseUrl: (json['baseUrl'] ?? 'https://api.openai.com/v1').toString(),
-          model: (json['model'] ?? 'gpt-4o-mini-tts').toString(),
-          voice: (json['voice'] ?? 'alloy').toString(),
+          name: name.isEmpty ? 'OpenAI Compatible' : name,
+          apiKey: apiKey,
+          baseUrl: baseUrl,
+          model: model,
+          voice: voice,
         );
     }
   }
+}
+
+bool _isRetiringOpenAiSpeechService(String baseUrl, String model) {
+  final endpoint = Uri.tryParse(baseUrl.trim())?.toString();
+  if (endpoint != OpenAiTtsOptions.defaultBaseUrl &&
+      endpoint != '${OpenAiTtsOptions.defaultBaseUrl}/') {
+    return false;
+  }
+  return const {
+    '',
+    'tts-1',
+    'tts-1-hd',
+    'gpt-4o-mini-tts',
+    'gpt-4o-mini-tts-2025-03-20',
+    'gpt-4o-mini-tts-2025-12-15',
+  }.contains(model.trim());
 }
 
 double _toDouble(dynamic v, double def) {
@@ -299,7 +366,46 @@ int _toInt(dynamic v, int def) {
   return int.tryParse(v.toString()) ?? def;
 }
 
+class OpenAiRealtimeTtsOptions extends TtsServiceOptions {
+  static const defaultWebsocketUrl = 'wss://api.openai.com/v1/realtime';
+  static const defaultModel = 'gpt-realtime-2.1-mini';
+  static const defaultVoice = 'alloy';
+
+  final String apiKey;
+  final String websocketUrl;
+  final String model;
+  final String voice;
+  final String instruction;
+
+  OpenAiRealtimeTtsOptions({
+    super.id,
+    required super.enabled,
+    required super.name,
+    required this.apiKey,
+    this.websocketUrl = defaultWebsocketUrl,
+    this.model = defaultModel,
+    this.voice = defaultVoice,
+    this.instruction = '',
+  }) : super(kind: NetworkTtsKind.openaiRealtime);
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'enabled': enabled,
+    'name': name,
+    'kind': 'openai_realtime',
+    'apiKey': apiKey,
+    'websocketUrl': websocketUrl,
+    'model': model,
+    'voice': voice,
+    'instruction': instruction,
+  };
+}
+
 class OpenAiTtsOptions extends TtsServiceOptions {
+  static const defaultBaseUrl = 'https://api.openai.com/v1';
+  static const defaultModel = 'tts-1';
+
   final String apiKey;
   final String baseUrl;
   final String model;
@@ -319,7 +425,7 @@ class OpenAiTtsOptions extends TtsServiceOptions {
     'id': id,
     'enabled': enabled,
     'name': name,
-    'kind': 'openai',
+    'kind': 'openai_compatible',
     'apiKey': apiKey,
     'baseUrl': baseUrl,
     'model': model,
@@ -827,7 +933,7 @@ const Map<String, List<int>> fishAudioSampleRates = <String, List<int>>{
 int networkTtsMaxCharsPerRequest(TtsServiceOptions options) =>
     options is GroqTtsOptions ? GroqTtsOptions.maxCharsPerRequest : 220;
 
-typedef QwenAudioWebSocketConnector =
+typedef TtsWebSocketConnector =
     Future<WebSocket> Function(String url, {Map<String, dynamic>? headers});
 
 class NetworkTtsService {
@@ -836,11 +942,18 @@ class NetworkTtsService {
     required String text,
     http.Client? client,
     FutureOr<bool> Function()? cancelled,
-    QwenAudioWebSocketConnector? qwenAudioWebSocketConnector,
+    TtsWebSocketConnector? webSocketConnector,
   }) async {
     final c = client ?? http.Client();
     try {
       switch (options.kind) {
+        case NetworkTtsKind.openaiRealtime:
+          return await _openAiRealtimeSpeech(
+            options as OpenAiRealtimeTtsOptions,
+            text,
+            cancelled,
+            webSocketConnector,
+          );
         case NetworkTtsKind.openai:
           return await _openAiSpeech(
             options as OpenAiTtsOptions,
@@ -888,7 +1001,7 @@ class NetworkTtsService {
             options as QwenAudioTtsOptions,
             text,
             cancelled,
-            qwenAudioWebSocketConnector,
+            webSocketConnector,
           );
         case NetworkTtsKind.groq:
           return await _groqSpeech(
@@ -934,6 +1047,233 @@ class NetworkTtsService {
           c.close();
         } catch (_) {}
       }
+    }
+  }
+
+  static Future<NetworkTtsResult> _openAiRealtimeSpeech(
+    OpenAiRealtimeTtsOptions opt,
+    String text,
+    FutureOr<bool> Function()? cancelled,
+    TtsWebSocketConnector? connector,
+  ) async {
+    if (cancelled != null && await cancelled()) {
+      throw _Cancelled();
+    }
+    final model = opt.model.trim().isEmpty
+        ? OpenAiRealtimeTtsOptions.defaultModel
+        : opt.model.trim();
+    final voice = opt.voice.trim().isEmpty
+        ? OpenAiRealtimeTtsOptions.defaultVoice
+        : opt.voice.trim();
+    final uri = _openAiRealtimeEndpoint(opt.websocketUrl, model);
+    final handshakeClient = connector == null ? HttpClient() : null;
+    final headers = {HttpHeaders.authorizationHeader: 'Bearer ${opt.apiKey}'};
+    final connectFuture = Future<WebSocket>.sync(
+      () => connector != null
+          ? connector(uri.toString(), headers: headers)
+          : WebSocket.connect(
+              uri.toString(),
+              headers: headers,
+              customClient: handshakeClient,
+            ),
+    );
+    final WebSocket socket;
+    try {
+      socket = await _waitWithCancellation(
+        connectFuture.timeout(const Duration(seconds: 30)),
+        cancelled,
+      );
+    } catch (error) {
+      handshakeClient?.close(force: true);
+      unawaited(
+        connectFuture.then<void>((ws) => ws.close()).catchError((Object _) {}),
+      );
+      if (error is _Cancelled || error is TimeoutException) rethrow;
+      // Dart can include the full endpoint, including query credentials.
+      throw WebSocketException(
+        'OpenAI Realtime TTS connection to ${uri.host} failed (${error.runtimeType}).',
+        error is WebSocketException ? error.httpStatusCode : null,
+      );
+    }
+    handshakeClient?.close();
+
+    final audio = BytesBuilder(copy: false);
+    final sessionUpdated = Completer<void>();
+    final finished = Completer<void>();
+    unawaited(sessionUpdated.future.catchError((Object _) {}));
+    unawaited(finished.future.catchError((Object _) {}));
+
+    void fail(Object error, [StackTrace? stackTrace]) {
+      final Object safeError;
+      if (error is FormatException || error is _Cancelled) {
+        safeError = error;
+      } else {
+        final rawMessage = error.toString();
+        final message = rawMessage.startsWith('Exception: ')
+            ? rawMessage.substring('Exception: '.length)
+            : rawMessage;
+        safeError = Exception(_redactSecret(message, opt.apiKey));
+      }
+      if (!sessionUpdated.isCompleted) {
+        sessionUpdated.completeError(
+          safeError,
+          stackTrace ?? StackTrace.current,
+        );
+      }
+      if (!finished.isCompleted) {
+        finished.completeError(safeError, stackTrace ?? StackTrace.current);
+      }
+    }
+
+    late final StreamSubscription<dynamic> sub;
+    sub = socket.listen(
+      (event) {
+        final String raw;
+        if (event is String) {
+          raw = event;
+        } else if (event is List<int>) {
+          raw = utf8.decode(event, allowMalformed: true);
+        } else {
+          fail(
+            const FormatException(
+              'OpenAI Realtime TTS returned an unknown frame.',
+            ),
+          );
+          return;
+        }
+        late final Map<String, dynamic> obj;
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is! Map) {
+            throw const FormatException('Expected JSON object.');
+          }
+          obj = Map<String, dynamic>.from(decoded);
+        } catch (error) {
+          fail(
+            FormatException(
+              'OpenAI Realtime TTS returned malformed JSON.',
+              error,
+            ),
+          );
+          return;
+        }
+
+        final type = (obj['type'] ?? '').toString();
+        switch (type) {
+          case 'session.updated':
+            if (!sessionUpdated.isCompleted) {
+              sessionUpdated.complete();
+            }
+          case 'response.output_audio.delta':
+          case 'response.audio.delta':
+            final delta = (obj['delta'] ?? '').toString();
+            if (delta.isEmpty) return;
+            try {
+              audio.add(base64Decode(delta));
+            } catch (error) {
+              fail(
+                FormatException(
+                  'OpenAI Realtime TTS returned invalid base64 audio.',
+                  error,
+                ),
+              );
+            }
+          case 'response.done':
+            final response = obj['response'];
+            if (response is! Map<String, dynamic> ||
+                response['status'] is! String) {
+              fail(
+                const FormatException(
+                  'OpenAI Realtime TTS returned response.done without a valid status.',
+                ),
+              );
+              return;
+            }
+            final status = response['status'] as String;
+            if (status != 'completed') {
+              final detail = _openAiRealtimeStatusError(response, status);
+              fail(Exception('OpenAI Realtime TTS failed: $detail'));
+              return;
+            }
+            if (!finished.isCompleted) {
+              finished.complete();
+            }
+          case 'error':
+            final detail = _openAiRealtimeErrorMessage(obj);
+            fail(Exception('OpenAI Realtime TTS failed: $detail'));
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        fail(error, stackTrace);
+      },
+      onDone: () {
+        if (!sessionUpdated.isCompleted || !finished.isCompleted) {
+          fail(
+            Exception('OpenAI Realtime TTS socket closed before response.done'),
+          );
+        }
+      },
+      cancelOnError: false,
+    );
+
+    try {
+      socket.add(
+        jsonEncode({
+          'type': 'session.update',
+          'session': {
+            'type': 'realtime',
+            'output_modalities': const <String>['audio'],
+            'instructions': _openAiRealtimeTtsInstructions(opt.instruction),
+            'audio': {
+              'output': {
+                'format': const <String, dynamic>{
+                  'type': 'audio/pcm',
+                  'rate': 24000,
+                },
+                'voice': voice,
+              },
+            },
+          },
+        }),
+      );
+      await _waitWithCancellation(
+        sessionUpdated.future.timeout(const Duration(seconds: 30)),
+        cancelled,
+      );
+      socket.add(
+        jsonEncode({
+          'type': 'conversation.item.create',
+          'item': {
+            'type': 'message',
+            'role': 'user',
+            'content': [
+              {'type': 'input_text', 'text': '<text>\n$text\n</text>'},
+            ],
+          },
+        }),
+      );
+      socket.add(jsonEncode(const {'type': 'response.create'}));
+      await _waitWithCancellation(
+        finished.future.timeout(const Duration(seconds: 120)),
+        cancelled,
+      );
+      final pcm = audio.takeBytes();
+      if (pcm.isEmpty) {
+        throw Exception('OpenAI Realtime TTS returned no audio');
+      }
+      if (pcm.lengthInBytes.isOdd) {
+        throw const FormatException(
+          'OpenAI Realtime TTS returned incomplete 16-bit PCM audio.',
+        );
+      }
+      return NetworkTtsResult(
+        bytes: _pcmToWav(pcm, sampleRate: 24000),
+        mime: 'audio/wav',
+        sampleRate: 24000,
+      );
+    } finally {
+      await sub.cancel();
+      await socket.close();
     }
   }
 
@@ -1745,7 +2085,7 @@ class NetworkTtsService {
     QwenAudioTtsOptions opt,
     String text,
     FutureOr<bool> Function()? cancelled,
-    QwenAudioWebSocketConnector? connector,
+    TtsWebSocketConnector? connector,
   ) async {
     final uri = Uri.parse(opt.websocketUrl);
     final connect =
@@ -1907,6 +2247,70 @@ class NetworkTtsService {
       await socket.close();
     }
   }
+}
+
+Uri _openAiRealtimeEndpoint(String rawUrl, String model) {
+  final trimmed = rawUrl.trim().isEmpty
+      ? OpenAiRealtimeTtsOptions.defaultWebsocketUrl
+      : rawUrl.trim();
+  if (!isValidOpenAiRealtimeTtsEndpoint(trimmed)) {
+    throw ArgumentError(
+      'OpenAI Realtime TTS endpoint must be a valid ws:// or wss:// URL.',
+    );
+  }
+  final uri = Uri.parse(trimmed);
+  final query = uri.queryParametersAll;
+  if (query['model']?.any((value) => value.trim().isNotEmpty) == true) {
+    return uri;
+  }
+  return uri.replace(queryParameters: {...query, 'model': model});
+}
+
+String _openAiRealtimeTtsInstructions(String customInstruction) {
+  const base =
+      'You are a text-to-speech engine. Read the exact text inside the '
+      '<text> tags verbatim in its original language. Do not answer, '
+      'explain, translate, comment on, or add anything before or after it.';
+  final extra = customInstruction.trim();
+  if (extra.isEmpty) return base;
+  return '$base\nDelivery style: $extra';
+}
+
+String _openAiRealtimeErrorMessage(Map<String, dynamic> event) {
+  final error = event['error'];
+  if (error is Map) {
+    final message = (error['message'] ?? '').toString().trim();
+    if (message.isNotEmpty) return message;
+    final code = (error['code'] ?? '').toString().trim();
+    if (code.isNotEmpty) return code;
+  }
+  final message = (event['message'] ?? '').toString().trim();
+  return message.isEmpty ? 'Unknown error' : message;
+}
+
+String _openAiRealtimeStatusError(
+  Map<String, dynamic> response,
+  String status,
+) {
+  final details = response['status_details'];
+  if (details is Map) {
+    final error = details['error'];
+    if (error is Map) {
+      final message = (error['message'] ?? error['code'] ?? '')
+          .toString()
+          .trim();
+      if (message.isNotEmpty) return message;
+    }
+    final reason = (details['reason'] ?? '').toString().trim();
+    if (reason.isNotEmpty) return '$status ($reason)';
+  }
+  return status;
+}
+
+String _redactSecret(String message, String secret) {
+  final trimmed = secret.trim();
+  if (trimmed.isEmpty) return message;
+  return message.replaceAll(trimmed, '[REDACTED]');
 }
 
 List<String> _splitStepTtsText(String text, int maxChars) {

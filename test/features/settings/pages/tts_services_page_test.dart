@@ -93,7 +93,10 @@ void main() {
 
     expect(find.text('Add TTS Service'), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);
-    expect(find.text('OpenAI'), findsWidgets);
+    expect(find.text('OpenAI Realtime'), findsWidgets);
+    expect(find.text('OpenAI Compatible'), findsOneWidget);
+    expect(find.text('Endpoint'), findsOneWidget);
+    expect(find.text('Style / voice description'), findsOneWidget);
     expect(find.text('xAI'), findsOneWidget);
 
     await tester.tap(find.text('xAI'));
@@ -309,7 +312,13 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    await selectProvider('OpenAI', 'Fish Audio');
+    expect(find.text('Endpoint'), findsOneWidget);
+    expect(find.text('Style / voice description'), findsOneWidget);
+    await selectProvider('OpenAI Realtime', 'OpenAI Compatible');
+    expect(find.text('API Base URL'), findsOneWidget);
+    expect(find.text('Style / voice description'), findsNothing);
+
+    await selectProvider('OpenAI Compatible', 'Fish Audio');
     expect(find.text('Temperature'), findsOneWidget);
     expect(find.text('Top P'), findsOneWidget);
     expect(find.text('Latency'), findsOneWidget);
@@ -373,7 +382,7 @@ void main() {
         await tester.tap(find.byTooltip('Add'));
         await tester.pumpAndSettle();
         if (desktop) {
-          await tester.tap(find.text('OpenAI').first);
+          await tester.tap(find.text('OpenAI Realtime').first);
           await tester.pumpAndSettle();
         }
         await tester.tap(find.text('DeepSeek'));
@@ -418,6 +427,88 @@ void main() {
         final edited = settings.ttsServices.single as DeepSeekTtsOptions;
         expect(edited.id, saved.id);
         expect(edited.voiceId, 'stella');
+      },
+    );
+  }
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'adds, validates, and edits an OpenAI Realtime voice on ${desktop ? 'desktop' : 'mobile'}',
+      (tester) async {
+        if (!desktop) {
+          tester.view.physicalSize = const Size(430, 1000);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+        }
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        final tts = TtsProvider(preferences: createBusinessTestPreferences());
+        addTearDown(tts.dispose);
+        await _pumpVoiceServices(
+          tester,
+          settings: settings,
+          tts: tts,
+          desktop: desktop,
+        );
+        await tester.tap(find.byTooltip('Add'));
+        await tester.pumpAndSettle();
+
+        final keyField = find.byWidgetPredicate(
+          (w) => w is TextField && w.obscureText,
+        );
+        final endpointField = find.byWidgetPredicate(
+          (w) =>
+              w is TextField &&
+              w.decoration?.hintText == 'wss://api.openai.com/v1/realtime',
+        );
+        final instructionField = find.byWidgetPredicate(
+          (w) => w is TextField && w.maxLines == 3,
+        );
+        await tester.enterText(keyField, 'rt-key');
+        await tester.enterText(
+          endpointField,
+          'https://api.openai.com/v1/realtime',
+        );
+        await tester.tap(
+          desktop ? find.text('Add').last : find.byTooltip('Add'),
+        );
+        await tester.pumpAndSettle();
+        expect(settings.ttsServices, isEmpty);
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(endpointField, 'wss://proxy.example/realtime');
+        await tester.enterText(instructionField, 'Speak calmly');
+        await tester.tap(
+          desktop ? find.text('Add').last : find.byTooltip('Add'),
+        );
+        await tester.pumpAndSettle();
+
+        final saved = settings.selectedTtsService as OpenAiRealtimeTtsOptions;
+        expect(saved.name, 'OpenAI Realtime');
+        expect(saved.apiKey, 'rt-key');
+        expect(saved.websocketUrl, 'wss://proxy.example/realtime');
+        expect(saved.model, 'gpt-realtime-2.1-mini');
+        expect(saved.voice, 'alloy');
+        expect(saved.instruction, 'Speak calmly');
+
+        await tester.tap(_iconBeside('OpenAI Realtime', Lucide.Settings2));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(endpointField).controller?.text,
+          'wss://proxy.example/realtime',
+        );
+        expect(
+          tester.widget<TextField>(instructionField).controller?.text,
+          'Speak calmly',
+        );
+        await tester.enterText(instructionField, 'Speak briskly');
+        await tester.tap(desktop ? find.text('Save') : find.byTooltip('Save'));
+        await tester.pumpAndSettle();
+
+        final edited = settings.ttsServices.single as OpenAiRealtimeTtsOptions;
+        expect(edited.id, saved.id);
+        expect(edited.instruction, 'Speak briskly');
       },
     );
   }
@@ -602,7 +693,7 @@ OpenAiTtsOptions _tts(String id, String name) {
     name: name,
     apiKey: 'test-key',
     baseUrl: 'https://api.openai.com/v1',
-    model: 'gpt-4o-mini-tts',
+    model: 'tts-1',
     voice: 'alloy',
   );
 }

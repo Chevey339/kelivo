@@ -14,13 +14,15 @@ import 'network_tts.dart';
 class TtsReplayCache {
   final _pending = <String, _PendingAudio>{};
 
-  static Future<String> serviceKey(TtsServiceOptions service) => compute(
-    _hashSettings,
-    service.toJson()
+  static Future<String> serviceKey(TtsServiceOptions service) {
+    final settings = service.toJson()
       ..remove('id')
       ..remove('name')
-      ..remove('enabled'),
-  );
+      ..remove('enabled');
+    // HTTP Speech still produces the audio stored under the original key.
+    if (service is OpenAiTtsOptions) settings['kind'] = 'openai';
+    return compute(_hashSettings, settings);
+  }
 
   // A voice-cloning profile can contain up to 10 MB of reference audio.
   static String _hashSettings(Map<String, dynamic> settings) =>

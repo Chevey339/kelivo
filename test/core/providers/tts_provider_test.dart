@@ -8,6 +8,7 @@ import 'package:Kelivo/core/services/mobile_background.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/core/services/tts/network_tts.dart';
 import 'package:Kelivo/core/services/tts/tts_playback_models.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -875,12 +876,14 @@ void main() {
         String voice, {
         String? id,
         String? apiKey,
+        String? kind,
       }) async {
         await session.preferences.setString(
           'tts_services_v1',
           jsonEncode([
             {
               ...service.toJson(),
+              if (kind != null) 'kind': kind,
               'voice': voice,
               'id': id ?? service.id,
               'apiKey': apiKey ?? service.apiKey,
@@ -907,7 +910,27 @@ void main() {
         expect(audio?.$2, 'mp3');
       }
 
-      await selectVoice('alloy');
+      const cachedText = 'cached before upgrade';
+      final oldSettings = jsonEncode({
+        'kind': 'openai',
+        'apiKey': service.apiKey,
+        'baseUrl': service.baseUrl,
+        'model': service.model,
+        'voice': service.voice,
+      });
+      final oldServiceKey = sha256.convert(utf8.encode(oldSettings));
+      final oldEntry = sha256.convert(
+        utf8.encode('$oldServiceKey:$cachedText'),
+      );
+      final cached = File(
+        '${tempDirectory.path}/tts_replay/$oldEntry/audio.mp3',
+      );
+      await cached.create(recursive: true);
+      await cached.writeAsBytes([42]);
+      await selectVoice('alloy', kind: 'openai');
+      await play(provider.speak(cachedText), 42);
+      expect(requests, isEmpty);
+
       await play(provider.speak('first'), 1);
       await selectVoice('alloy', id: 'equivalent-profile');
       final firstReplay = provider.togglePause();
