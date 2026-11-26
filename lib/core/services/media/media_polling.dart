@@ -130,5 +130,6 @@ Never failedMediaTask(Object? details) {
     failure.message.isEmpty
         ? 'Provider could not generate media'
         : failure.message,
+    logDetail: failure.logDetail,
   );
 }

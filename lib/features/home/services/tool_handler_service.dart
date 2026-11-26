@@ -1,3 +1,4 @@
+import '../../../utils/kelivo_file_uri.dart';
 import '../../../core/services/api/request_image_context.dart';
 import '../../../core/services/api/request_tool_declarations.dart';
 import 'package:Kelivo/core/services/conversation_tool_permissions.dart';
@@ -662,8 +663,21 @@ class ToolHandlerService {
                     id,
                   ), run);
           }
+          final candidateHandle = name == ViewImageTool.name
+              ? ViewImageTool.imageIdFromPath(args['path'])
+              : null;
+          final handleInPath =
+              candidateHandle != null &&
+                  RequestImageContext.current?.isGeneratedHandle(
+                        candidateHandle,
+                      ) ==
+                      true
+              ? candidateHandle
+              : null;
           if (name == ViewImageTool.name &&
-              (args['image_id'] != null || args['path'] == null)) {
+              (args['image_id'] != null ||
+                  args['path'] == null ||
+                  handleInPath != null)) {
             if (args['path'] != null && args['image_id'] != null) {
               return _toolError(
                 error: 'invalid_arguments',
@@ -683,21 +697,33 @@ class ToolHandlerService {
             final imageSettings = await chat.imageContextSettings(
               conversationId,
             );
-            if (!imageSettings.allowRecall) {
-              return const ClientToolResult(
-                'Image recall is disabled for this conversation. Ask the user to attach the image again if needed.',
-              );
-            }
             final allowed = await chat.imageContextHistory(
               conversationId,
               throughMessageId: imageContext.targetMessageId,
             );
-            return imageContext.readImage(
-              (args['image_id'] ?? '').toString(),
+            final handle = (args['image_id'] ?? handleInPath ?? '').toString();
+            final result = imageContext.readImage(
+              handle,
+              allowHistory: imageSettings.allowRecall,
               allowedMessages: allowed.map((m) => m.id).toSet(),
               excluded: imageSettings.excluded,
               offset: args['offset'] is int ? args['offset'] as int : 0,
             );
+            final source = mcpResultImageUris(
+              readMcpResultMetadata(result.metadata),
+            ).firstOrNull;
+            if (source != null &&
+                KelivoFileUri.generationImageItemId(source) != null &&
+                (await chat.chatRepositoryOrNull?.mediaRepository.ownsImage(
+                          source,
+                        ) !=
+                        true ||
+                    await imageContext.localAttachmentPath(handle) == null)) {
+              return const ClientToolResult(
+                'This image was removed from Creation and is no longer available.',
+              );
+            }
+            return result;
           }
           if (name == ViewImageTool.name && workspaceContext == null) {
             return _toolError(

@@ -6,6 +6,10 @@ import '../../utils/mcp_structured_image.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import 'multimodal_input_utils.dart';
 
+final _creationSourceKey = RegExp(r'^[^|]+\|creation:([a-zA-Z0-9_-]+)\|\d+$');
+String? creationItemFromSourceKey(String? key) =>
+    key == null ? null : _creationSourceKey.firstMatch(key)?.group(1);
+
 /// Only the built-in reader can retain authority to a conversation attachment.
 ({String sourceKey, String? contextKey, bool directAsset, String mime})?
 readChatImageMetadata(String name, Map<String, dynamic>? metadata) {

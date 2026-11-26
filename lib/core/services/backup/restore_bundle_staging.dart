@@ -1183,6 +1183,9 @@ final class RestoreBundleStaging {
       if (!args.scope.includes(BackupCategory.creations)) {
         await MediaRepository(database).clear();
       }
+      // The source receipt describes a different installation. After cutover,
+      // recheck chat originals against the selected media files and catalog.
+      await MediaRepository(database).invalidateChatOriginals();
       final devicePath = args.deviceDatabasePath;
       if (devicePath != null && await File(devicePath).exists()) {
         final localDatabase = AppDatabase.open(file: File(devicePath));

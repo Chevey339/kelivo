@@ -16929,7 +16929,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationDeleteTopic => '删除话题';
 
   @override
-  String get creationDeleteTopicBody => '删除这个话题和其中的所有作品？';
+  String get creationDeleteTopicBody => '删除这个话题和其中的所有作品？聊天和参考图中引用的作品也会失效。';
 
   @override
   String get creationImage => '图片';
@@ -17091,10 +17091,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationShare => '分享';
 
   @override
+  String get creationReferenceImagesLabel => '参考图';
+
+  @override
+  String get creationReferenceDeleted => '这张参考图已删除';
+
+  @override
+  String get creationOriginalDeleted => '图片已从创作中删除';
+
+  @override
+  String get creationMaskLabel => '蒙版';
+
+  @override
   String get creationDeleteItem => '删除作品';
 
   @override
-  String get creationDeleteItemBody => '删除这个作品？';
+  String get creationDeleteItemBody => '删除这个作品？聊天和参考图中引用的这件作品也会失效。';
 
   @override
   String get creationActionFailed => '操作未完成';
@@ -17502,7 +17514,7 @@ class AppLocalizationsZh extends AppLocalizations {
       other: '将从此设备删除这一组及其中的 $count 个文件，无法恢复。',
       zero: '确定从此设备删除这条生成记录吗？',
     );
-    return '$_temp0';
+    return '$_temp0聊天和参考图中引用的作品也会失效。';
   }
 
   @override
@@ -34776,7 +34788,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get creationDeleteTopic => '删除话题';
 
   @override
-  String get creationDeleteTopicBody => '删除这个话题和其中的所有作品？';
+  String get creationDeleteTopicBody => '删除这个话题和其中的所有作品？聊天和参考图中引用的作品也会失效。';
 
   @override
   String get creationImage => '图片';
@@ -34938,10 +34950,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get creationShare => '分享';
 
   @override
+  String get creationReferenceImagesLabel => '参考图';
+
+  @override
+  String get creationReferenceDeleted => '这张参考图已删除';
+
+  @override
+  String get creationOriginalDeleted => '图片已从创作中删除';
+
+  @override
+  String get creationMaskLabel => '蒙版';
+
+  @override
   String get creationDeleteItem => '删除作品';
 
   @override
-  String get creationDeleteItemBody => '删除这个作品？';
+  String get creationDeleteItemBody => '删除这个作品？聊天和参考图中引用的这件作品也会失效。';
 
   @override
   String get creationActionFailed => '操作未完成';
@@ -35349,7 +35373,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       other: '将从此设备删除这一组及其中的 $count 个文件，无法恢复。',
       zero: '确定从此设备删除这条生成记录吗？',
     );
-    return '$_temp0';
+    return '$_temp0聊天和参考图中引用的作品也会失效。';
   }
 
   @override
@@ -52674,7 +52698,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get creationDeleteTopic => '刪除話題';
 
   @override
-  String get creationDeleteTopicBody => '刪除這個話題和其中的所有作品？';
+  String get creationDeleteTopicBody => '刪除這個話題及其中的所有作品？聊天和參考圖中引用的作品也會失效。';
 
   @override
   String get creationImage => '圖片';
@@ -52836,10 +52860,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get creationShare => '分享';
 
   @override
+  String get creationReferenceImagesLabel => '參考圖片';
+
+  @override
+  String get creationReferenceDeleted => '這張參考圖已刪除';
+
+  @override
+  String get creationOriginalDeleted => '圖片已從創作中刪除';
+
+  @override
+  String get creationMaskLabel => '遮罩';
+
+  @override
   String get creationDeleteItem => '刪除作品';
 
   @override
-  String get creationDeleteItemBody => '刪除這個作品？';
+  String get creationDeleteItemBody => '刪除這個作品？聊天和參考圖中引用的這件作品也會失效。';
 
   @override
   String get creationActionFailed => '操作未完成';
@@ -53244,10 +53280,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '要從此裝置刪除這個群組及其中的 $count 個檔案嗎？',
-      zero: '要從此裝置刪除這筆生成記錄嗎？',
+      other: '將從此裝置刪除這一組及其中的 $count 個檔案。',
+      zero: '確定從此裝置刪除這條生成記錄嗎？',
     );
-    return '$_temp0';
+    return '$_temp0聊天和參考圖中引用的作品也會失效。';
   }
 
   @override

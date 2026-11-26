@@ -6,6 +6,8 @@ import '../../providers/settings_provider.dart';
 import '../api/tool_call_cancellation.dart';
 import '../mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import '../network/pinned_tls_socket.dart';
+import '../network/media_http_log.dart';
+import '../network/request_logger.dart';
 import '../network/public_internet_address.dart';
 import '../tool_image.dart';
 
@@ -16,6 +18,7 @@ const _maxRedirects = 3;
 Future<Uint8List> downloadWorkspaceImage(
   Uri uri, {
   required void Function() checkAccess,
+  bool logMediaRequest = false,
 }) async {
   checkAccess();
   final client = HttpClient()
@@ -43,7 +46,7 @@ Future<Uint8List> downloadWorkspaceImage(
   );
   try {
     return await Future.any([
-      _download(client, uri, checkRequestAccess),
+      _download(client, uri, checkRequestAccess, logMediaRequest),
       stopped.future,
     ]).timeout(_downloadTimeout);
   } on TimeoutException {
@@ -132,49 +135,92 @@ Future<Uint8List> _download(
   HttpClient client,
   Uri uri,
   void Function(Uri url) checkAccess,
+  bool logMediaRequest,
 ) async {
-  for (var redirects = 0; ; redirects++) {
-    if (!(uri.isScheme('http') || uri.isScheme('https')) ||
-        uri.host.isEmpty ||
-        uri.port < 1 ||
-        uri.port > 65535 ||
-        uri.userInfo.isNotEmpty) {
-      throw const ToolImageException('Use a public HTTP(S) image URL');
-    }
-    checkAccess(uri);
-    final request = await client.getUrl(uri);
-    checkAccess(uri);
-    request
-      ..followRedirects = false
-      ..persistentConnection = false;
-    request.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
-    final response = await request.close();
-    if (response.isRedirect) {
-      await response.listen(null).cancel();
-      final location = response.headers.value(HttpHeaders.locationHeader);
-      if (location == null || location.trim().isEmpty) {
-        throw const ToolImageException('Image redirect has no location');
+  int? logId;
+  try {
+    for (var redirects = 0; ; redirects++) {
+      if (!(uri.isScheme('http') || uri.isScheme('https')) ||
+          uri.host.isEmpty ||
+          uri.port < 1 ||
+          uri.port > 65535 ||
+          uri.userInfo.isNotEmpty) {
+        throw const ToolImageException('Use a public HTTP(S) image URL');
       }
-      if (redirects == _maxRedirects) {
-        throw const ToolImageException('Image URL redirected too many times');
+      checkAccess(uri);
+      logId = logMediaRequest && RequestLogger.enabled
+          ? RequestLogger.nextRequestId()
+          : null;
+      if (logId != null) {
+        RequestLogger.logLine('[REQ $logId] GET ${MediaHttpLog.url(uri)}');
       }
-      uri = uri.resolve(location);
-      continue;
+      final request = await client.getUrl(uri);
+      checkAccess(uri);
+      request
+        ..followRedirects = false
+        ..persistentConnection = false;
+      request.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
+      final response = await request.close();
+      if (logId != null && RequestLogger.enabled) {
+        RequestLogger.logLine('[RES $logId] status=${response.statusCode}');
+        final headers = <String, String>{};
+        response.headers.forEach(
+          (name, values) => headers[name] = values.join(','),
+        );
+        RequestLogger.logLine(
+          '[RES $logId] headers=${RequestLogger.encodeObject(MediaHttpLog.headers(headers))}',
+        );
+      }
+      if (response.isRedirect) {
+        await response.listen(null).cancel();
+        final location = response.headers.value(HttpHeaders.locationHeader);
+        if (location == null || location.trim().isEmpty) {
+          throw const ToolImageException('Image redirect has no location');
+        }
+        if (redirects == _maxRedirects) {
+          throw const ToolImageException('Image URL redirected too many times');
+        }
+        uri = uri.resolve(location);
+        if (logId != null) RequestLogger.logLine('[RES $logId] done');
+        logId = null;
+        continue;
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        await response.listen(null).cancel();
+        throw ToolImageException(
+          'Image download returned HTTP ${response.statusCode}',
+        );
+      }
+
+      const tooLarge = ToolImageException(
+        'Image exceeds the 20 MiB file limit',
+      );
+      if (response.contentLength > ToolImage.maxFileBytes) throw tooLarge;
+      final bytes = BytesBuilder(copy: false);
+      await for (final chunk in response) {
+        if (bytes.length + chunk.length > ToolImage.maxFileBytes) {
+          throw tooLarge;
+        }
+        bytes.add(chunk);
+      }
+      if (logId != null && RequestLogger.enabled && RequestLogger.saveOutput) {
+        final description = MediaHttpLog.describeBytes(
+          bytes.length,
+          response.headers.contentType?.mimeType,
+          null,
+        );
+        RequestLogger.logLine('[RES $logId] body=$description');
+      }
+      return bytes.takeBytes();
     }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      await response.listen(null).cancel();
-      throw ToolImageException(
-        'Image download returned HTTP ${response.statusCode}',
+  } catch (error) {
+    if (logId != null && RequestLogger.enabled) {
+      RequestLogger.logLine(
+        '[RES $logId] error=${RequestLogger.escape(MediaHttpLog.text(error.toString()))}',
       );
     }
-
-    const tooLarge = ToolImageException('Image exceeds the 20 MiB file limit');
-    if (response.contentLength > ToolImage.maxFileBytes) throw tooLarge;
-    final bytes = BytesBuilder(copy: false);
-    await for (final chunk in response) {
-      if (bytes.length + chunk.length > ToolImage.maxFileBytes) throw tooLarge;
-      bytes.add(chunk);
-    }
-    return bytes.takeBytes();
+    rethrow;
+  } finally {
+    if (logId != null) RequestLogger.logLine('[RES $logId] done');
   }
 }

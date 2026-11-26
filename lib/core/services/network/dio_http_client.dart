@@ -11,6 +11,7 @@ import 'package:socks5_proxy/socks_client.dart' as socks;
 import '../logging/log_redactor.dart';
 import 'provider_http_exception.dart';
 import 'request_logger.dart';
+import 'media_http_log.dart';
 
 Future<InternetAddress?> _resolveProxyAddress(String host) async {
   final parsed = InternetAddress.tryParse(host);
@@ -84,12 +85,14 @@ class TransportClientException extends http.ClientException {
   final Object cause;
 }
 
+enum HttpLogMode { standard, media, disabled }
+
 class DioHttpClient extends http.BaseClient {
   DioHttpClient({
     this._proxy,
     CancelToken? cancelToken,
     Duration? timeout,
-    this.logRequests = true,
+    this.logMode = HttpLogMode.standard,
     this.onRequestDispatched,
     HttpClientAdapter? adapter,
   }) : _cancelToken = cancelToken ?? CancelToken(),
@@ -162,7 +165,7 @@ class DioHttpClient extends http.BaseClient {
         );
   }
 
-  final bool logRequests;
+  final HttpLogMode logMode;
   final void Function(http.BaseRequest)? onRequestDispatched;
   final BaseOptions _options;
   late final HttpClientAdapter _adapter;
@@ -182,25 +185,57 @@ class DioHttpClient extends http.BaseClient {
     final uri = request.url;
     final method = request.method.toUpperCase();
 
+    final logged = logMode != HttpLogMode.disabled && RequestLogger.enabled;
+    final media = logMode == HttpLogMode.media;
+    String errorText(Object error) => media
+        ? MediaHttpLog.text(error.toString())
+        : LogRedactor.redactText(error.toString());
+    String headerText(Map<String, String> headers) =>
+        RequestLogger.encodeObject(
+          media
+              ? MediaHttpLog.headers(headers)
+              : LogRedactor.redactHeaders(headers),
+        );
+    if (logged) {
+      if (media) MediaHttpLog.started(request, reqId);
+      final address = media
+          ? MediaHttpLog.url(uri)
+          : LogRedactor.redactUrl(uri.toString());
+      RequestLogger.logLine('[REQ $reqId] $method $address');
+    }
     // A body that cannot be read (a file upload whose file went away) must
     // fail as such, not go out empty and come back as the server's 400.
-    final bodyBytes = await request.finalize().toBytes();
+    final Uint8List bodyBytes;
+    try {
+      bodyBytes = await request.finalize().toBytes();
+    } catch (error) {
+      if (logged) {
+        RequestLogger.logLine(
+          '[RES $reqId] error=${RequestLogger.escape(errorText(error))}',
+        );
+      }
+      rethrow;
+    }
 
     final reqHeaders = Map<String, String>.from(request.headers);
     if (!reqHeaders.keys.any((key) => key.toLowerCase() == 'user-agent')) {
       reqHeaders['User-Agent'] = 'Kelivo';
     }
 
-    if (logRequests && RequestLogger.enabled) {
-      RequestLogger.logLine(
-        '[REQ $reqId] $method ${LogRedactor.redactUrl(uri.toString())}',
-      );
+    if (logged && RequestLogger.enabled) {
       if (reqHeaders.isNotEmpty) {
-        RequestLogger.logLine(
-          '[REQ $reqId] headers=${RequestLogger.encodeObject(LogRedactor.redactHeaders(reqHeaders))}',
-        );
+        RequestLogger.logLine('[REQ $reqId] headers=${headerText(reqHeaders)}');
       }
-      if (bodyBytes.length > _loggedBodyLimit) {
+      if (media && bodyBytes.isNotEmpty) {
+        final description = MediaHttpLog.requestBody(
+          request,
+          bodyBytes,
+          request.headers['content-type'],
+        );
+        RequestLogger.logLine(
+          '[REQ $reqId] body=${RequestLogger.escape(description)}',
+        );
+      } else if (bodyBytes.length > _loggedBodyLimit) {
         // A file upload is bytes the log has no use for, and decoding them
         // would hold the body in memory a second and third time.
         RequestLogger.logLine(
@@ -252,12 +287,10 @@ class DioHttpClient extends http.BaseClient {
         headers[name] = values.join(',');
       });
 
-      if (logRequests && RequestLogger.enabled) {
+      if (logged && RequestLogger.enabled) {
         RequestLogger.logLine('[RES $reqId] status=$statusCode');
         if (headers.isNotEmpty) {
-          RequestLogger.logLine(
-            '[RES $reqId] headers=${RequestLogger.encodeObject(LogRedactor.redactHeaders(headers))}',
-          );
+          RequestLogger.logLine('[RES $reqId] headers=${headerText(headers)}');
         }
       }
 
@@ -268,7 +301,20 @@ class DioHttpClient extends http.BaseClient {
       const maxErrorBodyBytes = 256 * 1024;
 
       final logChunks =
-          (logRequests && RequestLogger.enabled) && RequestLogger.saveOutput;
+          logged && !media && RequestLogger.enabled && RequestLogger.saveOutput;
+      MediaResponseLog? mediaBody =
+          media &&
+              logged &&
+              RequestLogger.enabled &&
+              (RequestLogger.saveOutput || statusCode >= 400)
+          ? MediaResponseLog(
+              headers.entries
+                  .where((e) => e.key.toLowerCase() == 'content-type')
+                  .firstOrNull
+                  ?.value,
+              contentLength,
+            )
+          : null;
       // Keep partial UTF-8 characters between transport chunks without
       // buffering or transforming the bytes delivered to the caller.
       ByteConversionSink? logDecoder = logChunks
@@ -276,7 +322,19 @@ class DioHttpClient extends http.BaseClient {
               allowMalformed: true,
             ).startChunkedConversion(_ResponseLogSink(reqId))
           : null;
-      void closeLogDecoder() {
+      void finishLog({required bool complete}) {
+        final captured = mediaBody;
+        mediaBody = null;
+        if (captured != null &&
+            RequestLogger.enabled &&
+            (RequestLogger.saveOutput || statusCode >= 400)) {
+          final summary = captured.finish(complete: complete);
+          if (summary != null) {
+            RequestLogger.logLine(
+              '[RES $reqId] body=${RequestLogger.escape(summary)}',
+            );
+          }
+        }
         final decoder = logDecoder;
         logDecoder = null;
         decoder?.close();
@@ -307,15 +365,23 @@ class DioHttpClient extends http.BaseClient {
           (chunk) {
             // A synchronous consumer can cancel and close the decoder from
             // controller.add, so log this chunk before forwarding it.
+            if (mediaBody != null) {
+              if (RequestLogger.enabled &&
+                  (RequestLogger.saveOutput || statusCode >= 400)) {
+                mediaBody!.add(chunk);
+              } else {
+                mediaBody = null;
+              }
+            }
             logDecoder?.add(chunk);
             controller.add(chunk);
           },
           onError: (Object error, StackTrace stack) {
             responseState.finished = true;
-            closeLogDecoder();
-            if (logRequests && RequestLogger.enabled) {
+            finishLog(complete: false);
+            if (logged && RequestLogger.enabled) {
               RequestLogger.logLine(
-                '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(error.toString()))}',
+                '[RES $reqId] error=${RequestLogger.escape(errorText(error))}',
               );
             }
             final failure =
@@ -334,8 +400,8 @@ class DioHttpClient extends http.BaseClient {
           },
           onDone: () {
             responseState.finished = true;
-            closeLogDecoder();
-            if (logRequests && RequestLogger.enabled) {
+            finishLog(complete: true);
+            if (logged && RequestLogger.enabled) {
               RequestLogger.logLine('[RES $reqId] done');
             }
             unawaited(controller.close());
@@ -346,8 +412,11 @@ class DioHttpClient extends http.BaseClient {
       controller.onPause = () => responseState.subscription?.pause();
       controller.onResume = () => responseState.subscription?.resume();
       controller.onCancel = () async {
+        if (media && logged && !responseState.finished) {
+          RequestLogger.logLine('[RES $reqId] done');
+        }
         responseState.finished = true;
-        closeLogDecoder();
+        finishLog(complete: false);
         final subscription = responseState.subscription;
         responseState.subscription = null;
         await subscription?.cancel();
@@ -356,7 +425,7 @@ class DioHttpClient extends http.BaseClient {
 
       // Error payloads are small; read them now so the log does not depend
       // on the caller consuming the stream (and the viewer can parse body=).
-      if ((logRequests && RequestLogger.enabled) && statusCode >= 400) {
+      if (logged && !media && RequestLogger.enabled && statusCode >= 400) {
         final bytes = await _readLimited(controller.stream, maxErrorBodyBytes);
         final text = RequestLogger.safeDecodeUtf8(bytes);
         if (text.isNotEmpty) {
@@ -390,16 +459,16 @@ class DioHttpClient extends http.BaseClient {
       // metadata instead of wrapping it as an unclassified transport failure.
       rethrow;
     } on DioException catch (e) {
-      if (logRequests && RequestLogger.enabled) {
+      if (logged && RequestLogger.enabled) {
         RequestLogger.logLine(
-          '[RES $reqId] dio_error=${RequestLogger.escape(LogRedactor.redactText(RequestLogger.elidePayloads(e.toString())))}',
+          '[RES $reqId] dio_error=${RequestLogger.escape(media ? errorText(e) : LogRedactor.redactText(RequestLogger.elidePayloads(e.toString())))}',
         );
         final status = e.response?.statusCode;
         if (status != null) {
           RequestLogger.logLine('[RES $reqId] status=$status');
         }
         final data = e.response?.data;
-        if (data != null && data is! ResponseBody) {
+        if (data != null && data is! ResponseBody && !media) {
           RequestLogger.logLine(
             '[RES $reqId] body=${RequestLogger.escape(LogRedactor.redactBody(RequestLogger.elidePayloads(data.toString())))}',
           );
@@ -407,9 +476,9 @@ class DioHttpClient extends http.BaseClient {
       }
       throw TransportClientException(e, uri);
     } catch (e) {
-      if (logRequests && RequestLogger.enabled) {
+      if (logged && RequestLogger.enabled) {
         RequestLogger.logLine(
-          '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(e.toString()))}',
+          '[RES $reqId] error=${RequestLogger.escape(errorText(e))}',
         );
       }
       throw TransportClientException(e, uri);

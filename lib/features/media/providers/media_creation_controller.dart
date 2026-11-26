@@ -46,6 +46,33 @@ class CreationDraft {
   final bool videoFrames;
   final Map<(String, String), String> platformImages;
 
+  CreationDraft relinkImages(Map<String, String?> changedPaths) {
+    if (!references.any((ref) => changedPaths.containsKey(ref.path)) &&
+        !platformImages.values.any(changedPaths.containsKey)) {
+      return this;
+    }
+    return copyWith(
+      references: [
+        for (final ref in references)
+          if (!changedPaths.containsKey(ref.path))
+            ref
+          else if (changedPaths[ref.path] case final newPath?)
+            MediaReference(
+              newPath,
+              role: ref.role,
+              parameterKey: ref.parameterKey,
+            ),
+      ],
+      platformImages: {
+        for (final entry in platformImages.entries)
+          if (!changedPaths.containsKey(entry.value))
+            entry.key: entry.value
+          else if (changedPaths[entry.value] case final newPath?)
+            entry.key: newPath,
+      },
+    );
+  }
+
   CreationDraft copyWith({
     String? prompt,
     List<MediaReference>? references,
@@ -100,18 +127,27 @@ class MediaCreationController extends ChangeNotifier {
       notifyListeners();
     }, onError: _storageError);
     _itemsSubscription = runner.repository.watchItems().listen((items) {
+      _itemsLoaded = true;
       _readyItems = items
           .where((item) => item.status == GenerationItemStatus.ready)
           .toList();
-      _itemsById
-        ..clear()
-        ..addEntries(items.map((item) => MapEntry(item.id, item)));
+      final previous = _itemsById;
+      _itemsById = {for (final item in items) item.id: item};
       _itemsByBatch.clear();
       for (final item in items) {
         (_itemsByBatch[item.batchId] ??= []).add(item);
       }
       for (final items in _itemsByBatch.values) {
         items.sort((left, right) => left.ordinal.compareTo(right.ordinal));
+      }
+      final changedPaths = {
+        if (_drafts.isNotEmpty)
+          for (final item in previous.values)
+            if (_itemsById[item.id]?.path != item.path)
+              item.path: _itemsById[item.id]?.path,
+      };
+      if (changedPaths.isNotEmpty) {
+        _drafts.updateAll((_, draft) => draft.relinkImages(changedPaths));
       }
       notifyListeners();
     }, onError: _storageError);
@@ -133,9 +169,11 @@ class MediaCreationController extends ChangeNotifier {
   late final StreamSubscription<List<GenerationItemRow>> _itemsSubscription;
   List<GenerationTopicRow> _topics = const [];
   Map<String, GenerationTopicRow> _topicsById = const {};
+  bool _itemsLoaded = false;
+  bool get itemsLoaded => _itemsLoaded;
   List<GenerationItemRow> _readyItems = const [];
   final _batchesById = <String, GenerationBatchRow>{};
-  final _itemsById = <String, GenerationItemRow>{};
+  var _itemsById = <String, GenerationItemRow>{};
   final _batchesByTopic = <String, List<GenerationBatchRow>>{};
   final _batchesByMessage = <String, List<GenerationBatchRow>>{};
   final _itemsByBatch = <String, List<GenerationItemRow>>{};

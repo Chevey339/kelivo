@@ -245,6 +245,7 @@ class ChatDatabaseRepository {
   Future<T> _writeTransaction<T>(Future<T> Function() action) =>
       genUiStates.transaction(action);
   final File? _databaseFile;
+  File? get databaseFile => _databaseFile;
   final ChatDatabaseObserver _observer;
   bool _messageSearchFtsReady = false;
 
@@ -6991,7 +6992,7 @@ ORDER BY m.message_order DESC LIMIT 20
           .putIfAbsent(kind, () => [])
           .add(
             kind == 'tool_call'
-                ? remapChatImagePayload(
+                ? _fingerprintToolPayload(
                     payload,
                     messageOrdinals,
                     retainedImageOrigins,
@@ -7114,14 +7115,64 @@ ORDER BY m.message_order DESC LIMIT 20
     return normalized;
   }
 
-  /// Attachment identity for merge fingerprints. Drops environment-state
-  /// `unavailable` so the same attachment available on one device and missing
-  /// on another still dedupes; keeps uri/name/mime/assetId and ordinal order.
+  String _fingerprintToolPayload(
+    String payload,
+    Map<String, String> messageIds,
+    Set<String> retainedOrigins,
+  ) {
+    final mapped = remapChatImagePayload(payload, messageIds, retainedOrigins);
+    if (!mapped.contains('"generatedImage"') &&
+        !mapped.contains('|creation:')) {
+      return mapped;
+    }
+    try {
+      final event = jsonDecode(mapped);
+      if (event is! Map<String, dynamic>) return mapped;
+      final meta = event['metadata'];
+      if (meta is! Map<String, dynamic>) return mapped;
+      if (event['name'] == 'generate_image' && meta['generatedImage'] != null) {
+        final images = meta['generatedImage'];
+        meta['generatedImage'] = [
+          for (final image in images is List ? images : [images])
+            _fingerprintAttachmentPayload(
+              'image',
+              image is String ? image : jsonEncode(image),
+            ),
+        ];
+      } else {
+        final source = readChatImageMetadata(
+          event['name']?.toString() ?? '',
+          meta,
+        );
+        final id = creationItemFromSourceKey(source?.sourceKey);
+        final result = meta['mcpResult'];
+        if (id == null || result is! Map || result['imageUris'] is! List) {
+          return mapped;
+        }
+        // Recall results keep their item identity after file relocation or deletion.
+        result['imageUris'] = ['creation:$id'];
+      }
+      return jsonEncode(event);
+    } on FormatException {
+      return mapped;
+    }
+  }
+
+  /// Merge compares generated attachments by item ID. Paths and asset rows
+  /// can differ across devices and local availability can change after restore.
   String _fingerprintAttachmentPayload(String kind, String payload) {
     try {
       final decoded = jsonDecode(payload);
       if (decoded is! Map) return jsonEncode({'kind': kind, 'raw': payload});
       final map = Map<String, Object?>.from(decoded);
+      final id = map['generationItemId'];
+      if (kind == 'image' && id is String && KelivoFileUri.isGenerationId(id)) {
+        return jsonEncode({
+          'kind': kind,
+          'generationItemId': id,
+          if (map['mime'] != null) 'mime': map['mime'],
+        });
+      }
       return jsonEncode({
         'kind': kind,
         'uri': map['uri'],

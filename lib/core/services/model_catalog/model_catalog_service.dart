@@ -873,6 +873,6 @@ Future<Directory> _defaultCacheDirectory() async {
 http.Client _defaultClientFactory() {
   return DioHttpClient(
     timeout: kModelCatalogRefreshTimeout,
-    logRequests: false,
+    logMode: HttpLogMode.disabled,
   );
 }

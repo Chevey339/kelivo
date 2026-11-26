@@ -45,7 +45,7 @@ void main() {
             'Connection closed while receiving data',
           );
           final client = DioHttpClient(
-            logRequests: false,
+            logMode: HttpLogMode.disabled,
             adapter: _Adapter(
               () => Stream<Uint8List>.error(failure),
               statusCode: status,
@@ -85,7 +85,7 @@ void main() {
         type: DioExceptionType.cancel,
       );
       final client = DioHttpClient(
-        logRequests: false,
+        logMode: HttpLogMode.disabled,
         adapter: _Adapter(
           () => Stream<Uint8List>.error(cancelled),
           statusCode: 503,
@@ -117,7 +117,7 @@ void main() {
             return body.future;
           }),
           cancelToken: token,
-          logRequests: false,
+          logMode: HttpLogMode.disabled,
         );
         addTearDown(client.close);
         addTearDown(() {
@@ -157,7 +157,7 @@ void main() {
     final client = DioHttpClient(
       adapter: _Adapter(() => source.stream),
       cancelToken: token,
-      logRequests: false,
+      logMode: HttpLogMode.disabled,
     );
     addTearDown(client.close);
     final response = await client.send(
@@ -180,7 +180,7 @@ void main() {
       final client = DioHttpClient(
         adapter: _Adapter(() => source.stream),
         cancelToken: token,
-        logRequests: false,
+        logMode: HttpLogMode.disabled,
       );
       addTearDown(client.close);
       final response = await client.send(
@@ -208,7 +208,10 @@ void main() {
       var cancellations = 0;
       source.onCancel = () => cancellations++;
       final adapter = _Adapter(() => source.stream);
-      final client = DioHttpClient(adapter: adapter, logRequests: false);
+      final client = DioHttpClient(
+        adapter: adapter,
+        logMode: HttpLogMode.disabled,
+      );
       addTearDown(client.close);
       final response = await client.send(
         http.Request('GET', Uri.parse('https://test.invalid')),
@@ -245,7 +248,7 @@ void main() {
       final client = DioHttpClient(
         adapter: adapter,
         cancelToken: token,
-        logRequests: false,
+        logMode: HttpLogMode.disabled,
       );
       addTearDown(client.close);
       final response = await client.send(
@@ -272,7 +275,7 @@ void main() {
       final client = DioHttpClient(
         adapter: _Adapter(() => source.stream),
         timeout: const Duration(milliseconds: 50),
-        logRequests: false,
+        logMode: HttpLogMode.disabled,
       );
       addTearDown(client.close);
       final response = await client.send(
@@ -307,7 +310,7 @@ void main() {
     final client = DioHttpClient(
       adapter: _Adapter(() => source.stream),
       cancelToken: token,
-      logRequests: false,
+      logMode: HttpLogMode.disabled,
     );
     addTearDown(client.close);
     final response = await client.send(

@@ -32,7 +32,6 @@ import '../../media/providers/media_creation_controller.dart';
 import '../../media/widgets/creation_lightbox.dart';
 import '../../media/widgets/creation_timeline.dart';
 import '../../media/widgets/creation_waiting_card.dart';
-import '../pages/image_viewer_page.dart';
 
 typedef ChatImageSlot = ({
   String id,
@@ -47,43 +46,60 @@ List<ChatImageSlot> _imageSlots(
   List<ImagePart> attachments, {
   bool listen = true,
 }) {
-  List<(GenerationBatchRow, GenerationItemRow?)> rowsFor(
-    MediaCreationController? media,
-  ) => [
-    if (media != null)
-      for (final batch in media.chatBatchesFor(messageId))
-        (
-          batch,
-          media
-              .itemsFor(batch.id)
-              .where((item) => item.status == GenerationItemStatus.ready)
-              .firstOrNull,
-        ),
-  ];
-  final rows = listen
-      ? context.select<
-          MediaCreationController?,
-          List<(GenerationBatchRow, GenerationItemRow?)>
-        >(rowsFor)
-      : rowsFor(context.read<MediaCreationController?>());
-  final byItem = {
-    for (final part in attachments)
-      if (part.generationItemId case final id?) id: part,
-  };
-  return <ChatImageSlot>[
-    for (final (batch, item) in rows)
-      if (batch.status.isActive ||
-          item != null ||
-          batch.status != GenerationStatus.succeeded)
-        (
-          id: batch.id,
-          batch: batch,
+  List<ChatImageSlot> slotsFor(MediaCreationController? media) {
+    final parts = {
+      for (final part in attachments)
+        if (part.generationItemId case final id?) id: part,
+    };
+    final slots = <ChatImageSlot>[];
+    if (media != null) {
+      for (final batch in media.chatBatchesFor(messageId)) {
+        final ready = media
+            .itemsFor(batch.id)
+            .where(
+              (i) =>
+                  i.mode == MediaMode.image &&
+                  i.status == GenerationItemStatus.ready,
+            );
+        if (ready.isEmpty && batch.status != GenerationStatus.succeeded) {
+          slots.add((id: batch.id, batch: batch, item: null, attachment: null));
+        }
+        for (final (index, item) in ready.indexed) {
+          slots.add((
+            id: index == 0 ? batch.id : item.id,
+            batch: batch,
+            item: item,
+            attachment: parts.remove(item.id),
+          ));
+        }
+      }
+    }
+    // Forked messages can share the artwork. Only a live Creation item can supply its pixels.
+    for (final entry in parts.entries) {
+      final item = entry.value.unavailable ? null : media?.item(entry.key);
+      if (item?.status == GenerationItemStatus.ready &&
+          item?.mode == MediaMode.image) {
+        slots.add((
+          id: entry.key,
+          batch: media?.batch(item!.batchId),
           item: item,
-          attachment: byItem.remove(item?.id),
-        ),
-    for (final part in byItem.values)
-      (id: part.generationItemId!, batch: null, item: null, attachment: part),
-  ];
+          attachment: entry.value,
+        ));
+      } else if (entry.value.unavailable || media?.itemsLoaded == true) {
+        slots.add((
+          id: entry.key,
+          batch: null,
+          item: null,
+          attachment: entry.value,
+        ));
+      }
+    }
+    return slots;
+  }
+
+  return listen
+      ? context.select<MediaCreationController?, List<ChatImageSlot>>(slotsFor)
+      : slotsFor(context.read<MediaCreationController?>());
 }
 
 /// Matches only this reply's results. An older or unlinked image stays in the footer.
@@ -117,9 +133,8 @@ class ChatImagePlacement {
       if (tool.metadata?[GenerateImageTool.batchKey] case final String id) {
         byBatch[id] = step.sourceOrdinal;
       }
-      if (GenerateImageTool.attachment(tool.metadata)?.generationItemId
-          case final id?) {
-        byItem[id] = step.sourceOrdinal;
+      for (final part in GenerateImageTool.attachments(tool.metadata)) {
+        byItem[part.generationItemId!] = step.sourceOrdinal;
       }
     }
     final atCall = <int, List<ChatImageSlot>>{};
@@ -317,9 +332,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
         : 300.0;
     final readyCount = slots
         .where(
-          (value) =>
-              value.batch?.status.isActive != true &&
-              (value.item != null || value.attachment != null),
+          (value) => value.batch?.status.isActive != true && value.item != null,
         )
         .length;
     return Padding(
@@ -464,20 +477,12 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
         ),
       );
     }
-    if (slot.attachment case final part?) {
-      return IosCardPress(
-        onTap: part.unavailable
-            ? null
-            : () => ImageViewerPage(
-                images: [part.uri],
-                dismissOnTap: true,
-              ).open(context),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: AspectRatio(
-            aspectRatio: ratio,
-            child: CreationFileImage(part.uri),
-          ),
+    if (slot.item == null && slot.attachment != null) {
+      return Text(
+        AppLocalizations.of(context)!.creationOriginalDeleted,
+        style: TextStyle(
+          fontSize: 12.5,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       );
     }
@@ -591,7 +596,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
                       if (value.item case final artwork?) artwork,
                   ],
                 ),
-                child: CreationFileImage(slot.attachment?.uri ?? item.path),
+                child: CreationFileImage(item.path),
               ),
               if (desktop)
                 Align(
@@ -616,8 +621,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
     List<ChatImageSlot> slots,
   ) {
     final cs = Theme.of(context).colorScheme;
-    final path =
-        slot.item?.thumbnailPath ?? slot.attachment?.uri ?? slot.item?.path;
+    final path = slot.item?.thumbnailPath ?? slot.item?.path;
     final index = slots.indexWhere((s) => s.id == slot.id);
     final node = _thumbFocus.putIfAbsent(
       slot.id,

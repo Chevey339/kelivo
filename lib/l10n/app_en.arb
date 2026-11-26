@@ -23257,9 +23257,9 @@
   "@creationDeleteTopic": {
     "description": "Destructive action and confirmation title for deleting a topic, its generation groups, and media files."
   },
-  "creationDeleteTopicBody": "Delete this topic and all its creations?",
+  "creationDeleteTopicBody": "Delete this topic and all its creations? Linked images in chats and reference lists will also become unavailable.",
   "@creationDeleteTopicBody": {
-    "description": "Confirmation body for deleting an entire media creation topic."
+    "description": "Confirmation body for deleting an entire media creation topic. Explains the effect on linked chat images and creation references."
   },
   "creationImage": "Image",
   "@creationImage": {
@@ -23474,13 +23474,29 @@
   "@creationShare": {
     "description": "Shares a generated image file."
   },
+  "creationReferenceImagesLabel": "Reference images",
+  "@creationReferenceImagesLabel": {
+    "description": "Caption above the reference image thumbnails in a creation topic."
+  },
+  "creationReferenceDeleted": "This reference image was deleted",
+  "@creationReferenceDeleted": {
+    "description": "Accessible label for a reference thumbnail whose original was deleted from Creation."
+  },
+  "creationOriginalDeleted": "Image deleted from Creation",
+  "@creationOriginalDeleted": {
+    "description": "Shown in chat when the linked artwork has been deleted from Creation."
+  },
+  "creationMaskLabel": "Mask",
+  "@creationMaskLabel": {
+    "description": "Label of the input image used as an edit mask."
+  },
   "creationDeleteItem": "Delete creation",
   "@creationDeleteItem": {
     "description": "Action and confirmation title for deleting one generated image or video."
   },
-  "creationDeleteItemBody": "Delete this creation?",
+  "creationDeleteItemBody": "Delete this creation? Linked images in chats and reference lists will also become unavailable.",
   "@creationDeleteItemBody": {
-    "description": "Confirmation text for deleting one generated image or video."
+    "description": "Confirmation text for deleting one generated image or video. Explains the effect on linked chat images and creation references."
   },
   "creationActionFailed": "Could not complete the action",
   "@creationActionFailed": {
@@ -24046,9 +24062,9 @@
   "@creationDeleteBatch": {
     "description": "Destructive action in the generation group menu and title of its confirmation dialog."
   },
-  "creationDeleteBatchBody": "{count, plural, =0{Delete this generation record from this device?} one{Delete this group and its file from this device?} other{Delete this group and its {count} files from this device?}}",
+  "creationDeleteBatchBody": "{count, plural, =0{Delete this generation record from this device?} one{Delete this group and its file from this device?} other{Delete this group and its {count} files from this device?}} Linked images in chats and reference lists will also become unavailable.",
   "@creationDeleteBatchBody": {
-    "description": "Confirmation before deleting a generation group from this device. The count is the number of stored result files. A failed group can have none.",
+    "description": "Confirmation before deleting a generation group from this device. The count is the number of stored result files. A failed group can have none. Explains the effect on linked chat images and creation references.",
     "placeholders": {
       "count": {
         "type": "int"

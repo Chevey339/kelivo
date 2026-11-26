@@ -18026,7 +18026,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get creationDeleteTopicBody =>
-      'Bu konu ve tüm oluşturulanlar silinsin mi?';
+      'Bu konu ve içindeki tüm eserler silinsin mi? Sohbetlerde ve referans listelerinde bağlantılı görseller de kullanılamaz hale gelecek.';
 
   @override
   String get creationImage => 'Görsel';
@@ -18200,10 +18200,23 @@ class AppLocalizationsTr extends AppLocalizations {
   String get creationShare => 'Paylaş';
 
   @override
+  String get creationReferenceImagesLabel => 'Referans görselleri';
+
+  @override
+  String get creationReferenceDeleted => 'Bu referans görsel silindi';
+
+  @override
+  String get creationOriginalDeleted => 'Görsel Oluşturma\'dan silindi';
+
+  @override
+  String get creationMaskLabel => 'Maske';
+
+  @override
   String get creationDeleteItem => 'Oluşturmayı sil';
 
   @override
-  String get creationDeleteItemBody => 'Bu oluşturma silinsin mi?';
+  String get creationDeleteItemBody =>
+      'Bu eser silinsin mi? Sohbetlerde ve referans listelerinde bağlantılı görseller de kullanılamaz hale gelecek.';
 
   @override
   String get creationActionFailed => 'İşlem tamamlanamadı';
@@ -18648,11 +18661,11 @@ class AppLocalizationsTr extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Bu grup ve $count dosyası bu cihazdan silinsin mi?',
+      other: 'Bu grup ve içindeki $count dosya bu cihazdan silinsin mi?',
       one: 'Bu grup ve dosyası bu cihazdan silinsin mi?',
-      zero: 'Bu üretim kaydı bu cihazdan silinsin mi?',
+      zero: 'Bu oluşturma kaydı bu cihazdan silinsin mi?',
     );
-    return '$_temp0';
+    return '$_temp0 Sohbetlerde ve referans listelerinde bağlantılı görseller de kullanılamaz hale gelecek.';
   }
 
   @override

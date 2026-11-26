@@ -20,6 +20,7 @@ import '../../models/request_budget.dart';
 import '../../utils/multimodal_input_utils.dart' show sniffMimeFromFile;
 import '../../../utils/safe_resize_image.dart';
 import '../storage/attachment_file_lock.dart';
+import '../network/media_http_log.dart';
 import 'media_polling.dart';
 import 'media_adapter.dart' show classifyMediaFailure;
 import 'media_request.dart';
@@ -46,17 +47,38 @@ class MediaFileStore {
 
   Future<List<MediaReference>> snapshotReferences(
     String id,
-    List<MediaReference> references,
-  ) async {
+    List<MediaReference> references, {
+    required Future<bool> Function(String uri) ownsImage,
+  }) async {
     if (references.isEmpty) return const [];
     final originals = await _referenceFiles(references);
     final batch = await _batchDirectory(id);
-    final refs = await Directory(
-      p.join(batch.path, 'refs'),
-    ).create(recursive: true);
+    final refs = Directory(p.join(batch.path, 'refs'));
     final stored = <MediaReference>[];
     for (var index = 0; index < originals.length; index++) {
       final file = originals[index];
+      final original = KelivoFileUri.encodeFromAbsolute(
+        file.path,
+        root: batch.parent.parent.path,
+      );
+      if (original != null &&
+          KelivoFileUri.generationImageItemId(original) != null) {
+        if (!await ownsImage(original)) {
+          throw const MediaFailure(
+            MediaFailureKind.parameters,
+            'The original creation image was deleted.',
+          );
+        }
+        stored.add(
+          MediaReference(
+            original,
+            role: references[index].role,
+            parameterKey: references[index].parameterKey,
+          ),
+        );
+        continue;
+      }
+      await refs.create(recursive: true);
       final ext = p.extension(file.path).toLowerCase();
       final safeExt = RegExp(r'^\.[a-z0-9]{1,8}$').hasMatch(ext) ? ext : '.png';
       final target = p.join(refs.path, '$index$safeExt');
@@ -81,13 +103,20 @@ class MediaFileStore {
     final originals = <File>[];
     for (final ref in references) {
       final source = SandboxPathResolver.resolveForIo(ref.path);
-      if (source == null || !await File(source).exists()) {
+      final file = source == null
+          ? null
+          : KelivoFileUri.generationImageItemId(ref.path) != null
+          ? await SandboxPathResolver.managedFile(
+              ref.path,
+              contentRoot: (await directory()).parent.path,
+            )
+          : File(source);
+      if (ref.unavailable || file == null || !await file.exists()) {
         throw const MediaFailure(
           MediaFailureKind.parameters,
           'Reference file unavailable',
         );
       }
-      final file = File(source);
       bytes += await file.length();
       if (bytes > _referenceBudget.totalImageBytes) {
         throw const MediaFailure(
@@ -439,7 +468,7 @@ class MediaFileStore {
     if (response.statusCode < 200 ||
         response.statusCode >= 300 ||
         (response.contentLength ?? 0) > _maxFileBytes) {
-      await response.stream.listen(null).cancel();
+      await MediaHttpLog.discard(response);
       throw MediaFailure(
         MediaFailureKind.download,
         'HTTP ${response.statusCode}',

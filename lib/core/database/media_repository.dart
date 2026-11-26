@@ -5,7 +5,11 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../utils/kelivo_file_uri.dart';
 
 import '../models/media_creation.dart';
+import '../models/image_context.dart' show ContextImageIdentity;
+import '../utils/chat_image_result.dart' show creationItemFromSourceKey;
 import 'app_database.dart';
+
+part 'creation_chat_links.dart';
 
 class MediaRepository {
   MediaRepository(this._db);
@@ -125,6 +129,20 @@ class MediaRepository {
     return [for (final row in rows) row.read(table.id)!];
   });
 
+  Future<GenerationItemRow?> item(String id) => (_db.select(
+    _db.generationItemRows,
+  )..where((row) => row.id.equals(id))).getSingleOrNull();
+
+  Future<bool> ownsImage(String uri) async {
+    final id = KelivoFileUri.generationImageItemId(uri);
+    if (id == null) return false;
+    final image = await item(id);
+    return image != null &&
+        image.path == uri &&
+        image.mode == MediaMode.image &&
+        image.status == GenerationItemStatus.ready;
+  }
+
   Future<bool> hasItem(String id) async =>
       await (_db.select(
         _db.generationItemRows,
@@ -166,19 +184,35 @@ class MediaRepository {
         );
   }
 
-  Future<void> deleteTopic(String id) async {
+  Future<void> deleteTopic(String id) => _db.transaction(() async {
     _requireWritable();
+    await _retireImages(
+      await _db
+          .customSelect(
+            'SELECT i.id,i.path FROM generation_item_rows i JOIN generation_batch_rows b ON b.id=i.batch_id WHERE b.topic_id=? AND i.mode=\'image\'',
+            variables: [Variable.withString(id)],
+          )
+          .get(),
+    );
     await (_db.delete(
       _db.generationTopicRows,
     )..where((row) => row.id.equals(id))).go();
-  }
+  });
 
-  Future<void> deleteItem(String id) async {
+  Future<void> deleteItem(String id) => _db.transaction(() async {
     _requireWritable();
+    await _retireImages(
+      await _db
+          .customSelect(
+            "SELECT id,path FROM generation_item_rows WHERE id=? AND mode='image'",
+            variables: [Variable.withString(id)],
+          )
+          .get(),
+    );
     await (_db.delete(
       _db.generationItemRows,
     )..where((row) => row.id.equals(id))).go();
-  }
+  });
 
   Future<void> setFavorite(String id, bool favorite) async {
     _requireWritable();
@@ -191,6 +225,14 @@ class MediaRepository {
     _requireWritable();
     final existing = await batch(id);
     if (existing == null) return;
+    await _retireImages(
+      await _db
+          .customSelect(
+            "SELECT id,path FROM generation_item_rows WHERE batch_id=? AND mode='image'",
+            variables: [Variable.withString(id)],
+          )
+          .get(),
+    );
     await (_db.delete(
       _db.generationBatchRows,
     )..where((row) => row.id.equals(id))).go();
@@ -216,6 +258,45 @@ class MediaRepository {
     }
   });
 
+  Future<void> _retireImages(List<QueryRow> items) async {
+    if (items.isEmpty) return;
+    final originals = jsonEncode({
+      for (final r in items) r.read<String>('id'): r.read<String>('path'),
+    });
+    await _db.customUpdate(
+      r"""
+      UPDATE message_part_rows SET payload=json_set(payload,'$.unavailable',json('true'))
+      WHERE kind='image' AND instr(payload,'generationItemId')>0 AND json_valid(payload) AND
+        json_extract(payload,'$.generationItemId') IN (SELECT key FROM json_each(?))
+    """,
+      variables: [Variable.withString(originals)],
+      updates: {_db.messagePartRows},
+    );
+    await _db.customUpdate(
+      r"""
+      UPDATE message_part_rows SET payload=json_set(payload,'$.metadata.mcpResult.imageUris',json('[]'))
+      WHERE kind='tool_call' AND instr(payload,'chatImage')>0 AND json_valid(payload) AND json_extract(payload,'$.name')='view_image' AND
+        json_type(payload,'$.metadata.chatImage')='object' AND EXISTS(
+          SELECT 1 FROM json_each(payload,'$.metadata.mcpResult.imageUris')
+          WHERE value IN(SELECT value FROM json_each(?)))
+    """,
+      variables: [Variable.withString(originals)],
+      updates: {_db.messagePartRows},
+    );
+    await _db.customUpdate(
+      r"""
+      WITH retired(path) AS (SELECT value FROM json_each(?))
+      UPDATE generation_batch_rows SET references_json=(
+        SELECT json_group_array(json(CASE WHEN json_extract(r.value,'$.path') IN retired
+          THEN json_set(r.value,'$.unavailable',json('true')) ELSE r.value END))
+        FROM json_each(references_json) r)
+      WHERE references_json<>'[]' AND json_valid(references_json) AND EXISTS(SELECT 1 FROM json_each(references_json) r WHERE json_extract(r.value,'$.path') IN retired)
+    """,
+      variables: [Variable.withString(originals)],
+      updates: {_db.generationBatchRows},
+    );
+  }
+
   Future<List<RecentMediaImage>> recentImages(
     RecentImageSource source, {
     required int offset,
@@ -233,15 +314,20 @@ class MediaRepository {
         LEFT JOIN generation_topic_rows AS t ON t.id = b.topic_id
         WHERE ? IN ('all', 'creation') AND i.mode = 'image' AND i.status = 'ready'
         UNION ALL
-        SELECT COALESCE(a.path, json_extract(p.payload, '$.uri')) AS path,
-               a.thumbnail_path AS thumbnail, c.title, 'chat' AS source,
+        SELECT COALESCE(i.path, a.path, json_extract(p.payload, '$.uri')) AS path,
+               COALESCE(i.thumbnail_path, a.thumbnail_path) AS thumbnail, c.title, 'chat' AS source,
                p.created_at AS time, CAST(p.part_id AS TEXT) AS tie
         FROM message_part_rows AS p
         JOIN conversation_rows AS c ON c.id = p.conversation_id
+        LEFT JOIN generation_item_rows AS i
+          ON i.id = CASE WHEN json_valid(p.payload) THEN json_extract(p.payload, '$.generationItemId') END
+          AND i.mode='image' AND i.status='ready'
         LEFT JOIN asset_rows AS a
           ON a.id = CASE WHEN json_valid(p.payload) THEN json_extract(p.payload, '$.assetId') END
         WHERE ? IN ('all', 'chat') AND p.kind = 'image' AND json_valid(p.payload)
           AND COALESCE(json_extract(p.payload, '$.unavailable'), 0) = 0
+          AND (json_extract(p.payload,'$.generationItemId') IS NULL OR
+              (? = 'chat' AND i.id IS NOT NULL))
       )
       WHERE path IS NOT NULL AND length(path) > 0
         AND path NOT LIKE 'data:%'
@@ -249,6 +335,7 @@ class MediaRepository {
       LIMIT ? OFFSET ?
       """,
           variables: [
+            Variable.withString(source.name),
             Variable.withString(source.name),
             Variable.withString(source.name),
             Variable.withInt(limit),
@@ -296,7 +383,10 @@ class MediaRepository {
         for (final reference in _references(
           batch.read(_db.generationBatchRows.referencesJson)!,
         ))
-          if (reference case {'path': final String path}) path,
+          if (reference case {
+            'path': final String path,
+          } when reference['unavailable'] != true)
+            path,
     };
   });
 
@@ -346,8 +436,8 @@ class MediaRepository {
     for (final ref in refs) {
       if (ref case {
         'path': final String path,
-      } when KelivoFileUri.isGenerationFile(path, id)) {
-        paths.add(path);
+      } when KelivoFileUri.isGenerationReference(path, id)) {
+        if (ref['unavailable'] != true) paths.add(path);
       } else {
         throw const FormatException('Invalid stored creation reference');
       }
@@ -369,6 +459,39 @@ class MediaRepository {
     }
   }
 
+  /// Merge keeps the installed row for an existing item ID. Its files may
+  /// have been renamed by an earlier overwrite restore.
+  Future<Map<String, String>> existingPathsForMerge(
+    MediaRepository source,
+  ) async {
+    final incoming = source._db.generationItemRows;
+    final incomingRows = await (source._db.selectOnly(
+      incoming,
+    )..addColumns([incoming.id, incoming.path, incoming.thumbnailPath])).get();
+    if (incomingRows.isEmpty) return {};
+    final byId = {for (final row in incomingRows) row.read(incoming.id)!: row};
+    final existing = await _db
+        .customSelect(
+          'SELECT id, path, thumbnail_path FROM generation_item_rows '
+          'WHERE id IN (SELECT value FROM json_each(?))',
+          variables: [Variable.withString(jsonEncode(byId.keys.toList()))],
+        )
+        .get();
+    final paths = <String, String>{};
+    for (final row in existing) {
+      final sourceRow = byId[row.read<String>('id')]!;
+      final path = sourceRow.read(incoming.path)!;
+      final target = row.read<String>('path');
+      if (path != target) paths[path] = target;
+      final thumb = sourceRow.read(incoming.thumbnailPath);
+      final targetThumb = row.readNullable<String>('thumbnail_path');
+      if (thumb != null && targetThumb != null && thumb != targetThumb) {
+        paths[thumb] = targetThumb;
+      }
+    }
+    return paths;
+  }
+
   Future<void> importFrom(
     MediaRepository? source, {
     required bool overwrite,
@@ -379,7 +502,10 @@ class MediaRepository {
     _requireWritable();
     if (source == null) {
       if (overwrite) {
-        await clear();
+        await _db.transaction(() async {
+          await clear();
+          await invalidateChatOriginals();
+        });
         _replacementVersion++;
       }
       return;
@@ -399,6 +525,7 @@ class MediaRepository {
     }
     await _db.transaction(() async {
       if (overwrite) await clear();
+      await invalidateChatOriginals();
       await _db.batch((batch) {
         batch.insertAll(
           _db.generationTopicRows,

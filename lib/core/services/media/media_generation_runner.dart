@@ -18,6 +18,7 @@ import '../api/chat_api_helpers.dart';
 import '../auth/provider_oauth_service.dart';
 import '../mobile_background.dart';
 import '../network/provider_http_client.dart';
+import '../network/media_http_log.dart';
 import '../network/request_logger.dart';
 import '../storage/attachment_file_lock.dart';
 import 'media_adapter.dart';
@@ -129,7 +130,7 @@ class MediaGenerationRunner extends ChangeNotifier {
     provider,
     cancelToken: token,
     timeout: const Duration(minutes: 3),
-    logRequests: false,
+    logMode: HttpLogMode.media,
   );
 
   MediaCapabilities? capabilities(
@@ -283,7 +284,11 @@ class MediaGenerationRunner extends ChangeNotifier {
         );
       }
       try {
-        final refs = await files.snapshotReferences(id, request.references);
+        final refs = await files.snapshotReferences(
+          id,
+          request.references,
+          ownsImage: repository.ownsImage,
+        );
         request = request.copyWith(references: refs);
         _requireOpen();
         if (canEnqueue?.call() == false) {
@@ -850,6 +855,7 @@ class MediaGenerationRunner extends ChangeNotifier {
       } catch (error) {
         _checkCancelled(job);
         final failure = classifyMediaFailure(error);
+        job.log.recordProviderFailure(failure);
         if ((failure.kind == MediaFailureKind.network ||
                 failure.statusCode == 502 ||
                 failure.statusCode == 504) &&
@@ -940,7 +946,7 @@ class MediaGenerationRunner extends ChangeNotifier {
       final response = await client
           .send(request)
           .timeout(const Duration(seconds: 5));
-      await response.stream.listen(null).cancel();
+      await MediaHttpLog.discard(response);
     } catch (_) {
       // A provider can accept cancellation only while its task is queued.
     } finally {
@@ -976,6 +982,8 @@ class MediaGenerationRunner extends ChangeNotifier {
     GenerationStatus status, [
     MediaFailure? error,
   ]) async {
+    // A resumed provider task can fail while fetching its already-issued receipt.
+    if (error != null) job.log.recordProviderFailure(error);
     final diagnostics = error == null
         ? null
         : jsonEncode({...error.toJson(), ...job.log.toJson()});

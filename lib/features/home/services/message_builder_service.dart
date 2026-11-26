@@ -743,7 +743,10 @@ class MessageBuilderService {
     final refs = <Map<String, dynamic>>[];
     for (final part in message.parts) {
       if (part is ImagePart) {
-        if (part.unavailable || part.generationItemId != null) continue;
+        if (part.unavailable ||
+            (part.generationItemId != null && message.role != 'user')) {
+          continue;
+        }
         final uri = part.uri.trim();
         if (uri.isEmpty) continue;
         refs.add(encodeInternalMediaRef(uri: uri, mime: part.mime));

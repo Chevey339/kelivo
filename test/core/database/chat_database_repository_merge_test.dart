@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart' show Value;
 import 'package:Kelivo/core/database/app_database.dart';
@@ -448,6 +449,69 @@ void main() {
       expect(second.deduplicatedConversations, 1);
       expect(await live.getAllConversations(), hasLength(1));
     });
+
+    test(
+      'relocated generated attachments and reader observations deduplicate on every merge',
+      () async {
+        const item = 'artwork';
+        for (final repo in [live, source]) {
+          final local = identical(repo, live);
+          final image = ImagePart(
+            uri: local
+                ? 'kelivo-file:///generations/batch/artwork.png'
+                : 'kelivo-file:///upload/old.png',
+            generationItemId: item,
+            assetId: local ? null : 'old-upload',
+            mime: 'image/png',
+          );
+          await putConversationWithAttachments(
+            repo,
+            conversationId: 'same',
+            messageId: 'm',
+            content: 'Draw a bird',
+            parts: [
+              image,
+              ToolCallPart(
+                jsonEncode({
+                  'name': 'generate_image',
+                  'metadata': {
+                    'generationBatchId': 'batch',
+                    'generatedImage': image.encodePayload(),
+                  },
+                }),
+              ),
+              ToolCallPart(
+                jsonEncode({
+                  'name': 'view_image',
+                  'metadata': {
+                    'chatImage': {
+                      'version': 1,
+                      'sourceKey': 'm|creation:artwork|0',
+                      'directAsset': true,
+                      'mime': 'image/png',
+                    },
+                    'mcpResult': {
+                      'imageUris': [image.uri],
+                    },
+                  },
+                }),
+              ),
+            ],
+          );
+        }
+        await source.close();
+        sourceClosed = true;
+        for (var round = 0; round < 2; round++) {
+          expect(
+            (await live.mergeBackupSnapshot(
+              sourceFile,
+            )).deduplicatedConversations,
+            1,
+          );
+        }
+        expect(await live.getAllConversations(), hasLength(1));
+      },
+    );
 
     test('仅 sender_id 不同不会被误判为重复', () async {
       for (final repository in [live, source]) {

@@ -222,6 +222,9 @@ void main() {
         final sourceContent = Directory('${root.path}/source-content');
         PathProviderPlatform.instance = _Paths(sourceContent.path);
         await _addCreation(source, 'incoming');
+        await source.customStatement(
+          "UPDATE generation_item_rows SET id='image' WHERE batch_id='incoming'",
+        );
         await ExtensionEntityStore(source).upsert(
           'contextCompressionTask',
           'chat-only',
@@ -298,6 +301,55 @@ void main() {
         );
         expect(await local.exists(), mode == RestoreMode.merge);
         expect(await targetRepository.getPreference('theme_mode_v1'), 'light');
+        if (mode == RestoreMode.overwrite) {
+          // A second device edited the same original, under its pre-restore name.
+          PathProviderPlatform.instance = _Paths(sourceContent.path);
+          await _addCreation(source, 'edit');
+          const oldUri = 'kelivo-file:///generations/incoming/image.png';
+          await source.customStatement(
+            'UPDATE generation_batch_rows SET references_json=? WHERE id=?',
+            [
+              jsonEncode([
+                {'path': oldUri, 'role': 'image'},
+              ]),
+              'edit',
+            ],
+          );
+          final updated = await exporter.prepareBackupFile(
+            WebDavConfig(scope: _only({BackupCategory.creations})),
+          );
+          PathProviderPlatform.instance = _Paths(root.path);
+          await sync.restoreFromLocalFile(
+            updated,
+            const WebDavConfig(),
+            mode: RestoreMode.merge,
+          );
+          final edit = await restored.batch('edit');
+          expect(
+            (jsonDecode(edit!.referencesJson) as List).single['path'],
+            restoredPath,
+          );
+          expect(await oldIncoming.exists(), isFalse);
+          await restored.deleteItem('image');
+          await File(installed).delete();
+          expect(
+            (jsonDecode((await restored.batch('edit'))!.referencesJson) as List)
+                .single['unavailable'],
+            true,
+          );
+          await sync.restoreFromLocalFile(
+            updated,
+            const WebDavConfig(),
+            mode: RestoreMode.merge,
+          );
+          final revived =
+              (jsonDecode((await restored.batch('edit'))!.referencesJson)
+                      as List)
+                  .single;
+          expect(revived['path'], oldUri);
+          expect(revived['unavailable'], isNot(true));
+          expect(await restored.ownsImage(oldUri), isTrue);
+        }
       } finally {
         await chat.close();
         chat.dispose();

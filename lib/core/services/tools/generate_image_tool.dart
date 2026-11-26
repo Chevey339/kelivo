@@ -35,22 +35,33 @@ abstract final class GenerateImageTool {
     };
   }
 
-  static ImagePart? attachment(Map<String, dynamic>? metadata) {
-    final value = metadata?[attachmentKey];
-    if (value is! String) return null;
-    try {
-      final part = ImagePart.fromPayload(value);
-      final segments = KelivoFileUri.decodeToSegments(part.uri);
-      if (part.generationItemId != null &&
-          part.mime?.startsWith('image/') == true &&
-          segments?.first == 'upload') {
-        return part;
+  static List<ImagePart> attachments(Map<String, dynamic>? metadata) {
+    final raw = metadata?[attachmentKey];
+    final batch = metadata?[batchKey];
+    final parts = <ImagePart>[];
+    for (final value in raw is List ? raw : [raw]) {
+      if (value is! String) continue;
+      try {
+        final part = ImagePart.fromPayload(value);
+        final id = part.generationItemId;
+        if (id != null &&
+            part.mime?.startsWith('image/') == true &&
+            !part.unavailable &&
+            KelivoFileUri.generationImageItemId(part.uri) == id &&
+            (batch == null ||
+                batch is String &&
+                    KelivoFileUri.isGenerationFile(part.uri, batch))) {
+          parts.add(part);
+        }
+      } on FormatException {
+        continue;
       }
-    } on FormatException {
-      // Tool metadata can be incomplete if the call did not finish.
     }
-    return null;
+    return parts;
   }
+
+  static ImagePart? attachment(Map<String, dynamic>? metadata) =>
+      attachments(metadata).firstOrNull;
 
   static Map<String, dynamic> definition({
     required bool allowReferences,
@@ -77,7 +88,7 @@ Don't use for:
 - Describing or answering questions about an existing image (look at it directly, or use view_image)
 - Charts, tables, or diagrams that are clearer as text or code
 
-The result is shown to the user automatically, so don't repeat it in Markdown. One call makes one image; call again for more.''',
+The image is saved in Creation and appears in the conversation automatically. Do not add a Markdown image, invent a file path, or search the workspace for it. The result contains an image_id for each image. Pass it to view_image as image_id when available, or to generate_image as image_ids for an edit.''',
         'parameters': {
           'type': 'object',
           'properties': {

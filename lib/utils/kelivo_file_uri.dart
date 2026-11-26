@@ -77,6 +77,42 @@ final class KelivoFileUri {
         parts.skip(1).every(_creationSegment.hasMatch);
   }
 
+  static final _restoredPrefix = RegExp(
+    r'^(?:restored-[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}-)+',
+  );
+
+  /// Only a published original can be shared between batches or referenced by chat.
+  /// Thumbnails, reference snapshots and temporary files are never artwork IDs.
+  static String? generationImageItemId(String uri) {
+    final parts = decodeToSegments(uri);
+    if (parts == null ||
+        parts.length != 3 ||
+        parts.first != 'generations' ||
+        !isGenerationId(parts[1])) {
+      return null;
+    }
+    final name = parts.last;
+    final ext = p.posix.extension(name).toLowerCase();
+    if (!const {'.png', '.jpg', '.jpeg', '.gif', '.webp'}.contains(ext)) {
+      return null;
+    }
+    final id = p.posix
+        .basenameWithoutExtension(name)
+        .replaceFirst(_restoredPrefix, '');
+    return isGenerationId(id) ? id : null;
+  }
+
+  static bool isGenerationReferenceSnapshot(String uri, {String? batch}) {
+    final parts = decodeToSegments(uri);
+    return parts != null &&
+        parts.length == 4 &&
+        parts[2] == 'refs' &&
+        isGenerationFile(uri, batch ?? parts[1]);
+  }
+
+  static bool isGenerationReference(String uri, String batch) =>
+      isGenerationFile(uri, batch) || generationImageItemId(uri) != null;
+
   /// Resolve against an absolute app-data [root]. No existence checks.
   /// Returns `null` when [uri] is not a valid kelivo-file URI.
   static String? resolveToAbsolute(String uri, {required String root}) {

@@ -232,7 +232,7 @@ class StreamChunkHandler {
         _upsertTool(id, content: output ?? '', metadata: metadata);
         _flushTool(id);
         if (_tools[id]?.name == GenerateImageTool.name) {
-          if (GenerateImageTool.attachment(metadata) case final image?) {
+          for (final image in GenerateImageTool.attachments(metadata)) {
             if (!_parts.whereType<ImagePart>().any(
               (part) => part.generationItemId == image.generationItemId,
             )) {

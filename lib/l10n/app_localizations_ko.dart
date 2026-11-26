@@ -17370,7 +17370,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationDeleteTopic => '주제 삭제';
 
   @override
-  String get creationDeleteTopicBody => '이 주제와 모든 생성물을 삭제할까요?';
+  String get creationDeleteTopicBody =>
+      '이 주제와 모든 창작물을 삭제할까요? 채팅과 참조 목록에 연결된 이미지도 사용할 수 없게 됩니다.';
 
   @override
   String get creationImage => '이미지';
@@ -17539,10 +17540,23 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationShare => '공유';
 
   @override
+  String get creationReferenceImagesLabel => '참조 이미지';
+
+  @override
+  String get creationReferenceDeleted => '이 참조 이미지는 삭제되었습니다';
+
+  @override
+  String get creationOriginalDeleted => '이미지가 창작에서 삭제되었습니다';
+
+  @override
+  String get creationMaskLabel => '마스크';
+
+  @override
   String get creationDeleteItem => '작품 삭제';
 
   @override
-  String get creationDeleteItemBody => '이 작품을 삭제할까요?';
+  String get creationDeleteItemBody =>
+      '이 창작물을 삭제할까요? 채팅과 참조 목록에 연결된 이미지도 사용할 수 없게 됩니다.';
 
   @override
   String get creationActionFailed => '작업을 완료할 수 없습니다';
@@ -17971,10 +17985,10 @@ class AppLocalizationsKo extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '이 기기에서 이 그룹과 파일 $count개를 삭제할까요?',
+      other: '이 기기에서 이 그룹과 $count개 파일을 삭제할까요?',
       zero: '이 기기에서 이 생성 기록을 삭제할까요?',
     );
-    return '$_temp0';
+    return '$_temp0 채팅과 참조 목록에 연결된 이미지도 사용할 수 없게 됩니다.';
   }
 
   @override

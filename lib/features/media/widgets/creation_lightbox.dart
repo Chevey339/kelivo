@@ -1045,7 +1045,14 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                   borderRadius: BorderRadius.circular(7),
                   child: Opacity(
                     opacity: index == _index ? 1 : .55,
-                    child: CreationMediaCover(_deck[index], thumbnail: true),
+                    child: CreationMediaCover(
+                      _deck[index],
+                      thumbnail: true,
+                      playOverlay: false,
+                      cacheWidth:
+                          (size * MediaQuery.devicePixelRatioOf(context))
+                              .ceil(),
+                    ),
                   ),
                 ),
               ),
@@ -1822,6 +1829,21 @@ class CreationMediaCover extends StatelessWidget {
               child: playOverlay
                   ? null
                   : const Center(child: Icon(LucideIcons.video, size: 22)),
+            ),
+          if (thumbnail && !playOverlay && item.thumbnailPath != null)
+            const PositionedDirectional(
+              start: 3,
+              bottom: 3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.all(Radius.circular(3)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(2),
+                  child: Icon(LucideIcons.video, size: 12, color: Colors.white),
+                ),
+              ),
             ),
           if (playOverlay) ...[
             Center(

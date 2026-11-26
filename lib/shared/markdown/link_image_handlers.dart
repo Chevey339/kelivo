@@ -5,6 +5,8 @@ import 'dart:math' as math;
 import 'markdown_image_sources.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show setEquals;
+import '../../core/services/tools/view_image_tool.dart';
 import 'package:crypto/crypto.dart';
 import 'package:markstream/markstream.dart';
 import 'package:provider/provider.dart';
@@ -88,6 +90,30 @@ class KelivoLinkHandler implements LinkHandler {
   }
 }
 
+/// Some replies echo a generated image ID as a Markdown file destination.
+/// The native creation card already displays that exact output.
+class GeneratedImageMarkdownScope extends InheritedWidget {
+  const GeneratedImageMarkdownScope({
+    super.key,
+    required this.handles,
+    required super.child,
+  });
+  final Set<String> handles;
+  static bool covers(BuildContext context, String url, {bool listen = true}) {
+    final id = ViewImageTool.imageIdFromPath(url);
+    if (id == null) return false;
+    final scope = listen
+        ? context
+              .dependOnInheritedWidgetOfExactType<GeneratedImageMarkdownScope>()
+        : context.getInheritedWidgetOfExactType<GeneratedImageMarkdownScope>();
+    return scope?.handles.contains(id) == true;
+  }
+
+  @override
+  bool updateShouldNotify(GeneratedImageMarkdownScope oldWidget) =>
+      !setEquals(handles, oldWidget.handles);
+}
+
 class KelivoImageBuilder implements ImageBuilder {
   const KelivoImageBuilder();
   static final _dimensions = RegExp(r'^(?:(\d+)(?:x(\d+))?|x(\d+))$');
@@ -99,11 +125,18 @@ class KelivoImageBuilder implements ImageBuilder {
       return number != null && number.isFinite && number > 0 ? number : null;
     }
 
-    return _MarkdownImage(
+    final inline = _MarkdownImage(
       theme: theme,
       url: image.destination,
       width: size(dimensions?[1]),
       height: size(dimensions?[2] ?? dimensions?[3]),
+    );
+    if (ViewImageTool.imageIdFromPath(image.destination) == null) return inline;
+    return Builder(
+      builder: (context) =>
+          GeneratedImageMarkdownScope.covers(context, image.destination)
+          ? const SizedBox.shrink()
+          : inline,
     );
   }
 }
@@ -482,9 +515,11 @@ class _MarkdownImageState extends State<_MarkdownImage> {
     final urls = <String>[];
     if (source != null) {
       urls.addAll(
-        markdownImageSources(
-          source,
-        ).where((url) => KelivoLink.tryParse(url) == null),
+        markdownImageSources(source).where(
+          (url) =>
+              KelivoLink.tryParse(url) == null &&
+              !GeneratedImageMarkdownScope.covers(context, url, listen: false),
+        ),
       );
     }
     if (!urls.contains(url)) urls.insert(0, url);

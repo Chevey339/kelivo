@@ -1,4 +1,5 @@
 import 'creation_reference_actions.dart';
+import 'creation_reference_strip.dart';
 import 'creation_menu.dart';
 import 'creation_picker.dart';
 import 'dart:async';
@@ -649,12 +650,6 @@ class _BatchGroupState extends State<_BatchGroup> {
                               desktop: widget.desktop,
                               draftTopicId: batch.topicId,
                             ),
-                          if (_referenceCount(batch) case final count
-                              when count > 0)
-                            _Tag(
-                              l10n.creationImagesCount(count),
-                              leading: const Icon(Lucide.Image, size: 13),
-                            ),
                         ],
                       ),
                     ],
@@ -708,6 +703,7 @@ class _BatchGroupState extends State<_BatchGroup> {
               ],
             ),
             const SizedBox(height: 10),
+            CreationReferenceStrip(batch: batch),
             widget.results,
             if (!batch.status.isActive &&
                 batch.status != GenerationStatus.succeeded)
@@ -935,14 +931,6 @@ class _EditedFromTag extends StatelessWidget {
             borderRadius: BorderRadius.circular(7),
             child: tag,
           );
-  }
-}
-
-int _referenceCount(GenerationBatchRow batch) {
-  try {
-    return MediaRequest.fromBatch(batch).references.length;
-  } catch (_) {
-    return 0;
   }
 }
 

@@ -372,7 +372,11 @@ class _RecentImagesState extends State<_RecentImages> {
           paths.add(path);
           continue;
         }
-        final bytes = await downloadWorkspaceImage(uri, checkAccess: checkOpen);
+        final bytes = await downloadWorkspaceImage(
+          uri,
+          checkAccess: checkOpen,
+          logMediaRequest: true,
+        );
         final image = await ToolImage.fromNetworkBytes(bytes);
         checkOpen();
         final file = await ComposerClipboard.reserve(

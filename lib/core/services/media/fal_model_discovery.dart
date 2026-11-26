@@ -108,6 +108,7 @@ class FalModelDiscovery {
   ) async {
     final client = providerHttpClient(
       config,
+      logMode: HttpLogMode.media,
       cancelToken: cancelToken,
       timeout: const Duration(seconds: 12),
     );

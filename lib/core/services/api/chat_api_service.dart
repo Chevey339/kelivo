@@ -121,7 +121,11 @@ class ChatApiService {
       );
       check();
       client = ProviderOAuthService.instance.authenticatedClient(
-        providerHttpClient(config, cancelToken: token, logRequests: false),
+        providerHttpClient(
+          config,
+          cancelToken: token,
+          logMode: HttpLogMode.disabled,
+        ),
         config,
         cancelToken: token,
       );

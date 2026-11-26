@@ -2946,7 +2946,9 @@ class DataSync {
             ? await live.referencedFiles()
             : const <String>{};
         final content = await AppDirectories.getContentDirectory();
-        final relocated = <String, String>{};
+        final relocated = !overwrite && incoming != null
+            ? await live.existingPathsForMerge(incoming)
+            : <String, String>{};
         final installed = <File>[];
         final nonce = const Uuid().v4();
         try {
@@ -2955,7 +2957,12 @@ class DataSync {
             if (parts == null) continue;
             final source = File(p.joinAll([payload.path, ...parts]));
             if (!await source.exists()) continue;
-            var target = File(p.joinAll([content.path, ...parts]));
+            final destination = relocated[uri] ?? uri;
+            final targetParts = _creationPathSegments(destination);
+            if (targetParts == null) {
+              throw const FormatException('creation_path');
+            }
+            var target = File(p.joinAll([content.path, ...targetParts]));
             if (await FileSystemEntity.type(target.path, followLinks: false) !=
                 FileSystemEntityType.notFound) {
               if (!overwrite) continue;
@@ -3008,6 +3015,9 @@ class DataSync {
           }
         }
       });
+      // Restoring may relocate a published file to avoid replacing a live one.
+      // Resolve saved chat links after the media transaction and file lock.
+      await chatService.runAssetReferenceMaintenance();
     } finally {
       await snapshot?.close();
     }

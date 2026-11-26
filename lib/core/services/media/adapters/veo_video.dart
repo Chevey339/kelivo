@@ -114,10 +114,14 @@ class VeoVideoAdapter implements MediaAdapter {
         final bytes = video?['bytesBase64Encoded'];
         final url = route.resultUri(video?['gcsUri'] ?? video?['uri']);
         if (bytes is! String && url == null) {
-          if ((response?['raiMediaFilteredCount'] as num? ?? 0) > 0) {
-            throw const MediaFailure(
-              MediaFailureKind.rejected,
+          final count =
+              generated?['raiMediaFilteredCount'] ??
+              response?['raiMediaFilteredCount'];
+          if (count is num && count > 0) {
+            throw filteredMediaFailure(
               'Content filtered',
+              generated?['raiMediaFilteredReasons'] ??
+                  response?['raiMediaFilteredReasons'],
             );
           }
           throw const MediaFailure(

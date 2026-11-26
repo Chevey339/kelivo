@@ -3,11 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show compute;
-import 'package:image_picker/image_picker.dart' show XFile;
 import 'package:path/path.dart' as p;
 
 import '../../../utils/app_directories.dart';
-import '../../../utils/file_import_helper.dart';
 import '../../../utils/kelivo_file_uri.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../database/app_database.dart';
@@ -31,13 +29,11 @@ class ChatImageGenerationService {
     required this.runner,
     required this.chat,
     required this.settings,
-    Future<Directory> Function()? uploadDirectory,
-  }) : _uploadDirectory = uploadDirectory ?? AppDirectories.getUploadDirectory;
+  });
 
   final MediaGenerationRunner runner;
   final ChatService chat;
   final SettingsProvider settings;
-  final Future<Directory> Function() _uploadDirectory;
 
   static ClientToolResult error(String message, {String? batchId}) =>
       ClientToolResult(
@@ -113,6 +109,15 @@ class ChatImageGenerationService {
             }
           }
 
+          if (source.creationUri case final original?) {
+            if (!await runner.repository.ownsImage(original) ||
+                await context.localAttachmentPath(source.handle) == null) {
+              return error('This creation image is no longer available.');
+            }
+            checkAccess();
+            references.add(MediaReference(original));
+            continue;
+          }
           final image = await _readReference(context, source, checkAccess);
           if (image == null) {
             return error(
@@ -170,19 +175,24 @@ class ChatImageGenerationService {
           return error(_failureMessage(status), batchId: batchId);
         }
         cancellation?.throwIfCancelled();
-        final part = await AttachmentFileLock.synchronized(() async {
+        final parts = await AttachmentFileLock.synchronized(() async {
           cancellation?.throwIfCancelled();
           if (chat.getConversation(conversationId) == null ||
               runner.repository.replacementVersion != version) {
-            return null;
+            return const <ImagePart>[];
           }
-          return _copyResult(ticket.batchId);
+          return _resultParts(ticket.batchId);
         });
-        if (part == null) {
+        if (parts.isEmpty) {
           return error('The generated image is unavailable.', batchId: batchId);
         }
-        final handle = context.registerGeneratedImage(part);
-        return _result(ticket, model.spec.id, part, handle);
+        return _result(
+          ticket,
+          model.spec.id,
+          parts,
+          parts.map(context.registerGeneratedImage).toList(),
+          canView: context.canViewNewOutput,
+        );
       } finally {
         unregister?.call();
       }
@@ -214,6 +224,7 @@ class ChatImageGenerationService {
     if (RequestImageContext.isRemoteHttpUrl(uri)) {
       final data = await downloadWorkspaceImage(
         Uri.parse(uri),
+        logMediaRequest: true,
         checkAccess: checkAccess,
       );
       return ToolImage.fromNetworkBytes(data);
@@ -271,28 +282,30 @@ class ChatImageGenerationService {
         await repository.waitForFinishedMessage(messageId)) {
       final applied = await AttachmentFileLock.synchronized<bool?>(() async {
         if (runner.repository.replacementVersion != version) return null;
-        final part = await _copyResult(batch.id);
-        if (part == null) return null;
-        final handle = ContextImageIdentity(
-          messageId,
-          'creation:${part.generationItemId}',
-        ).handle;
-        final result = _result(ticket, batch.modelId, part, handle);
+        final generated = await _resultParts(batch.id);
+        if (generated.isEmpty) return null;
+        final handles = [
+          for (final part in generated)
+            ContextImageIdentity(
+              messageId,
+              'creation:${part.generationItemId}',
+            ).handle,
+        ];
+        final result = _result(ticket, batch.modelId, generated, handles);
         return chat.updateFinishedMessageParts(messageId, (parts) {
-          if (parts.whereType<ImagePart>().any(
-            (value) => value.generationItemId == part.generationItemId,
-          )) {
-            return parts;
-          }
+          final existing = {
+            for (final p in parts.whereType<ImagePart>()) p.generationItemId,
+          };
           return [
-            for (final previousPart in parts)
+            for (final part in parts)
               _replaceToolResult(
-                previousPart,
+                part,
                 batch.id,
                 toolCallId is String ? toolCallId : null,
                 result,
               ),
-            part,
+            for (final part in generated)
+              if (!existing.contains(part.generationItemId)) part,
           ];
         });
       });
@@ -301,43 +314,39 @@ class ChatImageGenerationService {
     return false;
   }
 
-  Future<ImagePart?> _copyResult(String batchId) async {
-    final items = await runner.repository.itemsForBatch(batchId);
-    final item = items
-        .where((item) => item.status == GenerationItemStatus.ready)
-        .firstOrNull;
-    if (item == null) return null;
-    final root = (await runner.files.directory()).parent.path;
-    final source = KelivoFileUri.resolveToAbsolute(item.path, root: root);
-    if (source == null) return null;
-    final upload = await _uploadDirectory();
-    final saved = await FileImportHelper.copyXFile(XFile(source), upload);
-    if (saved == null) return null;
-    final uri = KelivoFileUri.encodeFromAbsolute(
-      saved,
-      root: upload.parent.path,
-    );
-    if (uri == null) return null;
-    return ImagePart(uri: uri, mime: item.mime, generationItemId: item.id);
-  }
+  Future<List<ImagePart>> _resultParts(String batchId) async => [
+    for (final item in await runner.repository.itemsForBatch(batchId))
+      if (item.status == GenerationItemStatus.ready &&
+          item.mode == MediaMode.image &&
+          KelivoFileUri.generationImageItemId(item.path) == item.id)
+        ImagePart(uri: item.path, mime: item.mime, generationItemId: item.id),
+  ];
 
   static ClientToolResult _result(
     MediaGenerationTicket ticket,
     String modelId,
-    ImagePart part,
-    String handle,
-  ) => ClientToolResult(
+    List<ImagePart> parts,
+    List<String> handles, {
+    bool canView = false,
+  }) => ClientToolResult(
     jsonEncode({
       'images': [
-        {'image_id': handle},
+        for (final handle in handles) {'image_id': handle},
       ],
+      'location': 'Creation; already displayed in this conversation.',
+      if (canView) 'view_image': {'image_id': handles.first},
+      'usage': canView
+          ? 'To inspect an image, pass its image_id to view_image. It is not a workspace file.'
+          : 'The user can see the result. Do not search for a workspace file, embed an image link, or claim to have inspected the pixels. For an edit, pass image_ids if generate_image accepts references.',
       if (ticket.revisedPrompt case final prompt? when prompt.isNotEmpty)
         'revised_prompt': prompt,
       'model': modelId,
     }),
     metadata: {
       GenerateImageTool.batchKey: ticket.batchId,
-      GenerateImageTool.attachmentKey: part.encodePayload(),
+      GenerateImageTool.attachmentKey: parts.length == 1
+          ? parts.single.encodePayload()
+          : [for (final part in parts) part.encodePayload()],
     },
   );
 

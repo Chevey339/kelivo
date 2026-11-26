@@ -13,6 +13,7 @@ import 'package:Kelivo/core/services/media/media_generation_runner.dart';
 import 'package:Kelivo/core/services/media/media_request.dart';
 import 'package:Kelivo/desktop/desktop_media_creation_page.dart';
 import 'package:Kelivo/desktop/hotkeys/chat_action_bus.dart';
+import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/features/chat/widgets/chat_creation_images.dart';
 import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
 import 'package:Kelivo/core/services/tools/generate_image_tool.dart';
@@ -66,6 +67,86 @@ final _videoProvider = ProviderConfig(
 );
 
 void main() {
+  testWidgets(
+    'deleting a creation also removes its mounted legacy chat preview',
+    (tester) async {
+      final controller = await _pumpCreationGallery(
+        tester,
+        desktop: false,
+        chatMessageId: 'chat-result',
+        count: 1,
+        chatAttachments: const [
+          ImagePart(
+            uri: 'kelivo-file:///upload/old.png',
+            generationItemId: 'image-0',
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CreationFileImage), findsWidgets);
+      final original = controller.item('image-0')!.path;
+      controller.setReferences('draft', [
+        const MediaReference('/picked.png'),
+        MediaReference(original),
+      ]);
+      controller.setFrame('draft', MediaReferenceRole.firstFrame, original);
+      controller.setPlatformImage('draft', 'model', 'mask', original);
+      final relocated = controller.draftFor('draft').relinkImages({
+        original: 'new-location.png',
+      });
+      expect(relocated.references.map((ref) => (ref.path, ref.role)), [
+        ('/picked.png', MediaReferenceRole.image),
+        ('new-location.png', MediaReferenceRole.image),
+        ('new-location.png', MediaReferenceRole.firstFrame),
+      ]);
+      expect(relocated.platformImages.values, ['new-location.png']);
+      await tester.runAsync(() async {
+        await controller.runner.repository.deleteItem('image-0');
+        await controller.runner.repository.watchItems().firstWhere(
+          (items) => items.isEmpty,
+        );
+      });
+      await tester.pumpAndSettle();
+      expect(find.byType(CreationFileImage), findsNothing);
+      final draft = controller.draftFor('draft');
+      expect(draft.references.map((ref) => ref.path), ['/picked.png']);
+      expect(draft.platformImages, isEmpty);
+      expect(find.text('Image deleted from Creation'), findsOneWidget);
+    },
+  );
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'tapping a reference opens its image and returns to the topic (desktop=$desktop)',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = desktop
+            ? const Size(1120, 760)
+            : const Size(390, 844);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        await _pumpCreationGallery(
+          tester,
+          desktop: desktop,
+          withReferences: true,
+        );
+        await tester.tap(find.text('Mountain trip').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Reference images 2'));
+        await tester.pumpAndSettle();
+        final viewer = tester.widget<ImageViewerPage>(
+          find.byType(ImageViewerPage),
+        );
+        expect(viewer.initialIndex, 1);
+        expect(viewer.images, hasLength(2));
+        Navigator.of(tester.element(find.byType(ImageViewerPage))).pop();
+        await tester.pumpAndSettle();
+        expect(find.text('A wide mountain lake'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
@@ -1661,7 +1742,9 @@ Future<MediaCreationController> _pumpCreationGallery(
   Locale locale = const Locale('en'),
   bool seedTopic = true,
   String? chatMessageId,
+  List<ImagePart> chatAttachments = const [],
   int laterBatches = 0,
+  bool withReferences = false,
 }) async {
   final (harness, settings, runner, controller, folder) = (await tester
       .runAsync(() async {
@@ -1682,6 +1765,24 @@ Future<MediaCreationController> _pumpCreationGallery(
           final file = await File(
             '${folder.path}/result.png',
           ).writeAsBytes(image.encodePng(image.Image(width: 30, height: 17)));
+          final refs = <MediaReference>[];
+          if (withReferences) {
+            final dir = await Directory(
+              '${folder.path}/generations/batch/refs',
+            ).create(recursive: true);
+            for (var i = 0; i < 2; i++) {
+              await file.copy('${dir.path}/$i.png');
+              refs.add(
+                MediaReference('kelivo-file:///generations/batch/refs/$i.png'),
+              );
+            }
+            refs.add(
+              const MediaReference(
+                'kelivo-file:///generations/batch/refs/removed.png',
+                unavailable: true,
+              ),
+            );
+          }
           final created = DateTime(2025, 1, 2);
           await repository.enqueue(
             GenerationBatchRowsCompanion.insert(
@@ -1695,7 +1796,7 @@ Future<MediaCreationController> _pumpCreationGallery(
               mode: MediaMode.image,
               prompt: 'A wide mountain lake',
               paramsJson: '{}',
-              referencesJson: '[]',
+              referencesJson: jsonEncode([for (final r in refs) r.toJson()]),
               status: GenerationStatus.succeeded,
               source: chatMessageId == null
                   ? GenerationSource.workbench
@@ -1755,6 +1856,17 @@ Future<MediaCreationController> _pumpCreationGallery(
         await repository.watchItems().first;
         return (harness, settings, runner, controller, folder);
       }))!;
+  if (withReferences) {
+    final previous = SandboxPathResolver.docsDir;
+    final support = SandboxPathResolver.supportDir;
+    SandboxPathResolver.debugSetDirs(docsDir: folder.path);
+    addTearDown(
+      () => SandboxPathResolver.debugSetDirs(
+        docsDir: previous,
+        supportDir: support,
+      ),
+    );
+  }
   addTearDown(() async {
     controller.dispose();
     settings.dispose();
@@ -1779,7 +1891,7 @@ Future<MediaCreationController> _pumpCreationGallery(
             ? Scaffold(
                 body: ChatCreationImages(
                   messageId: chatMessageId,
-                  attachments: const [],
+                  attachments: chatAttachments,
                   streaming: false,
                 ),
               )

@@ -29,6 +29,7 @@ Future<void> showFalModelPicker(
   final lifetime = CancelToken();
   final client = providerHttpClient(
     config,
+    logMode: HttpLogMode.media,
     cancelToken: lifetime,
     timeout: const Duration(seconds: 15),
   );

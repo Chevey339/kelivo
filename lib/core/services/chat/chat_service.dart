@@ -1,3 +1,5 @@
+import '../../database/media_repository.dart';
+import '../../../utils/kelivo_file_uri.dart';
 import '../../../features/chat/models/conversation_find_candidate.dart';
 import '../../../features/chat/services/conversation_find_worker.dart';
 import '../../models/carried_original.dart';
@@ -2539,11 +2541,20 @@ class ChatService extends ChangeNotifier {
 
   Future<void> _backfillAssetReferences(Directory appDataDir) async {
     final targetRoot = p.normalize(appDataDir.absolute.path);
+    final copies = await AttachmentFileLock.synchronized(
+      () => _repo.mediaRepository.adoptChatOriginals(
+        prepare: (candidates) =>
+            compute(_prepareCreationOriginals, (targetRoot, candidates)),
+        identicalReferences: (candidates) =>
+            compute(_identicalCreationCopies, (targetRoot, candidates)),
+      ),
+    );
     final includeLegacyCandidates = await _repo.needsAssetReferenceBackfill(
       version: _assetReferenceBackfillVersion,
       targetRoot: targetRoot,
     );
-    if (!includeLegacyCandidates &&
+    if (copies.isEmpty &&
+        !includeLegacyCandidates &&
         !await _repo.hasPendingAssetReferenceSync()) {
       return;
     }
@@ -2577,6 +2588,36 @@ class ChatService extends ChangeNotifier {
         version: _assetReferenceBackfillVersion,
         targetRoot: targetRoot,
       );
+    }
+    final database = _repo.databaseFile;
+    if (copies.isNotEmpty && database != null) {
+      await AttachmentFileLock.synchronized(() async {
+        if (AttachmentFileLock.hasActiveTransientGeneration ||
+            await _repo.hasActiveGenerations()) {
+          return;
+        }
+        final check = await compute(_identicalCreationCopies, (
+          targetRoot,
+          copies,
+        ));
+        await StorageAttachmentUsage.deleteUnusedFiles(
+          [
+            for (final uri in check.identical)
+              KelivoFileUri.resolveToAbsolute(uri, root: targetRoot)!,
+          ],
+          referenceDatabase: database,
+          creationReferenceCopies: check.identical
+              .where((uri) => KelivoFileUri.isGenerationReferenceSnapshot(uri))
+              .toSet(),
+        );
+        if (!AttachmentFileLock.hasActiveTransientGeneration &&
+            !await _repo.hasActiveGenerations()) {
+          await _repo.mediaRepository.finishCopyCleanup({
+            for (final entry in copies.entries)
+              if (!check.retry.contains(entry.key)) entry.key: entry.value,
+          });
+        }
+      });
     }
   }
 
@@ -5651,4 +5692,111 @@ final class ActiveTimelineSlot {
   final DateTime? finalizedAt;
   final int versionCount;
   final int logicalIndex;
+}
+
+/// Restore a missing published file only from the upload that its own chat
+/// part names, with the size recorded at generation. Keep the upload until
+/// both a byte comparison and a live ownership check have succeeded.
+Future<Set<String>> _prepareCreationOriginals(
+  (String, Map<String, CreationOriginal>) input,
+) async {
+  final (root, candidates) = input;
+  final prepared = <String>{};
+  final realRoot = await Directory(root).resolveSymbolicLinks();
+  for (final entry in candidates.entries) {
+    final original = entry.value;
+    if (KelivoFileUri.generationImageItemId(original.uri) == null) continue;
+    final existing = await SandboxPathResolver.managedFile(
+      original.uri,
+      contentRoot: root,
+    );
+    if (existing != null && await existing.length() == original.bytes) {
+      prepared.add(entry.key);
+      continue;
+    }
+    if (KelivoFileUri.decodeToSegments(entry.key)?.first != 'upload') continue;
+    final old = await SandboxPathResolver.managedFile(
+      entry.key,
+      contentRoot: root,
+    );
+    final path = KelivoFileUri.resolveToAbsolute(original.uri, root: root)!;
+    if (old == null ||
+        await old.length() != original.bytes ||
+        await FileSystemEntity.type(path, followLinks: false) !=
+            FileSystemEntityType.notFound) {
+      continue;
+    }
+    final target = File(path);
+    final temporary = File('$path.${const Uuid().v4()}.part');
+    try {
+      // Only create folders underneath the live root, with no link components.
+      var parent = Directory(root);
+      final segments = KelivoFileUri.decodeToSegments(original.uri)!;
+      for (final component in segments.take(segments.length - 1)) {
+        parent = Directory(p.join(parent.path, component));
+        await parent.create();
+        if (!p.equals(
+          await parent.resolveSymbolicLinks(),
+          p.join(realRoot, p.relative(parent.path, from: root)),
+        )) {
+          throw const FileSystemException('Invalid original image directory');
+        }
+      }
+      await old.copy(temporary.path);
+      if (await temporary.length() != original.bytes) continue;
+      final output = await temporary.open(mode: FileMode.append);
+      try {
+        await output.flush();
+      } finally {
+        await output.close();
+      }
+      await temporary.rename(target.path);
+      prepared.add(entry.key);
+    } on FileSystemException {
+      // An unavailable drive or missing source can be retried on another launch.
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
+  }
+  return prepared;
+}
+
+Future<CreationCopyCheck> _identicalCreationCopies(
+  (String, Map<String, String>) input,
+) async {
+  final (root, copies) = input;
+  final targets = <String>{}, retry = <String>{};
+  for (final entry in copies.entries) {
+    try {
+      final a = await SandboxPathResolver.managedFile(
+        entry.key,
+        contentRoot: root,
+      );
+      final b = await SandboxPathResolver.managedFile(
+        entry.value,
+        contentRoot: root,
+      );
+      if (a == null) {
+        final path = KelivoFileUri.resolveToAbsolute(entry.key, root: root);
+        if (path != null &&
+            await FileSystemEntity.type(path, followLinks: false) ==
+                FileSystemEntityType.file) {
+          retry.add(entry.key);
+        }
+        continue;
+      }
+      if (b == null) {
+        retry.add(entry.key);
+        continue;
+      }
+      if (await a.length() != await b.length()) continue;
+      if (await sha256.bind(a.openRead()).first ==
+          await sha256.bind(b.openRead()).first) {
+        targets.add(entry.key);
+      }
+    } on FileSystemException {
+      retry.add(entry.key);
+    }
+  }
+  return (identical: targets, retry: retry);
 }

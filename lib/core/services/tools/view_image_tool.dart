@@ -1,11 +1,20 @@
 /// One image viewer with independently gated conversation and workspace inputs.
 abstract final class ViewImageTool {
   static const name = 'view_image';
+
+  /// Models sometimes return a generated image handle in the path field. It
+  /// still has to pass the same conversation lookup as an explicit image_id.
+  static final _generatedPath = RegExp(
+    r'^(?:(?:kelivo://chat/outputs/|/chat/outputs/))?(img_[0-9a-f]{20})(?:\.(?:png|jpe?g|webp|gif))?$',
+  );
+  static String? imageIdFromPath(Object? path) =>
+      path is String ? _generatedPath.firstMatch(path.trim())?.group(1) : null;
+
   static const historyDescription =
       'Images already included in messages can be inspected directly; do not call this tool for them. '
       'Use image_id only to retrieve a conversation image that is missing from the current context. '
       'Call with no image selected to list available conversation images; pass next_offset as offset to list more. '
-      'Omit path when using image_id.';
+      'For an image returned by generate_image, use its exact image_id. It is stored in Creation, not in the workspace. Omit path when using image_id.';
 
   /// Adds conversation lookup to the existing file viewer, when available.
   static Map<String, dynamic> withHistory([

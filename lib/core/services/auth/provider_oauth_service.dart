@@ -14,6 +14,7 @@ import '../../providers/settings_provider.dart';
 import '../model_spec/model_spec_resolver.dart';
 import '../api/request_image_context.dart';
 import '../network/dio_http_client.dart';
+import '../network/media_http_log.dart';
 import 'codex_client_version.dart';
 import 'codex_request.dart';
 import 'codex_turn_state.dart';
@@ -87,7 +88,7 @@ class ProviderOAuthService extends ChangeNotifier {
     final host = config.proxyHost?.trim() ?? '';
     final port = int.tryParse(config.proxyPort ?? '');
     return DioHttpClient(
-      logRequests: false,
+      logMode: HttpLogMode.disabled,
       timeout: const Duration(seconds: 30),
       proxy: config.proxyEnabled == true && host.isNotEmpty && port != null
           ? NetworkProxyConfig(
@@ -1185,6 +1186,9 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
               )
             : jsonEncode(payload);
         RequestImageContext.current?.validateBodyBytes(result.bodyBytes.length);
+      }
+      if (identical(result.bodyBytes, body)) {
+        MediaHttpLog.copyDescription(request, result);
       }
       return result;
     }

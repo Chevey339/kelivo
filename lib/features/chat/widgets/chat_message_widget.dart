@@ -42,6 +42,12 @@ import '../../../core/services/browser/browser_service.dart';
 import '../../browser/models/browser_tool_presentation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/image_context.dart' show ContextImageIdentity;
+import '../../../shared/markdown/link_image_handlers.dart'
+    show GeneratedImageMarkdownScope;
+import '../../../core/models/media_creation.dart';
+import '../../../core/utils/chat_image_result.dart';
+import '../../media/providers/media_creation_controller.dart';
 import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
@@ -51,6 +57,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/providers/assistant_provider.dart';
 import 'package:intl/intl.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/kelivo_file_uri.dart';
 import '../../../utils/safe_resize_image.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../../shared/widgets/avatar_image.dart';
@@ -967,13 +974,46 @@ class _BrowserStepDetailHeader extends StatelessWidget {
   }
 }
 
+/// A mounted tool observation can outlive its cached message. Resolve the
+/// current artwork before offering either its thumbnail or the details action.
+List<String> _liveToolImages(
+  BuildContext context,
+  ToolUIPart part,
+  List<String> paths, {
+  bool listen = true,
+}) {
+  final source = readChatImageMetadata(part.toolName, part.metadata);
+  final id = creationItemFromSourceKey(source?.sourceKey);
+  if (id == null) return paths;
+  return [?_liveCreationImagePath(context, id, listen: listen)];
+}
+
+String? _liveCreationImagePath(
+  BuildContext context,
+  String id, {
+  bool listen = true,
+}) {
+  String? original(MediaCreationController? media) {
+    final item = media?.item(id);
+    return item?.status == GenerationItemStatus.ready &&
+            item?.mode == MediaMode.image
+        ? item!.path
+        : null;
+  }
+
+  return listen
+      ? context.select<MediaCreationController?, String?>(original)
+      : original(context.read<MediaCreationController?>());
+}
+
 void _showToolDetail(BuildContext context, ToolUIPart part, {Widget? header}) {
   final l10n = AppLocalizations.of(context)!;
   final argsPretty = const JsonEncoder.withIndent('  ').convert(part.arguments);
-  final (cleanText, images) = parseToolResultImages(
+  final (cleanText, paths) = parseToolResultImages(
     part.content,
     metadata: part.metadata,
   );
+  final images = _liveToolImages(context, part, paths, listen: false);
   final resultText = cleanText.isNotEmpty
       ? _prettyToolJson(cleanText)
       : l10n.chatMessageWidgetNoResultYet;
@@ -2586,11 +2626,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         continue;
       }
       if (part is ImagePart) {
-        final path = part.uri.trim();
+        final id = alignEnd
+            ? part.generationItemId ??
+                  KelivoFileUri.generationImageItemId(part.uri)
+            : null;
+        final path = id == null
+            ? (part.unavailable ? '' : part.uri.trim())
+            : _liveCreationImagePath(context, id) ?? '';
         final fixed = path.isEmpty ? '' : _resolveAttachmentImageUri(path);
         final viewIndex = viewablePaths.length;
         final heroTag = (this, partIndex);
-        final available = !part.unavailable && fixed.isNotEmpty;
+        final available = fixed.isNotEmpty;
         if (available) {
           viewablePaths.add(fixed);
           heroTags.add(heroTag);
@@ -3416,7 +3462,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       alignEnd: false,
     );
 
-    return ChatSurfaceTheme(
+    final body = ChatSurfaceTheme(
       palette: fg,
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -4239,6 +4285,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           ],
         ),
       ),
+    );
+    return GeneratedImageMarkdownScope(
+      handles: creationAttachments.isNotEmpty
+          ? {
+              for (final part in creationAttachments)
+                ContextImageIdentity(
+                  widget.message.id,
+                  'creation:${part.generationItemId}',
+                ).handle,
+            }
+          : const {},
+      child: body,
     );
   }
 
@@ -7007,7 +7065,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
     );
 
     final cleanText = _cleanText;
-    final imagePaths = _imagePaths;
+    final imagePaths = _liveToolImages(context, widget.part, _imagePaths);
     final screenTimeResult = widget.part.toolName == LocalToolNames.screenTime
         ? ScreenTimeResult.tryParse(cleanText)
         : null;
@@ -7288,7 +7346,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final hideToolResultImages = context.select<SettingsProvider, bool>(
       (s) => s.hideToolResultImages,
     );
-    final hasImages = !hideToolResultImages && _imagePaths.isNotEmpty;
+    final imagePaths = _liveToolImages(context, widget.part, _imagePaths);
+    final hasImages = !hideToolResultImages && imagePaths.isNotEmpty;
     final l10n = AppLocalizations.of(context)!;
     final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
         ? _textToSpeechToolText(widget.part.arguments)
@@ -7575,10 +7634,10 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 height: kToolImageCardHeight,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: _imagePaths.length,
+                  itemCount: imagePaths.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (ctx, i) {
-                    final path = _imagePaths[i];
+                    final path = imagePaths[i];
                     return GestureDetector(
                       onTap: () => _showToolFullImage(context, path),
                       child: ClipRRect(

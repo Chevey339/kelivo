@@ -24,21 +24,26 @@ class RequestLogger {
   static int _nextRequestId = 0;
   static int nextRequestId() => ++_nextRequestId;
 
-  static Future<void> setEnabled(bool v) async {
-    if (_enabled == v) return;
+  static Future<void> setEnabled(bool v) {
+    if (_enabled == v) return v ? Future.value() : _writeQueue;
     _enabled = v;
-    if (!v) {
-      try {
-        await _sink?.flush();
-      } catch (_) {}
-      try {
-        await _sink?.close();
-      } catch (_) {}
+    if (v) {
+      _writeErrorReported = false;
+      return Future.value();
+    }
+    // Closing belongs to the same queue as opening and writing the sink.
+    // A quick disable/enable cannot close the next session's file underneath it.
+    return _writeQueue = _writeQueue.then((_) async {
+      final sink = _sink;
       _sink = null;
       _sinkDate = null;
-    } else {
-      _writeErrorReported = false;
-    }
+      try {
+        await sink?.flush();
+      } catch (_) {}
+      try {
+        await sink?.close();
+      } catch (_) {}
+    });
   }
 
   static IOSink? _sink;
@@ -116,7 +121,6 @@ class RequestLogger {
     final now = DateTime.now();
     final text = '[${_formatTs(now)}] ${capLine(line)}\n';
     _writeQueue = _writeQueue.then((_) async {
-      if (!_enabled) return;
       try {
         final sink = await _ensureSink();
         sink.write(text);

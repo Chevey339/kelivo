@@ -16,15 +16,18 @@ class MediaReference {
     this.path, {
     this.role = MediaReferenceRole.image,
     this.parameterKey,
+    this.unavailable = false,
   });
 
   final String path;
   final MediaReferenceRole role;
   final String? parameterKey;
+  final bool unavailable;
 
   Map<String, Object?> toJson() => {
     'path': path,
     'role': role.name,
+    if (unavailable) 'unavailable': true,
     if (parameterKey != null) 'parameterKey': parameterKey,
   };
 
@@ -39,7 +42,23 @@ class MediaReference {
       json['path'] as String,
       role: role,
       parameterKey: json['parameterKey'] as String?,
+      unavailable: json['unavailable'] == true,
     );
+  }
+  static List<MediaReference> forBatch(GenerationBatchRow batch) {
+    final values = jsonDecode(batch.referencesJson);
+    if (values is! List) {
+      throw const FormatException('Invalid creation references');
+    }
+    return [
+      for (final v in values)
+        if (v is Map &&
+            v['path'] is String &&
+            KelivoFileUri.isGenerationReference(v['path'] as String, batch.id))
+          MediaReference.fromJson(Map<String, dynamic>.from(v))
+        else
+          throw const FormatException('Invalid stored creation reference'),
+    ];
   }
 }
 
@@ -61,15 +80,7 @@ class MediaRequest {
     try {
       final params = jsonDecode(batch.paramsJson) as Map<String, dynamic>;
       params.remove(FalBatchState.key);
-      final refs = [
-        for (final row in jsonDecode(batch.referencesJson) as List)
-          MediaReference.fromJson((row as Map).cast<String, dynamic>()),
-      ];
-      if (refs.any(
-        (ref) => !KelivoFileUri.isGenerationFile(ref.path, batch.id),
-      )) {
-        throw const FormatException('Invalid stored creation reference');
-      }
+      final refs = MediaReference.forBatch(batch);
       return MediaRequest(
         modelId: batch.modelId,
         mode: batch.mode,
@@ -516,6 +527,7 @@ class MediaFailure implements Exception {
     this.retryAfter,
     this.statusCode,
     this.automaticRetry = true,
+    this.logDetail,
   });
 
   final MediaFailureKind kind;
@@ -523,6 +535,8 @@ class MediaFailure implements Exception {
   final Duration? retryAfter;
   final int? statusCode;
   final bool automaticRetry;
+  // Only for the optional network log, never persisted with the batch.
+  final String? logDetail;
 
   bool get retryable =>
       automaticRetry &&

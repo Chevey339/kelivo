@@ -65,6 +65,7 @@ class OpenAIProvider extends BaseProvider {
     if (cfg.isFal) {
       final client = providerHttpClient(
         cfg,
+        logMode: HttpLogMode.media,
         timeout: const Duration(seconds: 15),
       );
       try {

@@ -159,7 +159,7 @@ class ProviderBalanceService {
     final client = providerHttpClient(
       config,
       cancelToken: cancelToken,
-      logRequests: false,
+      logMode: config.isFal ? HttpLogMode.media : HttpLogMode.disabled,
     );
     try {
       final apiKey = _effectiveApiKey(config);

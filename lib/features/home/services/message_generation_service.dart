@@ -45,6 +45,7 @@ import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/workspace/workspace_tools_service.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/kelivo_file_uri.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
@@ -673,6 +674,11 @@ class MessageGenerationService {
             modelId.toLowerCase().startsWith('claude-'));
     return RequestImageContext(
       settings: imageSettings,
+      ownsCreationImage: (uri) async =>
+          await chatService.chatRepositoryOrNull?.mediaRepository.ownsImage(
+            uri,
+          ) ==
+          true,
       images: await RequestImageContext.collectHistory(
         history,
         parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
@@ -1112,9 +1118,11 @@ class MessageGenerationService {
 
     final parts = <MessagePart>[TextPart(processedUserText)];
     for (final path in input.imagePaths) {
+      final uri = SandboxPathResolver.canonicalize(path);
       parts.add(
         ImagePart(
-          uri: SandboxPathResolver.canonicalize(path),
+          uri: uri,
+          generationItemId: KelivoFileUri.generationImageItemId(uri),
           mime: await inferAttachmentMime(uri: path),
         ),
       );

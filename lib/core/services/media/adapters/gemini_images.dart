@@ -122,9 +122,12 @@ class GeminiImagesAdapter implements MediaAdapter {
               base64: data,
             ),
       ];
-      if (generated.isEmpty &&
-          predictions.any((row) => row['raiFilteredReason'] != null)) {
-        throw const MediaFailure(MediaFailureKind.rejected, 'Image filtered');
+      final reason = predictions
+          .map((row) => row['raiFilteredReason'])
+          .nonNulls
+          .firstOrNull;
+      if (generated.isEmpty && reason != null) {
+        throw filteredMediaFailure('Image filtered', reason);
       }
       yield MediaOutput(generated);
       return;
@@ -196,16 +199,20 @@ class GeminiImagesAdapter implements MediaAdapter {
         }
       }
     }
-    if (images.isEmpty &&
-        ((output['promptFeedback'] as Map?)?['blockReason'] != null ||
-            candidates.any(
-              (row) => const {
-                'SAFETY',
-                'IMAGE_SAFETY',
-                'IMAGE_PROHIBITED_CONTENT',
-              }.contains(row['finishReason']),
-            ))) {
-      throw const MediaFailure(MediaFailureKind.rejected, 'Image filtered');
+    if (images.isEmpty) {
+      final reason =
+          (output['promptFeedback'] as Map?)?['blockReason'] ??
+          candidates
+              .map((row) => row['finishReason'])
+              .where(
+                const {
+                  'SAFETY',
+                  'IMAGE_SAFETY',
+                  'IMAGE_PROHIBITED_CONTENT',
+                }.contains,
+              )
+              .firstOrNull;
+      if (reason != null) throw filteredMediaFailure('Image filtered', reason);
     }
     yield MediaOutput(images);
   }

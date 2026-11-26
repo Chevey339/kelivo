@@ -14,6 +14,10 @@ import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
 import 'package:Kelivo/core/services/network/pinned_tls_socket.dart';
+import 'package:Kelivo/core/services/network/request_logger.dart';
+import 'package:Kelivo/core/services/workspace/workspace_image_download.dart';
+import 'package:Kelivo/features/settings/logs/request_log_parser.dart';
+import 'package:Kelivo/utils/app_directories.dart';
 import 'package:Kelivo/core/services/api/tool_result_content.dart';
 import 'package:Kelivo/core/services/tool_image.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
@@ -242,6 +246,42 @@ void main() {
           action,
           _FixtureImageSockets(server.port),
         );
+
+    test(
+      'creation reference imports log both hops and preserve the original bytes',
+      () async {
+        await RequestLogger.setEnabled(true);
+        final saveOutput = RequestLogger.saveOutput;
+        RequestLogger.saveOutput = true;
+        try {
+          final data = await withFixtureSocket(
+            () => downloadWorkspaceImage(
+              Uri.parse('$origin/redirect?ticket=private-reference-secret'),
+              checkAccess: () {},
+              logMediaRequest: true,
+            ),
+          );
+          expect(data, png);
+          await RequestLogger.setEnabled(false);
+          final folder = await AppDirectories.getContentDirectory();
+          final text = await File(
+            p.join(folder.path, 'logs', 'logs.txt'),
+          ).readAsString();
+          final entries = RequestLogParser.parse(text);
+          expect(entries.map((e) => e.statusCode), unorderedEquals([302, 200]));
+          expect(
+            entries.map((e) => e.uri?.path),
+            unorderedEquals(['/redirect', '/image.bin']),
+          );
+          expect(text, isNot(contains('private-reference-secret')));
+          expect(text, isNot(contains('test_cookie=value')));
+          expect(text, isNot(contains(base64Encode(png))));
+        } finally {
+          await RequestLogger.setEnabled(false);
+          RequestLogger.saveOutput = saveOutput;
+        }
+      },
+    );
 
     test('follows a redirect and returns a replayable snapshot', () async {
       final result = await withFixtureSocket(

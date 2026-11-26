@@ -1,4 +1,11 @@
 import 'dart:convert';
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/media_repository.dart';
+import 'package:Kelivo/core/models/media_creation.dart';
+import 'package:Kelivo/core/services/media/media_generation_runner.dart';
+import 'package:Kelivo/core/services/media/media_file_store.dart';
+import 'package:Kelivo/features/media/providers/media_creation_controller.dart';
+
 import 'package:Kelivo/core/services/tools/generate_image_tool.dart';
 import 'package:Kelivo/features/chat/widgets/chat_creation_images.dart';
 import 'package:Kelivo/features/media/widgets/creation_lightbox.dart';
@@ -75,7 +82,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'multiple generated images follow their calls and unlinked copies stay below the reply',
+    'multiple generated images follow their calls and unlinked outputs stay below the reply',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(480, 2200);
@@ -86,7 +93,7 @@ void main() {
       await settings.loaded;
       await settings.setShowToolCards(false);
       ImagePart image(String id) => ImagePart(
-        uri: 'kelivo-file:///upload/$id.png',
+        uri: 'kelivo-file:///generations/batch-$id/$id.png',
         mime: 'image/png',
         generationItemId: id,
       );
@@ -101,6 +108,60 @@ void main() {
       final first = image('first'),
           second = image('second'),
           unlinked = image('unlinked');
+      final media = (await tester.runAsync(() async {
+        final harness = await BusinessTestHarness.create();
+        final repo = MediaRepository(harness.database);
+        final now = DateTime.now();
+        for (final part in [first, second, unlinked]) {
+          final id = part.generationItemId!, batchId = 'batch-$id';
+          await repo.enqueue(
+            GenerationBatchRowsCompanion.insert(
+              id: batchId,
+              providerId: 'test',
+              modelId: 'image',
+              mode: MediaMode.image,
+              prompt: 'image',
+              paramsJson: '{}',
+              referencesJson: '[]',
+              status: GenerationStatus.succeeded,
+              source: GenerationSource.chat,
+              createdAt: now,
+            ),
+          );
+          await repo.addItem(
+            GenerationItemRow(
+              id: id,
+              batchId: batchId,
+              ordinal: 0,
+              mode: MediaMode.image,
+              path: part.uri,
+              mime: 'image/png',
+              byteSize: 80,
+              status: GenerationItemStatus.ready,
+              favorite: false,
+              createdAt: now,
+            ),
+          );
+        }
+        final runner = MediaGenerationRunner(
+          repository: repo,
+          files: const MediaFileStore(),
+        );
+        await runner.initialized;
+        final controller = MediaCreationController(
+          runner: runner,
+          settings: settings,
+          preferences: harness.preferences,
+        );
+        await repo.watchItems().first;
+        addTearDown(() async {
+          controller.dispose();
+          await runner.shutdown();
+          runner.dispose();
+          await harness.close();
+        });
+        return controller;
+      }))!;
       final message = ChatMessage(
         id: 'creation-calls',
         role: 'assistant',
@@ -119,8 +180,11 @@ void main() {
       await tester.pumpWidget(
         _buildHarness(
           settings: settings,
-          child: SingleChildScrollView(
-            child: ChatMessageWidget(message: message, showModelIcon: false),
+          child: ChangeNotifierProvider<MediaCreationController>.value(
+            value: media,
+            child: SingleChildScrollView(
+              child: ChatMessageWidget(message: message, showModelIcon: false),
+            ),
           ),
         ),
       );

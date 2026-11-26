@@ -654,7 +654,11 @@ void main() {
       sources.add(MediaReference(file.path));
     }
     await expectLater(
-      files.snapshotReferences('too-large', sources),
+      files.snapshotReferences(
+        'too-large',
+        sources,
+        ownsImage: (_) async => false,
+      ),
       throwsA(
         isA<MediaFailure>().having(
           (failure) => failure.kind,

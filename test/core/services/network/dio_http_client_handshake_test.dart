@@ -28,7 +28,7 @@ void main() {
     var dispatches = 0;
     final client = DioHttpClient(
       cancelToken: token,
-      logRequests: false,
+      logMode: HttpLogMode.disabled,
       onRequestDispatched: (_) => dispatches++,
     );
     addTearDown(client.close);
@@ -55,7 +55,7 @@ void main() {
     var dispatches = 0;
     final client = DioHttpClient(
       cancelToken: token,
-      logRequests: false,
+      logMode: HttpLogMode.disabled,
       onRequestDispatched: (_) => dispatches++,
     );
     addTearDown(client.close);

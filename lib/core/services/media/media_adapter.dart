@@ -13,6 +13,8 @@ import '../../providers/settings_provider.dart';
 import '../api/chat_api_helpers.dart';
 import '../auth/provider_oauth_service.dart';
 import '../custom_request_merger.dart';
+import '../network/media_http_log.dart';
+import '../network/request_logger.dart';
 import 'media_request.dart';
 
 abstract interface class MediaAdapter {
@@ -49,9 +51,22 @@ class MediaRequestLog {
   Map<String, Object?>? _request;
   Map<String, Object?>? _response;
   final _retries = <Map<String, Object?>>[];
+  int? _networkId;
+  void recordProviderFailure(MediaFailure failure) {
+    final id = _networkId;
+    final detail =
+        failure.logDetail ??
+        (failure.kind == MediaFailureKind.rejected ? failure.kind.name : null);
+    if (id != null && detail != null && failure.statusCode == null) {
+      RequestLogger.logLine('[RES $id] error=${RequestLogger.escape(detail)}');
+      _networkId = null;
+    }
+  }
+
   bool get startedPost => _request?['method'] == 'POST';
 
   void start(http.BaseRequest request, Map<String, dynamic>? payload) {
+    _networkId = null;
     const knownSegments = {
       'images',
       'generations',
@@ -260,7 +275,9 @@ class MediaContext {
     if (cancellation != null) throw cancellation;
     request.followRedirects = false;
     log?.start(request, diagnosticBody);
+    MediaHttpLog.describeRequest(request, diagnosticBody);
     final response = await client.send(request);
+    log?._networkId = MediaHttpLog.requestId(response.request);
     log?.response(response.statusCode);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response;
@@ -385,6 +402,16 @@ Map<String, dynamic> decodeMediaJson(List<int> bytes) {
   return value;
 }
 
+MediaFailure filteredMediaFailure(String message, Object? reason) =>
+    MediaFailure(
+      MediaFailureKind.rejected,
+      message,
+      logDetail: MediaHttpLog.failure({
+        'error': 'content_filter',
+        'reason': reason,
+      }),
+    );
+
 MediaFailure mediaResponseFailure(
   Object? error, {
   int? statusCode,
@@ -452,6 +479,7 @@ MediaFailure mediaResponseFailure(
           }.contains(field))
         field,
     ].join(' · '),
+    logDetail: statusCode == null ? MediaHttpLog.failure(error) : null,
     statusCode: statusCode,
     retryAfter: retryAfter,
   );

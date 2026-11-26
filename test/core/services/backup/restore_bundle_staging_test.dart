@@ -195,6 +195,48 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
 
+    test(
+      'restoring chats and creations rechecks originals after attachment staging',
+      () async {
+        final extracted = await _createExtractedBundle(
+          root,
+          includeFiles: true,
+          seedDatabase: (db) async {
+            await db
+                .into(db.chatStorageMetaRows)
+                .insert(
+                  ChatStorageMetaRowsCompanion.insert(
+                    key: 'creation_chat_originals_v1',
+                    value: '1',
+                  ),
+                );
+          },
+        );
+        final staged = await RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: true,
+          scope: const BackupScope(excluded: {BackupCategory.files}),
+          sourceManifestSha256: await _manifestSha256(extracted),
+        );
+        final candidate = sqlite.sqlite3.open(
+          p.join(staged.payloadDirectory.path, 'database', 'kelivo.db'),
+          mode: sqlite.OpenMode.readOnly,
+        );
+        try {
+          expect(
+            candidate.select(
+              "SELECT value FROM chat_storage_meta_rows WHERE key='creation_chat_originals_v1'",
+            ),
+            isEmpty,
+          );
+        } finally {
+          candidate.close();
+        }
+      },
+    );
+
     test('stages a schema 1 payload by migrating it forward', () async {
       final extracted = await _createLegacyV1Bundle(root);
 
