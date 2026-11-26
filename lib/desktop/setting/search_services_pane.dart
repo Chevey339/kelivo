@@ -1255,6 +1255,21 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             ),
           ),
         ];
+      case 'specstream':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['url'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: SpecStreamOptions.defaultUrl,
+            ),
+          ),
+        ];
       case 'parallel':
         return [
           TextField(
@@ -1477,6 +1492,12 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
         );
       case 'anysearch':
         return AnySearchOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          url: (_controllers['url']?.text ?? '').trim(),
+        );
+      case 'specstream':
+        return SpecStreamOptions(
           id: id,
           apiKey: _controllers['apiKey']!.text,
           url: (_controllers['url']?.text ?? '').trim(),
@@ -2813,6 +2834,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'tinyfish', brand: 'tinyfish'),
     (type: 'anysearch', brand: 'anysearch'),
     (type: 'parallel', brand: 'parallel'),
+    (type: 'specstream', brand: 'specstream'),
     (type: 'kimi', brand: 'kimi'),
     (type: 'you', brand: 'you'),
     (type: 'keenable', brand: 'keenable'),

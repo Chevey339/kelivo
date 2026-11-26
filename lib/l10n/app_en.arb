@@ -3294,6 +3294,7 @@
   "searchProviderSearXNGDescription": "Privacy-respecting metasearch engine. Self-hosted instance required; no tracking.",
   "searchProviderFourGetDescription": "Web search through a public or self-hosted 4get instance with the API enabled.",
   "searchProviderTavilyDescription": "AI search API optimized for LLMs. Provides high-quality, relevant results.",
+  "searchProviderSpecStreamDescription": "Live web data engine with real-time search, extraction, and MCP server support.",
   "searchProviderZhipuDescription": "Chinese AI search by Zhipu AI. Optimized for Chinese content and queries.",
   "searchProviderOllamaDescription": "Ollama web search API. Augments models with up-to-date information.",
   "searchProviderDeepSeekDescription": "DeepSeek official web search and page fetch APIs. Uses a DeepSeek API key.",
@@ -3301,6 +3302,7 @@
   "searchServiceNameBingLocal": "Bing (Local)",
   "searchServiceNameDuckDuckGo": "DuckDuckGo",
   "searchServiceNameTavily": "Tavily",
+  "searchServiceNameSpecStream": "SpecStream",
   "searchServiceNameExa": "Exa",
   "searchServiceNameExaMcp": "Exa MCP",
   "searchServiceNameZhipu": "Zhipu AI",
@@ -14273,6 +14275,9 @@
   "@searchProviderTavilyDescription": {
     "description": "Description under the Tavily search provider option noting it is an AI search API optimized for LLMs."
   },
+  "@searchProviderSpecStreamDescription": {
+    "description": "Description under the SpecStream search provider option noting it is a live web data engine."
+  },
   "@searchProviderZhipuDescription": {
     "description": "Description under the Zhipu AI search provider option noting it is optimized for Chinese content and queries."
   },
@@ -14293,6 +14298,9 @@
   },
   "@searchServiceNameTavily": {
     "description": "Display name for the 'tavily' search service type in the search service list and editor."
+  },
+  "@searchServiceNameSpecStream": {
+    "description": "SpecStream search provider name."
   },
   "@searchServiceNameExa": {
     "description": "Display name for the 'exa' search service type in the search service list and editor."
