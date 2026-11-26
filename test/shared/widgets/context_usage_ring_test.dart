@@ -69,7 +69,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(ringPainter(tester).ratio, isNull);
     expect(
-      find.byTooltip('Estimated 400 + unknown compaction'),
+      find.byTooltip('Estimated 400, plus unknown server-side usage'),
       findsOneWidget,
     );
   });
@@ -92,7 +92,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(ringPainter(tester).ratio, isNull);
     expect(
-      find.byTooltip('Calculation failed\nUsage unavailable'),
+      find.byTooltip(
+        'Couldn’t calculate usage. Please try again.\nUsage isn’t available right now.',
+      ),
       findsOneWidget,
     );
   });
@@ -105,7 +107,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       find.byTooltip(
-        'Update failed · previous result is stale\n400 / 1k (40%)',
+        'Couldn’t refresh. Showing the previous result, which may be out of date.\n400 / 1k (40%)',
       ),
       findsOneWidget,
     );

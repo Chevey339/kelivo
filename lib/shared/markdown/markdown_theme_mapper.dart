@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:markstream/markstream.dart';
@@ -38,9 +40,13 @@ MarkstreamTheme mapMarkdownTheme(
       defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.windows;
   final backdrop = resolveMarkdownBackdrop(context, settings);
-  final customBackground = ExportCaptureScope.of(context)
-      ? null
-      : MarkdownSurfaceScope.maybeOf(context)?.customBackground;
+  final surface = MarkdownSurfaceScope.maybeOf(context);
+  final customBackground =
+      surface != null &&
+          surface.hasCustomBackground &&
+          !ExportCaptureScope.of(context)
+      ? surface.backgroundColor?.withValues(alpha: 1)
+      : null;
   if (backdrop != MarkstreamBackdrop.plain) {
     if (customBackground != null) {
       // Fixed syntax colors need a near-dark or near-light block surface, even
@@ -87,26 +93,76 @@ MarkstreamTheme mapMarkdownTheme(
     );
   }
   if (!settings.useLegacyInlineCodeStyle) return theme;
-  final translucent =
-      backdrop == MarkstreamBackdrop.wallpaper ||
-      backdrop == MarkstreamBackdrop.frostedBubble;
+  final inlineFill = theme.brightness == Brightness.dark
+      ? Colors.white12
+      : const Color(0x66F1F3F5);
   return theme.copyWith(
     inlineCode: theme.inlineCode.copyWith(
       text: theme.inlineCode.text.copyWith(
         height: 1.4,
         color: theme.colors.ink,
       ),
+      inheritBodyColor: _legacyInlineUsesBodyColor(
+        theme,
+        inlineFill,
+        surface?.backgroundColor,
+      ),
       // Keep short code within the paragraph's line height while giving
       // wrapped code room between lines.
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      backgroundColor: translucent
-          ? theme.colors.fillBlock
-          : theme.brightness == Brightness.dark
-          ? Colors.white12
-          : const Color(0x66F1F3F5),
+      backgroundColor: inlineFill,
       borderColor: theme.colors.border,
     ),
   );
+}
+
+bool _legacyInlineUsesBodyColor(
+  MarkstreamTheme theme,
+  Color inlineFill,
+  Color? bubbleFill,
+) {
+  final bodyInk = theme.body.color;
+  final blockInk = theme.colors.ink;
+  if (bodyInk == null || bodyInk == blockInk) return false;
+  final overWallpaper =
+      theme.backdrop == MarkstreamBackdrop.wallpaper ||
+      theme.backdrop == MarkstreamBackdrop.frostedBubble;
+  // A plain export may omit the wallpaper its body text color was chosen for.
+  if (!overWallpaper && (bubbleFill == null || bubbleFill.a == 0)) return false;
+
+  final fill = Color.alphaBlend(inlineFill, bubbleFill ?? Colors.transparent);
+  final darkest = Color.alphaBlend(fill, Colors.black);
+  final lightest = fill.a < 1 ? Color.alphaBlend(fill, Colors.white) : darkest;
+  final low = darkest.computeLuminance() + .05;
+  final high = lightest.computeLuminance() + .05;
+  double ratio(double a, double b) => a >= b ? a / b : b / a;
+
+  ({double minimum, double bestEndpoint}) contrast(Color ink) {
+    final inkLow = Color.alphaBlend(ink, darkest).computeLuminance() + .05;
+    final inkHigh = ink.a == 1 || lightest == darkest
+        ? inkLow
+        : Color.alphaBlend(ink, lightest).computeLuminance() + .05;
+    // Overlapping ink and surface luminance ranges can have contrast 1:1.
+    final minimum = math.max(1.0, math.max(inkLow / high, low / inkHigh));
+    return (
+      minimum: minimum,
+      bestEndpoint: math.max(ratio(inkLow, low), ratio(inkHigh, high)),
+    );
+  }
+
+  const readable = 4.5;
+  final body = contrast(bodyInk);
+  if (body.minimum >= readable) return true;
+  final block = contrast(blockInk);
+  if (block.minimum >= readable) return false;
+  // Plain Markdown can sit on a card with its own canvas. Keep the existing
+  // theme ink when a translucent bubble cannot establish a readable body ink.
+  if (!overWallpaper && fill.a < 1) return false;
+  // If neither ink covers the entire wallpaper range, prefer the user's
+  // color when it can work against the wallpaper they chose.
+  if (body.bestEndpoint >= readable) return true;
+  if (block.bestEndpoint >= readable) return false;
+  return body.minimum >= block.minimum;
 }
 
 CodeBlockTheme _legacyCodeBlockTheme(
@@ -181,7 +237,7 @@ MarkstreamBackdrop resolveMarkdownBackdrop(
   final surface = MarkdownSurfaceScope.maybeOf(context);
   // Custom bubbles need the readable block fill even when the outer bubble is
   // opaque: a small tint cannot shield fixed syntax colors from a midtone.
-  if (surface?.customBackground != null) {
+  if (surface?.hasCustomBackground == true) {
     return MarkstreamBackdrop.wallpaper;
   }
   return switch (surface?.kind) {

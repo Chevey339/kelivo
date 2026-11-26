@@ -193,6 +193,40 @@ SELECT 'm'||n,'c','assistant',1,n,'g'||(n%?),n/? FROM seq
   });
 
   test(
+    'rolling back the first history read also rolls back index readiness',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final index = MessageTimelineIndex(db);
+      await db.customStatement(
+        "INSERT INTO conversation_rows(id,title,created_at,updated_at) VALUES('c','test',1,1)",
+      );
+      await expectLater(
+        db.transaction(() async {
+          await index.ensureConversation('c');
+          throw StateError('abort history operation');
+        }),
+        throwsStateError,
+      );
+      expect(
+        await db
+            .customSelect(
+              "SELECT name FROM sqlite_master WHERE name='timeline_state'",
+            )
+            .get(),
+        isEmpty,
+      );
+      await index.ensureConversation('c');
+      final ready = await db
+          .customSelect(
+            "SELECT ready FROM timeline_state WHERE conversation_id='c'",
+          )
+          .getSingle();
+      expect(ready.read<int>('ready'), 1);
+    },
+  );
+
+  test(
     'indexed windows match authoritative history through structural mutations',
     () async {
       final db = AppDatabase(NativeDatabase.memory());

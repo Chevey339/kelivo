@@ -1,3 +1,4 @@
+import '../../utils/upload_dedupe.dart';
 import '../../features/intelligent_ui/models/ui_context_attachment.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -16,6 +17,14 @@ import '../models/composer_draft.dart';
 import '../models/conversation.dart';
 import '../models/tool_permission_mode.dart';
 import 'app_database.dart';
+
+typedef DocumentCopyObserver =
+    Future<void> Function(
+      DocumentAttachment document,
+      File source,
+      FileStat beforeCopy,
+      File destination,
+    );
 
 /// Device-local editor state. All mutations have an owner, including writes
 /// completing after navigation. Files live outside the portable backup roots.
@@ -476,10 +485,11 @@ class ComposerDraftStore extends ChangeNotifier {
     return input.copyWith(
       images: [
         for (final image in input.images)
-          DraftImage(
+          image.copyWith(
             path: paths[image.path]!,
-            processing: image.processing,
-            failed: image.failed,
+            sourcePath: image.sourcePath == null
+                ? null
+                : paths[image.sourcePath],
           ),
       ],
       documents: [
@@ -495,7 +505,8 @@ class ComposerDraftStore extends ChangeNotifier {
 
   bool sameOwnedFile(String id, String stored, String source) =>
       stored == source ||
-      stored == _ownedPaths['$id\u0000${SandboxPathResolver.fix(source)}'];
+      stored ==
+          _ownedPaths['$id\u0000${SandboxPathResolver.resolveForIo(source)}'];
 
   Future<String> ownFile(String id, String path) async {
     if (path.startsWith('data:') ||
@@ -503,7 +514,11 @@ class ComposerDraftStore extends ChangeNotifier {
         path.startsWith('https://')) {
       return path;
     }
-    final source = File(SandboxPathResolver.fix(path));
+    final local = SandboxPathResolver.resolveForIo(path);
+    if (local == null) {
+      return path; // Keep the unavailable reference in the draft.
+    }
+    final source = File(local);
     final dir = await directoryFor(id);
     if (p.isWithin(dir.path, source.absolute.path)) return source.path;
     final sourceKey = '$id\u0000${source.path}';
@@ -659,18 +674,30 @@ class ComposerDraftStore extends ChangeNotifier {
   }) async {
     final draft = _drafts[submission.conversationId];
     if (draft == null) return;
+    final retired = <String>{};
     if (await wasSubmitted(submission.id)) {
+      for (final image in draft.pending?.images ?? const <DraftImage>[]) {
+        if (image.sourcePath != null && image.sourcePath != image.path) {
+          retired.add(image.sourcePath!);
+        }
+      }
       await _removeCommittedSubmission(draft, preserveEdit: preserveEdit);
       _entries.removeWhere((_, entry) => entry.id == submission.conversationId);
     }
     _changed(draft);
     await flush();
+    if (retired.isNotEmpty) {
+      await releaseReplacedFiles(draft.conversationId, retired);
+    }
   }
 
   /// Only explicit submission publishes a private attachment into upload/.
   /// The marker is committed before the file appears and consumed together
   /// with the message, so interrupted sends remain excluded from backups.
-  Future<ChatInputData> prepareSubmissionInput(ChatInputData input) async {
+  Future<ChatInputData> prepareSubmissionInput(
+    ChatInputData input, {
+    DocumentCopyObserver? onDocumentCopied,
+  }) async {
     final submission = input.draftSubmission;
     if (submission == null) return input;
     void checkOwner() {
@@ -694,6 +721,7 @@ class ComposerDraftStore extends ChangeNotifier {
     final dir = await AppDirectories.getUploadDirectory();
     await dir.create(recursive: true);
     final paths = <String, String>{};
+    final documents = {for (final doc in input.documents) doc.path: doc};
     var index = 0;
     for (final raw in [
       ...input.imagePaths,
@@ -706,10 +734,13 @@ class ComposerDraftStore extends ChangeNotifier {
         paths[raw] = raw;
         continue;
       }
-      final source = File(
-        SandboxPathResolver.fix(await ownFile(submission.conversationId, raw)),
+      final local = SandboxPathResolver.resolveForIo(
+        await ownFile(submission.conversationId, raw),
       );
-      if (!await source.exists()) {
+      if (local == null) throw StateError('composer_attachment_missing');
+      final source = File(local);
+      final beforeCopy = await source.stat();
+      if (beforeCopy.type != FileSystemEntityType.file) {
         throw StateError('composer_attachment_missing');
       }
       final target = File(
@@ -731,10 +762,21 @@ class ComposerDraftStore extends ChangeNotifier {
           '${p.basename(target.path)}.part',
         ),
       );
-      await source.copy(staging.path);
+      try {
+        await source.copy(staging.path);
+      } on FileSystemException {
+        if (!await source.exists()) {
+          throw StateError('composer_attachment_missing');
+        }
+        rethrow;
+      }
       checkOwner();
       await staging.rename(target.path);
       paths[raw] = target.path;
+      final document = documents[raw];
+      if (document != null && onDocumentCopied != null) {
+        await onDocumentCopied(document, source, beforeCopy, target);
+      }
     }
     checkOwner();
     return ChatInputData(
@@ -749,7 +791,6 @@ class ComposerDraftStore extends ChangeNotifier {
             mime: doc.mime,
           ),
       ],
-      allowImagesApiRouting: input.allowImagesApiRouting,
       uiContext: input.uiContext,
       draftSubmission: submission,
     );
@@ -981,6 +1022,47 @@ class ComposerDraftStore extends ChangeNotifier {
       });
     } finally {
       await flush();
+    }
+  }
+
+  /// Only retire named replaced files after their replacement is durable.
+  /// A directory-wide sweep here could race an image import still in flight.
+  Future<void> releaseReplacedFiles(String id, Iterable<String> paths) async {
+    final candidates = paths.toSet();
+    if (candidates.isEmpty) return;
+    while (!_disposed && !suspended && !_deleted.contains(id)) {
+      await flush();
+      final settled = await _serialize(() async {
+        final draft = _drafts[id];
+        if (draft == null || suspended || _deleted.contains(id)) return true;
+        final directory = await directoryFor(id);
+        String ownedPath(String raw) {
+          final fixed = SandboxPathResolver.fix(raw);
+          return p.normalize(_ownedPaths['$id\u0000$fixed'] ?? fixed);
+        }
+
+        for (final path in candidates.map(ownedPath).toSet()) {
+          // Typing may have changed the draft while its transaction committed.
+          // Wait for the next durable version before deciding which files go.
+          if (_dirty.contains(id)) return false;
+          if (!p.isWithin(directory.path, path) ||
+              draft.paths.any((live) => ownedPath(live) == path) ||
+              UploadDedupe.isShared(path)) {
+            continue;
+          }
+          // Re-adding the same external file must import it again.
+          for (final alias
+              in _ownedPaths.keys
+                  .where((k) => _ownedPaths[k] == path)
+                  .toList()) {
+            _ownedPaths.remove(alias);
+            _imports.removeWhere((key, _) => key.startsWith('$alias\u0000'));
+          }
+          await UploadDedupe.deleteIfUnshared(path);
+        }
+        return true;
+      });
+      if (settled) return;
     }
   }
 

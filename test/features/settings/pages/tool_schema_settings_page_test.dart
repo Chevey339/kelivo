@@ -120,6 +120,7 @@ void main() {
     await tester.pump();
 
     expect(find.text(SearchToolService.toolName), findsOneWidget);
+    expect(find.text('view_image'), findsOneWidget);
     expect(find.byType(IosCardPress), findsWidgets);
     expect(find.byType(Divider), findsNothing);
     expect(find.byType(ListTile), findsNothing);

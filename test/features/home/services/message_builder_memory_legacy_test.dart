@@ -344,60 +344,79 @@ void main() {
   });
 
   group('legacyMemoryMode ON inject', () {
-    testWidgets(
-      'system message uses old memories + Memory Tool, not new rules',
-      (tester) async {
-        await tester.runAsync(openHarness);
-        addTearDown(() => tester.runAsync(closeHarness));
+    for (final lang in ['zh', 'en']) {
+      testWidgets(
+        '$lang legacy memory uses absolute dates without injecting the current hour',
+        (tester) async {
+          await tester.runAsync(openHarness);
+          addTearDown(() => tester.runAsync(closeHarness));
 
-        late String content;
-        await tester.runAsync(() async {
-          await settings.setLegacyMemoryMode(true);
-          await settings.setMemoryPromptLang('zh');
-          await memoryProvider.add(
-            assistantId: assistant.id,
-            content: 'User likes Flutter.',
+          late String content;
+          await tester.runAsync(() async {
+            await settings.setLegacyMemoryMode(true);
+            await settings.setMemoryPromptLang(lang);
+            await memoryProvider.add(
+              assistantId: assistant.id,
+              content: 'User likes Flutter.',
+            );
+          });
+
+          await tester.pumpWidget(
+            MultiProvider(
+              providers: [
+                ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+                ChangeNotifierProvider<MemoryProvider>.value(
+                  value: memoryProvider,
+                ),
+              ],
+              child: const SizedBox.shrink(),
+            ),
           );
-        });
+          final context = tester.element(find.byType(SizedBox));
+          final api = <Map<String, dynamic>>[
+            {'role': 'system', 'content': 'base system'},
+          ];
 
-        await tester.pumpWidget(
-          MultiProvider(
-            providers: [
-              ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-              ChangeNotifierProvider<MemoryProvider>.value(
-                value: memoryProvider,
-              ),
-            ],
-            child: const SizedBox.shrink(),
-          ),
-        );
-        final context = tester.element(find.byType(SizedBox));
-        final api = <Map<String, dynamic>>[
-          {'role': 'system', 'content': 'base system'},
-        ];
+          await tester.runAsync(() async {
+            await buildService(context: context).injectMemoryAndRecentChats(
+              api,
+              assistant.copyWith(allowPastConversationRecall: true),
+              settings: settings,
+            );
+            content = (api.first['content'] ?? '').toString();
+          });
 
-        await tester.runAsync(() async {
-          await buildService(context: context).injectMemoryAndRecentChats(
-            api,
-            assistant.copyWith(allowPastConversationRecall: true),
-            settings: settings,
+          expect(content, contains('<memories>'));
+          expect(content, contains('User likes Flutter.'));
+          expect(content, contains('## Memory Tool'));
+          expect(content, contains('create_memory'));
+          expect(
+            content,
+            contains(
+              lang == 'zh'
+                  ? '请使用绝对时间格式。'
+                  : 'include them in an absolute time format.',
+            ),
           );
-          content = (api.first['content'] ?? '').toString();
-        });
-
-        expect(content, contains('<memories>'));
-        expect(content, contains('User likes Flutter.'));
-        expect(content, contains('## Memory Tool'));
-        expect(content, contains('create_memory'));
-        expect(content, contains('当前时间是'));
-        expect(content, isNot(contains('## 长期记忆')));
-        expect(content, isNot(contains(MemoryPrompts.rulesZh)));
-        expect(
-          content,
-          isNot(contains(MemoryPrompts.rulesPastConversationRecallZh)),
-        );
-      },
-    );
+          final template = lang == 'zh'
+              ? MemoryPrompts.legacyRulesZh
+              : MemoryPrompts.legacyRulesEn;
+          expect(content, contains(template));
+          expect(template, isNot(contains('{{currentTime}}')));
+          expect(content, isNot(contains('{{currentTime}}')));
+          expect(
+            content,
+            isNot(matches(RegExp(r'\d{4}年\d{1,2}月\d{1,2}日的\d{1,2}点'))),
+          );
+          expect(content, isNot(contains('## 长期记忆')));
+          expect(content, isNot(contains(MemoryPrompts.rulesZh)));
+          expect(
+            content,
+            isNot(contains(MemoryPrompts.rulesPastConversationRecallZh)),
+          );
+        },
+      );
+    }
 
     testWidgets('uses the customizable legacy rules template', (tester) async {
       await tester.runAsync(openHarness);
@@ -437,7 +456,15 @@ void main() {
         content = (api.first['content'] ?? '').toString();
       });
 
-      expect(content, contains('Custom legacy rules at '));
+      expect(content.trimRight(), endsWith('Custom legacy rules at'));
+      expect(
+        settings.legacyMemoryPromptEn,
+        'Custom legacy rules at {{currentTime}}',
+      );
+      expect(
+        content,
+        isNot(matches(RegExp(r'\d{4}年\d{1,2}月\d{1,2}日的\d{1,2}点'))),
+      );
       expect(content, isNot(contains('{{currentTime}}')));
       expect(content, contains('User likes Flutter.'));
     });

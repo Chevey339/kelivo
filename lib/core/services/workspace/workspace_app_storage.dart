@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -52,7 +53,7 @@ class WorkspaceAppStorage {
   Future<Map<String, Object?>> read(String name) async {
     final relative = _relative(name);
     final rootPath = root;
-    return WorkspaceFileCoordinator.run(p.join(rootPath, relative), () async {
+    return _withFileLock(relative, () async {
       await authorize(relative, false);
       final result = await _readInWorker(rootPath, relative);
       await authorize(relative, false);
@@ -71,7 +72,7 @@ class WorkspaceAppStorage {
     }
     final relative = _relative(name);
     final rootPath = root;
-    return WorkspaceFileCoordinator.run(p.join(rootPath, relative), () async {
+    return _withFileLock(relative, () async {
       await authorize(relative, true);
       final staged = await _stageInWorker(rootPath, relative, content, version);
       try {
@@ -88,6 +89,23 @@ class WorkspaceAppStorage {
         await _cleanupInWorker(staged.path);
       }
     });
+  }
+
+  Future<Map<String, Object?>> _withFileLock(
+    String relative,
+    Future<Map<String, Object?>> Function() operation,
+  ) async {
+    try {
+      // The page RPC expires after 30 seconds. Reject long lock waits well
+      // before that deadline, without leaving a write queued to run later.
+      return await WorkspaceFileCoordinator.run(
+        p.join(root, relative),
+        operation,
+        waitTimeout: const Duration(seconds: 5),
+      );
+    } on TimeoutException {
+      throw StateError('storage_busy');
+    }
   }
 
   // Separate closure contexts keep UI/native objects captured by authorize

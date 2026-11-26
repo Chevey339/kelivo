@@ -76,15 +76,30 @@ Stream<StreamChunk> executeClientTools({
   if (emitCalls) {
     yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
   }
-  final executed = <ExecutedClientTool>[];
-  for (final call in calls) {
-    executed.add(await _executeClientTool(call, onToolCall));
-  }
-  yield* emitToolResults(
-    [for (final item in executed) _emitExecuted(item)],
+  yield* _executeWithResults(
+    calls,
+    onToolCall,
     usage: usage,
     totalTokens: totalTokens,
   );
+}
+
+Stream<StreamChunk> _executeWithResults(
+  List<EmitToolCall> calls,
+  ToolCallHandler onToolCall, {
+  List<ExecutedClientTool>? transcript,
+  TokenUsage? usage,
+  int totalTokens = 0,
+}) async* {
+  for (final (index, call) in calls.indexed) {
+    final item = await _executeClientTool(call, onToolCall);
+    transcript?.add(item);
+    yield* emitToolResults(
+      [_emitExecuted(item)],
+      usage: index == 0 ? usage : null,
+      totalTokens: index == 0 ? totalTokens : 0,
+    );
+  }
 }
 
 /// After-round client-tool loop: execute → append → send follow-up → repeat.
@@ -125,11 +140,10 @@ Stream<StreamChunk> runClientToolFollowUps({
     yield AssistantRoundEnd(
       reasoningDetails: details is List ? List<dynamic>.of(details) : null,
     );
-    for (final call in calls) {
-      executed.add(await _executeClientTool(call, onToolCall));
-    }
-    yield* emitToolResults(
-      [for (final item in executed) _emitExecuted(item)],
+    yield* _executeWithResults(
+      calls,
+      onToolCall,
+      transcript: executed,
       usage: usage,
       totalTokens: totalTokens,
     );
@@ -179,11 +193,10 @@ Stream<StreamChunk> runProviderToolRounds({
     }
     if (calls.isNotEmpty) yield const AssistantRoundEnd();
     if (execute != null) {
-      for (final call in calls) {
-        executed.add(await _executeClientTool(call, execute));
-      }
-      yield* emitToolResults(
-        [for (final item in executed) _emitExecuted(item)],
+      yield* _executeWithResults(
+        calls,
+        execute,
+        transcript: executed,
         usage: usage,
         totalTokens: totalTokens,
       );

@@ -36,25 +36,32 @@ List<SourceSpan> quoteSourceHighlights(
 TextSpan highlightedQuoteSource(
   String text,
   List<SourceSpan> ranges,
-  Color color,
-) {
-  final points = {
-    0,
-    text.length,
-    for (final range in ranges) ...[range.start, range.end],
-  }.toList()..sort();
-  return TextSpan(
-    children: [
-      for (var i = 0; i < points.length - 1; i++)
-        TextSpan(
-          text: text.substring(points[i], points[i + 1]),
-          style:
-              ranges.any(
-                (range) => range.start <= points[i] && range.end > points[i],
-              )
-              ? TextStyle(backgroundColor: color)
-              : null,
-        ),
-    ],
-  );
+  Color color, {
+  int start = 0,
+  int? end,
+}) {
+  final limit = end ?? text.length;
+  final sorted = ranges.where((r) => r.start < limit && r.end > start).toList()
+    ..sort((a, b) => a.start.compareTo(b.start));
+  final spans = <TextSpan>[];
+  var cursor = start;
+  var i = 0;
+  while (i < sorted.length) {
+    final a = sorted[i].start.clamp(start, limit);
+    var b = sorted[i++].end.clamp(start, limit);
+    while (i < sorted.length && sorted[i].start <= b) {
+      final next = sorted[i++].end.clamp(start, limit);
+      if (next > b) b = next;
+    }
+    if (a > cursor) spans.add(TextSpan(text: text.substring(cursor, a)));
+    spans.add(
+      TextSpan(
+        text: text.substring(a, b),
+        style: TextStyle(backgroundColor: color),
+      ),
+    );
+    cursor = b;
+  }
+  if (cursor < limit) spans.add(TextSpan(text: text.substring(cursor, limit)));
+  return TextSpan(children: spans);
 }

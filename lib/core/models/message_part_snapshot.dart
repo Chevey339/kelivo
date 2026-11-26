@@ -33,6 +33,7 @@ class MessagePartSnapshot extends UnmodifiableListView<MessagePart> {
         previous.revision < _owner._journal.keys.first - 1) {
       return null;
     }
+    if (revision == previous.revision + 1) return _owner._journal[revision];
     return {
       for (final entry in _owner._journal.entries)
         if (entry.key > previous.revision && entry.key <= revision)

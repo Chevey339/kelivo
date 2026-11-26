@@ -8,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/provider_oauth.dart';
 import '../logging/log_redactor.dart';
+import '../model_spec/model_list_metadata_cache.dart';
+import 'codex_client_version.dart';
 import 'oauth_callback.dart';
 import 'oauth_cancellation.dart';
 import 'oauth_failure.dart';
@@ -15,10 +17,6 @@ import 'oauth_pkce.dart';
 import 'claude_oauth_request.dart';
 
 part 'claude_oauth_adapter.dart';
-
-// OMP 37bb80e3: the backend hides GPT-6.1 Sol from older client versions,
-// independently of the model's advertised minimal_client_version.
-const codexClientVersion = '0.159.0';
 
 class OAuthLoginPrompt {
   const OAuthLoginPrompt({
@@ -186,13 +184,17 @@ abstract class ProviderOAuthAdapter {
   OAuthProvider get provider;
   Duration get tokenRequestTimeout => const Duration(seconds: 30);
 
-  static ProviderOAuthAdapter forProvider(OAuthProvider provider) =>
-      switch (provider) {
-        OAuthProvider.chatgpt => ChatGptOAuthAdapter(),
-        OAuthProvider.grok => GrokOAuthAdapter(),
-        OAuthProvider.kimi => KimiOAuthAdapter(),
-        OAuthProvider.claude => ClaudeOAuthAdapter(),
-      };
+  static ProviderOAuthAdapter forProvider(
+    OAuthProvider provider, {
+    String? codexVersion,
+  }) => switch (provider) {
+    OAuthProvider.chatgpt => ChatGptOAuthAdapter(
+      clientVersion: codexVersion ?? defaultCodexClientVersion,
+    ),
+    OAuthProvider.grok => GrokOAuthAdapter(),
+    OAuthProvider.kimi => KimiOAuthAdapter(),
+    OAuthProvider.claude => ClaudeOAuthAdapter(),
+  };
 
   Map<String, String> headers(ProviderOAuthCredentials credentials) => {
     'Authorization': 'Bearer ${credentials.accessToken}',
@@ -423,6 +425,10 @@ abstract class ProviderOAuthAdapter {
 }
 
 class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
+  ChatGptOAuthAdapter({this.clientVersion = defaultCodexClientVersion});
+
+  final String clientVersion;
+
   @override
   OAuthProvider get provider => OAuthProvider.chatgpt;
 
@@ -435,7 +441,7 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
     if (credentials.accountId case final accountId?)
       'chatgpt-account-id': accountId,
     'originator': 'kelivo',
-    'version': codexClientVersion,
+    'version': clientVersion,
     'User-Agent': 'Kelivo',
   };
 
@@ -615,7 +621,7 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
   ) async {
     final data = await get(
       wire,
-      '${provider.baseUrl}/models?client_version=$codexClientVersion',
+      '${provider.baseUrl}/models?client_version=$clientVersion',
       credentials,
     );
     final entries = data['models'] ?? data['data'];
@@ -779,10 +785,10 @@ class GrokOAuthAdapter extends ProviderOAuthAdapter {
             row['reasoning_efforts'] ??
             meta['reasoningEfforts'];
         final contextWindow =
-            row['contextWindow'] ??
-            row['context_window'] ??
-            meta['contextWindow'] ??
-            meta['totalContextTokens'];
+            parseModelListTokenLimit(row['context_window']) ??
+            parseModelListTokenLimit(row['contextWindow']) ??
+            parseModelListTokenLimit(meta['contextWindow']) ??
+            parseModelListTokenLimit(meta['totalContextTokens']);
         final levels = <String>[
           if (efforts is List)
             for (final effort in efforts)
@@ -790,19 +796,51 @@ class GrokOAuthAdapter extends ProviderOAuthAdapter {
                   case final value?)
                 value,
         ];
-        // Prefer Grok Build metadata for models present in both catalogs.
-        models.putIfAbsent(
-          id,
-          () => {
-            ...row.cast<String, dynamic>(),
-            'id': id,
-            if (contextWindow != null) 'context_window': contextWindow,
-            if (levels.isNotEmpty) 'supported_reasoning_levels': levels,
-          },
-        );
+        final model = <String, dynamic>{
+          ...row.cast<String, dynamic>(),
+          'id': id,
+          if (contextWindow != null) 'context_window': contextWindow,
+          if (levels.isNotEmpty) 'supported_reasoning_levels': levels,
+        };
+        final preferred = models[id];
+        if (preferred == null) {
+          models[id] = model;
+        } else {
+          _fillMissingNumbers(preferred, model);
+        }
       }
     }
+    final composer = models[grokComposerFastModelId];
+    if (composer != null &&
+        oauthString(composer['display_name']) == null &&
+        oauthString(composer['name']) == null) {
+      composer['display_name'] = 'Grok Composer 2.5 Fast';
+    }
     return models.values.toList();
+  }
+
+  // Build owns the model row. The API list can fill gaps in its numeric data.
+  static void _fillMissingNumbers(
+    Map<String, dynamic> preferred,
+    Map<String, dynamic> candidate,
+  ) {
+    final fallback = parseModelListMetadata(candidate);
+    if (fallback == null) return;
+    final current = parseModelListMetadata(preferred);
+    if (current?.contextWindow == null && fallback.contextWindow != null) {
+      preferred['context_window'] = fallback.contextWindow;
+    }
+    if (current?.maxOutput == null && fallback.maxOutput != null) {
+      preferred['max_output'] = fallback.maxOutput;
+    }
+    final price = fallback.pricing;
+    if (price != null) {
+      preferred['cost'] = {
+        if (preferred['cost'] case final Map cost) ...cost,
+        'input': current?.pricing?.input ?? price.input,
+        'output': current?.pricing?.output ?? price.output,
+      };
+    }
   }
 
   @override

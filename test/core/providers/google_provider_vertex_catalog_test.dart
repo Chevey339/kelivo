@@ -9,32 +9,61 @@ import 'package:Kelivo/core/services/model_catalog/catalog_entry.dart';
 import 'package:Kelivo/core/services/model_catalog/model_catalog_service.dart';
 
 late HttpServer server;
+late List<Map<String, dynamic>> listedModels;
 
 void main() {
   setUp(() async {
+    listedModels = [
+      {
+        'name': 'models/gemini-2.5-pro',
+        'displayName': 'Gemini 2.5 Pro',
+        'supportedGenerationMethods': ['generateContent'],
+      },
+      {
+        'name': 'models/claude-opus-4-5@20251101',
+        'displayName': 'Claude Opus 4.5',
+        'supportedGenerationMethods': ['generateContent'],
+      },
+    ];
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() => server.close(force: true));
     server.listen((request) async {
       request.response.headers.contentType = ContentType.json;
-      request.response.write(
-        jsonEncode({
-          'models': [
-            {
-              'name': 'models/gemini-2.5-pro',
-              'displayName': 'Gemini 2.5 Pro',
-              'supportedGenerationMethods': ['generateContent'],
-            },
-            {
-              'name': 'models/claude-opus-4-5@20251101',
-              'displayName': 'Claude Opus 4.5',
-              'supportedGenerationMethods': ['generateContent'],
-            },
-          ],
-        }),
-      );
+      request.response.write(jsonEncode({'models': listedModels}));
       await request.response.close();
     });
   });
+
+  test(
+    'Google lists named models when generation methods are unknown',
+    () async {
+      listedModels = [
+        {'name': 'models/omitted'},
+        {'name': 'models/null', 'supportedGenerationMethods': null},
+        {'name': 'models/empty', 'supportedGenerationMethods': []},
+        {
+          'name': 'models/count',
+          'supportedGenerationMethods': ['countTokens'],
+        },
+        {
+          'name': 'models/embed',
+          'supportedGenerationMethods': ['embedContent'],
+        },
+        {},
+        {'name': 'models/'},
+        {
+          'name': 'models/chat',
+          'supportedGenerationMethods': ['generateContent'],
+        },
+      ];
+      expect(await _listIds(vertexAI: false, baseUrl: _baseUrl()), [
+        'omitted',
+        'null',
+        'embed',
+        'chat',
+      ]);
+    },
+  );
 
   test(
     'Vertex listing merges catalog Anthropic models without duplicates',

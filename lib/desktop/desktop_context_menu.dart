@@ -14,6 +14,7 @@ class DesktopContextMenuItem {
   final String? svgAsset;
   final String label;
   final String? subtitle;
+  final String? groupLabel;
   final VoidCallback? onTap;
   final bool danger;
   final bool checked;
@@ -24,6 +25,7 @@ class DesktopContextMenuItem {
     this.svgAsset,
     required this.label,
     this.subtitle,
+    this.groupLabel,
     this.onTap,
     this.danger = false,
     this.checked = false,
@@ -38,6 +40,7 @@ Future<void> showDesktopContextMenuAt(
   required List<DesktopContextMenuItem> items,
   Color? backgroundColor,
   bool compact = false,
+  double borderRadius = 16,
 }) async {
   // Match the navigator used by showGeneralDialog, including nested panes.
   final overlay = Navigator.of(context, rootNavigator: true).overlay;
@@ -80,7 +83,8 @@ Future<void> showDesktopContextMenuAt(
                   subtitle: item.subtitle,
                   compact: compact,
                 ) +
-                (item.startsGroup ? 9 : 0),
+                (item.startsGroup ? 9 : 0) +
+                (item.groupLabel == null ? 0 : 26),
           )
           .clamp(44.0, menuMaxHeight);
       const double gap = 8; // offset from cursor
@@ -118,7 +122,7 @@ Future<void> showDesktopContextMenuAt(
                     child: DecoratedBox(
                       decoration: ShapeDecoration(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(borderRadius),
                           side: BorderSide(
                             color: isDark
                                 ? cs.onSurface.withValues(alpha: 0.08)
@@ -128,7 +132,7 @@ Future<void> showDesktopContextMenuAt(
                         ),
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(borderRadius),
                         child: DesktopOverlayBackdrop(
                           sigma: 14,
                           child: DecoratedBox(
@@ -156,6 +160,28 @@ Future<void> showDesktopContextMenuAt(
                                             thickness: 0.5,
                                             color: cs.outlineVariant.withValues(
                                               alpha: 0.3,
+                                            ),
+                                          ),
+                                        ),
+                                      if (it.groupLabel case final label?)
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            12,
+                                            6,
+                                            12,
+                                            4,
+                                          ),
+                                          child: Align(
+                                            alignment: AlignmentDirectional
+                                                .centerStart,
+                                            child: Text(
+                                              label,
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight:
+                                                    AppFontWeights.semibold,
+                                                color: cs.onSurfaceVariant,
+                                              ),
                                             ),
                                           ),
                                         ),

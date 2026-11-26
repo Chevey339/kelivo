@@ -517,6 +517,7 @@ class _ProviderBadge extends StatelessWidget {
 String? _kindBrandAsset(AsrServiceKind kind) {
   final hint = switch (kind) {
     AsrServiceKind.openAiRealtime => 'OpenAI',
+    AsrServiceKind.deepseek => 'DeepSeek',
     AsrServiceKind.groq => 'Groq',
     AsrServiceKind.mistral => 'Mistral',
     AsrServiceKind.elevenLabs => 'ElevenLabs',
@@ -922,6 +923,7 @@ class _AsrEditorState extends State<_AsrEditor> {
           ),
         );
         return;
+      case AsrServiceKind.deepseek:
       case AsrServiceKind.groq:
       case AsrServiceKind.mistral:
       case AsrServiceKind.elevenLabs:
@@ -1169,7 +1171,7 @@ class _AsrEditorState extends State<_AsrEditor> {
           hint: _defaultResourceId(_kind),
           desktop: widget.desktop,
         )
-      else
+      else if (_kind != AsrServiceKind.deepseek)
         _EditorField(
           label: l10n.asrServicesModelLabel,
           controller: _modelController,
@@ -1178,8 +1180,9 @@ class _AsrEditorState extends State<_AsrEditor> {
               : _defaultModel(_kind),
           desktop: widget.desktop,
         ),
-      if (_kind != AsrServiceKind.qwenAudio ||
-          _qwenMode == QwenAudioAsrMode.transcription)
+      if (_kind != AsrServiceKind.deepseek &&
+          (_kind != AsrServiceKind.qwenAudio ||
+              _qwenMode == QwenAudioAsrMode.transcription))
         _EditorField(
           label: l10n.asrServicesLanguageLabel,
           controller: _languageController,
@@ -1299,6 +1302,7 @@ class _AsrEditorState extends State<_AsrEditor> {
                       AsrServiceKind.system,
                       AsrServiceKind.sherpaOnnx,
                       AsrServiceKind.openAiRealtime,
+                      AsrServiceKind.deepseek,
                       AsrServiceKind.groq,
                       AsrServiceKind.mistral,
                       AsrServiceKind.elevenLabs,
@@ -1420,6 +1424,7 @@ class _ProviderChoiceGrid extends StatelessWidget {
           children: [
             for (final kind in const [
               AsrServiceKind.openAiRealtime,
+              AsrServiceKind.deepseek,
               AsrServiceKind.groq,
               AsrServiceKind.mistral,
               AsrServiceKind.elevenLabs,
@@ -2182,6 +2187,7 @@ IconData _kindIcon(AsrServiceKind kind) {
       return Lucide.AudioWaveform;
     case AsrServiceKind.mimo:
       return Lucide.Globe;
+    case AsrServiceKind.deepseek:
     case AsrServiceKind.groq:
     case AsrServiceKind.mistral:
     case AsrServiceKind.elevenLabs:
@@ -2228,6 +2234,7 @@ bool _isDefaultServiceName(AsrServiceKind kind, String name) {
       'OpenAI Realtime',
     }.contains(name),
     AsrServiceKind.groq => name == 'Groq',
+    AsrServiceKind.deepseek => name == 'DeepSeek',
     AsrServiceKind.mistral => name == 'Mistral',
     AsrServiceKind.elevenLabs => name == 'ElevenLabs',
     AsrServiceKind.dashScope => const {
@@ -2276,6 +2283,8 @@ String _kindTitle(AppLocalizations l10n, AsrServiceKind kind) {
       return l10n.asrServicesLocalTitle;
     case AsrServiceKind.openAiRealtime:
       return l10n.asrServicesOpenAiTitle;
+    case AsrServiceKind.deepseek:
+      return 'DeepSeek';
     case AsrServiceKind.groq:
       return 'Groq';
     case AsrServiceKind.mistral:
@@ -2303,6 +2312,8 @@ String _kindSubtitle(AppLocalizations l10n, AsrServiceKind kind) {
       return l10n.asrServicesLocalSubtitle;
     case AsrServiceKind.openAiRealtime:
       return l10n.asrServicesOpenAiSubtitle;
+    case AsrServiceKind.deepseek:
+      return l10n.asrServicesDeepSeekSubtitle;
     case AsrServiceKind.groq:
       return l10n.asrServicesGroqSubtitle;
     case AsrServiceKind.mistral:
@@ -2386,6 +2397,7 @@ String _defaultEndpoint(AsrServiceKind kind) {
   switch (kind) {
     case AsrServiceKind.openAiRealtime:
       return 'wss://api.openai.com/v1/realtime?intent=transcription';
+    case AsrServiceKind.deepseek:
     case AsrServiceKind.groq:
     case AsrServiceKind.mistral:
     case AsrServiceKind.elevenLabs:
@@ -2418,6 +2430,7 @@ String _defaultModel(AsrServiceKind kind) {
       return 'qwen3-asr-flash-realtime';
     case AsrServiceKind.qwenAudio:
       return 'qwen-audio-3.0-asr-flash-streaming';
+    case AsrServiceKind.deepseek:
     case AsrServiceKind.volcengine:
       return '';
     case AsrServiceKind.mimo:

@@ -4,6 +4,8 @@ import '../../database/database_family_preserver.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/database_installation_gate.dart';
+import '../../database/schema_migrations.dart';
+import 'backup_task_progress.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_business_lease.dart';
 import 'restore_cutover_executor.dart';
@@ -153,6 +155,7 @@ final class RestoreStartupGate {
     required Directory appDataDirectory,
     required RestoreWorkspaceLock workspaceLock,
     RestoreStartupStageSink? onStage,
+    BackupProgressSink? onProgress,
     RestoreStartupDiagnostics? diagnostics,
   }) async {
     final workspaceRoot = workspaceLock.workspaceRoot;
@@ -298,6 +301,7 @@ final class RestoreStartupGate {
       validatedCandidate = await _validatePreparedCandidate(
         runDirectory: runDirectory,
         receipt: receipt,
+        onProgress: onProgress,
       );
     }
     return PendingRestoreRun(
@@ -314,6 +318,8 @@ final class RestoreStartupGate {
     RestoreBusinessLease? businessLease,
     RestoreDurability? durability,
     RestoreStartupStageSink? onStage,
+    DatabaseUpgradeStageSink? onUpgradeStage,
+    BackupProgressSink? onProgress,
     RestoreStartupDiagnostics? diagnostics,
   }) async {
     diagnostics?.reset();
@@ -352,6 +358,7 @@ final class RestoreStartupGate {
       await DatabaseFamilyPreserver.resume(
         appDataDirectory,
         durability: resolvedDurability,
+        onUpgradeStage: onUpgradeStage,
       );
       if (await _snapshotRecoveryIncomplete(appDataDirectory)) {
         throw StateError('restore_startup_snapshot_preparation_incomplete');
@@ -381,6 +388,7 @@ final class RestoreStartupGate {
           appDataDirectory: appDataDirectory,
           workspaceLock: workspaceLock,
           onStage: reportStage,
+          onProgress: onProgress,
           diagnostics: diagnostics,
         );
         if (pending == null) return null;
@@ -392,6 +400,7 @@ final class RestoreStartupGate {
           archived: pending.runInCompletedDirectory,
           validatedCandidate: pending.validatedCandidate,
           onStage: reportStage,
+          onProgress: onProgress,
           diagnostics: diagnostics,
         );
         if (pending.receipt.state == RestoreReceiptState.committed ||
@@ -516,10 +525,12 @@ final class RestoreStartupGate {
   static Future<ValidatedRestoreCandidate> _validatePreparedCandidate({
     required Directory runDirectory,
     required RestoreReceipt receipt,
+    BackupProgressSink? onProgress,
   }) async {
     final candidate = await RestoreBundleStaging.validateExistingCandidate(
       candidateDirectory: Directory(p.join(runDirectory.path, 'candidate')),
       expectedManifestSha256: receipt.candidateManifestSha256,
+      onProgress: onProgress,
     );
     if (receipt.selectedComponents.contains(RestoreComponent.database) !=
             candidate.includeChats ||

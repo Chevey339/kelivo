@@ -902,8 +902,8 @@ abstract final class MemoryTools {
       'function': {
         'name': memoryRead,
         'description': zh
-            ? '读取用户的长期记忆。type 可选：identity（姓名、身边的人、职业等身份信息）、workflow（做事方式、工具偏好、调试习惯）、voice（行文风格、句式节奏、用词习惯）、instruction（用户对你的明确要求）。不传 type 则返回全部类型。使用 limit 和 offset 分页；结果中 total 为筛选后的总条数，has_more 为 true 时，保持筛选条件不变，将 next_offset 作为下次调用的 offset 继续读取，最后一页 next_offset 为 null。对话中已经提供了记忆摘要，只有在摘要标了 mode="summary" 被截断、或需要拿到条目 id 时才需要调用。'
-            : 'Read the user\'s long-term memory. Optional type: identity (name, people around them, occupation, etc.), workflow (ways of working, tool preferences, debugging habits), voice (writing style, rhythm, word choice), instruction (explicit requests to you). Omit type to return all types. Paginate with limit and offset. The result total counts all entries matching the filters. When has_more is true, keep the same filters and pass next_offset as offset to read the next page; next_offset is null on the last page. A memory summary is already in the conversation; call this only when a block is marked mode="summary" (truncated) or you need entry ids.',
+            ? '读取用户的长期记忆。可选按 type 筛选，省略则返回全部类型。用 limit 和 offset 分页；结果中 total 为筛选后的总条数，has_more 为 true 时，保持筛选条件不变，将 next_offset 作为下次调用的 offset 继续读取，最后一页 next_offset 为 null。对话中已有记忆摘要，仅在摘要标了 mode="summary" 被截断、或需要条目 id 时调用。'
+            : 'Read the user\'s long-term memory. Optionally filter by type; omit type to return all types. Paginate with limit and offset. The result total counts all entries matching the filters. When has_more is true, keep the same filters and pass next_offset as offset to read the next page; next_offset is null on the last page. A memory summary is already in the conversation; call this only when a block is marked mode="summary" (truncated) or you need entry ids.',
         'parameters': {
           'type': 'object',
           'properties': {
@@ -1132,8 +1132,8 @@ abstract final class MemoryTools {
       'function': {
         'name': chatSearch,
         'description': zh
-            ? '在历史对话中按关键词搜索消息内容（仅当前助手的会话，以及没有归属助手的旧会话）。需要回忆之前聊过什么，或者用户提到「上次」「之前说的」「我们讨论过」时，优先使用这个工具。默认不搜索当前对话，因为当前对话的内容已经在上下文里。'
-            : 'Search message content in this assistant\'s past conversations (and unowned older chats) by keywords. Prefer this when recalling prior discussion, or when the user mentions "last time", "earlier", or "we discussed". By default the current conversation is excluded because it is already in context.',
+            ? '在历史对话中按关键词搜索消息内容（仅当前助手的会话，以及没有归属助手的旧会话）。默认不搜索当前对话，因为当前对话的内容已经在上下文里。'
+            : 'Search message content in this assistant\'s past conversations (and unowned older chats) by keywords. By default the current conversation is excluded because it is already in context.',
         'parameters': {
           'type': 'object',
           'properties': {

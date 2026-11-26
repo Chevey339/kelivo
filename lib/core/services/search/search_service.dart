@@ -10,6 +10,7 @@ import 'providers/exa_search_service.dart';
 import 'providers/exa_mcp_search_service.dart';
 import 'providers/zhipu_search_service.dart';
 import 'providers/searxng_search_service.dart';
+import 'providers/four_get_search_service.dart';
 import 'providers/linkup_search_service.dart';
 import 'providers/brave_search_service.dart';
 import 'providers/metaso_search_service.dart';
@@ -32,6 +33,7 @@ import 'providers/kelivo_search_service.dart';
 import 'providers/parallel_search_service.dart';
 import 'providers/kimi_search_service.dart';
 import 'providers/you_search_service.dart';
+import 'providers/keenable_search_service.dart';
 
 // Base interface for all search services
 abstract class SearchService<T extends SearchServiceOptions> {
@@ -81,6 +83,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return ZhipuSearchService() as SearchService;
       case SearXNGOptions _:
         return SearXNGSearchService() as SearchService;
+      case FourGetOptions _:
+        return FourGetSearchService() as SearchService;
       case LinkUpOptions _:
         return LinkUpSearchService() as SearchService;
       case BraveOptions _:
@@ -125,6 +129,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return KimiSearchService() as SearchService;
       case YouSearchOptions _:
         return YouSearchService() as SearchService;
+      case KeenableOptions _:
+        return KeenableSearchService() as SearchService;
       default:
         return BingSearchService(locale: locale) as SearchService;
     }
@@ -246,6 +252,8 @@ abstract class SearchServiceOptions {
         return ZhipuOptions.fromJson(json);
       case 'searxng':
         return SearXNGOptions.fromJson(json);
+      case '4get':
+        return FourGetOptions.fromJson(json);
       case 'linkup':
         return LinkUpOptions.fromJson(json);
       case 'brave':
@@ -291,6 +299,8 @@ abstract class SearchServiceOptions {
         return KimiOptions.fromJson(json);
       case 'you':
         return YouSearchOptions.fromJson(json);
+      case 'keenable':
+        return KeenableOptions.fromJson(json);
       default:
         return BingLocalOptions(id: json['id']);
     }
@@ -468,6 +478,48 @@ class SearXNGOptions extends SearchServiceOptions {
     language: json['language'] ?? '',
     username: json['username'] ?? '',
     password: json['password'] ?? '',
+  );
+}
+
+class FourGetOptions extends SearchServiceOptions {
+  const FourGetOptions({
+    required super.id,
+    required this.url,
+    this.scraper = '',
+    this.passToken = '',
+  });
+
+  final String url;
+  final String scraper;
+  final String passToken;
+
+  static Uri? parseInstanceUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      return null;
+    }
+    return uri;
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': '4get',
+    'id': id,
+    'url': url,
+    'scraper': scraper,
+    'passToken': passToken,
+  };
+
+  factory FourGetOptions.fromJson(Map<String, dynamic> json) => FourGetOptions(
+    id: json['id'] as String,
+    url: json['url'] as String,
+    scraper: json['scraper'] as String? ?? '',
+    passToken: json['passToken'] as String? ?? '',
   );
 }
 
@@ -1251,6 +1303,27 @@ class YouSearchOptions extends SearchServiceOptions {
         id: json['id'],
         apiKey: json['apiKey'] ?? '',
         contentMode: normalizeContentMode(json['contentMode']),
+        extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+      );
+}
+
+class KeenableOptions extends SearchServiceOptions {
+  final String apiKey;
+
+  KeenableOptions({required super.id, this.apiKey = '', super.extraApiKeys});
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'keenable',
+    'id': id,
+    'apiKey': apiKey,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory KeenableOptions.fromJson(Map<String, dynamic> json) =>
+      KeenableOptions(
+        id: json['id'],
+        apiKey: json['apiKey'] ?? '',
         extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
       );
 }

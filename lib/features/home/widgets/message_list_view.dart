@@ -1,3 +1,5 @@
+import '../../chat/controllers/conversation_find_controller.dart';
+import '../../chat/widgets/conversation_find_highlights.dart';
 import '../../intelligent_ui/host/ui_persistence_host.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_control_region.dart';
@@ -27,6 +29,7 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/selection_scroll_container.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/timeline_projection.dart';
+import '../../chat/widgets/chat_creation_images.dart';
 import '../../chat/widgets/timeline_visibility.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../../chat/widgets/message_more_sheet.dart';
@@ -47,15 +50,7 @@ typedef OnResendMessage = void Function(ChatMessage message);
 typedef OnTranslateMessage = void Function(ChatMessage message);
 typedef OnEditMessage = void Function(ChatMessage message);
 typedef OnDeleteMessage =
-    Future<void> Function(
-      ChatMessage message,
-      Map<String, List<ChatMessage>> byGroup,
-    );
-typedef OnDeleteAllVersions =
-    Future<void> Function(
-      ChatMessage message,
-      Map<String, List<ChatMessage>> byGroup,
-    );
+    Future<void> Function(ChatMessage message, MessageVersionDeleteScope scope);
 typedef OnForkConversation = Future<void> Function(ChatMessage message);
 typedef OnSelectMessages =
     void Function(int messageIndex, List<ChatMessage> messages);
@@ -126,6 +121,8 @@ class MessageListView extends StatefulWidget {
     required this.selecting,
     required this.selectedItems,
     required this.dividerPadding,
+    this.fullWidth = false,
+    this.rightOverlayWidth = 0,
     this.topContentPadding = 8,
     this.bottomContentPadding = 16,
     this.footer,
@@ -133,8 +130,9 @@ class MessageListView extends StatefulWidget {
     this.isPinnedIndicatorActive = false,
     required this.processingFilesMessageId,
     this.streamingContentNotifier,
+    this.conversationFind,
     this.spotlightMessageId,
-    this.spotlightToken = 0,
+    this.spotlightOpacity = const AlwaysStoppedAnimation(0),
     this.removingSlotIds = const <String>{},
     this.onVersionChange,
     this.onRegenerateMessage,
@@ -144,7 +142,6 @@ class MessageListView extends StatefulWidget {
     this.onTranslateMessage,
     this.onEditMessage,
     this.onDeleteMessage,
-    this.onDeleteAllVersions,
     this.onForkConversation,
     this.onSelectMessages,
     this.onSpeakMessage,
@@ -167,6 +164,7 @@ class MessageListView extends StatefulWidget {
     this.collapseThinkingSteps = false,
     this.showThinkingCards = true,
     this.showToolCards = true,
+    this.inlineChatImages = false,
     this.showProducedFiles = true,
     this.showToolResultSummary = false,
     this.hideToolResultImages = false,
@@ -213,6 +211,8 @@ class MessageListView extends StatefulWidget {
   final bool selecting;
   final Set<String> selectedItems;
   final EdgeInsetsGeometry dividerPadding;
+  final bool fullWidth;
+  final double rightOverlayWidth;
   final double topContentPadding;
   final double bottomContentPadding;
   final String? pinnedStreamingMessageId;
@@ -229,10 +229,10 @@ class MessageListView extends StatefulWidget {
 
   /// When set, the message with this ID will receive a spotlight pulse animation.
   final String? spotlightMessageId;
+  final ConversationFindController? conversationFind;
 
-  /// Incremented each time a new spotlight is triggered. Used as an animation key
-  /// so re-selecting the same message re-triggers the pulse.
-  final int spotlightToken;
+  /// Progress belongs to the jump, so remounting a row resumes the same fade.
+  final Animation<double> spotlightOpacity;
 
   /// Slots currently fading out ahead of their deletion. The slot data stays
   /// in [messages] until the removal animation completes.
@@ -247,7 +247,6 @@ class MessageListView extends StatefulWidget {
   final OnTranslateMessage? onTranslateMessage;
   final OnEditMessage? onEditMessage;
   final OnDeleteMessage? onDeleteMessage;
-  final OnDeleteAllVersions? onDeleteAllVersions;
   final OnForkConversation? onForkConversation;
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
@@ -288,6 +287,7 @@ class MessageListView extends StatefulWidget {
 
   /// Whether tool-use cards render in chat.
   final bool showToolCards;
+  final bool inlineChatImages;
 
   /// Whether the file summary below a reply occupies height.
   final bool showProducedFiles;
@@ -352,6 +352,7 @@ class _MessageListViewState extends State<MessageListView> {
 
   bool _historyLoadScheduled = false;
   bool _pointerDragInProgress = false;
+  int _dragRevision = 0;
   ScrollMetrics? _latestPointerDragMetrics;
   bool _userScrollActive = false;
   final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
@@ -471,7 +472,10 @@ class _MessageListViewState extends State<MessageListView> {
     final previous = timelineImageAspects[imageKey];
     if (previous != null && (previous - aspectRatio).abs() < 0.001) return;
     timelineImageAspects[imageKey] = aspectRatio;
-    _invalidateToolExtentForMessage(messageId);
+    // The mounted image's relayout updates the list's measured extent. Only
+    // discard our estimate here: preserving distance from the end would fight
+    // the image's reading anchor when other images load below it in this frame.
+    _extentEstimateCache.remove(messageId);
   }
 
   void _invalidateToolExtentForMessage(String messageId) {
@@ -618,6 +622,7 @@ class _MessageListViewState extends State<MessageListView> {
     collapseThinkingSteps: false,
     showThinkingCards: true,
     showToolCards: true,
+    inlineChatImages: false,
     showToolResultSummary: false,
     hideToolResultImages: false,
     showBrowserPageCards: true,
@@ -746,7 +751,17 @@ class _MessageListViewState extends State<MessageListView> {
       reasoningSegments,
       isStreaming: message.isStreaming,
     );
-    final toolSignature = _toolEstimateSignature(toolParts);
+    final toolImageAspects =
+        _timelineStorage[message.id]?.readState(
+              context,
+              identifier: timelineToolImageAspectsStorageId,
+            )
+            as Map<String, double>?;
+    final toolSignature = Object.hash(
+      _toolEstimateSignature(toolParts),
+      toolImageAspects?.length,
+      widget.selecting,
+    );
     final partsSignature = _partsEstimateSignature(estimateParts);
     final streamingSignature = Object.hash(
       snapshot?.timelineStructureSignature ?? 0,
@@ -816,6 +831,13 @@ class _MessageListViewState extends State<MessageListView> {
     // User bubbles are inset and never span the full width.
     final bubbleWidth = crossAxisExtent * (message.role == 'user' ? 0.85 : 1.0);
     final textWidth = math.max(80.0, bubbleWidth - 28);
+    final toolImageMaxWidth =
+        crossAxisExtent -
+        2 *
+            (assistantMessageHorizontalPadding +
+                timelineCardHorizontalPadding) -
+        timelineStepContentInset -
+        (widget.selecting ? 44 : 0); // Checkbox hit target and its padding.
     // Wide (CJK) glyphs are about twice as wide as Latin ones, so the mix
     // decides how many characters fit on a line.
     final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(body));
@@ -849,6 +871,8 @@ class _MessageListViewState extends State<MessageListView> {
           snapshot?.toolCountAtSplit ??
           widget.contentSplits[message.id]?.toolCounts,
       textWidth: textWidth,
+      toolImageMaxWidth: toolImageMaxWidth,
+      toolImageAspects: toolImageAspects,
       fontScale: fontScale,
     );
     final bodyForLines = message.role == 'assistant'
@@ -909,6 +933,8 @@ class _MessageListViewState extends State<MessageListView> {
     required List<int>? reasoningCountAtSplit,
     required List<int>? toolCountAtSplit,
     required double textWidth,
+    required double toolImageMaxWidth,
+    required Map<String, double>? toolImageAspects,
     required double fontScale,
   }) {
     if (message.role != 'assistant') {
@@ -992,13 +1018,26 @@ class _MessageListViewState extends State<MessageListView> {
     final lineHeight = fontSize * 1.5;
     final codeFontSize = _estimateCodeFontSize * fontScale;
     final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
+    final generated = parts.whereType<ImagePart>().where(
+      (part) => part.generationItemId != null,
+    );
+    final placement = settings.inlineChatImages
+        ? ChatImagePlacement.resolve(
+            context,
+            message.id,
+            generated.toList(),
+            projected,
+            listen: false,
+          )
+        : null;
     for (final block in visibleAssistantTimeline(
       projected,
+      imageCallOrdinals: placement?.atCall.keys.toSet() ?? const {},
       showThinkingCards: settings.showThinkingCards,
       showToolCards: settings.showToolCards,
       isPendingApproval: isPending,
     )) {
-      if (block.isImage) {
+      if (block.isImage || block.imageCallOrdinal != null) {
         addVisible(
           estimateTimelineImageHeight(
             maxWidth: textWidth,
@@ -1041,8 +1080,15 @@ class _MessageListViewState extends State<MessageListView> {
           ),
           conversationId: message.conversationId,
           textWidth: textWidth,
+          toolImageMaxWidth: toolImageMaxWidth,
+          toolImageAspects: toolImageAspects,
           fontScale: fontScale,
         ),
+      );
+    }
+    if (placement?.footer.isNotEmpty ?? generated.isNotEmpty) {
+      addVisible(
+        estimateTimelineImageHeight(maxWidth: textWidth, aspectRatio: null),
       );
     }
     return (extent: extent, fromParts: projected.fromParts);
@@ -1052,6 +1098,8 @@ class _MessageListViewState extends State<MessageListView> {
     VisibleTimelineBlock visible, {
     required String conversationId,
     required double textWidth,
+    required double toolImageMaxWidth,
+    required Map<String, double>? toolImageAspects,
     required double fontScale,
   }) {
     final settings = _estimateSettings;
@@ -1085,6 +1133,8 @@ class _MessageListViewState extends State<MessageListView> {
             toolCallId: tool.providerId,
           ),
           textWidth: textWidth,
+          imageMaxWidth: toolImageMaxWidth,
+          imageAspects: toolImageAspects,
           fontScale: fontScale,
           wrappedLineCount: _wrappedLineCount,
         );
@@ -1375,6 +1425,7 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.collapseThinkingSteps != widget.collapseThinkingSteps ||
         oldWidget.showThinkingCards != widget.showThinkingCards ||
         oldWidget.showToolCards != widget.showToolCards ||
+        oldWidget.inlineChatImages != widget.inlineChatImages ||
         oldWidget.showProducedFiles != widget.showProducedFiles ||
         oldWidget.showToolResultSummary != widget.showToolResultSummary ||
         oldWidget.hideToolResultImages != widget.hideToolResultImages ||
@@ -1740,13 +1791,6 @@ class _MessageListViewState extends State<MessageListView> {
       defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux;
 
-  ScrollViewKeyboardDismissBehavior get _keyboardDismissBehavior {
-    if (_isDesktopPlatform) {
-      return ScrollViewKeyboardDismissBehavior.manual;
-    }
-    return ScrollViewKeyboardDismissBehavior.onDrag;
-  }
-
   @override
   void dispose() {
     widget.streamingContentNotifier?.toolHeightEvents.removeListener(
@@ -1787,6 +1831,7 @@ class _MessageListViewState extends State<MessageListView> {
       collapseThinkingSteps: widget.collapseThinkingSteps,
       showThinkingCards: widget.showThinkingCards,
       showToolCards: widget.showToolCards,
+      inlineChatImages: widget.inlineChatImages,
       showToolResultSummary: widget.showToolResultSummary,
       hideToolResultImages: widget.hideToolResultImages,
       showBrowserPageCards: widget.showBrowserPageCards,
@@ -1814,9 +1859,17 @@ class _MessageListViewState extends State<MessageListView> {
       conversationId: widget.messages.firstOrNull?.conversationId,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final horizontalPad =
+          final centeredPadding =
               ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
                   .clamp(0.0, double.infinity);
+          // Reuse the existing gutter for the overlay in full-width mode so
+          // narrow panes never give up any extra space.
+          final horizontalPadding = EdgeInsets.only(
+            left: widget.fullWidth ? 0 : centeredPadding,
+            right: widget.fullWidth
+                ? math.min(centeredPadding, widget.rightOverlayWidth)
+                : centeredPadding,
+          );
 
           return Builder(
             builder: (context) {
@@ -1828,17 +1881,17 @@ class _MessageListViewState extends State<MessageListView> {
                 addRepaintBoundaries: false,
                 findChildIndexCallback: _findMessageIndexByKey,
                 extentEstimation: _estimateItemExtent,
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPad,
-                  widget.topContentPadding,
-                  horizontalPad,
-                  widget.bottomContentPadding +
+                padding: horizontalPadding.copyWith(
+                  top: widget.topContentPadding,
+                  bottom:
+                      widget.bottomContentPadding +
                       (widget.isPinnedIndicatorActive ? 12 : 0),
                 ),
                 itemCount: _effectiveRenderModels.isEmpty && _hasFooter
                     ? 1
                     : _effectiveRenderModels.length,
-                keyboardDismissBehavior: _keyboardDismissBehavior,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.manual,
                 itemBuilder: (context, index) {
                   if (_effectiveRenderModels.isEmpty && _hasFooter) {
                     return widget.footer!;
@@ -1862,7 +1915,14 @@ class _MessageListViewState extends State<MessageListView> {
                     },
                     child: NotificationListener<ScrollNotification>(
                       onNotification: _handleScrollNotification,
-                      child: list,
+                      child: SelectionScrollScope(
+                        readDragRevision: _readDragRevision,
+                        handleViewportInsets: EdgeInsets.only(
+                          top: widget.topContentPadding,
+                          bottom: widget.bottomContentPadding,
+                        ),
+                        child: list,
+                      ),
                     ),
                   );
 
@@ -1906,7 +1966,7 @@ class _MessageListViewState extends State<MessageListView> {
                       child: IgnorePointer(
                         child: _WindowLoadingSkeleton(
                           key: MessageListView.windowSkeletonKey,
-                          horizontalPadding: horizontalPad,
+                          horizontalPadding: horizontalPadding,
                           topPadding: widget.topContentPadding,
                         ),
                       ),
@@ -1941,6 +2001,11 @@ class _MessageListViewState extends State<MessageListView> {
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification &&
+        notification.dragDetails != null &&
+        !_isDesktopPlatform) {
+      _dismissKeyboardForScroll();
+    }
     if (notification.depth != 0) return false;
     if (notification.metrics.axis != Axis.vertical) return false;
     if (notification is ScrollUpdateNotification) {
@@ -1993,7 +2058,21 @@ class _MessageListViewState extends State<MessageListView> {
     return false;
   }
 
+  void _dismissKeyboardForScroll() {
+    final scope = FocusScope.of(context, createDependency: false);
+    if (!scope.hasFocus || scope.hasPrimaryFocus) return;
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus == null) return;
+    // Flutter's on-drag behavior also unfocuses selectable text, clearing it.
+    final selection = focus.context
+        ?.findAncestorStateOfType<SelectableRegionState>();
+    if (selection?.widget.focusNode != focus) focus.unfocus();
+  }
+
+  int _readDragRevision() => _dragRevision;
+
   void _recordPointerDrag(ScrollMetrics metrics) {
+    _dragRevision++;
     _pointerDragInProgress = true;
     _latestPointerDragMetrics = metrics;
   }
@@ -2165,7 +2244,7 @@ class _MessageListViewState extends State<MessageListView> {
     final availableVersions = model.availableVersions;
     final selectedVersion = model.selectedVersion;
     final selectedIdx = model.selectedVersionIndex;
-    final total = availableVersions.length;
+    final hasMultipleVersions = model.versionCount > 1;
     final messageSuggestions =
         !widget.selecting &&
             model.isLatestCompleteAssistant &&
@@ -2248,7 +2327,7 @@ class _MessageListViewState extends State<MessageListView> {
                                 availableVersions: availableVersions,
                                 selectedVersion: selectedVersion,
                                 selectedIdx: selectedIdx,
-                                total: total,
+                                hasMultipleVersions: hasMultipleVersions,
                                 isProcessingFiles: isProcessingFiles,
                                 suggestions: messageSuggestions,
                                 presentation: presentation,
@@ -2266,7 +2345,7 @@ class _MessageListViewState extends State<MessageListView> {
                                 availableVersions: availableVersions,
                                 selectedVersion: selectedVersion,
                                 selectedIdx: selectedIdx,
-                                total: total,
+                                hasMultipleVersions: hasMultipleVersions,
                                 isProcessingFiles: isProcessingFiles,
                                 suggestions: messageSuggestions,
                                 presentation: presentation,
@@ -2365,40 +2444,43 @@ class _MessageListViewState extends State<MessageListView> {
           widget.footer!,
       ],
     );
-    final isSpotlight =
-        widget.spotlightMessageId != null &&
-        message.id == widget.spotlightMessageId;
-    final Widget item = isSpotlight
-        ? RepaintBoundary(
-            child: TweenAnimationBuilder<double>(
-              key: ValueKey('spotlight-${widget.spotlightToken}'),
-              tween: Tween<double>(begin: 1.0, end: 0.0),
-              duration: const Duration(milliseconds: 1200),
-              curve: Curves.easeOut,
-              builder: (context, opacity, child) {
-                return Stack(
-                  children: [
-                    child!,
-                    if (opacity > 0.0)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFFFA726,
-                              ).withValues(alpha: opacity * 0.30),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-              child: messageColumn,
+    final find = widget.conversationFind;
+    Widget highlightedMessage() {
+      final current = find?.activeHit;
+      return ConversationFindHighlights(
+        hits: find?.hitsFor(message.id) ?? const [],
+        current: current?.messageId == message.id ? current : null,
+        child: messageColumn,
+      );
+    }
+
+    final item = RepaintBoundary(
+      child: Stack(
+        children: [
+          if (find == null)
+            highlightedMessage()
+          else
+            ListenableBuilder(
+              listenable: find,
+              builder: (_, _) => highlightedMessage(),
             ),
-          )
-        : RepaintBoundary(child: messageColumn);
+          if (widget.spotlightMessageId == message.id)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: FadeTransition(
+                  opacity: widget.spotlightOpacity,
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Color(0x4DFFA726),
+                      borderRadius: BorderRadius.all(Radius.circular(4)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
 
     // The animator wraps the item's RepaintBoundary so the fade only
     // re-composites the boundary's cached layer instead of repainting the
@@ -2427,7 +2509,7 @@ class _MessageListViewState extends State<MessageListView> {
     required List<int> availableVersions,
     required int selectedVersion,
     required int selectedIdx,
-    required int total,
+    required bool hasMultipleVersions,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
@@ -2492,7 +2574,7 @@ class _MessageListViewState extends State<MessageListView> {
             availableVersions: availableVersions,
             selectedVersion: selectedVersion,
             selectedIdx: selectedIdx,
-            total: total,
+            hasMultipleVersions: hasMultipleVersions,
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
             presentation: presentation,
@@ -2521,7 +2603,7 @@ class _MessageListViewState extends State<MessageListView> {
     required List<int> availableVersions,
     required int selectedVersion,
     required int selectedIdx,
-    required int total,
+    required bool hasMultipleVersions,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
@@ -2540,7 +2622,7 @@ class _MessageListViewState extends State<MessageListView> {
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
       versionIndex: currentIdx < 0 ? selectedIdx : currentIdx,
-      versionCount: total > 0 ? total : 1,
+      versionCount: availableVersions.length,
       onPrevVersion: (currentIdx > 0)
           ? () => widget.onVersionChange?.call(
               gid,
@@ -2620,14 +2702,17 @@ class _MessageListViewState extends State<MessageListView> {
           ? () => widget.onEditMessage?.call(message)
           : null,
       onDelete: message.role == 'user'
-          ? () => widget.onDeleteMessage?.call(message, widget.byGroup)
+          ? () => widget.onDeleteMessage?.call(
+              message,
+              MessageVersionDeleteScope.current,
+            )
           : null,
       onMore: () async {
         final start = ContextHistory.fixedStart(widget.contextOperations);
         final action = await showMessageMoreSheet(
           context,
           message,
-          canDeleteAllVersions: total > 1,
+          hasMultipleVersions: hasMultipleVersions,
           canCreateBranch: widget.onForkConversation != null,
           canSetContextStart:
               widget.onSetContextStart != null && !message.isStreaming,
@@ -2637,10 +2722,8 @@ class _MessageListViewState extends State<MessageListView> {
           widget.onSetContextStart?.call(message);
         } else if (action == MessageMoreAction.cancelContextStart) {
           if (start != null) widget.onUndoContextOperation?.call(start);
-        } else if (action == MessageMoreAction.deleteCurrentVersion) {
-          await widget.onDeleteMessage?.call(message, widget.byGroup);
-        } else if (action == MessageMoreAction.deleteAllVersions) {
-          await widget.onDeleteAllVersions?.call(message, widget.byGroup);
+        } else if (action?.deleteScope case final scope?) {
+          await widget.onDeleteMessage?.call(message, scope);
         } else if (action == MessageMoreAction.edit) {
           widget.onEditMessage?.call(message);
         } else if (action == MessageMoreAction.fork) {
@@ -2754,6 +2837,7 @@ final class _EstimateSettings {
     required this.collapseThinkingSteps,
     required this.showThinkingCards,
     required this.showToolCards,
+    required this.inlineChatImages,
     required this.showToolResultSummary,
     required this.hideToolResultImages,
     required this.showBrowserPageCards,
@@ -2774,6 +2858,7 @@ final class _EstimateSettings {
 
   /// Whether tool-use cards contribute to estimated height.
   final bool showToolCards;
+  final bool inlineChatImages;
 
   /// Whether collapsed tool cards also show a short result summary.
   final bool showToolResultSummary;
@@ -2804,6 +2889,7 @@ final class _EstimateSettings {
       other.collapseThinkingSteps == collapseThinkingSteps &&
       other.showThinkingCards == showThinkingCards &&
       other.showToolCards == showToolCards &&
+      other.inlineChatImages == inlineChatImages &&
       other.showToolResultSummary == showToolResultSummary &&
       other.hideToolResultImages == hideToolResultImages &&
       other.showBrowserPageCards == showBrowserPageCards &&
@@ -2818,6 +2904,7 @@ final class _EstimateSettings {
     collapseThinkingSteps,
     showThinkingCards,
     showToolCards,
+    inlineChatImages,
     showToolResultSummary,
     hideToolResultImages,
     showBrowserPageCards,
@@ -3078,7 +3165,7 @@ class _WindowLoadingSkeleton extends StatefulWidget {
     required this.topPadding,
   });
 
-  final double horizontalPadding;
+  final EdgeInsets horizontalPadding;
   final double topPadding;
 
   @override
@@ -3120,11 +3207,8 @@ class _WindowLoadingSkeletonState extends State<_WindowLoadingSkeleton>
     }
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        widget.horizontalPadding + 12,
-        widget.topPadding + 24,
-        widget.horizontalPadding + 12,
-        0,
+      padding: widget.horizontalPadding.add(
+        EdgeInsets.fromLTRB(12, widget.topPadding + 24, 12, 0),
       ),
       child: FadeTransition(
         opacity: _pulse.drive(Tween<double>(begin: 0.45, end: 1.0)),

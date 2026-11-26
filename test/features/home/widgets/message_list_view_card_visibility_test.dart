@@ -416,6 +416,46 @@ void main() {
   });
 
   testWidgets(
+    'view_image extent uses the snapshot aspect and available width',
+    (tester) async {
+      final message = ChatMessage(
+        id: 'view-image',
+        role: 'assistant',
+        content: '',
+        conversationId: 'conversation-1',
+      );
+      final header = await _estimateExtent(
+        tester,
+        message: message,
+        toolParts: {
+          message.id: const [
+            ToolUIPart(id: 'snapshot', toolName: 'view_image', arguments: {}),
+          ],
+        },
+      );
+      final withImage = await _estimateExtent(
+        tester,
+        message: message,
+        toolParts: {
+          message.id: const [
+            ToolUIPart(
+              id: 'snapshot',
+              toolName: 'view_image',
+              arguments: {},
+              content: 'Image (480 x 120).\n![](https://example.com/wide.png)',
+            ),
+          ],
+        },
+      );
+      final estimate = tester
+          .widget<SuperListView>(find.byType(SuperListView))
+          .extentEstimation!;
+      expect(withImage - header, 60);
+      expect(estimate(0, 280) - header, 48);
+    },
+  );
+
+  testWidgets(
     'ask-user, TTS, and Screen Time extras count when summary is off',
     (tester) async {
       final message = ChatMessage(

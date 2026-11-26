@@ -23,6 +23,7 @@ void main() {
       containsAll(const ['create_memory', 'edit_memory', 'delete_memory']),
     );
     expect(LocalToolNames.all, [
+      LocalToolNames.generateImage,
       LocalToolNames.timeInfo,
       LocalToolNames.clipboard,
       LocalToolNames.textToSpeech,

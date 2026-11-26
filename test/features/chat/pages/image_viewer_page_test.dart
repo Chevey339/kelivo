@@ -1,11 +1,26 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/utils/safe_resize_image.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:image/image.dart' as image_lib;
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+
+// Two frames with different colors, a frame delay, and infinite looping.
+const _animatedGifBase64 =
+    'R0lGODlhAgACAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAA'
+    'ACwAAAAAAgACAAAIBgABCAQQEAAh+QQBCgABACwAAAAAAgACAIEAAP8AAAAAAAAAAAAI'
+    'BgABCAQQEAA7';
 
 const _transparentPngDataUrl =
     'data:image/png;base64,'
@@ -124,6 +139,7 @@ Widget _viewerApp({
 Widget _viewerRouteApp({
   required List<String> images,
   int initialIndex = 0,
+  bool dismissOnTap = false,
   Map<String, ImageProvider> imageProviders = const <String, ImageProvider>{},
   Size size = _mobileSize,
 }) {
@@ -143,6 +159,7 @@ Widget _viewerRouteApp({
                   MaterialPageRoute<void>(
                     builder: (_) => ImageViewerPage(
                       images: images,
+                      dismissOnTap: dismissOnTap,
                       initialIndex: initialIndex,
                       imageProviders: imageProviders,
                     ),
@@ -162,6 +179,7 @@ Future<void> _pumpViewerRoute(
   WidgetTester tester, {
   required List<String> images,
   int initialIndex = 0,
+  bool dismissOnTap = false,
   Map<String, ImageProvider> imageProviders = const <String, ImageProvider>{},
   Size size = _mobileSize,
 }) async {
@@ -169,6 +187,7 @@ Future<void> _pumpViewerRoute(
     _viewerRouteApp(
       images: images,
       initialIndex: initialIndex,
+      dismissOnTap: dismissOnTap,
       imageProviders: imageProviders,
       size: size,
     ),
@@ -177,11 +196,206 @@ Future<void> _pumpViewerRoute(
   await tester.pumpAndSettle();
 }
 
-Finder _displayTransformFinder(int index) {
-  return find.byKey(ValueKey('image-viewer-display-transform-$index'));
+class _ViewerSavePathProvider extends PathProviderPlatform {
+  _ViewerSavePathProvider(this.path);
+
+  final String path;
+
+  @override
+  Future<String?> getTemporaryPath() async => path;
 }
 
 void main() {
+  testWidgets('generated chat attachment preview closes with a single tap', (
+    tester,
+  ) async {
+    await _pumpViewerRoute(
+      tester,
+      images: [_widePngDataUrl],
+      dismissOnTap: true,
+    );
+    final viewer = find.byType(InteractiveViewer);
+    await tester.tapAt(tester.getCenter(viewer));
+    await tester.pumpAndSettle();
+    expect(viewer, findsNothing);
+  });
+
+  group('saving original images to the gallery', () {
+    late Directory temporaryDirectory;
+    late PathProviderPlatform previousPaths;
+    const channel = MethodChannel('image_gallery_saver_plus');
+    const nativeChannel = MethodChannel('app.file_save');
+    final platforms = TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    });
+
+    setUp(() {
+      temporaryDirectory = Directory.systemTemp.createTempSync(
+        'kelivo_viewer_save_test_',
+      );
+      previousPaths = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _ViewerSavePathProvider(
+        temporaryDirectory.path,
+      );
+    });
+
+    tearDown(() {
+      PathProviderPlatform.instance = previousPaths;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(nativeChannel, null);
+      temporaryDirectory.deleteSync(recursive: true);
+    });
+
+    for (final format in ['gif', 'png']) {
+      for (final sourceType in ['data', 'local', 'network', 'failure']) {
+        final saveFails = sourceType == 'failure';
+        final description = saveFails
+            ? 'reports $format save failure and removes temporary files'
+            : 'preserves the original $sourceType $format';
+        testWidgets(description, (tester) async {
+          _setTestViewSize(tester, _mobileSize);
+          final platform = defaultTargetPlatform;
+          final original = format == 'gif'
+              ? base64Decode(_animatedGifBase64)
+              : image_lib.encodePng(
+                  image_lib.Image(width: 2, height: 1, numChannels: 4)
+                    ..setPixelRgba(1, 0, 0, 255, 0, 128),
+                );
+          // Source names and MIME hints deliberately disagree with the bytes.
+          final source = switch (sourceType) {
+            'local' => File(
+              '${temporaryDirectory.path}/original.jpg',
+            )..writeAsBytesSync(original),
+            'network' => 'https://example.com/generated-image',
+            _ => 'data:image/jpeg;base64,${base64Encode(original)}',
+          };
+          final sourcePath = source is File ? source.path : source as String;
+          final calls = <MethodCall>[];
+          late Completer<void> saved;
+          File? savedFile;
+          Uint8List? savedBytes;
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(
+                platform == TargetPlatform.iOS ? nativeChannel : channel,
+                (call) async {
+                  calls.add(call);
+                  final pathKey = platform == TargetPlatform.iOS
+                      ? 'sourcePath'
+                      : 'file';
+                  final path = call.arguments[pathKey] as String?;
+                  if (path != null) {
+                    savedFile = File(path);
+                    savedBytes = savedFile!.readAsBytesSync();
+                  }
+                  saved.complete();
+                  if (platform == TargetPlatform.iOS) {
+                    if (saveFails) {
+                      throw PlatformException(code: 'photo_permission_denied');
+                    }
+                    return true;
+                  }
+                  return {
+                    'isSuccess': !saveFails,
+                    'filePath': saveFails
+                        ? null
+                        : 'content://media/external/images/media/42',
+                    'errorMessage': saveFails
+                        ? 'saveFileToGallery failed'
+                        : null,
+                  };
+                },
+              );
+
+          // A smaller display preview must never replace the original export.
+          await tester.pumpWidget(
+            _viewerApp(
+              images: [sourcePath],
+              imageProviders: {
+                sourcePath: MemoryImage(
+                  Uint8List.fromList(_transparentPngBytes),
+                ),
+              },
+            ),
+          );
+          await tester.pump();
+          final requests = <Uri>[];
+          await tester.runAsync(() async {
+            saved = Completer<void>();
+            await http
+                .runWithClient(
+                  () async {
+                    await tester.tap(find.byTooltip('Save Image'));
+                    await saved.future.timeout(const Duration(seconds: 5));
+                    if (savedFile != null) {
+                      while (await savedFile!.parent.exists()) {
+                        await Future<void>.delayed(
+                          const Duration(milliseconds: 1),
+                        );
+                      }
+                    }
+                  },
+                  () => MockClient((request) async {
+                    requests.add(request.url);
+                    return http.Response.bytes(
+                      original,
+                      200,
+                      headers: {'content-type': 'image/jpeg'},
+                    );
+                  }),
+                )
+                .timeout(const Duration(seconds: 5));
+          });
+          await tester.pumpAndSettle();
+
+          expect(calls, hasLength(1));
+          expect(
+            calls.single.method,
+            platform == TargetPlatform.iOS
+                ? 'saveImageToGallery'
+                : 'saveFileToGallery',
+          );
+          expect(savedFile!.path, endsWith('.$format'));
+          expect(savedBytes, orderedEquals(original));
+          if (format == 'gif') {
+            expect(image_lib.decodeGif(savedBytes!)!.numFrames, 2);
+          } else {
+            final png = image_lib.decodePng(savedBytes!)!;
+            expect(png.getPixel(0, 0).a, 0);
+            expect(png.getPixel(1, 0).a, 128);
+          }
+          expect(savedFile!.parent.existsSync(), isFalse);
+          final notification =
+              AppSnackBarManager().activeToasts.first.notification;
+          if (saveFails) {
+            expect(notification.type, NotificationType.error);
+            expect(
+              notification.message,
+              platform == TargetPlatform.iOS
+                  ? contains('photo_permission_denied')
+                  : startsWith('Save failed:'),
+            );
+          } else {
+            expect(notification.type, NotificationType.success);
+            expect(notification.message, 'Saved to gallery');
+          }
+          expect(
+            requests,
+            sourceType == 'network' ? [Uri.parse(sourcePath)] : isEmpty,
+          );
+          if (source is File) {
+            expect(source.readAsBytesSync(), orderedEquals(original));
+          }
+          AppSnackBarManager().dismissAll();
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox.shrink());
+        }, variant: platforms);
+      }
+    }
+  });
+
   testWidgets('ImageViewerPage uses a preloaded provider for the first frame', (
     tester,
   ) async {
@@ -231,25 +445,35 @@ void main() {
     },
   );
 
-  testWidgets('ImageViewerPage compact tap closes preview', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    _setTestViewSize(tester, _mobileSize);
-    try {
-      await _pumpViewerRoute(tester, images: const [_transparentPngDataUrl]);
+  testWidgets(
+    'ImageViewerPage compact tap hides controls and keeps preview open',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      _setTestViewSize(tester, _mobileSize);
+      try {
+        await _pumpViewerRoute(tester, images: const [_transparentPngDataUrl]);
 
-      expect(find.byTooltip('Close preview'), findsOneWidget);
+        expect(find.byTooltip('Close preview'), findsOneWidget);
 
-      await tester.tapAt(
-        tester.getCenter(find.byKey(const ValueKey('image-viewer-page-view'))),
-      );
-      await tester.pump(kDoubleTapTimeout);
-      await tester.pumpAndSettle();
+        await tester.tapAt(
+          tester.getCenter(
+            find.byKey(const ValueKey('image-viewer-page-view')),
+          ),
+        );
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pumpAndSettle();
 
-      expect(find.byType(ImageViewerPage), findsNothing);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
+        expect(find.byType(ImageViewerPage), findsOneWidget);
+        final chrome = find.ancestor(
+          of: find.byTooltip('Close preview'),
+          matching: find.byType(AnimatedOpacity),
+        );
+        expect(tester.widget<AnimatedOpacity>(chrome).opacity, 0);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 
   testWidgets('ImageViewerPage compact image uses the full viewport width', (
     tester,
@@ -399,42 +623,6 @@ void main() {
     },
   );
 
-  testWidgets('ImageViewerPage compact transform actions update the image', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    _setTestViewSize(tester, _mobileSize);
-    try {
-      await tester.pumpWidget(
-        _viewerApp(images: const [_transparentPngDataUrl], size: _mobileSize),
-      );
-      await tester.pump();
-
-      expect(find.byTooltip('Flip Horizontal'), findsOneWidget);
-      expect(find.byTooltip('Flip Vertical'), findsOneWidget);
-      expect(find.byTooltip('Rotate Left'), findsOneWidget);
-      expect(find.byTooltip('Rotate Right'), findsOneWidget);
-
-      final initial = tester.widget<Transform>(_displayTransformFinder(0));
-      expect(initial.transform.storage[0], moreOrLessEquals(1));
-
-      await tester.tap(find.byTooltip('Flip Horizontal'));
-      await tester.pumpAndSettle();
-
-      final flipped = tester.widget<Transform>(_displayTransformFinder(0));
-      expect(flipped.transform.storage[0], moreOrLessEquals(-1));
-
-      await tester.tap(find.byTooltip('Rotate Right'));
-      await tester.pumpAndSettle();
-
-      final rotated = tester.widget<Transform>(_displayTransformFinder(0));
-      expect(rotated.transform.storage[0].abs(), lessThan(0.001));
-      expect(rotated.transform.storage[1].abs(), moreOrLessEquals(1));
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
-
   testWidgets('ImageViewerPage desktop background tap closes preview', (
     tester,
   ) async {
@@ -478,53 +666,8 @@ void main() {
     }
   });
 
-  testWidgets('ImageViewerPage rotate actions animate by the shortest turn', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _viewerApp(images: const [_transparentPngDataUrl], size: _desktopSize),
-    );
-    await tester.pump();
-
-    await tester.tap(find.byTooltip('Rotate Left'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Rotate Left'));
-    await tester.pumpAndSettle();
-
-    final afterTwoLeft = tester.widget<Transform>(_displayTransformFinder(0));
-    expect(afterTwoLeft.transform.storage[0], moreOrLessEquals(-1));
-    expect(afterTwoLeft.transform.storage[5], moreOrLessEquals(-1));
-
-    await tester.tap(find.byTooltip('Rotate Right'));
-    await tester.pumpAndSettle();
-
-    final afterOneRight = tester.widget<Transform>(_displayTransformFinder(0));
-    expect(afterOneRight.transform.storage[0].abs(), lessThan(0.001));
-    expect(afterOneRight.transform.storage[1], moreOrLessEquals(-1));
-
-    await tester.tap(find.byTooltip('Rotate Right'));
-    await tester.pump();
-    final beforeMidTurn = tester.widget<Transform>(_displayTransformFinder(0));
-    expect(beforeMidTurn.transform.storage[0].abs(), lessThan(0.001));
-    await tester.pump(const Duration(milliseconds: 40));
-
-    final midTurn = tester.widget<Transform>(_displayTransformFinder(0));
-    final cosine = midTurn.transform.storage[0];
-    expect(cosine, inExclusiveRange(0, 1));
-
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Rotate Right'));
-    await tester.pumpAndSettle();
-
-    final afterThreeRight = tester.widget<Transform>(
-      _displayTransformFinder(0),
-    );
-    expect(afterThreeRight.transform.storage[0].abs(), lessThan(0.001));
-    expect(afterThreeRight.transform.storage[1], moreOrLessEquals(1));
-  });
-
   testWidgets(
-    'ImageViewerPage wide layout exposes navigation and zoom actions',
+    'ImageViewerPage wide layout exposes exports and filmstrip only',
     (tester) async {
       const secondImage =
           'data:image/png;base64,'
@@ -542,13 +685,13 @@ void main() {
       expect(find.text('1/2'), findsOneWidget);
       expect(find.byTooltip('Previous Image'), findsOneWidget);
       expect(find.byTooltip('Next Image'), findsOneWidget);
-      expect(find.byTooltip('Zoom In'), findsOneWidget);
-      expect(find.byTooltip('Zoom Out'), findsOneWidget);
-      expect(find.byTooltip('Reset Zoom'), findsOneWidget);
-      expect(find.byTooltip('Flip Horizontal'), findsOneWidget);
-      expect(find.byTooltip('Flip Vertical'), findsOneWidget);
-      expect(find.byTooltip('Rotate Left'), findsOneWidget);
-      expect(find.byTooltip('Rotate Right'), findsOneWidget);
+      expect(find.byTooltip('Zoom In'), findsNothing);
+      expect(find.byTooltip('Zoom Out'), findsNothing);
+      expect(find.byTooltip('Reset Zoom'), findsNothing);
+      expect(find.byTooltip('Flip Horizontal'), findsNothing);
+      expect(find.byTooltip('Flip Vertical'), findsNothing);
+      expect(find.byTooltip('Rotate Left'), findsNothing);
+      expect(find.byTooltip('Rotate Right'), findsNothing);
     },
   );
 
@@ -1019,57 +1162,6 @@ void main() {
       ),
       isTrue,
     );
-  });
-
-  testWidgets('rotate swaps decode axes and restores them after a full turn', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(1024, 720);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    try {
-      await tester.pumpWidget(
-        _viewerApp(
-          images: const [_widePngDataUrl],
-          size: const Size(1024, 720),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final initial =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(initial.width, greaterThan(initial.height));
-
-      await tester.tap(find.byTooltip('Rotate Right'));
-      await tester.pumpAndSettle();
-      final right =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(right.height, greaterThan(right.width));
-
-      await tester.tap(find.byTooltip('Rotate Left'));
-      await tester.pumpAndSettle();
-      final leftBack =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(leftBack.width, initial.width);
-      expect(leftBack.height, initial.height);
-
-      await tester.tap(find.byTooltip('Rotate Left'));
-      await tester.pumpAndSettle();
-      final left =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(left.height, greaterThan(left.width));
-
-      await tester.tap(find.byTooltip('Rotate Right'));
-      await tester.pumpAndSettle();
-      final restored =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(restored.width, initial.width);
-      expect(restored.height, initial.height);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
   });
 
   testWidgets(

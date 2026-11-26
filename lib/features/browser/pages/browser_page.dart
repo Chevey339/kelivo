@@ -1504,7 +1504,6 @@ class BrowserPageViewState extends State<BrowserPage>
     if (activity == BrowserAgentActivity.idle) return null;
     return BrowserAgentStatusChip(
       activity: activity,
-      pauseReason: _service.agentPauseFor(_visibleConversationId)?.reason,
       onPause: () => _service.takeOver(
         sessionId: _visibleConversationId,
         tabId: _service.activeTabId,

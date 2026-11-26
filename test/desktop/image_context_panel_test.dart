@@ -13,6 +13,8 @@ import 'package:Kelivo/features/home/services/context_usage_service.dart';
 import 'package:Kelivo/features/chat/widgets/image_context_panel.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 import '../support/business_test_harness.dart';
 
 class _TemporaryChat extends ChatService {
@@ -141,11 +143,11 @@ void main() {
     expect(find.text('diagram'), findsOneWidget);
     final recall = imageSwitch('Allow the model to recall images');
     final automatic = imageSwitch('Manage history images automatically');
-    expect(tester.widget<IosSwitch>(recall).value, isTrue);
+    expect(tester.widget<IosSwitch>(recall).value, isFalse);
     expect(tester.widget<IosSwitch>(automatic).value, isTrue);
     await tester.tap(recall);
     await settlePanel(tester);
-    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
     expect(tester.widget<IosSwitch>(automatic).value, isTrue);
 
     await tester.scrollUntilVisible(
@@ -160,14 +162,14 @@ void main() {
     await tester.tap(find.byTooltip('Pin image'));
     await settlePanel(tester);
     expect((await chat.imageContextSettings('chat')).pinned, {image.key});
-    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
     expect(find.byTooltip('Unpin image'), findsOneWidget);
     await tester.ensureVisible(automatic);
     await tester.pumpAndSettle();
     await tester.tap(automatic);
     await settlePanel(tester);
     expect((await chat.imageContextSettings('chat')).automatic, isFalse);
-    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
     expect((await chat.imageContextSettings('chat')).pinned, {image.key});
 
     await tester.scrollUntilVisible(
@@ -189,7 +191,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(recall);
     await settlePanel(tester);
-    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
     expect((await chat.imageContextSettings('chat')).automatic, isFalse);
     expect((await chat.imageContextSettings('chat')).pinned, {image.key});
   });
@@ -211,6 +213,99 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('an image row excludes and restores only that image', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 950));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    const pixels =
+        'data:image/png;base64,'
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwAD'
+        'hgGAWjR9awAAAABJRU5ErkJggg==';
+    usage.images = [
+      ChatContextImage(
+        identity: image.identity,
+        uri: pixels,
+        source: ContextImageSource.user,
+        label: 'diagram',
+      ),
+      ChatContextImage(
+        identity: const ContextImageIdentity('user', 'part:2'),
+        uri: pixels,
+        source: ContextImageSource.user,
+        label: 'photo',
+      ),
+    ];
+    await chat.updateImageContextSettings(
+      'chat',
+      (settings) => settings.pin(image.key, true),
+    );
+    await openPanel(tester, onAttach: (_) {});
+    final diagramRow = find.widgetWithText(SectionCard, 'diagram');
+    final photoRow = find.widgetWithText(SectionCard, 'photo');
+    Finder inRow(Finder row, Finder item) =>
+        find.descendant(of: row, matching: item);
+    final exclude = find.byTooltip('Exclude from context');
+    final restore = find.byTooltip('Remove exclusion');
+    expect(find.text('2 of 2 images included'), findsOneWidget);
+    final diagramExclude = inRow(diagramRow, exclude).hitTestable();
+    await tester.scrollUntilVisible(
+      diagramExclude,
+      150,
+      scrollable: find.descendant(
+        of: find.byType(ImageContextPanel),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(diagramExclude);
+    await settlePanel(tester);
+    expect(find.text('1 of 2 images included'), findsOneWidget);
+    expect(inRow(diagramRow, find.text('Excluded by you')), findsOneWidget);
+    expect(inRow(photoRow, exclude), findsOneWidget);
+    expect((await chat.imageContextSettings('chat')).excluded, {image.key});
+
+    await tester.tap(inRow(diagramRow, restore));
+    await settlePanel(tester);
+    expect(find.text('2 of 2 images included'), findsOneWidget);
+    expect(inRow(diagramRow, find.byTooltip('Unpin image')), findsOneWidget);
+    expect((await chat.imageContextSettings('chat')).excluded, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a recalled row keeps the original exclusion when it is alone', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 950));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    usage.images = [
+      ChatContextImage(
+        identity: const ContextImageIdentity('assistant', 'tool:recall'),
+        uri: file.path,
+        label: 'Recalled image',
+        source: ContextImageSource.tool,
+        sourceContextKey: image.key,
+        workspaceSnapshot: true,
+      ),
+    ];
+    await chat.updateImageContextSettings(
+      'chat',
+      (settings) => settings.exclude({image.key}, true),
+    );
+    await openPanel(tester, onAttach: (_) {});
+    final originalExcluded = tester.widget<IosIconButton>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is IosIconButton &&
+            widget.tooltip == 'Original image excluded',
+      ),
+    );
+    expect(originalExcluded.enabled, isFalse);
+    expect(find.byTooltip('Remove exclusion'), findsNothing);
+    expect(find.byTooltip('Add to composer again'), findsOneWidget);
+    expect((await chat.imageContextSettings('chat')).excluded, {image.key});
+  });
+
   testWidgets('image panel allows recall control before the first image', (
     tester,
   ) async {
@@ -219,14 +314,15 @@ void main() {
     expect(find.text('No images yet'), findsOneWidget);
     final recall = imageSwitch('Allow the model to recall images');
     final automatic = imageSwitch('Manage history images automatically');
+    expect(tester.widget<IosSwitch>(recall).value, isFalse);
     await tester.tap(recall);
     await settlePanel(tester);
-    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
     expect(tester.widget<IosSwitch>(automatic).value, isTrue);
     expect(find.text('No images yet'), findsOneWidget);
     await tester.tap(automatic);
     await settlePanel(tester);
     expect((await chat.imageContextSettings('chat')).automatic, isFalse);
-    expect(tester.widget<IosSwitch>(recall).value, isFalse);
+    expect(tester.widget<IosSwitch>(recall).value, isTrue);
   });
 }

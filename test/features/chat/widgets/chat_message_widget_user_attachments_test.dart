@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import "../../../support/business_test_harness.dart";
+import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 // ignore: depend_on_referenced_packages
 import 'package:audioplayers_platform_interface/audioplayers_platform_interface.dart';
@@ -12,6 +15,7 @@ import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -48,6 +52,103 @@ void main() {
   tearDown(() {
     AppSnackBarManager().dismissAll();
   });
+
+  testWidgets(
+    'a landscape attachment lands at its final bounds on the first viewer frame',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final bytes = img.encodeJpg(img.Image(width: 200, height: 100));
+      final source = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      await tester.pumpWidget(
+        _harness(
+          ChatMessageWidget(
+            showUserAvatar: false,
+            message: ChatMessage(
+              id: 'flight',
+              role: 'user',
+              conversationId: 'c',
+              parts: [
+                ImagePart(uri: source),
+                ImagePart(uri: source),
+              ],
+            ),
+          ),
+        ),
+      );
+      final tile = find.byKey(
+        const ValueKey('user-message-attachment:flight:1'),
+      );
+      final pixels = find.descendant(of: tile, matching: find.byType(RawImage));
+      for (
+        var i = 0;
+        i < 50 && tester.widget<RawImage>(pixels).image == null;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      expect(tester.widget<RawImage>(pixels).image, isNotNull);
+      final start = tester.getRect(tile);
+      await tester.tap(tile);
+      await tester.pump();
+      final destination = find.descendant(
+        of: find.byType(ImageViewerPage, skipOffstage: false),
+        matching: find.byType(Hero, skipOffstage: false),
+        skipOffstage: false,
+      );
+      const expanded = Rect.fromLTWH(0, 324.5, 390, 195);
+      expect(
+        tester
+            .widget<ImageViewerPage>(
+              find.byType(ImageViewerPage, skipOffstage: false),
+            )
+            .initialIndex,
+        1,
+      );
+      expect(tester.getRect(destination), expanded);
+      // Sample the overlay that is actually painted during the flight.
+      final flightPixels = find.byWidgetPredicate(
+        (widget) => widget is RawImage && widget.fit == BoxFit.cover,
+      );
+      var previous = start;
+      for (var frame = 0; frame < 6; frame++) {
+        await tester.pump(const Duration(milliseconds: 40));
+        final shuttle = find
+            .ancestor(of: flightPixels, matching: find.byType(ClipRRect))
+            .evaluate()
+            .where(
+              (element) =>
+                  element.findAncestorWidgetOfExactType<ChatMessageWidget>() ==
+                      null &&
+                  element.findAncestorWidgetOfExactType<ImageViewerPage>() ==
+                      null,
+            )
+            .single;
+        final box = shuttle.findRenderObject()! as RenderBox;
+        final rect = box.localToGlobal(Offset.zero) & box.size;
+        expect(
+          rect.width,
+          inInclusiveRange(previous.width - .01, expanded.width + .01),
+        );
+        expect(
+          rect.center.dy,
+          inInclusiveRange(previous.center.dy - .01, expanded.center.dy + .01),
+        );
+        previous = rect;
+      }
+      await tester.pumpAndSettle();
+      expect(tester.getRect(destination), expanded);
+      await tester.tap(find.byTooltip('Close preview'));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(tile), start);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('local audio attachments render as playable clips', (
     tester,

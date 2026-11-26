@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/models/message_part.dart';
+import '../../../core/models/message_part_snapshot.dart';
 
 /// Lightweight notifier for streaming message content updates.
 ///
@@ -381,19 +382,17 @@ class StreamingContentData {
         reasoningCountAtSplit ?? this.reasoningCountAtSplit;
     final nextToolCounts = toolCountAtSplit ?? this.toolCountAtSplit;
     final nextToolVersion = toolPartsVersion ?? this.toolPartsVersion;
+    final nextPartTokens = _reuseOrComputePartTokens(
+      nextParts,
+      previousParts: this.parts,
+      previousTokens: partStructureTokens,
+    );
     final structureUnchanged =
-        identical(nextParts, this.parts) &&
+        identical(nextPartTokens, partStructureTokens) &&
         identical(nextSplits, this.contentSplitOffsets) &&
         identical(nextReasoningCounts, this.reasoningCountAtSplit) &&
         identical(nextToolCounts, this.toolCountAtSplit) &&
         nextToolVersion == this.toolPartsVersion;
-    final nextPartTokens = structureUnchanged
-        ? partStructureTokens
-        : _reuseOrComputePartTokens(
-            nextParts,
-            previousParts: this.parts,
-            previousTokens: partStructureTokens,
-          );
     return StreamingContentData(
       content: content ?? this.content,
       totalTokens: totalTokens ?? this.totalTokens,
@@ -483,6 +482,20 @@ List<int> _reuseOrComputePartTokens(
 }) {
   if (parts == null || parts.isEmpty) return const <int>[];
   if (identical(parts, previousParts)) return previousTokens;
+  if (parts is MessagePartSnapshot &&
+      previousParts is MessagePartSnapshot &&
+      parts.length == previousParts.length &&
+      previousTokens.length == parts.length) {
+    final changed = parts.changesSince(previousParts);
+    if (changed != null &&
+        changed.every(
+          (i) =>
+              i < parts.length &&
+              _canReusePartToken(parts[i], previousParts[i]),
+        )) {
+      return previousTokens;
+    }
+  }
   return [
     for (var i = 0; i < parts.length; i++)
       if (previousParts != null &&

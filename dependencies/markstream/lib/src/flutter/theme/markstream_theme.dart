@@ -195,6 +195,7 @@ final class InlineCodeTheme extends _ThemeTokens {
   const InlineCodeTheme({
     required this.opticalCenter,
     required this.text,
+    this.inheritBodyColor = false,
     required this.padding,
     required this.radius,
     required this.backgroundColor,
@@ -202,6 +203,9 @@ final class InlineCodeTheme extends _ThemeTokens {
   });
   final double opticalCenter;
   final TextStyle text;
+
+  /// Use the enclosing surface's body text color, including inside painted blocks.
+  final bool inheritBodyColor;
   final EdgeInsetsGeometry padding;
   final double radius;
   final Color backgroundColor;
@@ -209,6 +213,7 @@ final class InlineCodeTheme extends _ThemeTokens {
   InlineCodeTheme copyWith({
     double? opticalCenter,
     TextStyle? text,
+    bool? inheritBodyColor,
     EdgeInsetsGeometry? padding,
     double? radius,
     Color? backgroundColor,
@@ -216,15 +221,23 @@ final class InlineCodeTheme extends _ThemeTokens {
   }) => InlineCodeTheme(
     opticalCenter: opticalCenter ?? this.opticalCenter,
     text: text ?? this.text,
+    inheritBodyColor: inheritBodyColor ?? this.inheritBodyColor,
     padding: padding ?? this.padding,
     radius: radius ?? this.radius,
     backgroundColor: backgroundColor ?? this.backgroundColor,
     borderColor: borderColor ?? this.borderColor,
   );
+
+  InlineCodeTheme _resolveBodyColor(Color color) =>
+      inheritBodyColor && text.color != color
+      ? copyWith(text: text.copyWith(color: color))
+      : this;
+
   @override
   List<Object?> get _values => [
     opticalCenter,
     text,
+    inheritBodyColor,
     padding,
     radius,
     backgroundColor,
@@ -408,11 +421,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     required this.compactRadius,
     required this.wideRadius,
     required this.toolbarHeight,
-    required this.singleColumnMinWidth,
-    required this.singleColumnMaxWidth,
-    required this.columnMinWidth,
-    required this.columnMaxWidth,
-    required this.visibleColumns,
+    required this.columnWrapWidth,
   });
   final Color outerBorderColor;
   final TextStyle heading;
@@ -425,11 +434,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
   final double compactRadius;
   final double wideRadius;
   final double toolbarHeight;
-  final double singleColumnMinWidth;
-  final double singleColumnMaxWidth;
-  final double columnMinWidth;
-  final double columnMaxWidth;
-  final double visibleColumns;
+  final double columnWrapWidth;
   MarkdownTableTheme copyWith({
     Color? outerBorderColor,
     TextStyle? heading,
@@ -442,11 +447,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     double? compactRadius,
     double? wideRadius,
     double? toolbarHeight,
-    double? singleColumnMinWidth,
-    double? singleColumnMaxWidth,
-    double? columnMinWidth,
-    double? columnMaxWidth,
-    double? visibleColumns,
+    double? columnWrapWidth,
   }) => MarkdownTableTheme(
     outerBorderColor: outerBorderColor ?? this.outerBorderColor,
     heading: heading ?? this.heading,
@@ -459,11 +460,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     compactRadius: compactRadius ?? this.compactRadius,
     wideRadius: wideRadius ?? this.wideRadius,
     toolbarHeight: toolbarHeight ?? this.toolbarHeight,
-    singleColumnMinWidth: singleColumnMinWidth ?? this.singleColumnMinWidth,
-    singleColumnMaxWidth: singleColumnMaxWidth ?? this.singleColumnMaxWidth,
-    columnMinWidth: columnMinWidth ?? this.columnMinWidth,
-    columnMaxWidth: columnMaxWidth ?? this.columnMaxWidth,
-    visibleColumns: visibleColumns ?? this.visibleColumns,
+    columnWrapWidth: columnWrapWidth ?? this.columnWrapWidth,
   );
   @override
   List<Object?> get _values => [
@@ -478,11 +475,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     compactRadius,
     wideRadius,
     toolbarHeight,
-    singleColumnMinWidth,
-    singleColumnMaxWidth,
-    columnMinWidth,
-    columnMaxWidth,
-    visibleColumns,
+    columnWrapWidth,
   ];
 }
 
@@ -558,8 +551,8 @@ final class MarkstreamTheme extends _ThemeTokens {
     required this.headingPadding,
     required this.blockSpacing,
     required this.link,
-    required this.inlineCode,
-    required this.keyboard,
+    required InlineCodeTheme inlineCode,
+    required InlineCodeTheme keyboard,
     required this.code,
     required this.quote,
     required this.listMarkerPadding,
@@ -574,6 +567,8 @@ final class MarkstreamTheme extends _ThemeTokens {
     required this.details,
     required this.fillAlphas,
   }) : assert(headings.length == 6),
+       inlineCode = inlineCode._resolveBodyColor(body.color ?? colors.ink),
+       keyboard = keyboard._resolveBodyColor(body.color ?? colors.ink),
        headings = List.unmodifiable(headings);
   final MarkstreamBackdrop backdrop;
   final MarkstreamChromeTheme chrome;
@@ -970,11 +965,7 @@ final class MarkstreamTheme extends _ThemeTokens {
         compactRadius: radiusMd,
         wideRadius: radiusMd,
         toolbarHeight: chrome.height,
-        singleColumnMinWidth: 220,
-        singleColumnMaxWidth: 360,
-        columnMinWidth: 112,
-        columnMaxWidth: 178,
-        visibleColumns: 2.45,
+        columnWrapWidth: 104,
       ),
       rulePadding: const EdgeInsets.symmetric(vertical: 12),
       ruleThickness: stroke,

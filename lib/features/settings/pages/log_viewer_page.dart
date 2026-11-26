@@ -22,6 +22,7 @@ import '../../../core/services/logging/context_log_models.dart';
 import '../../../core/services/logging/context_log_tail_reader.dart';
 import '../../../core/services/logging/log_payload_elider.dart';
 import '../logs/request_log_parser.dart';
+import '../logs/request_log_tail_reader.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -534,14 +535,37 @@ class _PlainLogContentPageState extends State<_PlainLogContentPage> {
   }
 }
 
-typedef _ParseRequest = ({String path, bool elide});
+typedef _RequestPageRead = ({
+  String path,
+  RequestLogTailCursor cursor,
+  bool elide,
+});
+Future<RequestLogTailPage> _readRequestPage(_RequestPageRead request) =>
+    RequestLogTailReader.readPage(
+      path: request.path,
+      cursor: request.cursor,
+      elide: request.elide,
+    );
 
-/// Runs on a background isolate: reading and parsing a multi-MB log on the UI
-/// isolate stutters the page transition.
-Future<List<RequestLogEntry>> _readAndParseRequestLog(_ParseRequest req) async {
-  final content = await File(req.path).readAsString();
-  return RequestLogParser.parse(content, elide: req.elide);
-}
+typedef _RequestDetailRead = ({String path, RequestLogItem item, bool elide});
+Future<RequestLogEntry> _readRequestDetail(_RequestDetailRead request) =>
+    RequestLogTailReader.readDetail(
+      path: request.path,
+      item: request.item,
+      elide: request.elide,
+    );
+
+typedef _ContextPageRead = ({
+  String path,
+  ContextLogTailCursor cursor,
+  int limit,
+});
+Future<ContextLogTailPage> _readContextPage(_ContextPageRead request) =>
+    ContextLogTailReader.readPage(
+      file: File(request.path),
+      cursor: request.cursor,
+      limit: request.limit,
+    );
 
 class _RequestLogFilePage extends StatefulWidget {
   const _RequestLogFilePage({required this.file, required this.title});
@@ -555,7 +579,15 @@ class _RequestLogFilePage extends StatefulWidget {
 
 class _RequestLogFilePageState extends State<_RequestLogFilePage> {
   bool _loading = true;
-  List<RequestLogEntry> _requests = const <RequestLogEntry>[];
+  bool _elide = true;
+  bool _loadingMore = false;
+  bool _hasMore = false;
+  int _loadGen = 0;
+  int _errorCount = 0;
+  int _warnCount = 0;
+  RequestLogTailCursor _cursor = const RequestLogTailCursor();
+  final Map<int, RequestLogItem> _bySequence = {};
+  List<RequestLogItem> _requests = [];
 
   @override
   void initState() {
@@ -564,29 +596,61 @@ class _RequestLogFilePageState extends State<_RequestLogFilePage> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final elide = context.read<SettingsProvider>().logElideLargePayloads;
+    final gen = ++_loadGen;
+    _elide = context.read<SettingsProvider>().logElideLargePayloads;
+    setState(() {
+      _loading = true;
+      _loadingMore = false;
+      _hasMore = false;
+      _errorCount = 0;
+      _warnCount = 0;
+      _cursor = const RequestLogTailCursor();
+      _bySequence.clear();
+      _requests = [];
+    });
+    await _fetchPage(gen);
+  }
+
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    await _fetchPage(_loadGen);
+  }
+
+  Future<void> _fetchPage(int gen) async {
     try {
-      // compute() rather than Isolate.run(): web is a build target, and there
-      // it degrades to an inline call instead of throwing.
-      final entries = await compute(_readAndParseRequestLog, (
+      final page = await compute(_readRequestPage, (
         path: widget.file.path,
-        elide: elide,
+        cursor: _cursor,
+        elide: _elide,
       ));
-      if (!mounted) {
-        return;
-      }
+      if (!mounted || gen != _loadGen) return;
       setState(() {
-        _requests = entries;
+        for (final item in page.items) {
+          final previous = _bySequence[item.entry.sequence];
+          if (previous?.entry.hasError ?? false) _errorCount--;
+          if (previous?.entry.hasWarning ?? false) _warnCount--;
+          _bySequence[item.entry.sequence] = item;
+          if (item.entry.hasError) _errorCount++;
+          if (item.entry.hasWarning) _warnCount++;
+        }
+        _requests = _bySequence.values.toList()
+          ..sort((a, b) {
+            final time = b.entry.startedAt!.compareTo(a.entry.startedAt!);
+            return time != 0
+                ? time
+                : b.entry.sequence.compareTo(a.entry.sequence);
+          });
+        _cursor = page.cursor;
+        _hasMore = page.hasMore;
         _loading = false;
+        _loadingMore = false;
       });
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted || gen != _loadGen) return;
       setState(() {
-        _requests = const <RequestLogEntry>[];
         _loading = false;
+        _loadingMore = false;
       });
     }
   }
@@ -617,9 +681,6 @@ class _RequestLogFilePageState extends State<_RequestLogFilePage> {
     final cs = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    final int errorCount = _requests.where((e) => e.hasError).length;
-    final int warnCount = _requests.where((e) => e.hasWarning).length;
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -641,7 +702,7 @@ class _RequestLogFilePageState extends State<_RequestLogFilePage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _requests.isEmpty
+          : _requests.isEmpty && !_hasMore
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -662,38 +723,107 @@ class _RequestLogFilePageState extends State<_RequestLogFilePage> {
                 ],
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-              itemCount: _requests.length + 1,
-              itemBuilder: (context, index) {
-                if (index == 0) {
+          : NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification is ScrollUpdateNotification &&
+                    notification.metrics.extentAfter < 240) {
+                  _loadMore();
+                }
+                return false;
+              },
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                itemCount: _requests.length + 2,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _RequestLogSummaryBar(
+                        total: _requests.length,
+                        errors: _errorCount,
+                        warnings: _warnCount,
+                      ),
+                    );
+                  }
+                  if (index == _requests.length + 1) {
+                    return _LogLoadOlderFooter(
+                      loading: _loadingMore,
+                      hasMore: _hasMore,
+                      onTap: _loadMore,
+                    );
+                  }
+                  final item = _requests[index - 1];
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _RequestLogSummaryBar(
-                      total: _requests.length,
-                      errors: errorCount,
-                      warnings: warnCount,
+                    key: ValueKey(item.entry.sequence),
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _RequestLogCard(
+                      entry: item.entry,
+                      onTap: () {
+                        final elide = context
+                            .read<SettingsProvider>()
+                            .logElideLargePayloads;
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => _RequestLogDetailLoader(
+                              path: widget.file.path,
+                              item: item,
+                              elide: elide,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   );
-                }
-                final e = _requests[index - 1];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _RequestLogCard(
-                    entry: e,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => _RequestLogDetailPage(entry: e),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
+                },
+              ),
             ),
     );
   }
+}
+
+class _RequestLogDetailLoader extends StatefulWidget {
+  const _RequestLogDetailLoader({
+    required this.path,
+    required this.item,
+    required this.elide,
+  });
+  final String path;
+  final RequestLogItem item;
+  final bool elide;
+
+  @override
+  State<_RequestLogDetailLoader> createState() =>
+      _RequestLogDetailLoaderState();
+}
+
+class _RequestLogDetailLoaderState extends State<_RequestLogDetailLoader> {
+  late final Future<RequestLogEntry> _entry = compute(_readRequestDetail, (
+    path: widget.path,
+    item: widget.item,
+    elide: widget.elide,
+  ));
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<RequestLogEntry>(
+    future: _entry,
+    builder: (context, snapshot) {
+      if (snapshot.hasData) return _RequestLogDetailPage(entry: snapshot.data!);
+      final l10n = AppLocalizations.of(context)!;
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Lucide.ArrowLeft, size: 22),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        body: Center(
+          child: snapshot.hasError
+              ? Text(l10n.logViewerErrorTitle)
+              : const CircularProgressIndicator(),
+        ),
+      );
+    },
+  );
 }
 
 class _ContextLogFilePage extends StatefulWidget {
@@ -741,10 +871,11 @@ class _ContextLogFilePageState extends State<_ContextLogFilePage> {
 
   Future<void> _fetchPage({required int gen, required bool reset}) async {
     try {
-      final page = await ContextLogTailReader.readPage(
-        file: widget.file,
+      final page = await compute(_readContextPage, (
+        path: widget.file.path,
         cursor: reset ? const ContextLogTailCursor() : _cursor,
-      );
+        limit: reset ? 10 : ContextLogTailReader.defaultPageSize,
+      ));
       if (!mounted || gen != _loadGen) return;
       setState(() {
         _snapshots = reset
@@ -815,7 +946,7 @@ class _ContextLogFilePageState extends State<_ContextLogFilePage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _snapshots.isEmpty
+          : _snapshots.isEmpty && !_hasMore
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -855,7 +986,7 @@ class _ContextLogFilePageState extends State<_ContextLogFilePage> {
                     );
                   }
                   if (index == _snapshots.length + 1) {
-                    return _ContextLoadOlderFooter(
+                    return _LogLoadOlderFooter(
                       loading: _loadingMore,
                       hasMore: _hasMore,
                       onTap: _loadMore,
@@ -883,8 +1014,8 @@ class _ContextLogFilePageState extends State<_ContextLogFilePage> {
   }
 }
 
-class _ContextLoadOlderFooter extends StatelessWidget {
-  const _ContextLoadOlderFooter({
+class _LogLoadOlderFooter extends StatelessWidget {
+  const _LogLoadOlderFooter({
     required this.loading,
     required this.hasMore,
     required this.onTap,
@@ -1688,7 +1819,7 @@ class _RequestLogCard extends StatelessWidget {
     final Uri? uri = entry.uri;
     final String title = () {
       if (uri == null) {
-        return (entry.rawUrl ?? '').trim();
+        return (entry.rawUrl ?? '#${entry.id}').trim();
       }
       final path = (uri.path.isEmpty ? '/' : uri.path);
       if (uri.query.isEmpty) {

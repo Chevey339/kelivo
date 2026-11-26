@@ -12,6 +12,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/reasoning/reasoning_dialects.dart';
 import 'package:Kelivo/core/services/model_catalog/catalog_entry.dart';
 import 'package:Kelivo/core/services/model_catalog/model_catalog_service.dart';
+import 'package:Kelivo/core/services/model_spec/model_list_metadata_cache.dart';
 import 'package:Kelivo/core/services/model_spec/model_spec_resolver.dart';
 
 void main() {
@@ -20,6 +21,7 @@ void main() {
   late Directory tempDir;
   late ModelCatalogService catalog;
   late ModelSpecResolver resolver;
+  late ModelListMetadataCache modelLists;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(const <String, Object>{});
@@ -30,7 +32,8 @@ void main() {
       clientFactory: () => MockClient((_) async => http.Response('{}', 500)),
       prefs: SharedPreferences.getInstance,
     )..debugSetData(_catalogData());
-    resolver = ModelSpecResolver(catalog: catalog);
+    modelLists = ModelListMetadataCache();
+    resolver = ModelSpecResolver(catalog: catalog, modelLists: modelLists);
   });
 
   tearDown(() async {
@@ -40,6 +43,154 @@ void main() {
   });
 
   group('ModelSpecResolver', () {
+    test(
+      'list metadata, window hints and model edits resolve by field',
+      () async {
+        const id = 'gemini-3.8-flash[1m]';
+        final cfg = _cfg(
+          id: 'relay',
+          kind: ProviderKind.openai,
+          baseUrl: 'https://proxy.example.com',
+        );
+        final tagged = resolver.resolve(cfg, '[times] gemini-3.8-flash');
+        expect(tagged.spec.contextWindow, 200000);
+        expect(
+          tagged.sources[ModelSpecField.contextWindow],
+          SpecSource.catalog,
+        );
+        expect(tagged.spec.pricing, isNull);
+
+        var resolved = resolver.resolve(cfg, id);
+        expect(resolved.spec.contextWindow, 1000000);
+        expect(
+          resolved.sources[ModelSpecField.contextWindow],
+          SpecSource.vendor,
+        );
+        expect(resolved.spec.maxOutput, 65536);
+        expect(resolved.sources[ModelSpecField.maxOutput], SpecSource.catalog);
+        expect(
+          resolved.spec.abilities,
+          containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+        );
+
+        await (await modelLists.startRefresh(cfg))([
+          (
+            id: id,
+            json: {
+              'context_length': 262144,
+              'cost': {'input': 0.75},
+            },
+          ),
+          (id: '[times] gemini-3.8-flash', json: {'context_length': 262144}),
+        ]);
+        expect(
+          resolver.spec(cfg, '[times] gemini-3.8-flash').contextWindow,
+          262144,
+        );
+        resolved = resolver.resolve(cfg, id);
+        expect(resolved.spec.contextWindow, 262144);
+        expect(resolved.spec.maxOutput, 65536);
+        expect(resolved.spec.pricing, const ModelPricing(input: 0.75));
+        expect(resolved.sources[ModelSpecField.pricing], SpecSource.vendor);
+
+        final edited = cfg.copyWith(
+          modelOverrides: {
+            id: {
+              'contextWindow': 128000,
+              'pricing': {'output': 3.5, 'currency': 'CNY'},
+            },
+          },
+        );
+        final override = resolver.resolve(edited, id);
+        expect(override.spec.contextWindow, 128000);
+        expect(override.spec.maxOutput, 65536);
+        expect(
+          override.spec.pricing,
+          const ModelPricing(output: 3.5, currency: 'CNY'),
+        );
+        expect(
+          override.sources[ModelSpecField.contextWindow],
+          SpecSource.override,
+        );
+        expect(override.sources[ModelSpecField.pricing], SpecSource.override);
+        expect(resolver.spec(cfg, id).contextWindow, 262144);
+        expect(cfg.modelOverrides, isEmpty);
+
+        await (await modelLists.startRefresh(cfg))([
+          (id: id, json: {'context_length': 0, 'context_window': 'abc'}),
+        ]);
+        expect(resolver.spec(cfg, id).contextWindow, 1000000);
+        expect(
+          resolver.spec(cfg, '[times] gemini-3.8-flash').contextWindow,
+          200000,
+        );
+        final unknown = resolver.resolve(cfg, 'unlisted[1m]');
+        expect(unknown.spec.contextWindow, isNull);
+        expect(
+          unknown.sources[ModelSpecField.contextWindow],
+          SpecSource.fallback,
+        );
+      },
+    );
+
+    test(
+      'reads metadata for the upstream ID before falling back per field',
+      () async {
+        const key = 'local-alias';
+        const upstream = 'relay/Gemini-3.8-Flash[1m]';
+        final cfg = _cfg(
+          id: 'proxy',
+          kind: ProviderKind.openai,
+          baseUrl: 'https://proxy.example.com',
+          overrides: {
+            key: {'apiModelId': upstream},
+          },
+        );
+        await (await modelLists.startRefresh(cfg))([
+          (id: upstream, json: {'context_window': 320000}),
+          (id: key, json: {'context_window': 96000, 'max_output': 20480}),
+        ]);
+        final resolved = resolver.resolve(cfg, key);
+        expect(resolved.spec.contextWindow, 320000);
+        expect(resolved.spec.maxOutput, 20480);
+        expect(resolved.sources[ModelSpecField.maxOutput], SpecSource.vendor);
+        expect(resolved.catalog?.model.id, 'gemini-3.8-flash');
+        expect(resolver.spec(cfg, 'gemini-3.8-flash').contextWindow, 200000);
+      },
+    );
+
+    test('borrowed catalog limits and capabilities carry no prices', () {
+      final cfg = _cfg(
+        id: 'proxy',
+        kind: ProviderKind.openai,
+        baseUrl: 'https://proxy.example.com',
+      );
+      final bare = resolver.spec(cfg, 'GLM-5.3-Flash');
+      final prefixed = resolver.resolve(cfg, 'loomy/GLM-5.3-Flash');
+      expect(prefixed.spec.contextWindow, 1000000);
+      expect(prefixed.spec.contextWindow, bare.contextWindow);
+      expect(prefixed.spec.maxOutput, 131072);
+      expect(prefixed.spec.maxOutput, bare.maxOutput);
+      expect(prefixed.spec.input, bare.input);
+      expect(prefixed.spec.abilities, bare.abilities);
+      expect(prefixed.spec.reasoning, bare.reasoning);
+      expect(prefixed.spec.pricing, isNull);
+      expect(
+        prefixed.sources[ModelSpecField.contextWindow],
+        SpecSource.catalog,
+      );
+
+      final openrouter = cfg.copyWith(baseUrl: 'https://openrouter.ai/api/v1');
+      final local = resolver.resolve(openrouter, 'z-ai/glm-5.3-flash');
+      expect(local.spec.contextWindow, 180000);
+      expect(local.spec.pricing, const ModelPricing(input: 1.2, output: 2.5));
+      expect(local.sources[ModelSpecField.pricing], SpecSource.catalog);
+
+      final mapped = resolver.resolve(cfg, 'z-ai/glm-5.3-flash');
+      expect(mapped.catalog?.provider.id, 'zai');
+      expect(mapped.spec.pricing, const ModelPricing(input: 0.5));
+    });
+
     test(
       'default inputs respect transport while explicit overrides remain editable',
       () {
@@ -1049,6 +1200,45 @@ ModelCatalogData _catalogData() {
             'gemini-3-pro-preview',
             reasoning: true,
             reasoningOptions: const [],
+          ),
+          _model(
+            'gemini-3.8-flash',
+            reasoning: true,
+            tool: true,
+            contextLimit: 200000,
+            outputLimit: 65536,
+            costInput: 1,
+            costOutput: 3,
+          ),
+        ],
+      ),
+      'zhipuai': _provider(
+        'zhipuai',
+        models: [
+          _model(
+            'glm-5.3-flash',
+            input: const ['text', 'image'],
+            tool: true,
+            reasoning: true,
+            contextLimit: 1000000,
+            outputLimit: 131072,
+            costInput: 0.25,
+          ),
+        ],
+      ),
+      'zai': _provider(
+        'zai',
+        models: [_model('glm-5.3-flash', contextLimit: 200000, costInput: 0.5)],
+      ),
+      'openrouter': _provider(
+        'openrouter',
+        api: 'https://openrouter.ai/api/v1',
+        models: [
+          _model(
+            'z-ai/glm-5.3-flash',
+            contextLimit: 180000,
+            costInput: 1.2,
+            costOutput: 2.5,
           ),
         ],
       ),

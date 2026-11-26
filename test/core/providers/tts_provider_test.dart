@@ -8,6 +8,7 @@ import 'package:Kelivo/core/services/mobile_background.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/core/services/tts/network_tts.dart';
 import 'package:Kelivo/core/services/tts/tts_playback_models.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,17 +27,26 @@ void main() {
   late Set<String> audioEventChannels;
   late int speakCallCount;
   late List<String> spokenTexts;
+  double? systemRate;
+  double? networkRate;
+  var failedSystemSpeaks = 0;
+  var deferSystemStart = false;
   late String? audioPlayerEventChannel;
   late BusinessPreferencesTestHarness harness;
   late BusinessPreferencesTestSession session;
   const backgroundChannel = MethodChannel('test.tts.background');
   final audioOwners = <String>{};
   var networkSources = 0;
+  var rejectNextSource = false;
+  Completer<void>? prepareGate;
   var networkResumes = 0;
   var rejectPause = false;
   Completer<void>? stopEntered;
   Completer<void>? stopGate;
   Completer<void>? speechGate;
+  Completer<void>? systemRateGate;
+  Completer<void>? systemStopGate;
+  var systemStops = 0;
   final terminalAudioOwners = <Set<String>>[];
 
   setUp(() async {
@@ -44,11 +54,16 @@ void main() {
     session = await harness.open();
     audioOwners.clear();
     networkSources = 0;
+    rejectNextSource = false;
+    prepareGate = null;
     networkResumes = 0;
     rejectPause = false;
     stopEntered = null;
     stopGate = null;
     speechGate = null;
+    systemRateGate = null;
+    systemStopGate = null;
+    systemStops = 0;
     terminalAudioOwners.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(backgroundChannel, (call) async {
@@ -68,6 +83,10 @@ void main() {
     audioEventChannels = <String>{};
     speakCallCount = 0;
     spokenTexts = <String>[];
+    systemRate = null;
+    networkRate = null;
+    failedSystemSpeaks = 0;
+    deferSystemStart = false;
     audioPlayerEventChannel = null;
     _mockAudioEventStream('xyz.luan/audioplayers.global/events');
     audioEventChannels.add('xyz.luan/audioplayers.global/events');
@@ -84,14 +103,29 @@ void main() {
             throw PlatformException(code: 'audio_services_reset');
           }
           final args = call.arguments as Map<dynamic, dynamic>;
+          if (call.method == 'setPlaybackRate') {
+            networkRate = args['playbackRate'] as double;
+          }
           final playerId = args['playerId'] as String;
           final eventChannel = 'xyz.luan/audioplayers/events/$playerId';
           if (call.method == 'create') {
             audioPlayerEventChannel = eventChannel;
             _mockAudioEventStream(eventChannel);
             audioEventChannels.add(eventChannel);
+          } else if (call.method == 'seek') {
+            scheduleMicrotask(
+              () => _emitAudioEvent(eventChannel, {
+                'event': 'audio.onSeekComplete',
+              }),
+            );
           } else if (call.method == 'setSourceUrl') {
             networkSources++;
+            await prepareGate?.future;
+            if (rejectNextSource) {
+              rejectNextSource = false;
+              scheduleMicrotask(() => _emitAudioError(eventChannel));
+              return null;
+            }
             scheduleMicrotask(() {
               unawaited(
                 _emitAudioEvent(eventChannel, {
@@ -106,6 +140,13 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           switch (call.method) {
+            case 'setSpeechRate':
+              await systemRateGate?.future;
+              systemRate = call.arguments as double;
+              return 1;
+            case 'setEngine':
+              systemRate = null;
+              return 1;
             case 'getLanguages':
               return const <String>['en-US', 'zh-CN'];
             case 'getEngines':
@@ -114,15 +155,21 @@ void main() {
               return true;
             case 'speak':
               speakCallCount++;
+              if (failedSystemSpeaks > 0) {
+                failedSystemSpeaks--;
+                return 0;
+              }
               final arguments = call.arguments;
               final text = arguments is Map
                   ? arguments['text']?.toString()
                   : arguments?.toString();
               spokenTexts.add(text ?? '');
-              await _emitTtsCallback('speak.onStart');
+              if (!deferSystemStart) await _emitTtsCallback('speak.onStart');
               await speechGate?.future;
               return 1;
             case 'stop':
+              systemStops++;
+              await systemStopGate?.future;
               await _emitTtsCallback('speak.onComplete');
               return 1;
             default:
@@ -780,88 +827,554 @@ void main() {
     },
   );
 
-  test('network replay uses cached audio only when enabled', () async {
-    final originalPathProvider = PathProviderPlatform.instance;
-    final tempDirectory = await Directory.systemTemp.createTemp(
-      'kelivo_tts_replay_test_',
-    );
-    PathProviderPlatform.instance = _FakePathProviderPlatform(
-      tempDirectory.path,
-    );
-    addTearDown(() async {
-      PathProviderPlatform.instance = originalPathProvider;
-      await tempDirectory.delete(recursive: true);
-    });
+  test(
+    'cached narration survives message changes and a fresh player',
+    () async {
+      final originalPathProvider = PathProviderPlatform.instance;
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'kelivo_tts_replay_test_',
+      );
+      PathProviderPlatform.instance = _FakePathProviderPlatform(
+        tempDirectory.path,
+      );
+      addTearDown(() async {
+        PathProviderPlatform.instance = originalPathProvider;
+        await tempDirectory.delete(recursive: true);
+      });
 
-    var requestCount = 0;
+      final requests = <(String, String)>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) async {
+        final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+        requests.add((body['input'] as String, body['voice'] as String));
+        request.response.add([requests.length]);
+        await request.response.close();
+      });
+      addTearDown(() => server.close(force: true));
+
+      var provider = TtsProvider(preferences: session.preferences);
+      addTearDown(() => provider.dispose());
+      await _waitUntil(() => provider.isAvailable);
+
+      expect(provider.cacheNetworkAudioForReplay, isFalse);
+      await provider.setCacheNetworkAudioForReplay(true);
+      expect(
+        session.preferences.getBool('tts_cache_network_audio_for_replay_v1'),
+        isTrue,
+      );
+
+      final service = OpenAiTtsOptions(
+        id: 'narration',
+        enabled: true,
+        name: 'Local TTS',
+        apiKey: 'test-key',
+        baseUrl: 'http://${server.address.address}:${server.port}/v1',
+        model: 'test-model',
+        voice: 'alloy',
+      );
+      Future<void> selectVoice(
+        String voice, {
+        String? id,
+        String? apiKey,
+        String? kind,
+      }) async {
+        await session.preferences.setString(
+          'tts_services_v1',
+          jsonEncode([
+            {
+              ...service.toJson(),
+              if (kind != null) 'kind': kind,
+              'voice': voice,
+              'id': id ?? service.id,
+              'apiKey': apiKey ?? service.apiKey,
+            },
+          ]),
+        );
+        await session.preferences.setString(
+          'tts_selected_service_id_v1',
+          id ?? service.id,
+        );
+      }
+
+      Future<void> play(Future<void> playback, int expectedAudio) async {
+        await _waitUntil(
+          () => provider.playbackState.status == TtsPlaybackStatus.playing,
+        );
+        await _emitAudioEvent(audioPlayerEventChannel!, {
+          'event': 'audio.onComplete',
+        });
+        await playback;
+        expect(provider.playbackState.status, TtsPlaybackStatus.ended);
+        final audio = await provider.synthesizeAllAndCollect();
+        expect(audio?.$1, [expectedAudio]);
+        expect(audio?.$2, 'mp3');
+      }
+
+      const cachedText = 'cached before upgrade';
+      final oldSettings = jsonEncode({
+        'kind': 'openai',
+        'apiKey': service.apiKey,
+        'baseUrl': service.baseUrl,
+        'model': service.model,
+        'voice': service.voice,
+      });
+      final oldServiceKey = sha256.convert(utf8.encode(oldSettings));
+      final oldEntry = sha256.convert(
+        utf8.encode('$oldServiceKey:$cachedText'),
+      );
+      final cached = File(
+        '${tempDirectory.path}/tts_replay/$oldEntry/audio.mp3',
+      );
+      await cached.create(recursive: true);
+      await cached.writeAsBytes([42]);
+      await selectVoice('alloy', kind: 'openai');
+      await play(provider.speak(cachedText), 42);
+      expect(requests, isEmpty);
+
+      await play(provider.speak('first'), 1);
+      await selectVoice('alloy', id: 'equivalent-profile');
+      final firstReplay = provider.togglePause();
+      await play(provider.togglePause(), 1);
+      await firstReplay;
+      expect(spokenTexts, isEmpty);
+      await play(provider.speak('first'), 1);
+      await provider.stop();
+      await play(provider.speak('second'), 2);
+      await play(provider.speak('first'), 1);
+
+      await provider.stop();
+      provider.dispose();
+      provider = TtsProvider(preferences: session.preferences);
+      await _waitUntil(() => provider.isAvailable);
+      expect(provider.cacheNetworkAudioForReplay, isTrue);
+      await play(provider.speak('first'), 1);
+      await selectVoice('nova');
+      await play(provider.speak('first'), 3);
+      await selectVoice('alloy');
+      await play(provider.speak('first'), 1);
+      await provider.setCacheNetworkAudioForReplay(false);
+      await play(provider.togglePause(), 4);
+      await play(provider.speak('first'), 5);
+      await provider.setCacheNetworkAudioForReplay(true);
+      expect((await provider.synthesizeAllAndCollect())?.$1, [5]);
+      await Directory(
+        '${tempDirectory.path}/tts_replay',
+      ).delete(recursive: true);
+      await play(provider.speak('first'), 5);
+      await provider.stop();
+      await play(provider.speak('first'), 5);
+      await provider.stop();
+      await Directory(
+        '${tempDirectory.path}/tts_replay',
+      ).delete(recursive: true);
+      await play(provider.speak('first'), 6);
+      await selectVoice('alloy', apiKey: 'second-account');
+      await play(provider.speak('first'), 7);
+      expect(requests, [
+        ('first', 'alloy'),
+        ('second', 'alloy'),
+        ('first', 'nova'),
+        ('first', 'alloy'),
+        ('first', 'alloy'),
+        ('first', 'alloy'),
+        ('first', 'alloy'),
+      ]);
+    },
+  );
+
+  test('replay shares pending chunks and retries only failed audio', () async {
+    final oldPaths = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _FakePathProviderPlatform(
+      harness.directory.path,
+    );
+    addTearDown(() => PathProviderPlatform.instance = oldPaths);
+    final attempts = <String, int>{};
+    final attemptedReplay = Completer<void>();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
     server.listen((request) async {
-      requestCount++;
-      await request.drain<void>();
-      request.response.statusCode = HttpStatus.ok;
-      request.response.add(const <int>[1, 2, 3]);
+      final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+      final letter = (body['input'] as String)[0];
+      final attempt = attempts.update(letter, (n) => n + 1, ifAbsent: () => 1);
+      if (letter == 'a') await attemptedReplay.future;
+      if (letter == 'b' && attempt == 1) {
+        request.response.statusCode = HttpStatus.serviceUnavailable;
+      } else {
+        request.response.add(letter.codeUnits);
+      }
       await request.response.close();
     });
-    addTearDown(() => server.close(force: true));
-
     final provider = TtsProvider(preferences: session.preferences);
     addTearDown(provider.dispose);
     await _waitUntil(() => provider.isAvailable);
-
-    expect(provider.cacheNetworkAudioForReplay, isFalse);
     await provider.setCacheNetworkAudioForReplay(true);
-    expect(
-      session.preferences.getBool('tts_cache_network_audio_for_replay_v1'),
-      isTrue,
-    );
-
     final service = OpenAiTtsOptions(
       enabled: true,
-      name: 'Local TTS',
-      apiKey: 'test-key',
+      name: 'Loopback',
+      apiKey: '',
       baseUrl: 'http://${server.address.address}:${server.port}/v1',
-      model: 'test-model',
+      model: 'tts',
       voice: 'alloy',
     );
-    unawaited(provider.speakWithNetworkService(service, 'hello network'));
-    await _waitUntil(
-      () =>
-          requestCount == 1 &&
-          provider.playbackState.status == TtsPlaybackStatus.playing,
-    );
-    await _emitAudioEvent(audioPlayerEventChannel!, {
-      'event': 'audio.onComplete',
-    });
-    await _waitUntil(
-      () => provider.playbackState.status == TtsPlaybackStatus.ended,
-    );
+    final text = ['a', 'a', 'b'].map((letter) => letter * 220).join();
+    final first = provider.speakWithNetworkService(service, text);
+    await _waitUntil(() => attempts.containsKey('b'));
+    final replacement = provider.speakWithNetworkService(service, text);
+    await first;
+    await _waitUntil(() => attempts['b'] == 2);
+    attemptedReplay.complete();
+    for (var i = 0; i < 3; i++) {
+      await _waitUntil(
+        () =>
+            provider.playbackState.status == TtsPlaybackStatus.playing &&
+            provider.playbackState.currentChunkIndex == i,
+      );
+      await _emitAudioEvent(audioPlayerEventChannel!, {
+        'event': 'audio.onComplete',
+      });
+    }
+    await replacement;
+    expect(provider.playbackState.status, TtsPlaybackStatus.ended);
+    expect((await provider.synthesizeAllAndCollect())?.$1, 'aab'.codeUnits);
+    expect(attempts, {'a': 1, 'b': 2});
+  });
 
-    unawaited(provider.togglePause());
+  Future<(TtsProvider, OpenAiTtsOptions)> networkPlayer(
+    Future<void> Function(HttpRequest request) respond, {
+    bool cache = true,
+  }) async {
+    final paths = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _FakePathProviderPlatform(
+      harness.directory.path,
+    );
+    addTearDown(() => PathProviderPlatform.instance = paths);
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen(respond);
+    final provider = TtsProvider(preferences: session.preferences);
+    addTearDown(provider.dispose);
+    await _waitUntil(() => provider.isAvailable);
+    await provider.setCacheNetworkAudioForReplay(cache);
+    return (
+      provider,
+      OpenAiTtsOptions(
+        enabled: true,
+        name: 'Loopback',
+        apiKey: '',
+        baseUrl: 'http://${server.address.address}:${server.port}/v1',
+        model: 'tts',
+        voice: 'alloy',
+      ),
+    );
+  }
+
+  test('the last chat speed survives restart for both TTS engines', () async {
+    await session.preferences.setDouble('tts_speech_rate_v1', 0.6);
+    final (first, service) = await networkPlayer((request) async {
+      await request.drain<void>();
+      request.response.add([1]);
+      await request.response.close();
+    }, cache: false);
+
+    final playback = first.speakWithNetworkService(service, 'First reply');
+    await _waitUntil(() => networkRate == 1.2);
+    await first.cyclePlaybackSpeed();
+    expect(networkRate, 1.5);
+    await first.stop();
+    await playback;
+    await session.close();
+
+    session = await harness.open();
+    final restored = TtsProvider(preferences: session.preferences);
+    addTearDown(restored.dispose);
+    await _waitUntil(() => restored.isAvailable);
+    expect(restored.speechRate, 0.6);
+    expect(restored.playbackState.speed, 1.5);
+
+    networkRate = null;
+    final next = restored.speakWithNetworkService(service, 'Next reply');
+    await _waitUntil(() => networkRate == 1.5);
+    await restored.stop();
+    await next;
+    // Force engine reselection and recreation on the first system reply.
+    failedSystemSpeaks = 6;
+    await restored.speak('System reply', waitForCompletion: false);
+    await _waitUntil(() => spokenTexts.contains('System reply'));
+    expect(systemRate, 0.75);
+    await restored.stop();
+  });
+
+  test('reselecting the system rate applies to the next playback', () async {
+    final provider = TtsProvider(preferences: session.preferences);
+    addTearDown(provider.dispose);
+    await _waitUntil(() => provider.isAvailable);
+    await provider.speak('First reply', waitForCompletion: false);
+    await _waitUntil(() => spokenTexts.isNotEmpty);
+    await provider.cyclePlaybackSpeed();
+    expect(provider.playbackState.speed, 1.2);
+    await provider.setSpeechRate(0.5);
+    await provider.stop();
+    await provider.speak('Second reply', waitForCompletion: false);
+    await _waitUntil(() => spokenTexts.contains('Second reply'));
+    expect(provider.playbackState.speed, 1.0);
+    expect(systemRate, 0.5);
+    await provider.stop();
+  });
+
+  test(
+    'speed taps during system buffering do not queue duplicate speech',
+    () async {
+      final provider = TtsProvider(preferences: session.preferences);
+      addTearDown(provider.dispose);
+      await _waitUntil(() => provider.isAvailable);
+      systemRateGate = Completer<void>();
+      await provider.speak('One reply', waitForCompletion: false);
+      expect(provider.playbackState.status, TtsPlaybackStatus.buffering);
+      final firstTap = provider.cyclePlaybackSpeed();
+      systemRateGate!.complete();
+      await firstTap;
+      await _waitUntil(() => spokenTexts.isNotEmpty);
+      expect(systemRate, 0.6);
+      expect(spokenTexts, ['One reply']);
+
+      final previousStops = systemStops;
+      systemStopGate = Completer<void>();
+      final restart = provider.cyclePlaybackSpeed();
+      await _waitUntil(() => systemStops > previousStops);
+      final lastTap = provider.cyclePlaybackSpeed();
+      systemStopGate!.complete();
+      await Future.wait([restart, lastTap]);
+      expect(systemRate, 1.0);
+      expect(spokenTexts, ['One reply', 'One reply']);
+      await provider.stop();
+      await session.close();
+      final reopened = await harness.open();
+      final restored = TtsProvider(preferences: reopened.preferences);
+      addTearDown(restored.dispose);
+      await _waitUntil(() => restored.isAvailable);
+      expect(restored.playbackState.speed, 2.0);
+    },
+  );
+
+  test(
+    'changing speed after native submission replaces the pending speech',
+    () async {
+      final provider = TtsProvider(preferences: session.preferences);
+      addTearDown(provider.dispose);
+      await _waitUntil(() => provider.isAvailable);
+      deferSystemStart = true;
+      await provider.speak('Queued reply', waitForCompletion: false);
+      await _waitUntil(() => spokenTexts.isNotEmpty);
+      expect(provider.playbackState.status, TtsPlaybackStatus.buffering);
+      final previousStops = systemStops;
+      await provider.cyclePlaybackSpeed();
+      expect(systemStops, previousStops + 1);
+      expect(spokenTexts, ['Queued reply', 'Queued reply']);
+      expect(systemRate, 0.6);
+      await _emitTtsCallback('speak.onStart');
+      expect(provider.playbackState.speed, 1.2);
+      await provider.stop();
+    },
+  );
+
+  test('a rejected audio source is regenerated on the next playback', () async {
+    var requests = 0;
+    final (provider, service) = await networkPlayer((request) async {
+      await request.drain<void>();
+      request.response.add([++requests]);
+      await request.response.close();
+    });
+    rejectNextSource = true;
+    await provider.speakWithNetworkService(service, 'hello');
+    expect(provider.playbackState.status, TtsPlaybackStatus.error);
+    final replay = provider.speakWithNetworkService(service, 'hello');
     await _waitUntil(
       () => provider.playbackState.status == TtsPlaybackStatus.playing,
     );
-    expect(requestCount, 1);
+    await _emitAudioError(
+      audioPlayerEventChannel!,
+      details: 'MEDIA_ERROR_SERVER_DIED',
+    );
+    await replay;
+    expect(provider.playbackState.status, TtsPlaybackStatus.error);
+    final recovered = provider.speakWithNetworkService(service, 'hello');
+    await _waitUntil(
+      () => provider.playbackState.status == TtsPlaybackStatus.playing,
+    );
     await _emitAudioEvent(audioPlayerEventChannel!, {
       'event': 'audio.onComplete',
     });
-    await _waitUntil(
-      () => provider.playbackState.status == TtsPlaybackStatus.ended,
-    );
+    await recovered;
+    expect((await provider.synthesizeAllAndCollect())?.$1, [2]);
+    expect(requests, 2);
+  });
 
-    await provider.setCacheNetworkAudioForReplay(false);
-    unawaited(provider.togglePause());
+  test(
+    'stop releases a stalled cached request so replay can start fresh',
+    () async {
+      var requests = 0;
+      final started = Completer<void>();
+      final (provider, service) = await networkPlayer((request) async {
+        await request.drain<void>();
+        if (++requests == 1) {
+          started.complete();
+          return;
+        }
+        request.response.add([42]);
+        await request.response.close();
+      });
+      final first = provider.speakWithNetworkService(service, 'hello');
+      await started.future;
+      await provider.stop();
+      await first;
+      final replay = provider.speakWithNetworkService(service, 'hello');
+      await _waitUntil(
+        () => provider.playbackState.status == TtsPlaybackStatus.playing,
+      );
+      await _emitAudioEvent(audioPlayerEventChannel!, {
+        'event': 'audio.onComplete',
+      });
+      await replay;
+      expect((await provider.synthesizeAllAndCollect())?.$1, [42]);
+      expect(requests, 2);
+    },
+  );
+
+  test('stopping cached Azure narration cancels its pending retry', () async {
+    var requests = 0;
+    final throttled = Completer<void>();
+    final (provider, endpoint) = await networkPlayer((request) async {
+      await request.drain<void>();
+      requests++;
+      request.response.statusCode = HttpStatus.serviceUnavailable;
+      await request.response.close();
+      if (!throttled.isCompleted) throttled.complete();
+    });
+    final first = provider.speakWithNetworkService(
+      AzureTtsOptions(
+        enabled: true,
+        name: 'Azure',
+        apiKey: '',
+        baseUrl: endpoint.baseUrl,
+        language: 'en-US',
+        voice: 'voice',
+      ),
+      'hello',
+    );
+    await throttled.future;
+    await provider.stop();
+    await first;
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    expect(requests, 1);
+  });
+
+  test('seeking during preparation plays the target chunk once', () async {
+    final (provider, service) = await networkPlayer((request) async {
+      await request.drain<void>();
+      request.response.add([1]);
+      await request.response.close();
+    });
+    prepareGate = Completer<void>();
+    final speech = provider.speakWithNetworkService(
+      service,
+      'a' * 220 + 'b' * 220,
+    );
+    await _waitUntil(() => networkSources == 1);
+    await provider.seekTo(const Duration(seconds: 45));
+    prepareGate!.complete();
     await _waitUntil(
       () =>
-          requestCount == 2 &&
+          networkSources == 2 &&
           provider.playbackState.status == TtsPlaybackStatus.playing,
     );
     await _emitAudioEvent(audioPlayerEventChannel!, {
       'event': 'audio.onComplete',
     });
-    await _waitUntil(
-      () => provider.playbackState.status == TtsPlaybackStatus.ended,
-    );
+    await speech.timeout(const Duration(seconds: 2));
+    expect(networkSources, 2);
+    expect(provider.playbackState.status, TtsPlaybackStatus.ended);
   });
+
+  test('export recovers a prefetched file cleared during playback', () async {
+    final attempts = <String, int>{};
+    final (provider, service) = await networkPlayer((request) async {
+      final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+      final letter = (body['input'] as String)[0];
+      final count = attempts.update(letter, (n) => n + 1, ifAbsent: () => 1);
+      if (letter == 'b' && count == 2) {
+        request.response.statusCode = HttpStatus.serviceUnavailable;
+      } else {
+        request.response.add(letter.codeUnits);
+      }
+      await request.response.close();
+    });
+    final speech = provider.speakWithNetworkService(
+      service,
+      'a' * 220 + 'b' * 220,
+    );
+    await _waitUntil(
+      () => provider.playbackState.status == TtsPlaybackStatus.playing,
+    );
+    await provider.pause();
+    expect((await provider.synthesizeAllAndCollect())?.$1, 'ab'.codeUnits);
+    await Directory(
+      '${harness.directory.path}/tts_replay',
+    ).delete(recursive: true);
+    await expectLater(
+      provider.synthesizeAllAndCollect(),
+      throwsA(predicate((e) => e.toString().contains('503'))),
+    );
+    expect((await provider.synthesizeAllAndCollect())?.$1, 'ab'.codeUnits);
+    expect(attempts, {'a': 2, 'b': 3});
+    await provider.stop();
+    await speech;
+  });
+
+  test(
+    'a paused export retries only its failed chunk and releases temporary files',
+    () async {
+      final attempts = <String, int>{};
+      final (provider, service) = await networkPlayer((request) async {
+        final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+        final letter = (body['input'] as String)[0];
+        final count = attempts.update(letter, (n) => n + 1, ifAbsent: () => 1);
+        if (letter == 'd' && count == 1) {
+          request.response.statusCode = HttpStatus.serviceUnavailable;
+        } else {
+          request.response.add(letter.codeUnits);
+        }
+        await request.response.close();
+      }, cache: false);
+      final speech = provider.speakWithNetworkService(
+        service,
+        ['a', 'b', 'c', 'd'].map((ch) => ch * 220).join(),
+      );
+      await _waitUntil(
+        () => provider.playbackState.status == TtsPlaybackStatus.playing,
+      );
+      await provider.pause();
+      await expectLater(
+        provider.synthesizeAllAndCollect(),
+        throwsA(predicate((e) => e.toString().contains('503'))),
+      );
+      expect((await provider.synthesizeAllAndCollect())?.$1, 'abcd'.codeUnits);
+      expect(attempts, {'a': 1, 'b': 1, 'c': 1, 'd': 2});
+      stopEntered = Completer<void>();
+      stopGate = Completer<void>();
+      final stopping = provider.stop();
+      await stopEntered!.future;
+      expect(await provider.synthesizeAllAndCollect(), isNull);
+      stopGate!.complete();
+      await stopping;
+      await speech;
+      expect(
+        harness.directory.listSync().where(
+          (file) => file.path.endsWith('.mp3'),
+        ),
+        isEmpty,
+      );
+    },
+  );
 }
 
 Future<void> _waitUntil(bool Function() condition) async {
@@ -892,6 +1405,19 @@ Future<void> _emitAudioEvent(String channel, Map<String, dynamic> event) async {
   await completer.future;
 }
 
+Future<void> _emitAudioError(
+  String channel, {
+  String details = 'MEDIA_ERROR_MALFORMED',
+}) async {
+  final data = const StandardMethodCodec().encodeErrorEnvelope(
+    code: 'AndroidAudioError',
+    message: 'MediaPlayer error',
+    details: details,
+  );
+  await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .handlePlatformMessage(channel, data, (_) {});
+}
+
 void _mockAudioEventStream(String channel) {
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMessageHandler(channel, (message) async {
@@ -914,4 +1440,7 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
   @override
   Future<String?> getTemporaryPath() async => path;
+
+  @override
+  Future<String?> getApplicationCachePath() async => path;
 }

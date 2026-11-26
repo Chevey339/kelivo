@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -9,9 +9,46 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
+import '../../../core/models/media_creation.dart';
+import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/media/media_models.dart';
+import '../../../desktop/desktop_settings_navigation_bus.dart';
+import '../../../utils/platform_utils.dart';
+import '../../model/widgets/creation_default_models.dart';
+import '../../provider/pages/providers_page.dart';
 import 'health_data_selection.dart';
 import 'local_tools_service.dart';
 import '../../settings/pages/phone_control_settings_page.dart';
+
+bool watchHasDefaultImageModel(BuildContext context) =>
+    context.select<SettingsProvider, bool>(
+      (settings) => resolveDefaultImageModel(settings) != null,
+    );
+
+Future<bool> configureChatImageModel(BuildContext context) async {
+  final settings = context.read<SettingsProvider>();
+  bool hasChoices() => settings.providerConfigs.values.any(
+    (provider) => provider.enabledModels.any(
+      (id) => resolveMediaModel(provider, id, MediaMode.image) != null,
+    ),
+  );
+  if (!hasChoices()) {
+    showAppSnackBar(
+      context,
+      message: AppLocalizations.of(context)!.creationConfigureImageProvider,
+      type: NotificationType.info,
+    );
+    if (PlatformUtils.isDesktopTarget) {
+      DesktopSettingsNavigationBus.instance.openProviders();
+      return false;
+    }
+    await Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute(builder: (_) => const ProvidersPage()));
+    if (!context.mounted || !hasChoices()) return false;
+  }
+  return pickCreationDefaultModel(context, CreationModelSlot.image);
+}
 
 /// Flips one entry of [Assistant.localToolIds], asking for the OS permission
 /// the tool needs first.
@@ -27,20 +64,36 @@ Future<void> setLocalToolEnabled(
   required bool value,
 }) async {
   Future<void> write(bool enabled) {
-    final ids = assistant.localToolIds.toSet();
+    if (!context.mounted) return Future.value();
+    final provider = context.read<AssistantProvider>();
+    final current = provider.getById(assistant.id);
+    if (current == null) return Future.value();
+    final ids = current.localToolIds.toSet();
     if (enabled) {
       ids.add(toolId);
     } else {
       ids.remove(toolId);
     }
-    return context.read<AssistantProvider>().updateAssistant(
-      assistant.copyWith(localToolIds: ids.toList(growable: false)),
+    return provider.updateAssistant(
+      current.copyWith(localToolIds: ids.toList(growable: false)),
     );
   }
 
   if (!value) {
     await write(false);
     return;
+  }
+
+  if (toolId == LocalToolNames.generateImage) {
+    final settings = context.read<SettingsProvider>();
+    if (resolveDefaultImageModel(settings) == null) {
+      final selected = await configureChatImageModel(context);
+      if (!selected ||
+          !context.mounted ||
+          resolveDefaultImageModel(settings) == null) {
+        return;
+      }
+    }
   }
 
   if (toolId == LocalToolNames.phoneControl) {

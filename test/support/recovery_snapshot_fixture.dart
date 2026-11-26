@@ -3,10 +3,45 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+
+void setUpRecoverySnapshotPaths() {
+  late PathProviderPlatform previous;
+  late Directory staging;
+  setUp(() async {
+    previous = PathProviderPlatform.instance;
+    staging = await Directory.systemTemp.createTemp('kelivo-recovery-staging-');
+    PathProviderPlatform.instance = _RecoverySnapshotPaths(staging.path);
+  });
+  tearDown(() async {
+    PathProviderPlatform.instance = previous;
+    await staging.delete(recursive: true);
+  });
+}
+
+class _RecoverySnapshotPaths extends PathProviderPlatform {
+  _RecoverySnapshotPaths(this.path);
+
+  final String path;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
+
+  @override
+  Future<String?> getApplicationCachePath() async => path;
+
+  @override
+  Future<String?> getTemporaryPath() async => path;
+}
 
 Future<File> writeRecoverySnapshot(
   File destination, {

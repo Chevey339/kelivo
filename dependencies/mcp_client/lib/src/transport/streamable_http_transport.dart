@@ -289,7 +289,7 @@ class StreamableHttpClientTransport implements ClientTransport {
           canRetryRequest: false,
         );
         if (_isRetryableStatus(error.statusCode)) {
-          await _waitForRetry(_httpRetryDelay(error), task.cancelledFuture);
+          await _waitForRetry(_defaultReconnectDelay, task.cancelledFuture);
           continue;
         }
         throw error;
@@ -444,7 +444,7 @@ class StreamableHttpClientTransport implements ClientTransport {
             backgroundError.statusCode == 403) {
           delay = _authenticationRetryDelay;
         } else if (_isRetryableStatus(backgroundError.statusCode)) {
-          delay = _httpRetryDelay(backgroundError);
+          delay = _defaultReconnectDelay;
         } else {
           return;
         }
@@ -554,9 +554,6 @@ class StreamableHttpClientTransport implements ClientTransport {
 
   bool _isRetryableStatus(int statusCode) =>
       statusCode == 408 || statusCode == 429 || statusCode >= 500;
-
-  Duration _httpRetryDelay(McpHttpError error) =>
-      _boundedRetry(error.retryAfter ?? _defaultReconnectDelay);
 
   Duration _boundedRetry(Duration delay) =>
       delay < _minimumReconnectDelay ? _minimumReconnectDelay : delay;

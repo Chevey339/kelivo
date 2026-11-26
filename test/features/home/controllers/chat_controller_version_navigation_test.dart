@@ -85,6 +85,75 @@ void main() {
 
   for (final temporary in [false, true]) {
     test(
+      'keep the selected revision in its original slot ($temporary)',
+      () async {
+        final conversation = temporary
+            ? await service.createDraftConversation(
+                title: 'Versions',
+                temporary: true,
+              )
+            : await service.createConversation(title: 'Versions');
+        final group = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'original',
+        );
+        final neighbor = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'neighbor',
+        );
+        final middle = (await service.appendMessageVersion(
+          messageId: group.id,
+          content: 'keep me',
+        ))!;
+        final latest = (await service.appendMessageVersion(
+          messageId: group.id,
+          content: 'latest',
+        ))!;
+        Future<Set<String>> deleteOthers(Set<String> ids, {String? keep}) =>
+            service.deleteMessages(
+              conversationId: conversation.id,
+              messageIds: ids,
+              versionSelectionChanges: {},
+              retainedMessageId: keep ?? middle.id,
+            );
+        // The open confirmation is stale if the user is now viewing the latest
+        // revision, or another regeneration has added an unconfirmed sibling.
+        expect(await deleteOthers({group.id, latest.id}), isEmpty);
+        await service.setSelectedVersion(
+          conversation.id,
+          group.id,
+          middle.version,
+        );
+        await service.updateConversationSuggestions(conversation.id, [
+          'Continue',
+        ]);
+        expect(await deleteOthers({group.id}), isEmpty);
+        expect(await deleteOthers({group.id, neighbor.id}), isEmpty);
+        expect(await deleteOthers({group.id, latest.id}), {
+          group.id,
+          latest.id,
+        });
+        expect(await deleteOthers({middle.id}, keep: latest.id), isEmpty);
+        final page = await service.loadTimelinePage(conversation.id);
+        expect(page!.slots.map((slot) => slot.message.id), [
+          middle.id,
+          neighbor.id,
+        ]);
+        expect(page.slots.first.message.content, 'keep me');
+        expect(page.slots.first.identity.versionCount, 1);
+        expect(service.getConversation(conversation.id)!.chatSuggestions, [
+          'Continue',
+        ]);
+        expect(
+          service.getVersionSelections(conversation.id)[group.id],
+          middle.version,
+        );
+      },
+    );
+
+    test(
       'deleting the selected version hydrates its survivor ($temporary)',
       () async {
         final conversation = temporary
@@ -144,6 +213,43 @@ void main() {
       },
     );
   }
+
+  test(
+    'keeping a revision in a cloned temporary chat preserves the cloned order',
+    () async {
+      final chat = await service.createDraftConversation(
+        title: 'Compacted',
+        temporary: true,
+      );
+      for (final id in ['summary', 'answer', 'followup']) {
+        await service.addMessageDirectly(
+          chat.id,
+          ChatMessage(
+            id: id,
+            role: 'assistant',
+            content: id,
+            conversationId: chat.id,
+          ),
+        );
+      }
+      final kept = (await service.appendMessageVersion(
+        messageId: 'answer',
+        content: 'edited answer',
+      ))!;
+      expect(
+        await service.deleteMessages(
+          conversationId: chat.id,
+          messageIds: {'answer'},
+          versionSelectionChanges: {},
+          retainedMessageId: kept.id,
+        ),
+        {'answer'},
+      );
+      final expected = ['summary', kept.id, 'followup'];
+      expect(chat.messageIds, expected);
+      expect(await service.getMessageIds(chat.id), expected);
+    },
+  );
 
   test(
     'survivor hydration cannot replace a newly opened conversation',

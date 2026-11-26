@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
+import '../../../core/models/translation_language.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -10,94 +11,6 @@ import '../../../desktop/menu_anchor.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
-
-class LanguageOption {
-  final String code;
-  final String displayName;
-  final String displayNameZh;
-  final String flag;
-
-  const LanguageOption({
-    required this.code,
-    required this.displayName,
-    required this.displayNameZh,
-    required this.flag,
-  });
-}
-
-const List<LanguageOption> supportedLanguages = [
-  LanguageOption(
-    code: 'zh-CN',
-    displayName: 'Simplified Chinese',
-    displayNameZh: '简体中文',
-    flag: '🇨🇳',
-  ),
-  LanguageOption(
-    code: 'en',
-    displayName: 'English',
-    displayNameZh: 'English',
-    flag: '🇺🇸',
-  ),
-  LanguageOption(
-    code: 'zh-TW',
-    displayName: 'Traditional Chinese',
-    displayNameZh: '繁體中文',
-    flag: '🇨🇳',
-  ),
-  LanguageOption(
-    code: 'ja',
-    displayName: 'Japanese',
-    displayNameZh: '日本語',
-    flag: '🇯🇵',
-  ),
-  LanguageOption(
-    code: 'ko',
-    displayName: 'Korean',
-    displayNameZh: '한국어',
-    flag: '🇰🇷',
-  ),
-  LanguageOption(
-    code: 'fr',
-    displayName: 'French',
-    displayNameZh: 'Français',
-    flag: '🇫🇷',
-  ),
-  LanguageOption(
-    code: 'de',
-    displayName: 'German',
-    displayNameZh: 'Deutsch',
-    flag: '🇩🇪',
-  ),
-  LanguageOption(
-    code: 'it',
-    displayName: 'Italian',
-    displayNameZh: 'Italiano',
-    flag: '🇮🇹',
-  ),
-  LanguageOption(
-    code: 'es',
-    displayName: 'Spanish',
-    displayNameZh: 'Español',
-    flag: '🇪🇸',
-  ),
-  // LanguageOption(code: 'pt', displayName: 'Portuguese', displayNameZh: 'Português', flag: '🇵🇹'),
-  LanguageOption(
-    code: 'ru',
-    displayName: 'Russian',
-    displayNameZh: 'Русский',
-    flag: '🇷🇺',
-  ),
-  LanguageOption(
-    code: 'tr',
-    displayName: 'Turkish',
-    displayNameZh: 'Türkçe',
-    flag: '🇹🇷',
-  ),
-  // LanguageOption(code: 'ar', displayName: 'Arabic', displayNameZh: 'العربية', flag: '🇸🇦'),
-  // LanguageOption(code: 'hi', displayName: 'Hindi', displayNameZh: 'हिन्दी', flag: '🇮🇳'),
-  // LanguageOption(code: 'th', displayName: 'Thai', displayNameZh: 'ไทย', flag: '🇹🇭'),
-  // LanguageOption(code: 'vi', displayName: 'Vietnamese', displayNameZh: 'Tiếng Việt', flag: '🇻🇳'),
-];
 
 String languageDisplayName(AppLocalizations l10n, String languageCode) {
   switch (languageCode) {
@@ -115,6 +28,10 @@ String languageDisplayName(AppLocalizations l10n, String languageCode) {
       return l10n.languageDisplayRussian;
     case 'tr':
       return l10n.languageDisplayTurkish;
+    case 'bn':
+      return l10n.languageDisplayBangla;
+    case 'ar':
+      return l10n.languageDisplayArabic;
     case 'fr':
       return l10n.languageDisplayFrench;
     case 'de':
@@ -128,7 +45,17 @@ String languageDisplayName(AppLocalizations l10n, String languageCode) {
   }
 }
 
-Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
+const _clearTranslation = LanguageOption(
+  code: '__clear__',
+  displayName: 'Clear Translation',
+  nativeName: '清空翻译',
+  flag: '',
+);
+
+Future<LanguageOption?> showLanguageSelector(
+  BuildContext context, {
+  required List<LanguageOption> languages,
+}) async {
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.windows ||
@@ -141,7 +68,7 @@ Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => const _LanguageSelectSheet(),
+      builder: (ctx) => _LanguageSelectSheet(languages: languages),
     );
   }
 
@@ -149,7 +76,7 @@ Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
   final l10n = AppLocalizations.of(context)!;
   LanguageOption? selected;
   final items = [
-    ...supportedLanguages.map(
+    ...languages.map(
       (lang) => DesktopContextMenuItem(
         icon: null,
         label: '${lang.flag} ${languageDisplayName(l10n, lang.code)}',
@@ -159,12 +86,7 @@ Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
     DesktopContextMenuItem(
       icon: Lucide.X,
       label: l10n.languageSelectSheetClearButton,
-      onTap: () => selected = const LanguageOption(
-        code: '__clear__',
-        displayName: 'Clear Translation',
-        displayNameZh: '清空翻译',
-        flag: '',
-      ),
+      onTap: () => selected = _clearTranslation,
       danger: true,
     ),
   ];
@@ -176,14 +98,11 @@ Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
   return selected;
 }
 
-class _LanguageSelectSheet extends StatefulWidget {
-  const _LanguageSelectSheet();
+class _LanguageSelectSheet extends StatelessWidget {
+  const _LanguageSelectSheet({required this.languages});
 
-  @override
-  State<_LanguageSelectSheet> createState() => _LanguageSelectSheetState();
-}
+  final List<LanguageOption> languages;
 
-class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
   // Auto height with a max constraint; no draggable sheet.
 
   @override
@@ -225,7 +144,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      ...supportedLanguages.map(
+                      ...languages.map(
                         (lang) => _languageOption(context, lang),
                       ),
                       const SizedBox(height: 8),
@@ -238,14 +157,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                           duration: const Duration(milliseconds: 260),
                           onTap: () {
                             Haptics.light();
-                            Navigator.of(context).pop(
-                              const LanguageOption(
-                                code: '__clear__',
-                                displayName: 'Clear Translation',
-                                displayNameZh: '清空翻译',
-                                flag: '',
-                              ),
-                            );
+                            Navigator.of(context).pop(_clearTranslation);
                           },
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Row(
@@ -303,7 +215,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  _getLanguageDisplayName(l10n, lang.code),
+                  languageDisplayName(l10n, lang.code),
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: AppFontWeights.medium,
@@ -315,9 +227,5 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
         ),
       ),
     );
-  }
-
-  String _getLanguageDisplayName(AppLocalizations l10n, String languageCode) {
-    return languageDisplayName(l10n, languageCode);
   }
 }

@@ -38,6 +38,7 @@ import '../../../core/models/memory_entry.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/media/media_models.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/memory/memory_gatekeeper.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
@@ -61,7 +62,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
-import '../../../utils/avatar_cache.dart';
+import '../../../shared/widgets/avatar_image.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
@@ -1865,81 +1866,40 @@ class _DesktopAssistantBasicPaneState
               child: Builder(
                 builder: (context) {
                   final av = a.avatar?.trim() ?? '';
-                  Widget inner;
-                  if (av.isEmpty) {
-                    inner = Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: cs.primary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        (a.name.isNotEmpty ? a.name.characters.first : '?'),
-                        style: TextStyle(
-                          color: cs.primary,
-                          fontWeight: AppFontWeights.emphasis,
-                          fontSize: 22,
-                        ),
-                      ),
-                    );
-                  } else if (av.startsWith('http')) {
-                    inner = ClipOval(
-                      child: Image.network(
-                        av,
-                        width: 56,
-                        height: 56,
-                        fit: BoxFit.cover,
-                      ),
-                    );
-                  } else if (av.startsWith('/') || av.contains(':')) {
-                    final fixed = SandboxPathResolver.fix(av);
-                    final f = File(fixed);
-                    if (f.existsSync()) {
-                      inner = ClipOval(
-                        child: Image.file(
-                          f,
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                        ),
-                      );
-                    } else {
-                      inner = Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: cs.primary.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          (a.name.isNotEmpty ? a.name.characters.first : '?'),
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: AppFontWeights.emphasis,
-                            fontSize: 22,
-                          ),
-                        ),
-                      );
-                    }
-                  } else {
-                    inner = Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: cs.primary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        av.characters.take(1).toString(),
-                        style: TextStyle(fontSize: 26),
-                      ),
-                    );
-                  }
-                  return inner;
+                  final isImage =
+                      av.startsWith('http') ||
+                      av.startsWith('/') ||
+                      av.contains(':');
+                  final emoji = av.isNotEmpty && !isImage;
+                  final fallback = Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      emoji
+                          ? av.characters.first
+                          : (a.name.isEmpty ? '?' : a.name.characters.first),
+                      style: emoji
+                          ? const TextStyle(fontSize: 26)
+                          : TextStyle(
+                              color: cs.primary,
+                              fontWeight: AppFontWeights.emphasis,
+                              fontSize: 22,
+                            ),
+                    ),
+                  );
+                  return isImage
+                      ? AvatarImage(
+                          source: av,
+                          isNetwork: av.startsWith('http'),
+                          size: 56,
+                          fallback: fallback,
+                        )
+                      : fallback;
                 },
               ),
             ),

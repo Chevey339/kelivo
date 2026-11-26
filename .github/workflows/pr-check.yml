@@ -69,6 +69,9 @@ jobs:
       - name: Localization tool tests
         run: python3 -m unittest discover -s tool/l10n -p 'test_*.py'
 
+      - name: AppImage packaging script tests
+        run: python3 -m unittest discover -s tool -p 'test_bundle_appimage_gtk.py'
+
       - name: dart analyze (app and development tools)
         run: dart analyze --fatal-infos lib test integration_test tool
 

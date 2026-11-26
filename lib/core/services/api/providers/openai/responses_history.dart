@@ -5,6 +5,7 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/mcp_structured_image.dart';
 import '../../chat_api_helpers.dart';
+import '../../request_image_context.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
 import 'openai_tool_transcript.dart';
@@ -192,7 +193,11 @@ List<Map<String, dynamic>>? buildResponsesHistory({
           'tool_call_id': callId,
           'name': call['name'],
           'content': toolResultContentForModel(event['content'].toString()),
-          if (event['metadata'] != null) 'metadata': event['metadata'],
+          if (event['metadata'] case final Map metadata)
+            'metadata': <String, dynamic>{
+              ...metadata.cast<String, dynamic>(),
+              imageContextCallKey: localId,
+            },
         });
       }
       // A cancelled batch cannot be replayed, including reasoning that belongs

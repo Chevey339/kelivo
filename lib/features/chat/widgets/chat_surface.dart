@@ -8,7 +8,7 @@ import 'frosted/frosted_surface.dart';
 import 'package:Kelivo/shared/markdown/markdown_surface_scope.dart';
 
 ({ChatMessageBackgroundStyle style, ChatBubbleStyleOverrides overrides})
-_chatSurfaceStyleSelection(BuildContext context, {bool isUser = false}) {
+_chatSurfaceStyleSelection(BuildContext context, ChatBubbleStyleTarget target) {
   try {
     return context.select<
       SettingsProvider,
@@ -16,7 +16,7 @@ _chatSurfaceStyleSelection(BuildContext context, {bool isUser = false}) {
     >(
       (s) => (
         style: s.chatMessageBackgroundStyle,
-        overrides: s.chatBubbleStyleOverridesFor(isUser: isUser),
+        overrides: s.chatBubbleStyleOverridesFor(target),
       ),
     );
   } on ProviderNotFoundException {
@@ -30,7 +30,10 @@ _chatSurfaceStyleSelection(BuildContext context, {bool isUser = false}) {
 Color chatSurfacePlainTextColor(BuildContext context, {bool isUser = false}) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
+  final selection = _chatSurfaceStyleSelection(
+    context,
+    isUser ? ChatBubbleStyleTarget.user : ChatBubbleStyleTarget.assistant,
+  );
   if (selection.style == ChatMessageBackgroundStyle.defaultStyle) {
     return cs.onSurface;
   }
@@ -48,21 +51,28 @@ Widget buildSharedChatSurface(
   required BorderRadius borderRadius,
   required EdgeInsetsGeometry padding,
   Color? defaultColor,
-  bool bareOnDefault = false,
-  bool isUser = false,
+  bool bare = false,
+  ChatBubbleStyleTarget target = ChatBubbleStyleTarget.assistant,
 }) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
+  final selection = _chatSurfaceStyleSelection(context, target);
   final style = selection.style;
   final overrides = selection.overrides;
   final resolved = resolveBubbleStyle(cs, theme.brightness, style, overrides);
+  Widget content = bare ? child : Padding(padding: padding, child: child);
+  if (style != ChatMessageBackgroundStyle.defaultStyle &&
+      overrides.hasTextOverride(theme.brightness)) {
+    content = DefaultTextStyle.merge(
+      style: TextStyle(color: resolved.text),
+      child: content,
+    );
+  }
+  if (bare) return content;
+
   final customBackgroundArgb = theme.brightness == Brightness.dark
       ? overrides.backgroundArgbDark
       : overrides.backgroundArgbLight;
-  final customBackground = customBackgroundArgb == null
-      ? null
-      : resolved.background.withValues(alpha: 1);
   // A lightly tinted bubble does not provide the .66 veil assumed by the
   // frosted block tokens. A translucent solid bubble needs the same treatment.
   final surfaceKind = resolved.background.a < .66
@@ -70,26 +80,18 @@ Widget buildSharedChatSurface(
       : style == ChatMessageBackgroundStyle.solid && resolved.background.a == 1
       ? MarkdownSurfaceKind.solid
       : MarkdownSurfaceKind.frosted;
-  Widget paddedChild = Padding(padding: padding, child: child);
-  if (style != ChatMessageBackgroundStyle.defaultStyle &&
-      overrides.hasTextOverride(theme.brightness)) {
-    paddedChild = DefaultTextStyle.merge(
-      style: TextStyle(color: resolved.text),
-      child: paddedChild,
-    );
-  }
-
   switch (style) {
     case ChatMessageBackgroundStyle.frosted:
       final radius = BorderRadius.circular(resolved.radius);
       return FrostedSurface(
         style: resolved,
         borderRadius: radius,
-        isUser: isUser,
+        isUser: target == ChatBubbleStyleTarget.user,
         child: MarkdownSurfaceScope(
           kind: surfaceKind,
-          customBackground: customBackground,
-          child: paddedChild,
+          backgroundColor: resolved.background,
+          hasCustomBackground: customBackgroundArgb != null,
+          child: content,
         ),
       );
     case ChatMessageBackgroundStyle.solid:
@@ -105,16 +107,14 @@ Widget buildSharedChatSurface(
         ),
         child: MarkdownSurfaceScope(
           kind: surfaceKind,
-          customBackground: customBackground,
-          child: paddedChild,
+          backgroundColor: resolved.background,
+          hasCustomBackground: customBackgroundArgb != null,
+          child: content,
         ),
       );
     case ChatMessageBackgroundStyle.defaultStyle:
-      if (bareOnDefault) {
-        return child;
-      }
       if (defaultColor == null) {
-        return paddedChild;
+        return content;
       }
       return DecoratedBox(
         decoration: BoxDecoration(
@@ -123,7 +123,8 @@ Widget buildSharedChatSurface(
         ),
         child: MarkdownSurfaceScope(
           kind: MarkdownSurfaceKind.tinted,
-          child: paddedChild,
+          backgroundColor: defaultColor,
+          child: content,
         ),
       );
   }
@@ -196,16 +197,21 @@ ChatSurfaceForegroundPalette chatSurfaceForegroundPalette(
     final inherited = ChatSurfaceTheme.maybeOf(context);
     if (inherited != null) return inherited;
   }
-  return computeChatSurfaceForegroundPalette(context, isUser: isUser);
+  return computeChatSurfaceForegroundPalette(
+    context,
+    target: isUser
+        ? ChatBubbleStyleTarget.user
+        : ChatBubbleStyleTarget.assistant,
+  );
 }
 
 ChatSurfaceForegroundPalette computeChatSurfaceForegroundPalette(
   BuildContext context, {
-  bool isUser = false,
+  ChatBubbleStyleTarget target = ChatBubbleStyleTarget.assistant,
 }) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
+  final selection = _chatSurfaceStyleSelection(context, target);
   if (selection.style == ChatMessageBackgroundStyle.defaultStyle) {
     return ChatSurfaceForegroundPalette(
       strong: cs.secondary,

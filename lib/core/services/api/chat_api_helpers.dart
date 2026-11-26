@@ -193,13 +193,14 @@ Future<ParsedTextAndImages> parseTextAndImages(
   // Custom attachment markers are intentionally not recognized here.
   // Attachments arrive via structured parts / media-path keys.
   final images = <ImageRef>[];
-  void addImage(String kind, String source, int offset) {
+  void addImage(String kind, String source, Match match) {
     final reference = imageReferences[source];
     images.add(
       ImageRef(
         reference == null ? kind : 'data',
         reference ?? source,
-        offset: offset,
+        offset: match.start,
+        endOffset: match.end,
       ),
     );
   }
@@ -296,7 +297,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
         }
         if (url.startsWith('data:')) {
           if (allowDataImages) {
-            addImage('data', url, m1.start);
+            addImage('data', url, m1);
           } else if (keepDisallowedImageText) {
             buf.write(full);
           }
@@ -315,7 +316,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
             i = m1.end;
             continue;
           }
-          addImage('url', url, m1.start);
+          addImage('url', url, m1);
           if (keepRemoteMarkdownText) {
             buf.write(full);
           }
@@ -345,7 +346,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
           i = m1.end;
           continue;
         }
-        addImage('path', url, m1.start);
+        addImage('path', url, m1);
         i = m1.end;
         continue;
       }
@@ -476,8 +477,10 @@ void applyAnthropicMessagesProtocolConstraints(Map<String, dynamic> body) {
 Map<String, dynamic> cleanSchemaForGemini(
   Map<String, dynamic> schema, {
   bool stringEnumOnly = false,
+  bool vertexAI = false,
 }) {
-  return _cleanSchemaNode(schema, stringEnumOnly) as Map<String, dynamic>;
+  return _cleanSchemaNode(schema, stringEnumOnly, vertexAI)
+      as Map<String, dynamic>;
 }
 
 /// JSON Schema scalar type of [value], or null when it is not a scalar.
@@ -520,12 +523,14 @@ String? _inferScalarType(List<dynamic> values) {
   return type;
 }
 
-dynamic _cleanSchemaNode(dynamic node, bool stringEnumOnly) {
+dynamic _cleanSchemaNode(dynamic node, bool stringEnumOnly, bool vertexAI) {
   if (node is! Map) return node;
   // Native Schema rejects this JSON Schema keyword. Only remove it from
   // schema nodes; a property name or a key inside default/example is data.
   final result = Map<String, dynamic>.from(node)
     ..remove('additionalProperties');
+  // Vertex's function declaration subset excludes string patterns.
+  if (vertexAI) result.remove('pattern');
 
   final declaredType = (result['type'] ?? '').toString();
 
@@ -583,7 +588,9 @@ dynamic _cleanSchemaNode(dynamic node, bool stringEnumOnly) {
     props = <String, dynamic>{};
   }
   if (props.isNotEmpty || type == 'object') {
-    props.updateAll((key, value) => _cleanSchemaNode(value, stringEnumOnly));
+    props.updateAll(
+      (key, value) => _cleanSchemaNode(value, stringEnumOnly, vertexAI),
+    );
 
     // Gemini requires every entry in `required` to exist in `properties`
     final req = result['required'];
@@ -600,7 +607,11 @@ dynamic _cleanSchemaNode(dynamic node, bool stringEnumOnly) {
 
   // Handle array items recursively; arrays always need an items schema
   if (result['items'] is Map) {
-    result['items'] = _cleanSchemaNode(result['items'], stringEnumOnly);
+    result['items'] = _cleanSchemaNode(
+      result['items'],
+      stringEnumOnly,
+      vertexAI,
+    );
   } else if (type == 'array' && !result.containsKey('items')) {
     result['items'] = {'type': 'string'}; // Default to string array
   }
@@ -608,7 +619,7 @@ dynamic _cleanSchemaNode(dynamic node, bool stringEnumOnly) {
   if (result['anyOf'] is List) {
     result['anyOf'] = [
       for (final variant in result['anyOf'] as List)
-        _cleanSchemaNode(variant, stringEnumOnly),
+        _cleanSchemaNode(variant, stringEnumOnly, vertexAI),
     ];
   }
 
@@ -620,7 +631,8 @@ class ImageRef {
   final String src;
   final String? mime;
   final int? offset;
-  const ImageRef(this.kind, this.src, {this.mime, this.offset});
+  final int? endOffset;
+  const ImageRef(this.kind, this.src, {this.mime, this.offset, this.endOffset});
 }
 
 class ParsedTextAndImages {

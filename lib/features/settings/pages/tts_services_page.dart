@@ -896,7 +896,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
   void initState() {
     super.initState();
     final initial = widget.initial;
-    _kind = initial?.kind ?? NetworkTtsKind.openai;
+    _kind = initial?.kind ?? NetworkTtsKind.openaiRealtime;
     _nameCtl = TextEditingController(text: initial?.name ?? '');
     _apiKeyCtl = TextEditingController(text: _apiKeyOf(initial));
     _baseCtl = TextEditingController(text: _baseUrlOf(initial));
@@ -974,7 +974,9 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
       text: initial is QwenAudioTtsOptions ? initial.region : 'cn-beijing',
     );
     _instructionCtl = TextEditingController(
-      text: initial is MimoTtsOptions
+      text: initial is OpenAiRealtimeTtsOptions
+          ? initial.instruction
+          : initial is MimoTtsOptions
           ? initial.instruction
           : initial is StepTtsOptions
           ? initial.instruction
@@ -1113,6 +1115,8 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                         _TtsEditorTextField(
                           label: _kind == NetworkTtsKind.qwenAudio
                               ? l10n.ttsServicesFieldWorkspaceIdLabel
+                              : _kind == NetworkTtsKind.openaiRealtime
+                              ? l10n.asrServicesEndpointLabel
                               : l10n.ttsServicesFieldBaseUrlLabel,
                           controller: _baseCtl,
                           hint: _kind == NetworkTtsKind.qwenAudio
@@ -1121,7 +1125,8 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                               ? 'https://<region>.tts.speech.microsoft.com'
                               : _defaultBaseUrl(_kind),
                         ),
-                        if (_kind != NetworkTtsKind.xai &&
+                        if (_kind != NetworkTtsKind.deepseek &&
+                            _kind != NetworkTtsKind.xai &&
                             _kind != NetworkTtsKind.azure)
                           _TtsEditorTextField(
                             label: l10n.ttsServicesFieldModelLabel,
@@ -1131,7 +1136,16 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                                 ? (_) => setState(() {})
                                 : null,
                           ),
-                        if (!_isMimoVoiceDesign)
+                        if (_kind == NetworkTtsKind.deepseek)
+                          _TtsEditorSelectField(
+                            label: l10n.ttsServicesFieldVoiceLabel,
+                            value: _voiceCtl.text,
+                            options: DeepSeekTtsOptions.voiceIds,
+                            labelFor: l10n.ttsServicesDeepSeekVoice,
+                            onChanged: (value) =>
+                                setState(() => _voiceCtl.text = value),
+                          )
+                        else if (!_isMimoVoiceDesign)
                           _TtsEditorTextField(
                             label: _isMimoVoiceClone
                                 ? l10n.ttsServicesFieldReferenceAudioLabel
@@ -1152,6 +1166,13 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                               ),
                             ),
                           ),
+                        if (_kind == NetworkTtsKind.openaiRealtime) ...[
+                          _TtsEditorTextField(
+                            label: l10n.ttsServicesFieldInstructionLabel,
+                            controller: _instructionCtl,
+                            maxLines: 3,
+                          ),
+                        ],
                         if (_kind == NetworkTtsKind.minimax) ...[
                           _TtsEditorSelectField(
                             label: l10n.ttsServicesFieldEmotionLabel,
@@ -1429,6 +1450,18 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
       );
       return;
     }
+    final realtimeEndpoint = _baseCtl.text.trim().isEmpty
+        ? _defaultBaseUrl(_kind)
+        : _baseCtl.text.trim();
+    if (_kind == NetworkTtsKind.openaiRealtime &&
+        !isValidOpenAiRealtimeTtsEndpoint(realtimeEndpoint)) {
+      showAppSnackBar(
+        context,
+        message: l10n.asrServicesWebSocketEndpointInvalid,
+        type: NotificationType.error,
+      );
+      return;
+    }
     if ((_kind == NetworkTtsKind.fishAudio || _isMimoVoiceClone) &&
         _voiceCtl.text.trim().isEmpty) {
       showAppSnackBar(
@@ -1533,6 +1566,17 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
     final rawVoice = _voiceCtl.text.trim();
     final voice = rawVoice.isEmpty ? _defaultVoice(_kind) : rawVoice;
     switch (_kind) {
+      case NetworkTtsKind.openaiRealtime:
+        return OpenAiRealtimeTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          websocketUrl: base,
+          model: model,
+          voice: voice,
+          instruction: _instructionCtl.text.trim(),
+        );
       case NetworkTtsKind.openai:
         return OpenAiTtsOptions(
           id: initial?.id,
@@ -1542,6 +1586,15 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           baseUrl: base,
           model: model,
           voice: voice,
+        );
+      case NetworkTtsKind.deepseek:
+        return DeepSeekTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          voiceId: voice,
         );
       case NetworkTtsKind.gemini:
         return GeminiTtsOptions(
@@ -1723,7 +1776,7 @@ class _ProviderKindWrap extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final kind in _networkTtsKinds)
+        for (final kind in NetworkTtsKind.values)
           _ProviderKindChip(
             kind: kind,
             selected: kind == value,
@@ -2229,23 +2282,10 @@ Widget _sheetDivider(BuildContext context) {
   );
 }
 
-const List<NetworkTtsKind> _networkTtsKinds = [
-  NetworkTtsKind.openai,
-  NetworkTtsKind.gemini,
-  NetworkTtsKind.azure,
-  NetworkTtsKind.minimax,
-  NetworkTtsKind.qwen,
-  NetworkTtsKind.qwenAudio,
-  NetworkTtsKind.groq,
-  NetworkTtsKind.xai,
-  NetworkTtsKind.elevenlabs,
-  NetworkTtsKind.mimo,
-  NetworkTtsKind.step,
-  NetworkTtsKind.fishAudio,
-];
-
 String _apiKeyOf(TtsServiceOptions? option) {
+  if (option is OpenAiRealtimeTtsOptions) return option.apiKey;
   if (option is OpenAiTtsOptions) return option.apiKey;
+  if (option is DeepSeekTtsOptions) return option.apiKey;
   if (option is GeminiTtsOptions) return option.apiKey;
   if (option is AzureTtsOptions) return option.apiKey;
   if (option is MiniMaxTtsOptions) return option.apiKey;
@@ -2261,7 +2301,9 @@ String _apiKeyOf(TtsServiceOptions? option) {
 }
 
 String _baseUrlOf(TtsServiceOptions? option) {
+  if (option is OpenAiRealtimeTtsOptions) return option.websocketUrl;
   if (option is OpenAiTtsOptions) return option.baseUrl;
+  if (option is DeepSeekTtsOptions) return option.baseUrl;
   if (option is GeminiTtsOptions) return option.baseUrl;
   if (option is AzureTtsOptions) return option.baseUrl;
   if (option is MiniMaxTtsOptions) return option.baseUrl;
@@ -2277,6 +2319,7 @@ String _baseUrlOf(TtsServiceOptions? option) {
 }
 
 String _modelOf(TtsServiceOptions? option) {
+  if (option is OpenAiRealtimeTtsOptions) return option.model;
   if (option is OpenAiTtsOptions) return option.model;
   if (option is GeminiTtsOptions) return option.model;
   if (option is MiniMaxTtsOptions) return option.model;
@@ -2291,7 +2334,9 @@ String _modelOf(TtsServiceOptions? option) {
 }
 
 String _voiceOf(TtsServiceOptions? option) {
+  if (option is OpenAiRealtimeTtsOptions) return option.voice;
   if (option is OpenAiTtsOptions) return option.voice;
+  if (option is DeepSeekTtsOptions) return option.voiceId;
   if (option is GeminiTtsOptions) return option.voiceName;
   if (option is AzureTtsOptions) return option.voice;
   if (option is MiniMaxTtsOptions) return option.voiceId;
@@ -2308,8 +2353,12 @@ String _voiceOf(TtsServiceOptions? option) {
 
 String _defaultBaseUrl(NetworkTtsKind k) {
   switch (k) {
+    case NetworkTtsKind.openaiRealtime:
+      return OpenAiRealtimeTtsOptions.defaultWebsocketUrl;
     case NetworkTtsKind.openai:
-      return 'https://api.openai.com/v1';
+      return OpenAiTtsOptions.defaultBaseUrl;
+    case NetworkTtsKind.deepseek:
+      return DeepSeekTtsOptions.defaultBaseUrl;
     case NetworkTtsKind.gemini:
       return 'https://generativelanguage.googleapis.com/v1beta';
     case NetworkTtsKind.azure:
@@ -2337,10 +2386,13 @@ String _defaultBaseUrl(NetworkTtsKind k) {
 
 String _defaultModel(NetworkTtsKind k) {
   switch (k) {
+    case NetworkTtsKind.openaiRealtime:
+      return OpenAiRealtimeTtsOptions.defaultModel;
     case NetworkTtsKind.openai:
-      return 'gpt-4o-mini-tts';
+      return OpenAiTtsOptions.defaultModel;
     case NetworkTtsKind.gemini:
       return 'gemini-3.1-flash-tts-preview';
+    case NetworkTtsKind.deepseek:
     case NetworkTtsKind.azure:
       return '';
     case NetworkTtsKind.minimax:
@@ -2366,8 +2418,12 @@ String _defaultModel(NetworkTtsKind k) {
 
 String _defaultVoice(NetworkTtsKind k) {
   switch (k) {
+    case NetworkTtsKind.openaiRealtime:
+      return OpenAiRealtimeTtsOptions.defaultVoice;
     case NetworkTtsKind.openai:
       return 'alloy';
+    case NetworkTtsKind.deepseek:
+      return DeepSeekTtsOptions.defaultVoiceId;
     case NetworkTtsKind.gemini:
       return 'Kore';
     case NetworkTtsKind.azure:
@@ -2395,6 +2451,8 @@ String _defaultVoice(NetworkTtsKind k) {
 
 String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
   switch (k) {
+    case NetworkTtsKind.deepseek:
+    case NetworkTtsKind.openaiRealtime:
     case NetworkTtsKind.openai:
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.gemini:

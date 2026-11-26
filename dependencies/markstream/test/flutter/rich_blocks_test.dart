@@ -677,11 +677,14 @@ void main() {
       host(MarkstreamView(source: tableSource(45), extensions: extensions)),
     );
     await tester.pumpAndSettle();
-    final before = tester.getSize(find.byType(Table)).height;
+    final table = find.byType(Table);
+    final tableElement = tester.element(table);
+    final before = tester.getSize(table).height;
     await expectLater(actions.capturePng(double.nan), throwsArgumentError);
     final future = actions.capturePng(1);
     await tester.pump();
-    expect(tester.widget<Table>(find.byType(Table)).children, hasLength(46));
+    expect(tester.element(table), same(tableElement));
+    expect(tester.widget<Table>(table).children, hasLength(46));
     await tester.runAsync(() async {
       final bytes = await future;
       final codec = await ui.instantiateImageCodec(bytes);
@@ -699,7 +702,8 @@ void main() {
       codec.dispose();
     });
     await tester.pumpAndSettle();
-    expect(tester.widget<Table>(find.byType(Table)).children, hasLength(40));
+    expect(tester.element(table), same(tableElement));
+    expect(tester.widget<Table>(table).children, hasLength(40));
     final tooLarge = expectLater(actions.capturePng(1000), throwsStateError);
     await tester.pump();
     await tooLarge;

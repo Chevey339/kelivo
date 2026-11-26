@@ -400,7 +400,10 @@ Stream<StreamChunk> sendClaudeStream(
       Future<http.Request> buildRequest(Map<String, dynamic> body) async {
         final request = http.Request('POST', url);
         request.headers.addAll(baseHeaders);
-        request.body = await RequestImageContext.encodeBody(body);
+        request.body = await RequestImageContext.encodeBody(
+          body,
+          claudeOAuth: config.oauthProvider == OAuthProvider.claude,
+        );
         return request;
       }
 

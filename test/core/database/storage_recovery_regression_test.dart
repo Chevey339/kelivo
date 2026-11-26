@@ -237,12 +237,12 @@ void main() {
           ),
         ),
       );
+      final snapshotHash = await digest(snapshot);
+      await PrivateDataStorage.prepare(source: documents, target: private);
       expect(
         (await DataSync.inspectRecoverySnapshot(snapshot)).messageCount,
         42,
       );
-      final snapshotHash = await digest(snapshot);
-      await PrivateDataStorage.prepare(source: documents, target: private);
       final copies = await LocalCopyCatalog(appDataDirectory: private).list();
       expect(
         copies.map((c) => c.file.path),

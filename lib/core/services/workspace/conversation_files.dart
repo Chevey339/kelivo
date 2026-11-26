@@ -6,9 +6,10 @@ import 'package:path/path.dart' as p;
 /// call can report which files it created or modified.
 class FileSnapshot {
   static const int defaultMaxEntries = 20000;
+  static const _ignoredDirectories = {'build', 'node_modules', '__pycache__'};
 
-  /// Returns host path → mtime milliseconds. Skips dot-directories and
-  /// `.l2s.*` overlay files. Caps at [maxEntries].
+  /// Returns host path → mtime milliseconds. Skips dot-directories, build/cache
+  /// directories and `.l2s.*` overlay files. Caps at [maxEntries].
   static Future<Map<String, int>> snapshot(
     List<Directory> roots, {
     int maxEntries = defaultMaxEntries,
@@ -51,7 +52,9 @@ class FileSnapshot {
       final name = p.basename(entity.path);
       if (name.startsWith('.l2s.')) continue;
       if (entity is Directory) {
-        if (name.startsWith('.')) continue;
+        if (name.startsWith('.') || _ignoredDirectories.contains(name)) {
+          continue;
+        }
         await _walk(entity, out, maxEntries, checkCancelled);
         continue;
       }

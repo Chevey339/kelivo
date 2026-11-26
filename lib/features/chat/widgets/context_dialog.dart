@@ -38,10 +38,12 @@ class ContextDialogActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.primary = false,
+    this.maxLines = 1,
   });
   final String label;
   final VoidCallback? onTap;
   final bool primary;
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -62,8 +64,11 @@ class ContextDialogActionButton extends StatelessWidget {
         child: Center(
           child: Text(
             label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            maxLines: maxLines,
+            overflow: maxLines == null
+                ? TextOverflow.clip
+                : TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 14,
               fontWeight: AppFontWeights.emphasis,

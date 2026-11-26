@@ -280,7 +280,7 @@ void main() {
   for (final full in [false, true]) {
     for (final sandboxed in [false, true]) {
       test(
-        'skills nested in a workspace stay read-only (full=$full sandboxed=$sandboxed)',
+        'skills nested in a workspace stay writable and use skill links (full=$full sandboxed=$sandboxed)',
         () async {
           skills = Directory(p.join(workspace.path, 'skills'))..createSync();
           final original = File(p.join(skills.path, 'note.txt'))
@@ -294,8 +294,10 @@ void main() {
                   'content': 'changed',
                 }, toolCallId: 'skills'),
           );
-          expect(jsonDecode(result.content)['error'], 'skills_readonly');
-          expect(original.readAsStringSync(), marker);
+          final payload = jsonDecode(result.content);
+          expect(payload['ok'], isTrue);
+          expect(payload['link'], 'kelivo://skills/note.txt');
+          expect(original.readAsStringSync(), 'changed');
         },
       );
     }

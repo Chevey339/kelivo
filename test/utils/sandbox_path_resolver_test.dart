@@ -215,6 +215,21 @@ void main() {
   });
 
   group('SandboxPathResolver.tryDecodeLocalFileUri', () {
+    test('decodes the path independently of the query and fragment', () {
+      final file = Uri.parse('file:///tmp/manual%20%231%2520.pdf');
+      for (final host in ['', 'localhost']) {
+        final link = file.replace(
+          host: host,
+          query: 'view=fit',
+          fragment: 'page=2',
+        );
+        expect(
+          SandboxPathResolver.tryDecodeLocalFileUri(link.toString()),
+          file.toFilePath(),
+        );
+      }
+    });
+
     test('decodes local file URIs and rejects UNC/SMB hosts', () {
       final local = Uri.parse(
         'file:///tmp/kelivo_docs/upload/a.png',

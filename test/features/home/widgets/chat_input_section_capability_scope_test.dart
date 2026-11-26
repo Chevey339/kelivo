@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/services/chat/chat_service.dart';
+import '../../../support/mcp_presentation_harness.dart';
 import 'dart:convert';
 
 import 'package:Kelivo/core/providers/asr_provider.dart';
@@ -68,6 +70,7 @@ void main() {
     required AssistantProvider assistants,
     required bool isConversationOverride,
     SettingsProvider? settingsOverride,
+    McpProvider? mcpOverride,
     bool supportsReasoning = false,
     String? providerKey = 'SomeProvider',
     String? modelId = 'no-tools-model',
@@ -75,6 +78,7 @@ void main() {
     bool desktopTools = false,
     double composerWidth = 800,
     VoidCallback? openBrowser,
+    VoidCallback? configureReasoning,
     GlobalKey? reasoningButtonKey,
   }) async {
     final settings = settingsOverride ?? SettingsProvider(preferences);
@@ -93,9 +97,13 @@ void main() {
             create: (_) =>
                 InstructionInjectionProvider(preferences: preferences),
           ),
-          ChangeNotifierProvider(
-            create: (_) => McpProvider(preferences: preferences),
-          ),
+          ChangeNotifierProvider(create: (_) => ChatService()),
+          if (mcpOverride != null)
+            ChangeNotifierProvider<McpProvider>.value(value: mcpOverride)
+          else
+            ChangeNotifierProvider(
+              create: (_) => McpProvider(preferences: preferences),
+            ),
           ChangeNotifierProvider(
             create: (_) => QuickPhraseProvider(preferences: preferences),
           ),
@@ -124,6 +132,7 @@ void main() {
                   isReasoningModel: (_, _) => supportsReasoning,
                   isReasoningEnabled: (request) =>
                       request.level != ReasoningLevel.off,
+                  onConfigureReasoning: configureReasoning,
                   onOpenBrowser: desktopTools ? openBrowser ?? () {} : null,
                   onOpenTools: desktopTools
                       ? () => showDesktopToolsPopover(
@@ -152,6 +161,50 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
   }
+
+  testWidgets(
+    'a chat model without reasoning can open response speed controls',
+    (tester) async {
+      final assistants = await loadAssistantWithMcp(tester);
+      final config = ProviderConfig(
+        id: 'relay',
+        name: 'Relay',
+        enabled: true,
+        baseUrl: 'https://relay.example/v1',
+        apiKey: 'test-key',
+        providerType: ProviderKind.openai,
+        models: ['mychat-gpt62'],
+        modelOverrides: {
+          'mychat-gpt62': {
+            'responseSpeedTiers': ['fast'],
+          },
+        },
+      );
+      late SettingsProvider settings;
+      await tester.runAsync(() async {
+        settings = SettingsProvider(preferences);
+        await settings.loaded;
+        await settings.setProviderConfig(config.id, config);
+      });
+      addTearDown(settings.dispose);
+      final key = GlobalKey();
+      var opens = 0;
+      await pumpComposer(
+        tester,
+        settingsOverride: settings,
+        assistants: assistants,
+        isConversationOverride: true,
+        providerKey: config.id,
+        modelId: config.models.single,
+        desktopTools: true,
+        reasoningButtonKey: key,
+        configureReasoning: () => opens++,
+      );
+      expect(find.byTooltip('Response speed'), findsOneWidget);
+      await tester.tap(find.byKey(key));
+      expect(opens, 1);
+    },
+  );
 
   for (final scenario in [
     (name: 'no model', providerKey: null, modelId: null, supportsTools: false),
@@ -406,6 +459,44 @@ void main() {
       );
     },
   );
+
+  testWidgets('selected offline MCP stays selected and marks the tools entry', (
+    tester,
+  ) async {
+    final assistants = await loadAssistantWithMcp(tester);
+    final mcp = (await tester.runAsync(() async {
+      final provider = PresentationMcpProvider(preferences: preferences);
+      await provider.loaded;
+      return provider;
+    }))!;
+    mcp.items = [presentationServer('server-1', 'Offline')];
+    mcp.statuses['server-1'] = McpStatus.error;
+    addTearDown(mcp.dispose);
+    await pumpComposer(
+      tester,
+      assistants: assistants,
+      isConversationOverride: true,
+      supportsTools: true,
+      mcpOverride: mcp,
+    );
+    expect(
+      tester.widget<ChatInputBar>(find.byType(ChatInputBar)).toolsActive,
+      isTrue,
+    );
+    expect(
+      find.byKey(const ValueKey('chat-tools-connection-issue')),
+      findsOneWidget,
+    );
+    expect(assistants.getById('assistant-1')!.mcpServerIds, ['server-1']);
+    mcp.statuses['server-1'] = McpStatus.connected;
+    mcp.notifyListeners();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('chat-tools-connection-issue')),
+      findsNothing,
+    );
+    expect(assistants.getById('assistant-1')!.mcpServerIds, ['server-1']);
+  });
 
   Future<void> pumpTabletComposer(
     WidgetTester tester, {

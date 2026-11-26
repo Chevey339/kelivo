@@ -118,6 +118,7 @@ void main() {
         'querit',
         'parallel',
         'you',
+        'keenable',
       ];
       for (final type in types) {
         final decoded = SearchServiceOptions.fromJson({

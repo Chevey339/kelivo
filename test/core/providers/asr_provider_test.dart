@@ -87,6 +87,7 @@ void main() {
   }
 
   for (final kind in [
+    AsrServiceKind.deepseek,
     AsrServiceKind.groq,
     AsrServiceKind.mistral,
     AsrServiceKind.elevenLabs,
@@ -101,11 +102,11 @@ void main() {
             requestCount++;
             expect(
               request.url.path,
-              endsWith(
-                kind == AsrServiceKind.elevenLabs
-                    ? '/speech-to-text'
-                    : '/audio/transcriptions',
-              ),
+              endsWith(switch (kind) {
+                AsrServiceKind.deepseek => '/v1/tools/asr',
+                AsrServiceKind.elevenLabs => '/speech-to-text',
+                _ => '/audio/transcriptions',
+              }),
             );
             return http.Response.bytes(utf8.encode('{"text":"语音输入"}'), 200);
           }),
@@ -655,6 +656,31 @@ void main() {
     expect(provider.activeService, isNull);
     await provider.start(options);
     expect(provider.state, AsrSessionState.listening);
+  });
+
+  test('system auto-stop keeps the last non-empty transcript', () async {
+    final backend = _FakeSystemAsrBackend()..initialization.complete(true);
+    final provider = AsrProvider(
+      systemService: SystemAsrService(backend: backend),
+    );
+    addTearDown(provider.dispose);
+    final options = SystemAsrOptions();
+
+    await provider.start(options);
+    backend.emitTranscript('partial transcript', false);
+    backend.emitStatus('notListening');
+    backend.emitTranscript('  ', true);
+    backend.emitStatus('done');
+
+    expect(provider.state, AsrSessionState.idle);
+    expect(provider.transcript, 'partial transcript');
+
+    await provider.start(options);
+    backend.emitTranscript('  ', true);
+    backend.emitStatus('done');
+
+    expect(provider.state, AsrSessionState.idle);
+    expect(provider.transcript, isEmpty);
   });
 
   test(

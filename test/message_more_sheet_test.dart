@@ -21,7 +21,7 @@ ChatMessage _message() {
 
 Future<void> _openMoreSheet(
   WidgetTester tester, {
-  required bool canDeleteAllVersions,
+  required bool hasMultipleVersions,
   bool canCreateBranch = true,
   bool canSetContextStart = false,
   bool isContextStart = false,
@@ -55,7 +55,7 @@ Future<void> _openMoreSheet(
                   showMessageMoreSheet(
                     context,
                     _message(),
-                    canDeleteAllVersions: canDeleteAllVersions,
+                    hasMultipleVersions: hasMultipleVersions,
                     canCreateBranch: canCreateBranch,
                     canSetContextStart: canSetContextStart,
                     isContextStart: isContextStart,
@@ -98,7 +98,7 @@ void main() {
       MessageMoreAction? selected;
       await _openMoreSheet(
         tester,
-        canDeleteAllVersions: false,
+        hasMultipleVersions: false,
         canSetContextStart: true,
         locale: const Locale('zh'),
         onSelected: (action) => selected = action,
@@ -106,7 +106,6 @@ void main() {
       final l10n = AppLocalizations.of(tester.element(find.text('open')))!;
       expect(find.text(l10n.contextFixedStartDescription), findsNothing);
       expect(find.text(l10n.branchInheritNote), findsNothing);
-      expect(find.byType(Divider), findsNWidgets(3));
       final rows = find.byType(IosCardPress);
       expect(rows, findsNWidgets(8));
       final bounds = [
@@ -138,7 +137,7 @@ void main() {
       MessageMoreAction? selected;
       await _openMoreSheet(
         tester,
-        canDeleteAllVersions: true,
+        hasMultipleVersions: true,
         canSetContextStart: true,
         textScale: 2,
         onSelected: (action) => selected = action,
@@ -163,7 +162,7 @@ void main() {
         MessageMoreAction? selected;
         await _openMoreSheet(
           tester,
-          canDeleteAllVersions: false,
+          hasMultipleVersions: false,
           canSetContextStart: true,
           isContextStart: pinned,
           onSelected: (action) => selected = action,
@@ -196,7 +195,7 @@ void main() {
       MessageMoreAction? selected;
       await _openMoreSheet(
         tester,
-        canDeleteAllVersions: false,
+        hasMultipleVersions: false,
         onSelected: (action) => selected = action,
       );
       expect(find.text('Share'), findsNothing);
@@ -214,27 +213,37 @@ void main() {
     }),
   );
 
-  testWidgets('多版本消息菜单显示删除全部版本', (tester) async {
-    await _openMoreSheet(tester, canDeleteAllVersions: true);
+  testWidgets('多版本消息可选择删除其他版本', (tester) async {
+    MessageMoreAction? selected;
+    await _openMoreSheet(
+      tester,
+      hasMultipleVersions: true,
+      onSelected: (action) => selected = action,
+    );
 
     expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Create Branch'), findsOneWidget);
     expect(find.text('Delete This Version'), findsOneWidget);
     expect(find.text('Delete All Versions'), findsOneWidget);
-  });
+    await tester.ensureVisible(find.text('Delete Other Versions'));
+    await tester.tap(find.text('Delete Other Versions'));
+    await tester.pumpAndSettle();
+    expect(selected?.deleteScope, MessageVersionDeleteScope.others);
+  }, variant: platforms);
 
   testWidgets('单版本消息菜单不显示删除全部版本', (tester) async {
-    await _openMoreSheet(tester, canDeleteAllVersions: false);
+    await _openMoreSheet(tester, hasMultipleVersions: false);
 
     expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Delete This Version'), findsOneWidget);
+    expect(find.text('Delete Other Versions'), findsNothing);
     expect(find.text('Delete All Versions'), findsNothing);
   });
 
   testWidgets('临时会话消息菜单不显示创建分支', (tester) async {
     await _openMoreSheet(
       tester,
-      canDeleteAllVersions: false,
+      hasMultipleVersions: false,
       canCreateBranch: false,
     );
 

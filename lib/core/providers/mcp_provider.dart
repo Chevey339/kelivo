@@ -30,13 +30,6 @@ enum McpStatus {
   error,
 }
 
-class _Cooldown {
-  final DateTime startedAt;
-  final DateTime until;
-
-  const _Cooldown({required this.startedAt, required this.until});
-}
-
 class _DetachedConnection {
   const _DetachedConnection({
     this.activeConnect,
@@ -61,7 +54,11 @@ class _ServerConnection {
   int generation = 0;
   McpStatus status = McpStatus.idle;
   String? error;
-  _Cooldown? cooldown;
+  int connectionFailures = 0;
+  DateTime? connectRetryAt;
+  bool automaticConnectStopped = false;
+  bool manuallyDisconnected = false;
+  Future<bool>? reconnectFuture;
   Future<bool>? refreshFuture;
   Future<McpOAuthState?>? oauthRefreshFuture;
   Future<mcp.Client?>? oauthRecoveryFuture;
@@ -372,6 +369,7 @@ class McpProvider extends ChangeNotifier {
   final Map<String, List<Map<String, dynamic>>> _declaredIcons = {};
 
   final BusinessPreferences preferences;
+  final DateTime Function() _now;
   late final Future<void> loaded;
   final McpOAuthService _oauthService;
   final bool _ownsOAuthService;
@@ -408,7 +406,7 @@ class McpProvider extends ChangeNotifier {
         continue;
       }
       state.workspace = workspace;
-      if (server.enabled && supportsStdio) {
+      if (server.enabled && supportsStdio && !state.manuallyDisconnected) {
         unawaited(reconnect(server.id));
       }
     }
@@ -429,12 +427,14 @@ class McpProvider extends ChangeNotifier {
       for (final server in _servers.where(
         (s) => s.transport == McpTransportType.stdio,
       )) {
+        if (_connections[server.id]?.manuallyDisconnected == true) continue;
         if (available && server.enabled) {
           // A previous initialization may still be settling after disconnect.
           // Wait for it before starting a connection in the new environment.
           unawaited(reconnect(server.id));
         } else if (!available) {
-          unawaited(disconnect(server.id));
+          final detached = _detachConnection(server.id);
+          unawaited(_finishDisconnect(detached, terminateSession: true));
         }
       }
     }
@@ -443,11 +443,13 @@ class McpProvider extends ChangeNotifier {
 
   McpProvider({
     required this.preferences,
+    DateTime Function()? now,
     McpOAuthService? oauthService,
     this.workspaceRuntime,
     this.environment,
     this.workspaces,
-  }) : _oauthService = oauthService ?? McpOAuthService(),
+  }) : _now = now ?? DateTime.now,
+       _oauthService = oauthService ?? McpOAuthService(),
        _ownsOAuthService = oauthService == null {
     _stdioWasAvailable = supportsStdio;
     workspaceRuntime?.addListener(_onEnvironmentChanged);
@@ -473,7 +475,6 @@ class McpProvider extends ChangeNotifier {
         state?.status == McpStatus.connected;
   }
 
-  bool isInCooldown(String id) => _activeCooldown(_connections[id]) != null;
   List<McpServerConfig> get connectedServers => _servers
       .where((s) => statusFor(s.id) == McpStatus.connected)
       .toList(growable: false);
@@ -1440,16 +1441,15 @@ class McpProvider extends ChangeNotifier {
       if (connected ||
           !_isDesktopPlatform() ||
           state.status != McpStatus.error ||
-          _activeCooldown(state) != null ||
           !_authorizationIsCurrent(server, state, generation)) {
         return connected;
       }
       await Future<void>.delayed(const Duration(milliseconds: 500));
       if (state.status != McpStatus.error ||
-          _activeCooldown(state) != null ||
           !_authorizationIsCurrent(server, state, generation)) {
         return false;
       }
+      _resetConnectionRetry(state);
       return await session.wait(_connect(server.id, retryUnauthorized: false));
     } on McpOAuthCancelled {
       if (_authorizationIsCurrent(server, state, generation)) {
@@ -1661,6 +1661,8 @@ class McpProvider extends ChangeNotifier {
   }
 
   Future<void> connect(String id) async {
+    final state = _connections[id];
+    if (state != null) _resetConnectionRetry(state);
     await _connect(id);
   }
 
@@ -1675,7 +1677,6 @@ class McpProvider extends ChangeNotifier {
     final state = _connections.putIfAbsent(id, _ServerConnection.new);
     final active = state.connectFuture;
     if (active != null) return active;
-    if (_activeCooldown(state) != null) return Future<bool>.value(false);
     if (state.client?.isConnected == true) {
       state.status = McpStatus.connected;
       state.error = null;
@@ -1684,6 +1685,11 @@ class McpProvider extends ChangeNotifier {
       return Future<bool>.value(true);
     }
 
+    if (state.manuallyDisconnected ||
+        state.automaticConnectStopped ||
+        (state.connectRetryAt?.isAfter(_now()) ?? false)) {
+      return Future<bool>.value(false);
+    }
     return _beginConnect(
       id,
       server,
@@ -1745,7 +1751,6 @@ class McpProvider extends ChangeNotifier {
     mcp.Client? client;
     mcp.ClientTransport? initializingTransport;
     WorkspaceStdioTransport? workspaceTransport;
-    final startedAt = DateTime.now();
     try {
       server = await _withFreshOAuth(server, state);
       if (_disposed ||
@@ -1872,7 +1877,7 @@ class McpProvider extends ChangeNotifier {
       state.status = McpStatus.connected;
       state.error = null;
       _finishScopeUpgrade(state, 'connect');
-      _clearCooldownAfterSuccess(state, startedAt);
+      _resetConnectionRetry(state);
       _attachClient(
         id,
         state,
@@ -1904,21 +1909,21 @@ class McpProvider extends ChangeNotifier {
           effectiveError = refreshError;
         }
       }
-      if (await _requiresOAuthAuthorization(
+      final requiresAuthorization = await _requiresOAuthAuthorization(
         server,
         state,
         effectiveError,
         operation: 'connect',
-      )) {
+      );
+      if (_disposed || state.generation != generation) return false;
+      if (requiresAuthorization) {
+        state.automaticConnectStopped = true;
         state.status = McpStatus.needsAuthorization;
         state.error = effectiveError.toString();
         _notify();
         return false;
       }
-      if (effectiveError is mcp.McpHttpError &&
-          _requiresCooldown(effectiveError)) {
-        _enterCooldown(state, effectiveError.retryAfter);
-      }
+      _recordConnectionFailure(state, effectiveError);
       state.status = McpStatus.error;
       state.error =
           workspaceTransport?.describeError(effectiveError) ??
@@ -2212,11 +2217,13 @@ class McpProvider extends ChangeNotifier {
         return;
       }
       state.client = null;
+      state.refreshDirty = false;
       final failed = workspaceTransport?.failed == true;
-      state.status = failed ? McpStatus.error : McpStatus.idle;
+      state.status = McpStatus.error;
       state.error = failed
           ? workspaceTransport!.describeError('STDIO transport disconnected')
-          : null;
+          : 'MCP connection closed. It will reconnect when next used.';
+      client.dispose();
       _notify();
     });
     client.onError.listen((error) {
@@ -2235,9 +2242,6 @@ class McpProvider extends ChangeNotifier {
           state.lastBackgroundSessionRecoveryAt = DateTime.now();
           _startBackgroundSessionRecovery(id, state, client);
         }
-      } else if (error is mcp.McpHttpError && _requiresCooldown(error)) {
-        _enterCooldown(state, error.retryAfter);
-        _notify();
       } else if (_looksUnauthorized(error)) {
         unawaited(_handleClientAuthorizationError(id, state, client, error));
       }
@@ -2318,12 +2322,14 @@ class McpProvider extends ChangeNotifier {
 
   Future<void> disconnect(String id, {bool terminateSession = true}) async {
     final detached = _detachConnection(id);
+    _connections[id]?.manuallyDisconnected = true;
     await _finishDisconnect(detached, terminateSession: terminateSession);
   }
 
   _DetachedConnection _detachConnection(String id) {
     final state = _connections.putIfAbsent(id, _ServerConnection.new);
     state.generation++;
+    state.reconnectFuture = null;
     final active = state.connectFuture;
     final activeAuthorization = state.authorizationFuture;
     final authorizationSession = state.authorizationSession;
@@ -2339,7 +2345,7 @@ class McpProvider extends ChangeNotifier {
     state.client = null;
     state.status = McpStatus.idle;
     state.error = null;
-    state.cooldown = null;
+    _resetConnectionRetry(state);
     state.refreshDirty = false;
     state.lastBackgroundSessionRecoveryAt = null;
     state.sessionRecoveryFuture = null;
@@ -2380,12 +2386,30 @@ class McpProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> reconnect(String id) async {
-    if (_activeCooldown(_connections[id]) != null) return false;
-    await disconnect(id, terminateSession: true);
-    if (!await _connect(id)) return false;
-    await _awaitHttpSessionSettlement(id);
-    return isConnected(id);
+  Future<bool> reconnect(String id) {
+    final state = _connections[id];
+    if (_disposed || state == null || getById(id)?.enabled != true) {
+      return Future<bool>.value(false);
+    }
+    final active = state.reconnectFuture;
+    if (active != null) return active;
+    final detached = _detachConnection(id);
+    final generation = state.generation;
+    late final Future<bool> future;
+    future =
+        (() async {
+          await _finishDisconnect(detached, terminateSession: true);
+          if (_disposed || state.generation != generation) return false;
+          if (!await _connect(id)) return false;
+          await _awaitHttpSessionSettlement(id);
+          return isConnected(id);
+        })().whenComplete(() {
+          if (identical(state.reconnectFuture, future)) {
+            state.reconnectFuture = null;
+          }
+        });
+    state.reconnectFuture = future;
+    return future;
   }
 
   Future<void> _awaitHttpSessionSettlement(String id) async {
@@ -2740,8 +2764,13 @@ class McpProvider extends ChangeNotifier {
   /// A successful discovery may return an empty tool list.
   Future<bool> refreshTools(String id) {
     final state = _connections[id];
-    if (state?.client == null || _disposed) return Future<bool>.value(false);
-    state!.refreshDirty = true;
+    if (state == null || _disposed) return Future<bool>.value(false);
+    if (state.client == null) {
+      return _connect(
+        id,
+      ).then((connected) => connected ? refreshTools(id) : false);
+    }
+    state.refreshDirty = true;
     final active = state.refreshFuture;
     if (active != null) return active;
 
@@ -2801,17 +2830,12 @@ class McpProvider extends ChangeNotifier {
     }
 
     for (var attempt = 0; attempt < 3; attempt++) {
-      final cooldown = _activeCooldown(state);
-      if (cooldown != null) {
-        await Future<void>.delayed(cooldown.until.difference(DateTime.now()));
-      }
       if (_disposed ||
           state.generation != generation ||
           !identical(state.client, client)) {
         return _ToolRefreshOutcome.failed;
       }
 
-      final startedAt = DateTime.now();
       try {
         final tools = await client.listTools();
         if (_disposed ||
@@ -2828,10 +2852,15 @@ class McpProvider extends ChangeNotifier {
         state.status = McpStatus.connected;
         state.error = null;
         _finishScopeUpgrade(state, 'tools/list');
-        _clearCooldownAfterSuccess(state, startedAt);
+        _resetConnectionRetry(state);
         _notify();
         return _ToolRefreshOutcome.success;
       } catch (error) {
+        if (_disposed ||
+            state.generation != generation ||
+            !identical(state.client, client)) {
+          return _ToolRefreshOutcome.failed;
+        }
         if (_isRejectedSession(error)) {
           return _ToolRefreshOutcome.sessionExpired;
         }
@@ -2862,14 +2891,10 @@ class McpProvider extends ChangeNotifier {
           _notify();
           return _ToolRefreshOutcome.failed;
         }
-        if (effectiveError is mcp.McpHttpError &&
-            _requiresCooldown(effectiveError)) {
-          _enterCooldown(state, effectiveError.retryAfter);
-        }
         if (_isSafeTransient(effectiveError) && attempt < 2) {
-          if (_activeCooldown(state) == null) {
-            await Future<void>.delayed(Duration(seconds: attempt == 0 ? 1 : 4));
-          }
+          await Future<void>.delayed(
+            Duration(milliseconds: attempt == 0 ? 250 : 1000),
+          );
           continue;
         }
         if (effectiveError is McpOAuthException &&
@@ -2950,7 +2975,8 @@ class McpProvider extends ChangeNotifier {
     if (cfg == null || !cfg.enabled) return;
     if (isConnected(id) && cfg.oauth?.shouldRefresh() != true) return;
     if (isConnected(id)) {
-      await disconnect(id, terminateSession: false);
+      final detached = _detachConnection(id);
+      await _finishDisconnect(detached, terminateSession: false);
     }
     await _connect(id);
   }
@@ -2963,22 +2989,21 @@ class McpProvider extends ChangeNotifier {
     await ensureConnected(serverId);
     final state = _connections[serverId];
     if (state == null) return null;
-    final cooldown = _activeCooldown(state);
-    if (cooldown != null) {
+    final client = state.client;
+    if (client == null) {
       return _toolError(
-        'MCP server is temporarily unavailable; retry after '
-        '${cooldown.until.difference(DateTime.now()).inSeconds + 1} seconds.',
+        state.manuallyDisconnected
+            ? 'MCP server is disconnected. Reconnect it to use its tools.'
+            : state.automaticConnectStopped
+            ? 'MCP connection failed. Reconnect the server manually. ${state.error ?? ''}'
+            : 'MCP connection is unavailable. Try again shortly. ${state.error ?? ''}',
       );
     }
-    final client = state.client;
-    if (client == null) return null;
     final scopeOperation = _scopeOperationForTool(toolName);
     final normalized = _normalizeArgsForTool(serverId, toolName, args);
-    final startedAt = DateTime.now();
     try {
       final result = await client.callTool(toolName, normalized);
       _finishScopeUpgrade(state, scopeOperation);
-      _clearCooldownAfterSuccess(state, startedAt);
       return result;
     } catch (error) {
       if (error is mcp.McpError && error.code == -32602) {
@@ -3035,12 +3060,8 @@ class McpProvider extends ChangeNotifier {
         );
       }
       if (effectiveError is mcp.McpHttpError &&
-          _requiresCooldown(effectiveError)) {
-        _enterCooldown(state, effectiveError.retryAfter);
-        _notify();
-        if (effectiveError.statusCode == 429) {
-          return _toolError('MCP server rate limited this request.');
-        }
+          effectiveError.statusCode == 429) {
+        return _toolError('MCP server rate limited this request.');
       }
       if (_isRejectedSession(effectiveError)) {
         final replacement = await _recoverExpiredSession(
@@ -3055,12 +3076,8 @@ class McpProvider extends ChangeNotifier {
             return result;
           } catch (retryError) {
             if (retryError is mcp.McpHttpError &&
-                _requiresCooldown(retryError)) {
-              _enterCooldown(state, retryError.retryAfter);
-              _notify();
-              if (retryError.statusCode == 429) {
-                return _toolError('MCP server rate limited this request.');
-              }
+                retryError.statusCode == 429) {
+              return _toolError('MCP server rate limited this request.');
             }
             if (retryError is mcp.McpError && retryError.code != null) {
               return _toolError(retryError.toString());
@@ -3108,7 +3125,7 @@ class McpProvider extends ChangeNotifier {
     state.client = null;
     state.status = McpStatus.connecting;
     state.error = null;
-    state.cooldown = null;
+    _resetConnectionRetry(state);
 
     final server = getById(id);
     if (server == null || !server.enabled || _disposed) {
@@ -3129,45 +3146,30 @@ class McpProvider extends ChangeNotifier {
     }
   }
 
-  _Cooldown? _activeCooldown(_ServerConnection? state) {
-    final cooldown = state?.cooldown;
-    if (cooldown == null) return null;
-    if (!cooldown.until.isAfter(DateTime.now())) {
-      state!.cooldown = null;
-      return null;
-    }
-    return cooldown;
+  void _resetConnectionRetry(_ServerConnection state) {
+    state.connectionFailures = 0;
+    state.connectRetryAt = null;
+    state.automaticConnectStopped = false;
+    state.manuallyDisconnected = false;
   }
 
-  void _enterCooldown(_ServerConnection state, Duration? retryAfter) {
-    const minimum = Duration(seconds: 1);
-    var delay = retryAfter ?? const Duration(seconds: 30);
-    if (delay < minimum) delay = minimum;
-    final now = DateTime.now();
-    final until = now.add(delay);
-    final current = _activeCooldown(state);
-    state.cooldown = _Cooldown(
-      startedAt: now,
-      until: current != null && current.until.isAfter(until)
-          ? current.until
-          : until,
-    );
+  // Retry on the next use, never from a background timer. A manual reconnect
+  // or configuration change starts a fresh series of attempts.
+  void _recordConnectionFailure(_ServerConnection state, Object error) {
+    state.connectionFailures++;
+    state.automaticConnectStopped =
+        state.connectionFailures >= 5 ||
+        (error is mcp.McpHttpError &&
+            error.statusCode >= 400 &&
+            error.statusCode < 500 &&
+            error.statusCode != 408 &&
+            error.statusCode != 429);
+    state.connectRetryAt = state.automaticConnectStopped
+        ? null
+        : _now().add(
+            Duration(seconds: 10 * (1 << (state.connectionFailures - 1))),
+          );
   }
-
-  void _clearCooldownAfterSuccess(
-    _ServerConnection state,
-    DateTime requestStartedAt,
-  ) {
-    final cooldown = state.cooldown;
-    if (cooldown == null || !requestStartedAt.isAfter(cooldown.startedAt)) {
-      return;
-    }
-    state.cooldown = null;
-  }
-
-  bool _requiresCooldown(mcp.McpHttpError error) =>
-      error.statusCode == 429 ||
-      (error.statusCode >= 500 && error.retryAfter != null);
 
   bool _isRapidBackgroundSessionExpiry(_ServerConnection state) {
     final last = state.lastBackgroundSessionRecoveryAt;
@@ -3184,6 +3186,7 @@ class McpProvider extends ChangeNotifier {
     state.generation++;
     state.client = null;
     state.status = McpStatus.error;
+    state.automaticConnectStopped = true;
     state.error =
         'MCP session stream failed again immediately after reconnect '
         '($error). Reconnect manually.';

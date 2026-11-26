@@ -90,7 +90,7 @@ class AssistantPartSnapshots {
       return snapshot;
     }
     var remaining = visibleText.length;
-    final out = List<MessagePart>.of(_transformed);
+    List<MessagePart>? clippedParts;
     final clipped = <int>{};
     final removed = <int>[];
     for (final index in _textIndices) {
@@ -101,13 +101,15 @@ class AssistantPartSnapshots {
       } else if (part.text.length <= remaining) {
         remaining -= part.text.length;
       } else {
-        out[index] = TextPart(part.text.substring(0, remaining));
+        (clippedParts ??= List<MessagePart>.of(_transformed))[index] = TextPart(
+          part.text.substring(0, remaining),
+        );
         clipped.add(index);
         remaining = 0;
       }
     }
     for (final index in removed.reversed) {
-      out.removeAt(index);
+      (clippedParts ??= List<MessagePart>.of(_transformed)).removeAt(index);
     }
     final dirty =
         _presentationDirty != null && _presentationAligned && removed.isEmpty
@@ -115,7 +117,10 @@ class AssistantPartSnapshots {
         : null;
     _previousClipped = clipped;
     _presentationAligned = removed.isEmpty;
-    final snapshot = _presentation.update(out, changed: dirty);
+    final snapshot = _presentation.update(
+      clippedParts ?? _transformed,
+      changed: dirty,
+    );
     _presentationDirty = {};
     return snapshot;
   }

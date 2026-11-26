@@ -7,16 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'model_spec_corpus.dart';
 
-bool _isImagesApiId(String id) {
-  final normalized = id.toLowerCase();
-  return normalized.startsWith('gpt-image-') ||
-      normalized.startsWith('chatgpt-image-') ||
-      normalized.startsWith('agnes-image-') ||
-      normalized == 'sensenova-u1-fast' ||
-      normalized == 'dall-e-2' ||
-      normalized == 'dall-e-3';
-}
-
 T _byName<T extends Enum>(Iterable<T> values, String name) {
   return values.firstWhere((value) => value.name == name);
 }
@@ -51,9 +41,10 @@ void main() {
             isNot(ReasoningReplayPolicy.toolTurns),
             reason: id,
           );
-          final expectedType = _isImagesApiId(id)
-              ? ModelType.image
-              : _byName(ModelType.values, expected['type'] as String);
+          final expectedType = _byName(
+            ModelType.values,
+            expected['type'] as String,
+          );
           expect(guess.type, expectedType, reason: id);
           expect(
             [

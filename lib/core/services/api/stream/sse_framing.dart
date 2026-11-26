@@ -62,6 +62,8 @@ class SseEventParser {
   String? _id;
   String? _event;
   int? _retryMillis;
+  static final _newlines = RegExp(r'\r\n|[\r\n]');
+  bool _pendingCarriageReturn = false;
   bool _started = false;
   bool _lastLineWasBlank = false;
   bool _reportedAdjacentJsonRecovery = false;
@@ -75,40 +77,41 @@ class SseEventParser {
         text = text.substring(1);
       }
     }
-    _carry.write(text);
-    return _drain(flushIncompleteLine: false);
-  }
-
-  List<SseEvent> close() {
-    final events = _drain(flushIncompleteLine: true);
-    events.addAll(_takeEvents());
+    final events = <SseEvent>[];
+    var start = 0;
+    if (_pendingCarriageReturn) {
+      _finishLine(events);
+      _pendingCarriageReturn = false;
+      if (text.startsWith('\n')) start = 1;
+    }
+    // Scan only newly arrived text. A single base64 line can span thousands
+    // of network packets; materialize its accumulated prefix only once.
+    for (final match in _newlines.allMatches(text, start)) {
+      _carry.write(text.substring(start, match.start));
+      start = match.end;
+      if (start == text.length &&
+          text.codeUnitAt(match.start) == 13 &&
+          match.end - match.start == 1) {
+        _pendingCarriageReturn = true;
+      } else {
+        _finishLine(events);
+      }
+    }
+    if (start < text.length) _carry.write(text.substring(start));
     return events;
   }
 
-  List<SseEvent> _drain({required bool flushIncompleteLine}) {
-    var buffer = _carry.toString();
+  void _finishLine(List<SseEvent> events) {
+    final line = _carry.toString();
     _carry.clear();
-    final deferTrailingCarriageReturn =
-        !flushIncompleteLine && buffer.endsWith('\r');
-    if (deferTrailingCarriageReturn) {
-      buffer = buffer.substring(0, buffer.length - 1);
-    }
-    buffer = buffer.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    _processLine(line, events);
+  }
+
+  List<SseEvent> close() {
     final events = <SseEvent>[];
-    while (true) {
-      final index = buffer.indexOf('\n');
-      if (index < 0) {
-        if (flushIncompleteLine) {
-          if (buffer.isNotEmpty) _processLine(buffer, events);
-        } else if (buffer.isNotEmpty) {
-          _carry.write(buffer);
-        }
-        break;
-      }
-      _processLine(buffer.substring(0, index), events);
-      buffer = buffer.substring(index + 1);
-    }
-    if (deferTrailingCarriageReturn) _carry.write('\r');
+    if (_pendingCarriageReturn || _carry.isNotEmpty) _finishLine(events);
+    _pendingCarriageReturn = false;
+    events.addAll(_takeEvents());
     return events;
   }
 
@@ -150,8 +153,9 @@ class SseEventParser {
 
   List<SseEvent> _takeEventsBeforeError() {
     final recovered = <SseEvent>[];
-    if (_carry.toString().endsWith('\r')) {
-      recovered.addAll(_drain(flushIncompleteLine: true));
+    if (_pendingCarriageReturn) {
+      _pendingCarriageReturn = false;
+      _finishLine(recovered);
     }
 
     if (!recoverAdjacentJsonDataRecords ||

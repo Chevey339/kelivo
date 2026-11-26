@@ -15,8 +15,10 @@ import 'package:path/path.dart' as p;
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/environment_variable.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
+import 'package:Kelivo/core/services/workspace/workspace_app_storage.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/core/services/workspace/desktop_shell.dart';
@@ -65,6 +67,38 @@ class _InterruptedWriter extends FakeWorkspaceRuntime {
     yield const CommandStarted();
     File(p.join(request.cwd, 'partial.txt')).writeAsStringSync('saved');
     if (throwError) throw StateError('stream interrupted');
+  }
+}
+
+class _PausedShellRuntime extends FakeWorkspaceRuntime {
+  _PausedShellRuntime({this.finishFirst});
+
+  final Future<void> Function()? finishFirst;
+  final firstStarted = Completer<void>();
+  final secondStarted = Completer<void>();
+  final releaseFirst = Completer<void>();
+
+  @override
+  Stream<CommandEvent> run(CommandRequest request) async* {
+    requests.add(request);
+    yield const CommandStarted();
+    if (request.command == 'first') {
+      firstStarted.complete();
+      await releaseFirst.future;
+      await finishFirst?.call();
+    } else {
+      secondStarted.complete();
+    }
+    await File(
+      p.join(request.cwd, '${request.command}.txt'),
+    ).writeAsString('done');
+    yield const CommandExited(
+      exitCode: 0,
+      timedOut: false,
+      cancelled: false,
+      interrupted: false,
+      duration: Duration.zero,
+    );
   }
 }
 
@@ -122,18 +156,23 @@ void main() {
     Set<String> disabledTools = const {},
     List<Mount> externalMounts = const [],
     Future<List<Mount>> Function()? loadExternalMounts,
+    Directory? workspaceOverride,
+    Directory? sessionOverride,
+    String conversationId = 'conv-1',
   }) {
+    final root = workspaceOverride ?? workspaceDir;
+    final session = sessionOverride ?? sessionDir;
     final paths = sandboxed
         ? WorkspacePaths.sandboxed(
             externalMounts: externalMounts,
             loadExternalMounts: loadExternalMounts,
-            workspaceHostRoot: workspaceDir.path,
-            sessionHostDir: sessionDir.path,
+            workspaceHostRoot: root.path,
+            sessionHostDir: session.path,
             skillsHostDir: skillsDir.path,
           )
         : WorkspacePaths.native(
-            workspaceHostRoot: workspaceDir.path,
-            sessionHostDir: sessionDir.path,
+            workspaceHostRoot: root.path,
+            sessionHostDir: session.path,
             skillsHostDir: skillsDir.path,
           );
     return WorkspaceToolContext(
@@ -145,9 +184,9 @@ void main() {
           : ToolPermissionMode.requestApproval,
       binding: WorkspaceBinding(workspaceId: 'ws1', toolsUsed: toolsUsed),
       paths: paths,
-      sessionDir: sessionDir,
-      outputsDir: Directory(p.join(sessionDir.path, 'outputs')),
-      conversationId: 'conv-1',
+      sessionDir: session,
+      outputsDir: Directory(p.join(session.path, 'outputs')),
+      conversationId: conversationId,
       runtimeStatus:
           status ??
           RuntimeStatus(ready: true, engine: 'fake', sandboxed: sandboxed),
@@ -158,7 +197,7 @@ void main() {
   WorkspaceToolsService service({
     WorkspaceRuntime? runtime,
     bool registerRuntime = true,
-    Future<void> Function()? onShellCompleted,
+    Future<void> Function()? refreshSkills,
     Future<EnvironmentExecutionConfig> Function()? loadEnvironment,
     ToolPermissionState? Function(String)? readPermissionState,
   }) {
@@ -169,7 +208,7 @@ void main() {
     return WorkspaceToolsService(
       registry: registry,
       runtimeProvider: provider,
-      onShellCompleted: onShellCompleted,
+      refreshSkills: refreshSkills,
       loadEnvironment: loadEnvironment,
       readPermissionState: readPermissionState,
       updateConversationExtras: (id, update) async {
@@ -243,7 +282,7 @@ void main() {
       final tools = service(
         runtime: FakeWorkspaceRuntime(useRealProcess: true),
         loadEnvironment: () async => config,
-        onShellCompleted: () async {
+        refreshSkills: () async {
           config = EnvironmentExecutionConfig(
             variables: {'TOKEN': 'new-secret'},
           );
@@ -313,32 +352,44 @@ void main() {
     const DesktopShell(r'C:\Windows\cmd.exe', DesktopShellKind.cmd),
     const DesktopShell('/bin/zsh', DesktopShellKind.posix),
   ]) {
-    test('tool schema and prompt use resolved ${shell.name}', () {
-      final context = ctx(
-        status: RuntimeStatus(
-          ready: true,
-          engine: 'process',
-          sandboxed: false,
-          shell: shell,
-        ),
-      );
-      final definition = service()
-          .buildToolDefinitions(context)
-          .firstWhere((tool) => (tool['function'] as Map)['name'] == 'shell');
-      final schema = jsonEncode(definition);
-      final prompt = WorkspaceToolsService.buildPromptFragment(
-        context,
-        environmentVariableNames: ['API_KEY'],
-      );
-      expect(schema, contains(shell.name));
-      expect(prompt, contains(shell.invocation));
-      expect(prompt, contains('Use ${shell.environmentReference} references'));
-      expect(prompt, contains(shell.syntaxHint));
-      expect(schema, isNot(contains('sh -lc')));
-      if (shell.version?.startsWith('5.') == true) {
-        expect(prompt, isNot(contains('Chain with &&.')));
-      }
-    });
+    test(
+      'tool schema uses ${shell.name} and the prompt lists its variable references',
+      () {
+        final context = ctx(
+          status: RuntimeStatus(
+            ready: true,
+            engine: 'process',
+            sandboxed: false,
+            shell: shell,
+          ),
+        );
+        final definition = service()
+            .buildToolDefinitions(context)
+            .firstWhere((tool) => (tool['function'] as Map)['name'] == 'shell');
+        final schema = (definition['function'] as Map)['description'] as String;
+        final prompt = WorkspaceToolsService.buildPromptFragment(
+          context,
+          environmentVariableNames: ['API_KEY'],
+        );
+        expect(schema, contains(shell.name));
+        expect(schema, contains(shell.invocation));
+        expect(prompt, isNot(contains('Fresh non-interactive')));
+        expect(
+          prompt,
+          contains('Use ${shell.environmentReference} references'),
+        );
+        expect(schema, contains(shell.syntaxHint));
+        expect(schema, contains('Use non-interactive flags'));
+        expect(
+          schema,
+          contains('${context.paths.sessionHostDir}/outputs/<id>.txt'),
+        );
+        expect(schema, isNot(contains('sh -lc')));
+        if (shell.version?.startsWith('5.') == true) {
+          expect(schema, isNot(contains('Chain with &&.')));
+        }
+      },
+    );
   }
 
   test('tool execution carries the shell used in the model prompt', () async {
@@ -372,6 +423,40 @@ void main() {
     expect(prompt, isNot(contains('Sandbox environment not installed')));
   });
 
+  test('workspace session facts are independent of file tool selection', () {
+    String fragment(Set<String> disabled) =>
+        WorkspaceToolsService.buildPromptFragment(
+          ctx(disabledTools: disabled),
+          environmentVariableNames: ['MODEL_ENV'],
+        );
+    const prefer = 'Prefer read_file, edit_file, and write_file over cat/sed.';
+    final all = fragment({});
+    expect(all, contains('MODEL_ENV'));
+    expect(all, isNot(contains(prefer)));
+    for (final text in [
+      'Enabled tools:',
+      'shell is one-shot',
+      'Always read_file before editing.',
+      'Use non-interactive flags',
+      'long output is saved',
+    ]) {
+      expect(all, isNot(contains(text)));
+    }
+    final withoutShell = fragment({'shell'});
+    expect(withoutShell, isNot(contains('MODEL_ENV')));
+    expect(withoutShell, isNot(contains(prefer)));
+    for (final name in ['read_file', 'edit_file', 'write_file']) {
+      expect(fragment({name}), all, reason: name);
+    }
+    final edit = service()
+        .buildToolDefinitions(ctx())
+        .singleWhere((tool) => tool['function']['name'] == 'edit_file');
+    expect(
+      edit['function']['description'],
+      contains('Read the file before editing.'),
+    );
+  });
+
   test('workspace prompt lists names without including values', () {
     final prompt = WorkspaceToolsService.buildPromptFragment(
       ctx(),
@@ -386,7 +471,7 @@ void main() {
     var refreshes = 0;
     final tools = service(
       runtime: runtime,
-      onShellCompleted: () async {
+      refreshSkills: () async {
         refreshes++;
       },
     );
@@ -416,6 +501,10 @@ void main() {
     await tools.handle(ctx(), 'read_file', {
       'path': 'missing',
     }, toolCallId: 'read');
+    await tools.handle(ctx(), 'write_file', {
+      'path': 'workspace.txt',
+      'content': 'project file',
+    }, toolCallId: 'write-workspace');
     await tools.handle(ctx(), 'shell', {}, toolCallId: 'invalid');
     await tools.handle(ctx(disabledTools: {'shell'}), 'shell', {
       'command': 'install',
@@ -433,7 +522,7 @@ void main() {
   test('refresh failures do not change a successful command result', () async {
     final tools = service(
       runtime: FakeWorkspaceRuntime(),
-      onShellCompleted: () async {
+      refreshSkills: () async {
         throw const FileSystemException('unavailable');
       },
     );
@@ -708,6 +797,289 @@ void main() {
       },
     );
 
+    test('shared workspace shells attribute only their own changes', () async {
+      final secondSession = await Directory(
+        p.join(tmp.path, 'session-2'),
+      ).create();
+      final projectA = await Directory(
+        p.join(workspaceDir.path, 'project-a'),
+      ).create();
+      final projectB = await Directory(
+        p.join(workspaceDir.path, 'project-b'),
+      ).create();
+      final runtime = _PausedShellRuntime();
+      final first = service(runtime: runtime).handle(ctx(), 'shell', {
+        'command': 'first',
+        'cwd': projectA.path,
+      }, toolCallId: 'first');
+      await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+      final second = service(runtime: runtime).handle(
+        ctx(sessionOverride: secondSession, conversationId: 'conv-2'),
+        'shell',
+        {'command': 'second', 'cwd': projectB.path},
+        toolCallId: 'second',
+      );
+      try {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(runtime.secondStarted.isCompleted, isFalse);
+      } finally {
+        runtime.releaseFirst.complete();
+        await Future.wait([first, second]);
+      }
+      for (final pair in [
+        (await first, 'first.txt'),
+        (await second, 'second.txt'),
+      ]) {
+        final files = metaOf(pair.$1).files;
+        expect(files.map((file) => p.basename(file.path)), [pair.$2]);
+        expect(
+          jsonOf(pair.$1)['changed_files'],
+          files.map((file) => file.path).toList(),
+        );
+      }
+    });
+
+    for (final tool in ['write_file', 'edit_file']) {
+      test(
+        '$tool changes cannot become another conversation shell output',
+        () async {
+          final other = File(p.join(workspaceDir.path, 'other.txt'));
+          if (tool == 'edit_file') {
+            await other.writeAsString('original');
+            await other.setLastModified(DateTime.utc(2000));
+          }
+          final runtime = _PausedShellRuntime();
+          final tools = service(runtime: runtime);
+          final first = tools.handle(ctx(), 'shell', {
+            'command': 'first',
+          }, toolCallId: 'first');
+          await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+          final write = tools.handle(ctx(conversationId: 'conv-2'), tool, {
+            'path': other.path,
+            if (tool == 'write_file') 'content': 'updated',
+            if (tool == 'edit_file') ...{
+              'old_string': 'original',
+              'new_string': 'updated',
+            },
+          }, toolCallId: 'write');
+          try {
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+            expect(
+              await other.exists() ? await other.readAsString() : null,
+              tool == 'edit_file' ? 'original' : null,
+            );
+          } finally {
+            runtime.releaseFirst.complete();
+            await Future.wait([first, write]);
+          }
+          expect(
+            metaOf(await first).files.map((file) => p.basename(file.path)),
+            ['first.txt'],
+          );
+          expect(
+            metaOf(await write).files.map((file) => p.basename(file.path)),
+            ['other.txt'],
+          );
+          expect(await other.readAsString(), 'updated');
+        },
+      );
+    }
+
+    test('skill edits wait for shell changes to the shared library', () async {
+      final entrypoint = File(p.join(skillsDir.path, 'demo', 'SKILL.md'));
+      await entrypoint.parent.create();
+      await entrypoint.writeAsString('original\n');
+      final runtime = _PausedShellRuntime(
+        finishFirst: () => entrypoint.writeAsString('original\nshell note\n'),
+      );
+      final tools = service(runtime: runtime);
+      final first = tools.handle(ctx(), 'shell', {
+        'command': 'first',
+      }, toolCallId: 'first');
+      await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+      final edit = tools.handle(ctx(conversationId: 'conv-2'), 'edit_file', {
+        'path': entrypoint.path,
+        'old_string': 'original',
+        'new_string': 'edited',
+      }, toolCallId: 'edit-skill');
+      try {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(await entrypoint.readAsString(), 'original\n');
+      } finally {
+        runtime.releaseFirst.complete();
+        await Future.wait([first, edit]);
+      }
+      expect(metaOf(await edit).status, 'ok');
+      expect(await entrypoint.readAsString(), 'edited\nshell note\n');
+    });
+
+    test('shell snapshot waits for in-flight web app storage writes', () async {
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      final storage = WorkspaceAppStorage(
+        root: await workspaceDir.resolveSymbolicLinks(),
+        directory: 'notes.app.html.data',
+        authorize: (_, write) async {
+          if (write && !entered.isCompleted) {
+            entered.complete();
+            await release.future;
+          }
+        },
+      );
+      final write = storage.write('state.txt', 'web app data', null);
+      await entered.future.timeout(const Duration(seconds: 3));
+      final runtime = _PausedShellRuntime()..releaseFirst.complete();
+      final shell = service(
+        runtime: runtime,
+      ).handle(ctx(), 'shell', {'command': 'first'}, toolCallId: 'shell');
+      try {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(runtime.firstStarted.isCompleted, isFalse);
+      } finally {
+        release.complete();
+        await Future.wait<Object?>([write, shell]);
+      }
+      expect(metaOf(await shell).files.map((file) => p.basename(file.path)), [
+        'first.txt',
+      ]);
+      expect((await storage.read('state.txt'))['content'], 'web app data');
+    });
+
+    test(
+      'cancelling a queued shell does not release the active shell',
+      () async {
+        final runtime = _PausedShellRuntime();
+        final tools = service(runtime: runtime);
+        final first = tools.handle(ctx(), 'shell', {
+          'command': 'first',
+        }, toolCallId: 'first');
+        await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+        final cancelled = Completer<void>();
+        final cancellation = ToolCallCancellation(
+          isCancelled: () => cancelled.isCompleted,
+          cancelled: cancelled.future,
+        );
+        final second = cancellation.run(
+          () => tools.handle(ctx(), 'shell', {
+            'command': 'cancelled',
+          }, toolCallId: 'cancelled'),
+        );
+        try {
+          await Future.doWhile(() async {
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            return cancellation.listenerCount == 0;
+          }).timeout(const Duration(seconds: 3));
+          cancelled.complete();
+          final result = await second.timeout(const Duration(seconds: 3));
+          expect(jsonOf(result)['message'], contains('tool_call_cancelled'));
+          expect(cancellation.listenerCount, 0);
+          final third = tools.handle(ctx(), 'shell', {
+            'command': 'third',
+          }, toolCallId: 'third');
+          try {
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+            expect(runtime.secondStarted.isCompleted, isFalse);
+          } finally {
+            runtime.releaseFirst.complete();
+            await Future.wait([first, third]);
+          }
+          expect(
+            metaOf(await third).files.map((file) => p.basename(file.path)),
+            ['third.txt'],
+          );
+          expect(runtime.requests.map((request) => request.command), [
+            'first',
+            'third',
+          ]);
+        } finally {
+          if (!runtime.releaseFirst.isCompleted) {
+            runtime.releaseFirst.complete();
+          }
+          if (!cancelled.isCompleted) cancelled.complete();
+          await Future.wait([first, second]);
+        }
+      },
+    );
+
+    test('independent workspace shells still run concurrently', () async {
+      final otherWorkspace = await Directory(
+        p.join(tmp.path, 'workspace-2'),
+      ).create();
+      final otherSession = await Directory(
+        p.join(tmp.path, 'session-2'),
+      ).create();
+      final runtime = _PausedShellRuntime();
+      final tools = service(runtime: runtime);
+      final first = tools.handle(ctx(), 'shell', {
+        'command': 'first',
+      }, toolCallId: 'first');
+      await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+      final second = tools.handle(
+        ctx(
+          workspaceOverride: otherWorkspace,
+          sessionOverride: otherSession,
+          conversationId: 'conv-2',
+        ),
+        'shell',
+        {'command': 'second'},
+        toolCallId: 'second',
+      );
+      try {
+        final result = await second.timeout(const Duration(seconds: 3));
+        expect(metaOf(result).files.map((file) => p.basename(file.path)), [
+          'second.txt',
+        ]);
+        expect(runtime.releaseFirst.isCompleted, isFalse);
+      } finally {
+        runtime.releaseFirst.complete();
+        await Future.wait([first, second]);
+      }
+    });
+
+    test(
+      'native cwd in another workspace shares its snapshot exclusion',
+      () async {
+        final otherWorkspace = await Directory(
+          p.join(tmp.path, 'workspace-2'),
+        ).create();
+        final otherSession = await Directory(
+          p.join(tmp.path, 'session-2'),
+        ).create();
+        final runtime = _PausedShellRuntime();
+        final tools = service(runtime: runtime);
+        final first = tools.handle(ctx(), 'shell', {
+          'command': 'first',
+          'cwd': otherWorkspace.path,
+        }, toolCallId: 'first');
+        await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+        final second = tools.handle(
+          ctx(
+            workspaceOverride: otherWorkspace,
+            sessionOverride: otherSession,
+            conversationId: 'conv-2',
+          ),
+          'shell',
+          {'command': 'second'},
+          toolCallId: 'second',
+        );
+        try {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          expect(runtime.secondStarted.isCompleted, isFalse);
+        } finally {
+          runtime.releaseFirst.complete();
+          await Future.wait([first, second]);
+        }
+        expect(
+          metaOf(await second).files.map((file) => p.basename(file.path)),
+          ['second.txt'],
+        );
+        expect(
+          await File(p.join(otherWorkspace.path, 'first.txt')).readAsString(),
+          'done',
+        );
+      },
+    );
+
     test('environment_not_ready when runtime is null', () async {
       final tools = service(registerRuntime: false);
       final result = await tools.handle(
@@ -909,19 +1281,86 @@ void main() {
       expect(grep, contains('needle'));
     });
 
-    test('skills write is denied', () async {
-      final skillFile = p.join(skillsDir.path, 's1', 'SKILL.md');
-      Directory(p.dirname(skillFile)).createSync(recursive: true);
-      File(skillFile).writeAsStringSync('old');
+    test('skills writes cannot follow a link outside the sandbox', () async {
+      final outside = File(p.join(tmp.path, 'outside.txt'))
+        ..writeAsStringSync('old');
+      Link(p.join(skillsDir.path, 'link.txt')).createSync(outside.path);
       final result = await service().handle(
         ctx(sandboxed: true, fullAccess: true),
         'write_file',
-        {'path': '/skills/s1/SKILL.md', 'content': 'new'},
+        {'path': '/skills/link.txt', 'content': 'new'},
         toolCallId: 'skill-write',
       );
-      expect(jsonOf(result)['error'], 'skills_readonly');
+      expect(jsonOf(result)['error'], 'path_outside');
       expect(metaOf(result).status, 'denied');
-      expect(File(skillFile).readAsStringSync(), 'old');
+      expect(outside.readAsStringSync(), 'old');
+    });
+
+    test('skill writes protect bundle receipts and staging paths', () async {
+      final receipt = File(p.join(skillsDir.path, '.bundled-skill-creator'))
+        ..writeAsStringSync('1\n');
+      Link(p.join(skillsDir.path, 'receipt.txt')).createSync(receipt.path);
+      final tools = service();
+      for (final path in [
+        '/skills/.bundled-skill-creator',
+        '/skills/receipt.txt',
+        '/skills/.bundled-visualize/SKILL.md',
+      ]) {
+        final result = await tools.handle(ctx(sandboxed: true), 'write_file', {
+          'path': path,
+          'content': 'overwritten',
+        }, toolCallId: 'metadata-write');
+        expect(metaOf(result).status, 'denied');
+        expect(jsonOf(result)['message'], contains('skill library metadata'));
+      }
+      expect(receipt.readAsStringSync(), '1\n');
+      expect(
+        Directory(p.join(skillsDir.path, '.bundled-visualize')).existsSync(),
+        isFalse,
+      );
+    });
+
+    test('only skill entrypoint writes rescan the library', () async {
+      var refreshes = 0;
+      final tools = service(
+        refreshSkills: () async {
+          refreshes++;
+        },
+      );
+      final context = ctx(sandboxed: true);
+      const resource = '/skills/demo/references/example.md';
+      final writeResource = await tools.handle(context, 'write_file', {
+        'path': resource,
+        'content': 'example',
+      }, toolCallId: 'resource');
+      expect(metaOf(writeResource).status, 'ok');
+      expect(refreshes, 0);
+
+      final writeEntrypoint = await tools.handle(context, 'write_file', {
+        'path': '/skills/demo/SKILL.md',
+        'content': 'original',
+      }, toolCallId: 'entrypoint');
+      expect(metaOf(writeEntrypoint).status, 'ok');
+      expect(refreshes, 1);
+
+      final editResource = await tools.handle(context, 'edit_file', {
+        'path': resource,
+        'old_string': 'example',
+        'new_string': 'changed',
+      }, toolCallId: 'edit-resource');
+      expect(metaOf(editResource).status, 'ok');
+      expect(refreshes, 1);
+
+      Link(
+        p.join(workspaceDir.path, 'skill-alias.md'),
+      ).createSync(p.join(skillsDir.path, 'demo', 'SKILL.md'));
+      final editEntrypoint = await tools.handle(context, 'edit_file', {
+        'path': '/workspace/skill-alias.md',
+        'old_string': 'original',
+        'new_string': 'changed',
+      }, toolCallId: 'edit-entrypoint');
+      expect(metaOf(editEntrypoint).status, 'ok');
+      expect(refreshes, 2);
     });
   });
 
@@ -1441,13 +1880,14 @@ void main() {
     });
 
     test('does not mark tools used on denial', () async {
-      await service().handle(
-        ctx(sandboxed: true, fullAccess: true, toolsUsed: false),
+      final result = await service().handle(
+        ctx(fullAccess: false, toolsUsed: false),
         'write_file',
-        {'path': '/skills/x.txt', 'content': 'no'},
+        {'path': p.join(tmp.path, 'outside.txt'), 'content': 'no'},
         toolCallId: 'lock-deny',
         conversationId: 'conv-1',
       );
+      expect(metaOf(result).status, 'denied');
       expect(extrasById, isEmpty);
       expect(touched, isEmpty);
     });

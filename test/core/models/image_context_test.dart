@@ -20,27 +20,25 @@ Set<String> omitted(List<ImageContextCandidate> items, {int bytes = 100}) =>
     );
 
 void main() {
-  test('recall preference survives JSON and pin changes independently', () {
-    expect(const ImageContextSettings().allowRecall, isTrue);
-    expect(ImageContextSettings.fromJson(const {}).allowRecall, isTrue);
-    const settings = ImageContextSettings(allowRecall: false);
+  test('recall is opt-in and survives JSON and pin changes independently', () {
+    expect(const ImageContextSettings().allowRecall, isFalse);
+    expect(ImageContextSettings.fromJson(const {}).allowRecall, isFalse);
+    expect(
+      ImageContextSettings.fromJson(const {'allowRecall': false}).allowRecall,
+      isFalse,
+    );
+    const settings = ImageContextSettings(allowRecall: true);
     final restored = ImageContextSettings.fromJson(settings.toJson());
-    expect(restored.allowRecall, isFalse);
+    expect(restored.allowRecall, isTrue);
     expect(restored.automatic, isTrue);
     final pinned = restored.pin('message|part:1|0', true);
     expect(pinned.pinned, {'message|part:1|0'});
-    expect(pinned.allowRecall, isFalse);
+    expect(pinned.allowRecall, isTrue);
     expect(pinned.automatic, isTrue);
     final unpinned = pinned.pin('message|part:1|0', false);
     expect(unpinned.pinned, isEmpty);
-    expect(unpinned.allowRecall, isFalse);
+    expect(unpinned.allowRecall, isTrue);
     expect(unpinned.automatic, isTrue);
-    expect(
-      ImageContextSettings.fromJson(
-        const ImageContextSettings(automatic: false).toJson(),
-      ).allowRecall,
-      isTrue,
-    );
   });
 
   test(

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../icons/lucide_adapter.dart' as lucide;
 import '../../../l10n/app_localizations.dart';
+import '../../../core/models/translation_language.dart';
 import '../../home/widgets/model_icon.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -14,11 +15,12 @@ import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../settings/widgets/language_select_sheet.dart'
-    show LanguageOption, supportedLanguages, showLanguageSelector;
+    show languageDisplayName, showLanguageSelector;
 import '../../../core/services/haptics.dart';
 import '../../model/widgets/model_select_sheet.dart' show showModelSelector;
 import '../../../theme/app_font_weights.dart';
 import '../widgets/translation_output.dart';
+import 'translation_languages_page.dart';
 
 class TranslatePage extends StatefulWidget {
   const TranslatePage({super.key});
@@ -30,7 +32,6 @@ class TranslatePage extends StatefulWidget {
 class _TranslatePageState extends State<TranslatePage> {
   final TextEditingController _src = TextEditingController();
   final ValueNotifier<String> _dst = ValueNotifier('');
-  LanguageOption? _lang;
   String? _providerKey;
   String? _modelId;
   StreamSubscription? _sub;
@@ -55,13 +56,7 @@ class _TranslatePageState extends State<TranslatePage> {
   void _initDefaults() {
     final settings = context.read<SettingsProvider>();
     final assistant = context.read<AssistantProvider>().currentAssistant;
-    final lc = Localizations.localeOf(context).languageCode.toLowerCase();
-    final savedLang = _languageForCode(settings.translateTargetLang);
-    final localeLang = lc.startsWith('zh')
-        ? _languageForCode('zh-CN')
-        : _languageForCode(lc) ?? _languageForCode('en');
     setState(() {
-      _lang = savedLang ?? localeLang ?? supportedLanguages.first;
       _providerKey =
           settings.translateModelProvider ??
           assistant?.chatModelProvider ??
@@ -96,17 +91,20 @@ class _TranslatePageState extends State<TranslatePage> {
 
   Future<void> _pickLanguage() async {
     if (_loading) return;
-    final lang = await showLanguageSelector(context);
+    final settings = context.read<SettingsProvider>();
+    final lang = await showLanguageSelector(
+      context,
+      languages: settings.visibleTranslationLanguages,
+    );
     if (!mounted || lang == null) return;
     if (lang.code == '__clear__') {
       _dst.value = '';
       return;
     }
-    setState(() => _lang = lang);
-    await context.read<SettingsProvider>().setTranslateTargetLang(lang.code);
+    await settings.setTranslateTargetLang(lang.code);
   }
 
-  Future<void> _translate() async {
+  Future<void> _translate(LanguageOption target) async {
     final l10n = AppLocalizations.of(context)!;
     final txt = _src.text.trim();
     if (txt.isEmpty) return;
@@ -124,10 +122,7 @@ class _TranslatePageState extends State<TranslatePage> {
     final cfg = settings.getProviderConfig(pk);
     final p = settings.translatePrompt
         .replaceAll('{source_text}', txt)
-        .replaceAll(
-          '{target_lang}',
-          _displayNameFor(l10n, (_lang ?? supportedLanguages.first).code),
-        );
+        .replaceAll('{target_lang}', languageDisplayName(l10n, target.code));
 
     setState(() {
       _loading = true;
@@ -185,40 +180,6 @@ class _TranslatePageState extends State<TranslatePage> {
     if (mounted) setState(() => _loading = false);
   }
 
-  LanguageOption? _languageForCode(String? code) {
-    if (code == null || code.isEmpty) return null;
-    try {
-      return supportedLanguages.firstWhere((e) => e.code == code);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  String _displayNameFor(AppLocalizations l10n, String code) {
-    switch (code) {
-      case 'zh-CN':
-        return l10n.languageDisplaySimplifiedChinese;
-      case 'en':
-        return l10n.languageDisplayEnglish;
-      case 'zh-TW':
-        return l10n.languageDisplayTraditionalChinese;
-      case 'ja':
-        return l10n.languageDisplayJapanese;
-      case 'ko':
-        return l10n.languageDisplayKorean;
-      case 'fr':
-        return l10n.languageDisplayFrench;
-      case 'de':
-        return l10n.languageDisplayGerman;
-      case 'it':
-        return l10n.languageDisplayItalian;
-      case 'es':
-        return l10n.languageDisplaySpanish;
-      default:
-        return code;
-    }
-  }
-
   Future<void> _pasteFromClipboard() async {
     final data = await Clipboard.getData('text/plain');
     final text = data?.text ?? '';
@@ -251,6 +212,15 @@ class _TranslatePageState extends State<TranslatePage> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final (languages, selectedCode) = context.select(
+      (SettingsProvider settings) =>
+          (settings.visibleTranslationLanguages, settings.translateTargetLang),
+    );
+    final target = standaloneTranslationLanguage(
+      languages,
+      selectedCode: selectedCode,
+      localeLanguageCode: Localizations.localeOf(context).languageCode,
+    );
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -264,6 +234,21 @@ class _TranslatePageState extends State<TranslatePage> {
         ),
         title: Text(l10n.desktopNavTranslateTooltip),
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: IosIconButton(
+              icon: lucide.Lucide.SlidersHorizontal,
+              size: 20,
+              padding: const EdgeInsets.all(8),
+              tooltip: l10n.translationLanguageManagerTitle,
+              enabled: !_loading,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const TranslationLanguagesPage(),
+                ),
+              ),
+            ),
+          ),
           // Paste
           Tooltip(
             message: l10n.translatePagePasteButton,
@@ -380,16 +365,13 @@ class _TranslatePageState extends State<TranslatePage> {
                       child: Row(
                         children: [
                           Text(
-                            (_lang ?? supportedLanguages.first).flag,
-                            style: TextStyle(fontSize: 18),
+                            target.flag,
+                            style: const TextStyle(fontSize: 18),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              _displayNameFor(
-                                l10n,
-                                (_lang ?? supportedLanguages.first).code,
-                              ),
+                              languageDisplayName(l10n, target.code),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -413,7 +395,7 @@ class _TranslatePageState extends State<TranslatePage> {
                     borderRadius: BorderRadius.circular(12),
                     baseColor: cs.primary,
                     pressedBlendStrength: isDark ? 0.08 : 0.06,
-                    onTap: _loading ? _stop : _translate,
+                    onTap: _loading ? _stop : () => _translate(target),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,

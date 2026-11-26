@@ -1,3 +1,4 @@
+import 'carried_original.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
@@ -12,6 +13,8 @@ class CompressionConfig {
   const CompressionConfig({
     this.mode = AutoCompressionMode.off,
     this.nativeEnabled = false,
+    this.carryOriginals = const CarrySetting(),
+    this.nativeCarryOriginals = const CarrySetting(),
     this.nativeKeepRecentUserTurns = 6,
     this.nativeTriggerInputRatio = .8,
     this.templateId = 'general',
@@ -20,10 +23,10 @@ class CompressionConfig {
     this.targetInputRatio = .6,
     this.summaryTokens = 4096,
     this.maxOutputTokens,
-    this.maxRequestAttempts = 8,
     this.requestTimeoutMinutes,
     this.planningWindow,
     this.includeReference = true,
+    this.includeInstructionInjections = true,
     this.replaceConsumedTools = false,
     this.summaryInWorldBookScan = true,
     this.providerId,
@@ -33,6 +36,8 @@ class CompressionConfig {
   static const conversationKind = 'conversationCompression';
   final AutoCompressionMode mode;
   final bool nativeEnabled;
+  final CarrySetting carryOriginals;
+  final CarrySetting nativeCarryOriginals;
   final int nativeKeepRecentUserTurns;
   final double nativeTriggerInputRatio;
   final String templateId;
@@ -43,7 +48,6 @@ class CompressionConfig {
 
   /// Total generation budget, including reasoning. Null uses the summary target.
   final int? maxOutputTokens;
-  final int maxRequestAttempts;
 
   /// Per model invocation. Null preserves each compression mode's default.
   final num? requestTimeoutMinutes;
@@ -55,6 +59,7 @@ class CompressionConfig {
         );
   final int? planningWindow;
   final bool includeReference;
+  final bool includeInstructionInjections;
   final bool replaceConsumedTools;
   final bool summaryInWorldBookScan;
   final String? providerId;
@@ -66,6 +71,8 @@ class CompressionConfig {
   Map<String, dynamic> toJson({bool includeMode = true}) => {
     if (includeMode) 'mode': mode.name,
     'nativeEnabled': nativeEnabled,
+    'carryOriginals': carryOriginals.toJson(),
+    'nativeCarryOriginals': nativeCarryOriginals.toJson(),
     'nativeKeepRecentUserTurns': nativeKeepRecentUserTurns,
     'nativeTriggerInputRatio': nativeTriggerInputRatio,
     'templateId': templateId,
@@ -74,10 +81,10 @@ class CompressionConfig {
     'targetInputRatio': targetInputRatio,
     'summaryTokens': summaryTokens,
     'maxOutputTokens': maxOutputTokens,
-    'maxRequestAttempts': maxRequestAttempts,
     'requestTimeoutMinutes': requestTimeoutMinutes,
     'planningWindow': planningWindow,
     'includeReference': includeReference,
+    'includeInstructionInjections': includeInstructionInjections,
     'replaceConsumedTools': replaceConsumedTools,
     'summaryInWorldBookScan': summaryInWorldBookScan,
     'providerId': providerId,
@@ -88,6 +95,8 @@ class CompressionConfig {
     final config = CompressionConfig(
       mode: AutoCompressionMode.values.byName(json['mode'] as String? ?? 'off'),
       nativeEnabled: json['nativeEnabled'] == true,
+      carryOriginals: CarrySetting.fromJson(json['carryOriginals']),
+      nativeCarryOriginals: CarrySetting.fromJson(json['nativeCarryOriginals']),
       nativeKeepRecentUserTurns: json['nativeKeepRecentUserTurns'] as int? ?? 6,
       nativeTriggerInputRatio: (json['nativeTriggerInputRatio'] as num? ?? .8)
           .toDouble(),
@@ -97,10 +106,11 @@ class CompressionConfig {
       targetInputRatio: (json['targetInputRatio'] as num? ?? .6).toDouble(),
       summaryTokens: json['summaryTokens'] as int? ?? 4096,
       maxOutputTokens: json['maxOutputTokens'] as int?,
-      maxRequestAttempts: json['maxRequestAttempts'] as int? ?? 8,
       requestTimeoutMinutes: json['requestTimeoutMinutes'] as num?,
       planningWindow: json['planningWindow'] as int?,
       includeReference: json['includeReference'] as bool? ?? true,
+      includeInstructionInjections:
+          json['includeInstructionInjections'] as bool? ?? true,
       replaceConsumedTools: json['replaceConsumedTools'] as bool? ?? false,
       summaryInWorldBookScan: json['summaryInWorldBookScan'] as bool? ?? true,
       providerId: json['providerId'] as String?,
@@ -124,8 +134,6 @@ class CompressionConfig {
         (config.maxOutputTokens != null &&
             (config.maxOutputTokens! < config.summaryTokens ||
                 config.maxOutputTokens! > 1048576)) ||
-        config.maxRequestAttempts < 1 ||
-        config.maxRequestAttempts > 128 ||
         (config.requestTimeoutMinutes != null &&
             (!config.requestTimeoutMinutes!.isFinite ||
                 config.requestTimeoutMinutes! <= 0 ||
@@ -245,9 +253,4 @@ class CompressionInputBudget {
               (config.nativeEnabled
                   ? config.nativeTriggerInputRatio
                   : config.triggerInputRatio);
-  bool accepts({
-    required int before,
-    required int after,
-    required CompressionConfig config,
-  }) => after < before && after < input * config.triggerInputRatio;
 }

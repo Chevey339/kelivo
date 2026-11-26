@@ -1,10 +1,13 @@
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
+import 'package:Kelivo/desktop/widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/features/provider/pages/provider_balance_page.dart';
 import 'package:Kelivo/features/provider/pages/provider_detail_page.dart';
 import 'package:Kelivo/features/provider/widgets/provider_balance_badge.dart';
 import 'package:Kelivo/features/provider/widgets/provider_balance_request_editor.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +16,121 @@ import 'package:provider/provider.dart';
 import '../../support/business_test_harness.dart';
 
 void main() {
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'fal balance can be enabled from provider settings on ${desktop ? "desktop" : "mobile"}',
+      (tester) async {
+        tester.view.physicalSize = desktop
+            ? const Size(1200, 900)
+            : const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await tester.runAsync(() => settings.loaded);
+        addTearDown(settings.dispose);
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: settings,
+            child: MaterialApp(
+              locale: const Locale('en'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: desktop
+                  ? const Scaffold(
+                      body: DesktopProviderDetailPane(
+                        providerKey: 'fal',
+                        displayName: 'fal',
+                      ),
+                    )
+                  : const ProviderDetailPage(
+                      keyName: 'fal',
+                      displayName: 'fal',
+                    ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        Future<void> tap(Finder finder) async {
+          await tester.ensureVisible(finder);
+          await tester.tap(finder);
+          await tester.pumpAndSettle();
+        }
+
+        await tap(
+          desktop
+              ? find.byKey(const ValueKey('desktop-provider-settings-fal'))
+              : find.text('Get account balance'),
+        );
+        await tap(find.byKey(const ValueKey('provider-balance-enabled')));
+        expect(settings.getProviderConfig('fal').balanceEnabled, isTrue);
+        expect(find.textContaining('billing:usage:read'), findsOneWidget);
+        expect(find.text('Refresh after generation'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('provider-balance-method')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('provider-balance-api-path')),
+          findsNothing,
+        );
+        final editor = tester.widget<ProviderBalanceRequestEditor>(
+          find.byType(ProviderBalanceRequestEditor),
+        );
+        await editor.onHeadersChanged(const [
+          {'name': 'Authorization', 'value': 'Key billing-test'},
+        ]);
+        await tester.pumpAndSettle();
+        expect(
+          settings.getProviderConfig('fal').balanceHeaders.single['value'],
+          'Key billing-test',
+        );
+        expect(settings.getProviderConfig('fal').apiKey, isEmpty);
+        await tap(find.byKey(const ValueKey('provider-balance-enabled')));
+        expect(settings.getProviderConfig('fal').balanceEnabled, isFalse);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(milliseconds: 500));
+      },
+    );
+  }
+  testWidgets('first mobile refresh override preserves a preset display name', (
+    tester,
+  ) async {
+    late SettingsProvider settings;
+    await tester.runAsync(() async {
+      settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+    });
+    addTearDown(settings.dispose);
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: settings,
+        child: const MaterialApp(
+          locale: Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ProviderBalancePage(
+            providerKey: 'Aliyun',
+            providerDisplayName: '阿里云千问',
+          ),
+        ),
+      ),
+    );
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(ProviderBalancePage)),
+    )!;
+    expect(settings.providerConfigs.containsKey('Aliyun'), isFalse);
+    expect(find.text('默认 · 开启'), findsOneWidget);
+    await tester.tap(find.text(l10n.providerBalanceRefreshOnReply));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.providerBalanceRefreshOff));
+    await tester.pumpAndSettle();
+    final config = settings.providerConfigs['Aliyun']!;
+    expect(config.name, l10n.providersPageAliyunName);
+    expect(config.balanceRefreshOnReply, isFalse);
+    expect(config.balanceEnabled, isNot(true));
+  });
+
   for (final desktop in [false, true]) {
     for (final kind in ProviderKind.values) {
       testWidgets(
@@ -80,6 +198,14 @@ void main() {
             await tester.pumpAndSettle();
           }
 
+          Finder refreshChoice(String label) => desktop
+              ? find.byWidgetPredicate(
+                  (widget) =>
+                      widget is DesktopSelectDropdown &&
+                      widget.semanticLabel == label,
+                )
+              : find.text(label);
+
           final settingsButton = find.byKey(
             const ValueKey('desktop-provider-settings-BalanceTest'),
           );
@@ -101,6 +227,56 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.byType(ProviderBalanceBadge), findsOneWidget);
           await openSettings();
+
+          final scope = refreshChoice('Automatic balance refresh');
+          final interval = refreshChoice('Timed refresh');
+          final reply = refreshChoice('Refresh after replies');
+          expect(scope, findsOneWidget);
+          expect(interval, findsOneWidget);
+          expect(find.text('This provider'), findsOneWidget);
+          expect(find.text('Default · On'), findsOneWidget);
+          expect(find.text('Global defaults'), findsNothing);
+          if (kind == ProviderKind.openai) {
+            await tap(interval);
+            await tap(find.text('Custom interval…'));
+            await enter(
+              find.descendant(
+                of: find.byKey(
+                  const ValueKey('provider-balance-custom-interval'),
+                ),
+                matching: find.byType(TextField),
+              ),
+              '10',
+            );
+            await tap(find.widgetWithText(IosTextButton, 'Save'));
+            expect(
+              settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
+              10,
+            );
+            expect(find.text('10 minutes'), findsOneWidget);
+            await tap(interval);
+            await tap(find.text('Off'));
+            expect(
+              settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
+              0,
+            );
+            await tap(interval);
+            await tap(find.text('Default · Off').hitTestable());
+            expect(
+              settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
+              isNull,
+            );
+
+            await tap(reply);
+            await tap(find.text('Off'));
+            expect(
+              settings.getProviderConfig('BalanceTest').balanceRefreshOnReply,
+              isFalse,
+            );
+            expect(settings.balanceRefreshOnReply, isTrue);
+            await tap(interval);
+            await tap(find.text('15 minutes'));
+          }
 
           final editor = find.byType(ProviderBalanceRequestEditor);
           Finder inEditor(String key) =>
@@ -143,6 +319,15 @@ void main() {
           expect(config.customHeaders, [
             {'name': 'X-Chat', 'value': 'chat-only'},
           ]);
+
+          await tap(inEditor('provider-custom-header-delete-0'));
+          expect(
+            settings.getProviderConfig('BalanceTest').balanceHeaders,
+            isEmpty,
+          );
+          await tap(inEditor('provider-custom-header-add'));
+          await enter(headerName, 'x-api-key');
+          await enter(headerValue, '{{apiKey}}');
 
           // Some IMEs commit by clearing composing without changing the text.
           const imeBody = '{"api_key":"{{apiKey}}","account":"中文"}';
@@ -193,21 +378,119 @@ void main() {
             tester.widget<TextField>(body).controller!.text,
             config.balanceBody,
           );
-          await tap(inEditor('provider-custom-header-delete-0'));
-          expect(
-            settings.getProviderConfig('BalanceTest').balanceHeaders,
-            isEmpty,
+          final reset = find.widgetWithText(
+            IosTextButton,
+            'Restore default balance settings',
           );
-          await tap(find.byTooltip('Reset balance settings'));
+          if (!desktop) {
+            await tester.scrollUntilVisible(
+              reset,
+              150,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(ProviderBalancePage),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+          }
+          final queryIcon = find.byIcon(Lucide.RefreshCw);
+          final query = desktop
+              ? find.byTooltip('Check Balance')
+              : find
+                    .ancestor(
+                      of: find.text('Check Balance'),
+                      matching: find.byType(Row),
+                    )
+                    .first;
+          expect(
+            find.descendant(of: query, matching: queryIcon),
+            findsOneWidget,
+          );
+
+          final beforeReset = settings
+              .getProviderConfig('BalanceTest')
+              .toJson();
+          final confirm = find.widgetWithText(
+            IosTextButton,
+            'Restore defaults',
+          );
+          final composingPath = desktop && kind == ProviderKind.openai
+              ? '/custom/路径'
+              : null;
+          if (composingPath != null) {
+            await tester.ensureVisible(apiPath);
+            await tester.showKeyboard(apiPath);
+            final draft = TextEditingValue(
+              text: composingPath,
+              selection: TextSelection.collapsed(offset: composingPath.length),
+              composing: TextRange(
+                start: '/custom/'.length,
+                end: composingPath.length,
+              ),
+            );
+            tester.testTextInput.updateEditingValue(draft);
+            await tester.pump();
+            expect(tester.widget<TextField>(apiPath).controller!.value, draft);
+            expect(
+              settings.getProviderConfig('BalanceTest').toJson(),
+              beforeReset,
+            );
+          }
+          await tap(reset);
+          expect(confirm, findsOneWidget);
+          expect(
+            settings.getProviderConfig('BalanceTest').toJson(),
+            beforeReset,
+          );
+          await tap(find.widgetWithText(IosTextButton, 'Cancel'));
+          expect(confirm, findsNothing);
+          expect(
+            settings.getProviderConfig('BalanceTest').toJson(),
+            beforeReset,
+          );
+          if (composingPath != null) {
+            expect(
+              tester.widget<TextField>(apiPath).controller!.text,
+              composingPath,
+            );
+          }
+
+          await tap(reset);
+          await tap(confirm);
           config = settings.getProviderConfig('BalanceTest');
+          final defaults = ProviderConfig.defaultsFor('BalanceTest');
           expect(config.balanceEnabled, isFalse);
+          expect(config.balanceApiPath, defaults.balanceApiPath);
+          expect(config.balanceResultPath, defaults.balanceResultPath);
           expect(config.balanceMethod, 'GET');
           expect(config.balanceHeaders, isEmpty);
           expect(config.balanceBody, isEmpty);
+          expect(config.balanceRefreshInterval, isNull);
+          expect(config.balanceRefreshOnReply, isNull);
           expect(config.providerType, kind);
           expect(config.customHeaders, [
             {'name': 'X-Chat', 'value': 'chat-only'},
           ]);
+          if (kind == ProviderKind.openai) {
+            await tap(scope);
+            await tap(find.text('Global defaults'));
+            await tap(interval);
+            await tap(find.text('5 minutes'));
+            expect(settings.balanceRefreshOnReply, isTrue);
+            await tap(find.text('Refresh after replies'));
+            expect(settings.balanceRefreshInterval, 5);
+            expect(settings.balanceRefreshOnReply, isFalse);
+            config = settings.getProviderConfig('BalanceTest');
+            expect(config.balanceEnabled, isFalse);
+            expect(config.balanceRefreshInterval, isNull);
+            expect(config.balanceRefreshOnReply, isNull);
+
+            await tap(scope);
+            await tap(find.text('This provider'));
+            expect(find.text('Default · 5 minutes'), findsOneWidget);
+            expect(find.text('Default · Off'), findsOneWidget);
+          }
           await tap(find.byKey(const ValueKey('provider-balance-enabled')));
           expect(tester.widget<SegmentedTabs>(method).index, 0);
           expect(headerName, findsNothing);
@@ -217,6 +500,9 @@ void main() {
           await tester.pumpWidget(const SizedBox());
           await tester.runAsync(() async => await settings.loaded);
         },
+        variant: TargetPlatformVariant({
+          desktop ? TargetPlatform.macOS : TargetPlatform.android,
+        }),
       );
     }
   }

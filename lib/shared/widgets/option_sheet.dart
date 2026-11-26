@@ -122,6 +122,7 @@ class _OptionList<T> extends StatelessWidget {
           if (i > 0) IosRowDivider(indent: items[i].icon == null ? 12 : 54),
           IosNavRow(
             key: items[i].key,
+            focusable: true,
             icon: items[i].icon,
             label: items[i].label,
             subtitle: items[i].subtitle,

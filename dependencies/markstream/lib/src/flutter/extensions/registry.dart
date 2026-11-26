@@ -7,6 +7,7 @@ import '../../core/text_index/text_index.dart';
 import '../../core/parser/syntax/block_syntax.dart';
 import '../../core/parser/syntax/inline_syntax.dart';
 import '../theme/markstream_theme.dart';
+import '../prose_direction_resolver.dart';
 import '../render/chrome.dart';
 
 /// Rendering callbacks use the same document, style and selection owner as
@@ -107,7 +108,8 @@ typedef LiteralSpanBuilder =
 /// Immutable registration snapshot. Keep its identity across streaming updates.
 final class MarkstreamExtensions {
   const MarkstreamExtensions.empty()
-    : blockSyntaxes = const [],
+    : proseDirection = const ProseDirectionResolver(),
+      blockSyntaxes = const [],
       inlineSyntaxes = const [],
       nodeBuilders = const NodeBuilderRegistry.empty(),
       codeBlockBuilders = const {},
@@ -120,6 +122,7 @@ final class MarkstreamExtensions {
       literalSpanBuilder = null;
 
   MarkstreamExtensions({
+    this.proseDirection = const ProseDirectionResolver(),
     List<BlockSyntax> blockSyntaxes = const [],
     List<InlineSyntax> inlineSyntaxes = const [],
     this.nodeBuilders = const NodeBuilderRegistry.empty(),
@@ -137,6 +140,7 @@ final class MarkstreamExtensions {
        directiveBuilders = _normalized(directiveBuilders),
        namedInlineBuilders = _normalized(namedInlineBuilders);
 
+  final ProseDirectionResolver proseDirection;
   final List<BlockSyntax> blockSyntaxes;
   final List<InlineSyntax> inlineSyntaxes;
   final NodeBuilderRegistry nodeBuilders;

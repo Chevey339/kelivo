@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/haptics.dart';
 import '../../theme/app_font_weights.dart';
 import '../../theme/app_semantic_colors.dart';
+import 'ios_tactile.dart';
 
 class SegmentedTab {
   const SegmentedTab({required this.label, this.icon});
@@ -21,6 +22,8 @@ class SegmentedTabs extends StatelessWidget {
     this.height = 40,
     this.enabled = true,
     this.radioGroup = false,
+    this.compact = false,
+    this.iconOnly = false,
     this.enableHaptics = true,
     this.backgroundColor,
     this.selectedColor,
@@ -33,7 +36,7 @@ class SegmentedTabs extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final bool expand;
   final double height;
-  final bool enabled, radioGroup, enableHaptics;
+  final bool enabled, radioGroup, compact, iconOnly, enableHaptics;
   final Color? backgroundColor,
       selectedColor,
       foregroundColor,
@@ -47,10 +50,12 @@ class SegmentedTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final innerRadius = (_shellRadius - _innerPadding).clamp(0.0, _shellRadius);
+    final padding = compact ? 3.0 : _innerPadding;
+    final radius = compact ? 11.0 : _shellRadius;
+    final innerRadius = radius - padding;
     final segments = <Widget>[];
     for (var i = 0; i < tabs.length; i++) {
-      if (i != 0) segments.add(const SizedBox(width: _gap));
+      if (i != 0) segments.add(SizedBox(width: compact ? 2 : _gap));
       final segment = _segment(
         cs: cs,
         tab: tabs[i],
@@ -75,11 +80,11 @@ class SegmentedTabs extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: backgroundColor ?? context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(_shellRadius),
+        borderRadius: BorderRadius.circular(radius),
       ),
       clipBehavior: Clip.hardEdge,
       child: Padding(
-        padding: const EdgeInsets.all(_innerPadding),
+        padding: EdgeInsets.all(padding),
         child: expand
             ? row
             : SingleChildScrollView(
@@ -109,7 +114,7 @@ class SegmentedTabs extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: color,
-        fontSize: 13,
+        fontSize: compact ? 12 : 13,
         fontWeight: selected ? AppFontWeights.semibold : AppFontWeights.medium,
       ),
     );
@@ -119,38 +124,32 @@ class SegmentedTabs extends StatelessWidget {
       children: [
         if (tab.icon != null) ...[
           Icon(tab.icon, size: 16, color: color),
-          const SizedBox(width: 6),
+          if (!iconOnly) const SizedBox(width: 6),
         ],
-        expand ? Flexible(child: label) : label,
+        if (!iconOnly || tab.icon == null)
+          if (expand) Flexible(child: label) else label,
       ],
     );
 
-    return Semantics(
-      button: !radioGroup,
-      selected: radioGroup ? null : selected,
-      checked: radioGroup ? selected : null,
-      inMutuallyExclusiveGroup: radioGroup,
-      enabled: enabled,
-      label: tab.label,
+    return IosCardPress(
+      focusable: true,
+      haptics: false,
       onTap: enabled ? onTap : null,
-      child: ExcludeSemantics(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: enabled ? onTap : null,
-          child: AnimatedContainer(
-            duration: reducedMotion ? Duration.zero : _animDuration,
-            curve: Curves.easeOutCubic,
-            decoration: BoxDecoration(
-              color: selected
-                  ? (selectedColor ?? cs.primary.withValues(alpha: 0.14))
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(innerRadius),
-            ),
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Center(child: content),
-          ),
-        ),
+      duration: reducedMotion ? Duration.zero : _animDuration,
+      baseColor: selected
+          ? (selectedColor ?? cs.primary.withValues(alpha: 0.14))
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(innerRadius),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 8),
+      child: Semantics(
+        button: !radioGroup,
+        selected: radioGroup ? null : selected,
+        checked: radioGroup ? selected : null,
+        inMutuallyExclusiveGroup: radioGroup,
+        enabled: enabled,
+        label: tab.label,
+        excludeSemantics: true,
+        child: Center(child: content),
       ),
     );
   }

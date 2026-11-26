@@ -16,6 +16,14 @@ import '../services/custom_request_merger.dart';
 import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_spec.dart';
+import '../services/media/openrouter_media_catalog.dart';
+import '../services/media/fal_model_discovery.dart';
+import '../services/media/replicate_models.dart';
+import '../services/media/modelscope_models.dart';
+import '../services/media/gemini_media_models.dart';
+import '../services/media/adapters/gemini_images.dart';
+import '../services/media/adapters/veo_video.dart';
+import '../services/model_spec/model_list_metadata_cache.dart';
 import '../services/model_spec/model_spec_resolver.dart';
 import '../services/model_spec/ollama_model_service.dart';
 import '../services/model_catalog/model_catalog_service.dart';
@@ -25,6 +33,12 @@ abstract class BaseProvider {
 }
 
 class _Http {
+  static Iterable<ModelListRow> modelRows(List data) sync* {
+    for (final row in data.whereType<Map>()) {
+      if (row['id'] case final String id) yield (id: id, json: row);
+    }
+  }
+
   static Map<String, String> modelListHeaders(
     ProviderConfig cfg,
     Map<String, String> base,
@@ -48,6 +62,26 @@ class OpenAIProvider extends BaseProvider {
 
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    if (cfg.isFal) {
+      final client = providerHttpClient(
+        cfg,
+        logMode: HttpLogMode.media,
+        timeout: const Duration(seconds: 15),
+      );
+      try {
+        return await FalModelDiscovery.forProvider(client, cfg).listModels();
+      } finally {
+        client.close();
+      }
+    }
+    final replaceMetadata = await _resolver.startModelListRefresh(cfg);
+    if (ReplicateMediaModel.isHost(Uri.tryParse(cfg.baseUrl)?.host)) {
+      await replaceMetadata(const []);
+      return [
+        for (final model in ReplicateMediaModel.values)
+          _resolver.spec(cfg, model.id),
+      ];
+    }
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
@@ -59,21 +93,37 @@ class OpenAIProvider extends BaseProvider {
       final mergedHeaders = _Http.modelListHeaders(cfg, headers);
       final ollamaIds = await _ollama.fetchModels(cfg, mergedHeaders);
       if (ollamaIds != null) {
+        await replaceMetadata(const []);
         return [for (final id in ollamaIds) _resolver.spec(cfg, id)];
       }
       final res = await client.get(uri, headers: mergedHeaders);
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        final data = (jsonDecode(res.body)['data'] as List?) ?? [];
+        final data = jsonDecode(res.body)['data'] as List?;
+        if (data == null) return [];
+        final keyed = {
+          for (final row in _Http.modelRows(data)) row.id: row.json,
+        };
+        if (isModelScopeInferenceHost(uri.host)) {
+          for (final id in modelScopeCreationModels) {
+            keyed.putIfAbsent(id, () => {'id': id});
+          }
+        }
+        if (OpenRouterMediaModel.isHost(uri.host)) {
+          await mergeOpenRouterMediaCatalogs(
+            client,
+            Uri.parse(cfg.baseUrl),
+            mergedHeaders,
+            keyed,
+            cached: (mode) => _resolver.cachedOpenRouterMedia(cfg, mode),
+          );
+        }
+        final rows = keyed.entries.map(
+          (entry) => (id: entry.key, json: entry.value),
+        );
+        await replaceMetadata(rows);
         return [
-          for (final e in data)
-            if (e is Map && e['id'] is String)
-              _resolver
-                  .resolve(
-                    cfg,
-                    e['id'] as String,
-                    displayName: e['id'] as String,
-                  )
-                  .spec,
+          for (final row in rows)
+            _resolver.spec(cfg, row.id, displayName: row.id),
         ];
       }
       return [];
@@ -87,6 +137,8 @@ class ClaudeProvider extends BaseProvider {
   static const String anthropicVersion = '2023-06-01';
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    final resolver = ModelSpecResolver.instance;
+    final replaceMetadata = await resolver.startModelListRefresh(cfg);
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
@@ -101,18 +153,20 @@ class ClaudeProvider extends BaseProvider {
       );
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final obj = jsonDecode(res.body) as Map<String, dynamic>;
-        final data = (obj['data'] as List?) ?? [];
+        final data = obj['data'] as List?;
+        if (data == null) return [];
+        final rows = _Http.modelRows(data);
+        await replaceMetadata(rows);
         return [
-          for (final e in data)
-            if (e is Map && e['id'] is String)
-              ModelSpecResolver.instance
-                  .resolve(
-                    cfg,
-                    e['id'] as String,
-                    displayName:
-                        (e['display_name'] as String?) ?? (e['id'] as String),
-                  )
-                  .spec,
+          for (final row in rows)
+            resolver.spec(
+              cfg,
+              row.id,
+              displayName: switch (row.json['display_name']) {
+                final String name => name,
+                _ => row.id,
+              },
+            ),
         ];
       }
       return [];
@@ -124,12 +178,18 @@ class ClaudeProvider extends BaseProvider {
 
 class GoogleProvider extends BaseProvider {
   String _buildUrl(ProviderConfig cfg) {
+    final host = Uri.tryParse(cfg.baseUrl)?.host ?? '';
+    final directGoogle =
+        host == 'generativelanguage.googleapis.com' ||
+        host == 'aiplatform.googleapis.com' ||
+        host.endsWith('-aiplatform.googleapis.com') ||
+        host.endsWith('.rep.googleapis.com');
     if (cfg.vertexAI == true &&
-        (cfg.location?.isNotEmpty == true) &&
-        (cfg.projectId?.isNotEmpty == true)) {
-      final loc = cfg.location!;
-      final proj = cfg.projectId!;
-      return 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models';
+        (directGoogle ||
+            (cfg.projectId ?? '').trim().isNotEmpty ||
+            (cfg.serviceAccountJson ?? '').trim().isNotEmpty)) {
+      final location = (cfg.location ?? '').trim();
+      return "${providerVertexOrigin(cfg, location.isEmpty ? 'us-central1' : location)}/v1beta1/publishers/google/models";
     }
     final base = cfg.baseUrl.endsWith('/')
         ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
@@ -139,6 +199,8 @@ class GoogleProvider extends BaseProvider {
 
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    final resolver = ModelSpecResolver.instance;
+    final replaceMetadata = await resolver.startModelListRefresh(cfg);
     final client = providerHttpClient(cfg);
     try {
       final url = _buildUrl(cfg);
@@ -169,36 +231,76 @@ class GoogleProvider extends BaseProvider {
       }
       final out = <ModelSpec>[];
       try {
-        final res = await client.get(
-          Uri.parse(url),
-          headers: _Http.modelListHeaders(cfg, headers),
-        );
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          final obj = jsonDecode(res.body) as Map<String, dynamic>;
-          final arr = (obj['models'] as List?) ?? [];
-          for (final e in arr) {
-            if (e is Map) {
-              final name = (e['name'] as String?) ?? '';
-              final id = name.startsWith('models/')
-                  ? name.substring('models/'.length)
-                  : name;
-              final displayName = (e['displayName'] as String?) ?? id;
-              final methods =
-                  (e['supportedGenerationMethods'] as List?)
-                      ?.map((m) => m.toString())
-                      .toSet() ??
-                  {};
-              if (!(methods.contains('generateContent') ||
-                  methods.contains('embedContent'))) {
-                continue;
-              }
-              out.add(
-                ModelSpecResolver.instance
-                    .resolve(cfg, id, displayName: displayName)
-                    .spec,
-              );
-            }
+        final base = Uri.parse(url);
+        final rows = <String, ModelListRow>{};
+        final tokens = <String>{};
+        Uri page = base;
+        var complete = false;
+        while (true) {
+          final Map<String, dynamic> data;
+          try {
+            final res = await client.get(
+              page,
+              headers: _Http.modelListHeaders(cfg, headers),
+            );
+            if (res.statusCode < 200 || res.statusCode >= 300) break;
+            data = jsonDecode(res.body) as Map<String, dynamic>;
+          } on Exception {
+            break;
           }
+          final models = cfg.vertexAI == true
+              ? data['publisherModels'] ?? data['models']
+              : data['models'];
+          if (models is! List) break;
+          for (final row in models.whereType<Map>()) {
+            final name = row['name'];
+            if (name is! String) continue;
+            final id = name.replaceFirst(
+              RegExp(r'^(?:publishers/google/)?models/'),
+              '',
+            );
+            if (id.trim().isNotEmpty) rows[id] = (id: id, json: row);
+          }
+          final next = data['nextPageToken'];
+          if (next == null || next == '') {
+            complete = true;
+            break;
+          }
+          if (next is! String || !tokens.add(next)) break;
+          page = base.replace(
+            queryParameters: {...base.queryParameters, 'pageToken': next},
+          );
+        }
+        if (complete) await replaceMetadata(rows.values);
+        for (final row in rows.values) {
+          if (cfg.vertexAI == true &&
+              (VeoVideoAdapter.retiredOnVertex(row.id) ||
+                  GeminiImagesAdapter.retiredOnVertex(row.id))) {
+            continue;
+          }
+          final methods = row.json['supportedGenerationMethods'];
+          final nativeMedia =
+              isGeminiOmniVideoModel(row.id) ||
+              cfg.vertexAI == true && row.id.startsWith('veo-') ||
+              base.host != 'generativelanguage.googleapis.com' &&
+                  GeminiImagesAdapter.isImagen(row.id) &&
+                  (cfg.vertexAI != true ||
+                      !GeminiImagesAdapter.retiredOnVertex(row.id));
+          if (!nativeMedia &&
+              methods != null &&
+              (methods is! List ||
+                  !(methods.contains('generateContent') ||
+                      methods.contains('embedContent')))) {
+            continue;
+          }
+          final name = row.json['displayName'];
+          out.add(
+            resolver.spec(
+              cfg,
+              row.id,
+              displayName: name is String ? name : row.id,
+            ),
+          );
         }
       } catch (_) {}
 
@@ -212,13 +314,11 @@ class GoogleProvider extends BaseProvider {
         )) {
           if (!out.any((m) => m.id == model.id)) {
             out.add(
-              ModelSpecResolver.instance
-                  .resolve(
-                    cfg,
-                    model.id,
-                    displayName: model.name.isEmpty ? null : model.name,
-                  )
-                  .spec,
+              resolver.spec(
+                cfg,
+                model.id,
+                displayName: model.name.isEmpty ? null : model.name,
+              ),
             );
           }
         }

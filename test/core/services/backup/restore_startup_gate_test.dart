@@ -9,7 +9,9 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/startup_failure_report.dart';
+import 'package:Kelivo/core/models/backup_scope.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
 import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
 import 'package:Kelivo/core/services/backup/restore_cutover_executor.dart';
@@ -39,6 +41,46 @@ void main() {
     tearDown(() async {
       if (await root.exists()) await root.delete(recursive: true);
     });
+
+    test(
+      'cold start hashes a previously staged user import before moving live data',
+      () async {
+        final live = File(p.join(appData.path, 'kelivo.db'));
+        await _createDatabase(live, conversationId: 'old');
+        final prepared = await _prepareBundle(
+          root: root,
+          appData: appData,
+          directoryName: 'user-import',
+          includeFiles: true,
+          consumeExtractedFiles: true,
+        );
+        final file = File(
+          p.join(prepared.candidateDirectory.path, 'upload', 'new.txt'),
+        );
+        final previousSize = await file.length();
+        await file.writeAsString('bad asset', flush: true);
+        expect(await file.length(), previousSize);
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: appData,
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'payload',
+              contains('restore_staging_candidate:upload/new.txt'),
+            ),
+          ),
+        );
+        expect(await _conversationIds(live), ['old']);
+        expect(
+          await Directory(
+            p.join(prepared.workspace.path, 'previous.pending'),
+          ).exists(),
+          isFalse,
+        );
+      },
+    );
 
     test(
       'Windows occupied workspace resumes the same partially preserved restore',
@@ -586,9 +628,16 @@ void main() {
       );
 
       final stages = <RestoreStartupStage>[];
+      final measuredStages = <RestoreStartupStage>{};
       final terminal = await RestoreStartupGate.recoverAndRequireBusinessReady(
         appDataDirectory: appData,
         onStage: stages.add,
+        onProgress: (progress) {
+          if (progress.unit == BackupProgressUnit.bytes &&
+              progress.processed > 0) {
+            measuredStages.add(stages.last);
+          }
+        },
       );
 
       expect(terminal?.state, RestoreReceiptState.committed);
@@ -599,6 +648,14 @@ void main() {
         RestoreStartupStage.verifying,
         RestoreStartupStage.finishing,
       ]);
+      expect(
+        measuredStages,
+        containsAll([
+          RestoreStartupStage.checkingBackup,
+          RestoreStartupStage.installingBackup,
+          RestoreStartupStage.verifying,
+        ]),
+      );
       expect(
         await RestoreStartupGate.hasPendingWork(appDataDirectory: appData),
         isFalse,
@@ -882,6 +939,7 @@ Future<PreparedRestoreBundle> _prepareV130Bundle({
     appData: appData,
     directoryName: 'v130_source',
     includeFiles: includeFiles,
+    scope: const BackupScope(excluded: {BackupCategory.creations}),
   );
   // v1.3.0 persisted version 2, without an assetRoots declaration. Its
   // receipt format is unchanged; bind the fixture receipt to the old bytes.
@@ -1019,6 +1077,8 @@ Future<PreparedRestoreBundle> _prepareBundle({
   required Directory appData,
   required String directoryName,
   required bool includeFiles,
+  bool consumeExtractedFiles = false,
+  BackupScope scope = const BackupScope(),
 }) async {
   final extracted = Directory(p.join(root.path, directoryName));
   await extracted.create();
@@ -1064,6 +1124,8 @@ Future<PreparedRestoreBundle> _prepareBundle({
   return RestoreBundlePreparation.prepare(
     appDataDirectory: appData,
     extractedDirectory: extracted,
+    consumeExtractedFiles: consumeExtractedFiles,
+    scope: scope,
     sourceManifestSha256: (await sha256.bind(manifest.openRead()).first)
         .toString(),
     bundleIncludesChats: true,

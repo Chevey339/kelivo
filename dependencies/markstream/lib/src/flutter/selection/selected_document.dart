@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../../core/ast/nodes.dart';
 import '../../core/ast/source_span.dart';
 import '../../core/ast/transform.dart';
@@ -51,15 +53,25 @@ DocumentNode selectedDocument(
     }
     final fragments = parts[node];
     if (fragments != null) {
-      converted[node] = node is TextNode
-          ? TextNode(
-              span: SourceSpan(
-                fragments.first.sourceSpan.start,
-                fragments.last.sourceSpan.end,
-              ),
-              text: fragments.map((part) => part.text).join(),
-            )
-          : node;
+      final literalHtml =
+          node is HtmlElementNode && (node.tag == 'code' || node.tag == 'kbd');
+      if (node is TextNode || literalHtml) {
+        final text = fragments.map((part) => part.text).join();
+        final clipped = TextNode(
+          span: SourceSpan(
+            fragments.map((part) => part.sourceSpan.start).reduce(math.min),
+            fragments.map((part) => part.sourceSpan.end).reduce(math.max),
+          ),
+          text: text,
+        );
+        converted[node] = node is TextNode
+            ? clipped
+            : text == toPlainText(node)
+            ? node
+            : replaceChildren(node, [clipped]);
+      } else {
+        converted[node] = node;
+      }
       continue;
     }
     if (node is ReferenceDefinitionNode) {

@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/translation_language.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -81,16 +82,17 @@ Future<void> showSelectionTranslationPanel(
       (locale.languageCode == 'zh'
           ? (locale.scriptCode == 'Hant' ? 'zh-TW' : 'zh-CN')
           : locale.languageCode);
+  final languages = settings.visibleTranslationLanguages;
   final initial =
-      supportedLanguages
+      languages
           .where(
             (language) =>
                 language.code == preferred ||
                 language.displayName == preferred ||
-                language.displayNameZh == preferred,
+                language.nativeName == preferred,
           )
           .firstOrNull ??
-      supportedLanguages.first;
+      languages.first;
   Widget panel(BuildContext context) => SelectionResultPanel(
     controller: controller,
     initialLanguage: initial,
@@ -177,13 +179,16 @@ class _SelectionResultPanelState extends State<SelectionResultPanel> {
 
   Future<void> _selectLanguage() async {
     final l10n = AppLocalizations.of(context)!;
+    final languages = context
+        .read<SettingsProvider>()
+        .visibleTranslationLanguages;
     LanguageOption? selected;
     if (selectionUsesDesktop) {
       await showDesktopAnchoredMenu(
         context,
         anchorKey: _languageAnchor,
         items: [
-          for (final language in supportedLanguages)
+          for (final language in languages)
             DesktopContextMenuItem(
               label: languageDisplayName(l10n, language.code),
               checked: language.code == _language.code,
@@ -197,7 +202,7 @@ class _SelectionResultPanelState extends State<SelectionResultPanel> {
         title: l10n.languageSelectSheetTitle,
         selected: _language,
         items: [
-          for (final language in supportedLanguages)
+          for (final language in languages)
             OptionSheetItem(
               value: language,
               label: languageDisplayName(l10n, language.code),

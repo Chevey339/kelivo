@@ -22,6 +22,7 @@ class _FakeLazyChatService extends ChatService {
   int messageIndexCalls = 0;
   int contextStartIndex = -1;
   bool temporary = false;
+  bool orderIdsLoaded = true;
   int? timelineSelectedVersionOverride;
   bool requireGroupLoad = false;
   bool groupsLoaded = false;
@@ -73,6 +74,7 @@ class _FakeLazyChatService extends ChatService {
 
   @override
   int getMessageIndex(String conversationId, String messageId) {
+    if (!orderIdsLoaded) return -1;
     messageIndexCalls++;
     return _messages.indexWhere((message) => message.id == messageId);
   }
@@ -1045,6 +1047,48 @@ void main() {
       expect(controller.hasMoreAfter, isFalse);
     });
 
+    test(
+      'a cold versioned history counts logical slots when appending',
+      () async {
+        final revisions = [
+          for (var i = 0; i < 200; i++) ...[
+            _versionedMessage(
+              id: 'u$i',
+              role: 'user',
+              groupId: 'u$i',
+              version: 0,
+            ),
+            for (var v = 0; v < 3; v++)
+              _versionedMessage(
+                id: 'a$i-v$v',
+                role: 'assistant',
+                groupId: 'a$i',
+                version: v,
+              ),
+          ],
+        ];
+        chatService = _FakeLazyChatService(revisions)
+          ..orderIdsLoaded = false
+          ..versionSelections = {for (var i = 0; i < 200; i++) 'a$i': 0};
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+        final previous = controller.messages.map((m) => m.id).toList();
+        expect(previous, hasLength(40));
+        final user = chatService.appendPersistedMessage(_message(800));
+        final assistant = chatService.appendPersistedMessage(_message(801));
+        final loads = chatService.timelinePageCalls;
+        await controller.appendPersistedTailMessages([user, assistant]);
+        expect(chatService.timelinePageCalls, loads + 1);
+        expect(controller.messages.map((m) => m.id), [
+          ...previous,
+          user.id,
+          assistant.id,
+        ]);
+        expect(controller.totalMessageCount, 402);
+      },
+    );
+
     test('batch append notifies listeners exactly once', () async {
       await controller.setCurrentConversationAndLoad(conversation);
       final user = chatService.appendPersistedMessage(_message(100));
@@ -1056,6 +1100,26 @@ void main() {
 
       expect(notifyCount, 1);
     });
+
+    test(
+      'sending in a cold long conversation keeps the original history window',
+      () async {
+        chatService.orderIdsLoaded = false;
+        await controller.setCurrentConversationAndLoad(conversation);
+        final previous = controller.messages.map((m) => m.id).toList();
+        final user = chatService.appendPersistedMessage(_message(100));
+        final assistant = chatService.appendPersistedMessage(_message(101));
+        await controller.appendPersistedTailMessages([user, assistant]);
+        expect(controller.messages.map((m) => m.id), [
+          ...previous,
+          user.id,
+          assistant.id,
+        ]);
+        expect(controller.totalMessageCount, 102);
+        expect(controller.hasMoreBefore, isTrue);
+        expect(chatService.fullLoadCalls, 0);
+      },
+    );
 
     test(
       'a persisted gap between window tail and batch forces a reload',
@@ -1072,7 +1136,10 @@ void main() {
         ]);
 
         expect(appended, isTrue);
-        expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend + 1);
+        // The first bounded page discovers the unreported extra slot. The
+        // second preserves the oldest row that was already on screen.
+        expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend + 2);
+        expect(controller.messages.first.id, 'message-60');
         expect(controller.messages.last.id, straggler.id);
         expect(
           controller.messages.any((message) => message.id == 'message-100'),

@@ -41,6 +41,7 @@ void main() {
     expect(find.text('System'), findsWidgets);
     expect(find.text('Offline Model'), findsOneWidget);
     expect(find.text('OpenAI Realtime'), findsOneWidget);
+    expect(find.text('DeepSeek'), findsOneWidget);
     expect(find.text('Groq'), findsOneWidget);
     expect(find.text('Mistral'), findsOneWidget);
     expect(find.text('ElevenLabs'), findsOneWidget);
@@ -210,6 +211,7 @@ void main() {
     );
 
     for (final (kind, title) in [
+      (AsrServiceKind.deepseek, 'DeepSeek'),
       (AsrServiceKind.groq, 'Groq'),
       (AsrServiceKind.mistral, 'Mistral'),
       (AsrServiceKind.elevenLabs, 'ElevenLabs'),
@@ -251,19 +253,24 @@ void main() {
                 .text,
             defaults.baseUrl,
           );
-          expect(
-            tester
-                .widget<TextField>(find.byType(TextField).at(3))
-                .controller!
-                .text,
-            defaults.model,
-          );
+          final isDeepSeek = kind == AsrServiceKind.deepseek;
+          if (isDeepSeek) {
+            expect(find.text('Model'), findsNothing);
+            expect(find.text('Language'), findsNothing);
+          } else {
+            expect(
+              tester
+                  .widget<TextField>(find.byType(TextField).at(3))
+                  .controller!
+                  .text,
+              defaults.model,
+            );
+          }
           final values = [
             '$title custom',
             'test-api-key',
             'https://proxy.test/v1',
-            'custom-model',
-            'zh',
+            if (!isDeepSeek) ...['custom-model', 'zh'],
           ];
           for (var index = 0; index < values.length; index++) {
             final field = find.byType(TextField).at(index);
@@ -284,8 +291,8 @@ void main() {
           expect(saved.name, values[0]);
           expect(saved.apiKey, values[1]);
           expect(saved.baseUrl, values[2]);
-          expect(saved.model, values[3]);
-          expect(saved.language, values[4]);
+          expect(saved.model, isDeepSeek ? '' : values[3]);
+          expect(saved.language, isDeepSeek ? '' : values[4]);
           expect(settings.selectedAsrServiceId, saved.id);
 
           await settings.setAsrServices([

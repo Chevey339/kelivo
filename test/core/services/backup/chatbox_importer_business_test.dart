@@ -1081,10 +1081,10 @@ void main() {
           chatService: chatService,
         ),
         throwsA(
-          isA<ChatboxImportException>().having(
-            (e) => e.message,
-            'message',
-            contains('formatVersion'),
+          isA<ChatboxUnsupportedBackupVersionException>().having(
+            (e) => e.version,
+            'version',
+            99,
           ),
         ),
       );

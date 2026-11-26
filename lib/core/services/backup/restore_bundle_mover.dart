@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
 import '../../../utils/app_directories.dart';
 import '../../database/chat_database_repository.dart';
+import 'backup_task_progress.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_durability.dart';
 import 'restore_previous_builder.dart';
@@ -18,6 +20,7 @@ final class RestoreBundleMover {
     required this.appDataDirectory,
     required this.candidateDirectory,
     required this.previousStore,
+    this.onProgress,
     RestoreDurability? durability,
   }) : durability = durability ?? RestorePlatformDurability();
 
@@ -26,6 +29,7 @@ final class RestoreBundleMover {
   final Directory appDataDirectory;
   final Directory candidateDirectory;
   final RestorePreviousStore previousStore;
+  final BackupProgressSink? onProgress;
   final RestoreDurability durability;
 
   /// Moves the selected live objects into the pending previous bundle.
@@ -117,8 +121,15 @@ final class RestoreBundleMover {
           )) {
         throw StateError('restore_mover_database_not_installed');
       }
-      final actual = await ChatDatabaseRepository.inspectPreparedSnapshot(
-        target,
+      onProgress?.call(
+        const BackupProgress(
+          phase: BackupPhase.checkingDatabase,
+          processed: 0,
+          cancellable: false,
+        ),
+      );
+      final actual = await Isolate.run(
+        () => ChatDatabaseRepository.inspectPreparedSnapshot(target),
       );
       if (actual != candidate.databaseInfo) {
         throw StateError('restore_mover_database_metadata');
@@ -129,10 +140,12 @@ final class RestoreBundleMover {
       final source = await RestorePreviousBuilder.inspectAssets(
         candidateDirectory,
         rootNames: candidate.assetRoots,
+        onProgress: onProgress,
       );
       final target = await RestorePreviousBuilder.inspectAssets(
         await AppDirectories.contentDirectoryFor(appDataDirectory),
         rootNames: candidate.assetRoots,
+        onProgress: onProgress,
       );
       for (final root in candidate.assetRoots) {
         if (_exactAssetRootPresence(source, expected, root) ||
@@ -568,10 +581,12 @@ final class RestoreBundleMover {
     final source = await RestorePreviousBuilder.inspectAssets(
       sourceContainer,
       rootNames: expected.rootStates.keys,
+      onProgress: onProgress,
     );
     final target = await RestorePreviousBuilder.inspectAssets(
       targetContainer,
       rootNames: expected.rootStates.keys,
+      onProgress: onProgress,
     );
     final rootsToMove = <String>{};
     for (final root in expected.rootStates.keys) {
@@ -591,11 +606,19 @@ final class RestoreBundleMover {
       if (sourcePresent) rootsToMove.add(root);
     }
     if (syncSourceBeforeMove && rootsToMove.isNotEmpty) {
+      onProgress?.call(
+        const BackupProgress(
+          phase: BackupPhase.finalizing,
+          processed: 0,
+          cancellable: false,
+        ),
+      );
       await RestorePreviousBuilder.syncAssetRoots(
         root: sourceContainer,
         expected: expected,
         rootNames: rootsToMove,
         durability: durability,
+        onProgress: onProgress,
       );
     }
     for (final root in RestorePreviousAssetsPlan.rootNames) {
@@ -628,11 +651,16 @@ final class RestoreBundleMover {
     }
     if (!sourcePresent) return;
     await durability.renameAndSync(source: source, targetPath: target.path);
-    if (!await _exactFilePresence(
-      target,
-      expected,
-      databaseFamily: databaseFamily,
-    )) {
+    // A successful same-volume rename moves the already-hashed file. Confirm
+    // its placement here; validateInstalled hashes its contents before commit.
+    if (await FileSystemEntity.type(source.path, followLinks: false) !=
+            FileSystemEntityType.notFound ||
+        await FileSystemEntity.type(target.path, followLinks: false) !=
+            FileSystemEntityType.file ||
+        await target.length() != expected.bytes ||
+        (databaseFamily &&
+            (await _hasDatabaseSidecar(source) ||
+                await _hasDatabaseSidecar(target)))) {
       throw StateError('restore_mover_file_result');
     }
   }
@@ -665,7 +693,7 @@ final class RestoreBundleMover {
     if (type != FileSystemEntityType.file) {
       throw StateError('restore_mover_file_type');
     }
-    return RestorePreviousBuilder.describeFile(file);
+    return RestorePreviousBuilder.describeFile(file, onProgress: onProgress);
   }
 
   Future<bool> _anyDatabaseFamilyEntry(File file) async {

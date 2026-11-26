@@ -2,30 +2,34 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:archive/archive_io.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
-// ignore: depend_on_referenced_packages
-import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
 import 'package:Kelivo/shared/widgets/restore_failure_screen.dart';
 import '../../support/recovery_snapshot_fixture.dart';
 import 'restore_failure_screen_test.dart' as helpers;
 
-class _TemporaryPaths extends PathProviderPlatform {
-  _TemporaryPaths(this.root);
-  final Directory root;
+final class _RecoveryStagingFailure extends IOOverrides {
+  _RecoveryStagingFailure(this.diskFull);
+  final bool diskFull;
+
   @override
-  Future<String?> getTemporaryPath() async => '${root.path}/tmp';
+  Directory createDirectory(String path) =>
+      p.basename(path).startsWith('kelivo-recovery-check-')
+      ? _UnavailableStagingDirectory(path, diskFull)
+      : super.createDirectory(path);
 }
 
-class _UnavailableTemporaryDirectory implements Directory {
-  _UnavailableTemporaryDirectory(this.path, this.diskFull);
+class _UnavailableStagingDirectory implements Directory {
+  _UnavailableStagingDirectory(this.path, this.diskFull);
   final bool diskFull;
   @override
   final String path;
   @override
-  Future<Directory> createTemp([String? prefix]) async =>
+  Future<Directory> create({bool recursive = false}) async =>
       throw FileSystemException(
         diskFull ? 'No space left on device' : 'Permission denied',
         path,
@@ -42,6 +46,7 @@ class _UnavailableTemporaryDirectory implements Directory {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpRecoverySnapshotPaths();
   testWidgets(
     'newer database copies guide an app update without calling them invalid',
     (tester) async {
@@ -49,9 +54,6 @@ void main() {
       final root = (await tester.runAsync(
         () => Directory.systemTemp.createTemp('newer-recovery-'),
       ))!;
-      final previousPaths = PathProviderPlatform.instance;
-      PathProviderPlatform.instance = _TemporaryPaths(root);
-      addTearDown(() => PathProviderPlatform.instance = previousPaths);
       addTearDown(() => root.delete(recursive: true));
       final snapshot = File(
         '${root.path}/kelivo-snapshot-1792421104232879.zip',
@@ -59,6 +61,7 @@ void main() {
       final database = File('${root.path}/kelivo 2.db');
       late List<int> retainedDatabase;
       late List<int> retainedSnapshot;
+      const futureSchema = AppDatabase.currentSchemaVersion + 1;
       await tester.runAsync(() async {
         await writeRecoverySnapshot(snapshot);
         final zip = ZipDecoder().decodeBytes(await snapshot.readAsBytes());
@@ -67,7 +70,7 @@ void main() {
         );
         final raw = sqlite.sqlite3.open(database.path);
         try {
-          raw.userVersion = 6;
+          raw.userVersion = futureSchema;
         } finally {
           raw.close();
         }
@@ -75,7 +78,7 @@ void main() {
         final manifest =
             jsonDecode(utf8.decode(zip.findFile('manifest.json')!.readBytes()!))
                 as Map<String, dynamic>;
-        (manifest['database'] as Map)['schemaVersion'] = 6;
+        (manifest['database'] as Map)['schemaVersion'] = futureSchema;
         (manifest['entries'] as Map)['database/kelivo.db'] = {
           'bytes': retainedDatabase.length,
           'sha256': sha256.convert(retainedDatabase).toString(),
@@ -168,48 +171,40 @@ void main() {
             appVersionLoader: helpers.stubVersion,
           ),
         );
-        final temporaryPath = Directory.systemTemp.path;
-        await IOOverrides.runZoned(
-          () async {
-            await tester.pumpWidget(screen(const ValueKey('full')));
-            await helpers.settleDiagnostics(tester);
-            expect(
-              find.text('Some free space is needed'),
-              diskFull ? findsOneWidget : findsNothing,
+        await IOOverrides.runWithIOOverrides(() async {
+          await tester.pumpWidget(screen(const ValueKey('full')));
+          await helpers.settleDiagnostics(tester);
+          expect(
+            find.text('Some free space is needed'),
+            diskFull ? findsOneWidget : findsNothing,
+          );
+          expect(
+            find.textContaining(
+              diskFull
+                  ? 'This does not mean they are damaged'
+                  : 'Some local copies could not be checked yet',
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining(
+              'validation failed. The original file has been kept.',
+            ),
+            findsNothing,
+          );
+          expect(find.text('Choose a copy to recover'), findsNothing);
+          expect(find.textContaining('No space left on device'), findsNothing);
+          if (diskFull) {
+            await tester.ensureVisible(find.text('Other options'));
+            await tester.tap(find.text('Other options'));
+            await tester.pumpAndSettle();
+            final reset = find.widgetWithText(
+              OutlinedButton,
+              'Start with an empty chat list',
             );
-            expect(
-              find.textContaining(
-                diskFull
-                    ? 'This does not mean they are damaged'
-                    : 'Some local copies could not be checked yet',
-              ),
-              findsOneWidget,
-            );
-            expect(
-              find.textContaining(
-                'validation failed. The original file has been kept.',
-              ),
-              findsNothing,
-            );
-            expect(find.text('Choose a copy to recover'), findsNothing);
-            expect(
-              find.textContaining('No space left on device'),
-              findsNothing,
-            );
-            if (diskFull) {
-              await tester.ensureVisible(find.text('Other options'));
-              await tester.tap(find.text('Other options'));
-              await tester.pumpAndSettle();
-              final reset = find.widgetWithText(
-                OutlinedButton,
-                'Start with an empty chat list',
-              );
-              expect(tester.widget<OutlinedButton>(reset).onPressed, isNull);
-            }
-          },
-          getSystemTempDirectory: () =>
-              _UnavailableTemporaryDirectory(temporaryPath, diskFull),
-        );
+            expect(tester.widget<OutlinedButton>(reset).onPressed, isNull);
+          }
+        }, _RecoveryStagingFailure(diskFull));
         await tester.runAsync(() async {
           expect(
             (await sha256.bind(snapshot.openRead()).first).toString(),

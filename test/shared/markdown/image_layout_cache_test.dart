@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
+import 'package:Kelivo/shared/markdown/link_image_handlers.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +44,29 @@ Future<void> _decodeFirstFrame(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'an echoed generated handle is hidden only in the reply which owns the creation card',
+    (tester) async {
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      addTearDown(settings.dispose);
+      const handle = 'img_aabbccddee0123456789';
+      const path = '$handle.png';
+      final markdown = _host(settings, path);
+      await tester.pumpWidget(
+        GeneratedImageMarkdownScope(handles: const {handle}, child: markdown),
+      );
+      await tester.pump();
+      expect(find.byIcon(Lucide.ImageOff), findsNothing);
+      await tester.pumpWidget(
+        GeneratedImageMarkdownScope(handles: const {}, child: markdown),
+      );
+      await tester.pump();
+      expect(find.byIcon(Lucide.ImageOff), findsOneWidget);
+    },
+  );
+
   testWidgets('measuring a data image reuses its decoded image', (
     tester,
   ) async {

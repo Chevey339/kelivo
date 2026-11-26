@@ -1,5 +1,6 @@
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/conversation.dart';
 
 /// Helper class for extracting model display information.
@@ -51,13 +52,19 @@ class ModelDisplayInfo {
   Assistant? assistant,
 }) {
   final pinned = settings.perChatModelEnabled ? conversation : null;
-  final providerKey =
-      pinned?.chatModelProvider ??
-      assistant?.chatModelProvider ??
-      settings.currentModelProvider;
-  final modelId =
-      pinned?.chatModelId ?? assistant?.chatModelId ?? settings.currentModelId;
-  return (providerKey: providerKey, modelId: modelId);
+  for (final (providerKey, modelId) in [
+    (pinned?.chatModelProvider, pinned?.chatModelId),
+    (assistant?.chatModelProvider, assistant?.chatModelId),
+    (settings.currentModelProvider, settings.currentModelId),
+  ]) {
+    if (providerKey == null || modelId == null) continue;
+    final provider = settings.getProviderConfig(providerKey);
+    if (ModelSpecResolver.instance.spec(provider, modelId).type.isMedia) {
+      continue;
+    }
+    return (providerKey: providerKey, modelId: modelId);
+  }
+  return (providerKey: null, modelId: null);
 }
 
 /// Extracts model display information from settings, conversation and assistant.

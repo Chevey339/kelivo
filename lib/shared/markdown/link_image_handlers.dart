@@ -5,9 +5,15 @@ import 'dart:math' as math;
 import 'markdown_image_sources.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show setEquals;
+import '../../core/services/tools/view_image_tool.dart';
 import 'package:crypto/crypto.dart';
 import 'package:markstream/markstream.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/providers/workspace_provider.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/features/workspace/workspace_file_navigation.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
@@ -84,6 +90,30 @@ class KelivoLinkHandler implements LinkHandler {
   }
 }
 
+/// Some replies echo a generated image ID as a Markdown file destination.
+/// The native creation card already displays that exact output.
+class GeneratedImageMarkdownScope extends InheritedWidget {
+  const GeneratedImageMarkdownScope({
+    super.key,
+    required this.handles,
+    required super.child,
+  });
+  final Set<String> handles;
+  static bool covers(BuildContext context, String url, {bool listen = true}) {
+    final id = ViewImageTool.imageIdFromPath(url);
+    if (id == null) return false;
+    final scope = listen
+        ? context
+              .dependOnInheritedWidgetOfExactType<GeneratedImageMarkdownScope>()
+        : context.getInheritedWidgetOfExactType<GeneratedImageMarkdownScope>();
+    return scope?.handles.contains(id) == true;
+  }
+
+  @override
+  bool updateShouldNotify(GeneratedImageMarkdownScope oldWidget) =>
+      !setEquals(handles, oldWidget.handles);
+}
+
 class KelivoImageBuilder implements ImageBuilder {
   const KelivoImageBuilder();
   static final _dimensions = RegExp(r'^(?:(\d+)(?:x(\d+))?|x(\d+))$');
@@ -95,11 +125,18 @@ class KelivoImageBuilder implements ImageBuilder {
       return number != null && number.isFinite && number > 0 ? number : null;
     }
 
-    return _MarkdownImage(
+    final inline = _MarkdownImage(
       theme: theme,
       url: image.destination,
       width: size(dimensions?[1]),
       height: size(dimensions?[2] ?? dimensions?[3]),
+    );
+    if (ViewImageTool.imageIdFromPath(image.destination) == null) return inline;
+    return Builder(
+      builder: (context) =>
+          GeneratedImageMarkdownScope.covers(context, image.destination)
+          ? const SizedBox.shrink()
+          : inline,
     );
   }
 }
@@ -145,6 +182,8 @@ class _MarkdownImage extends StatefulWidget {
 
 class _MarkdownImageState extends State<_MarkdownImage> {
   Future<File?>? _file;
+  File? _cachedFile;
+  Object? _fileCacheId;
   String? _conversationId;
   late String _sourceId = sha256.convert(utf8.encode(widget.url)).toString();
   PageStorageBucket? _storage;
@@ -157,15 +196,16 @@ class _MarkdownImageState extends State<_MarkdownImage> {
 
   Object get _aspectId => ('markdown-image-aspect', _conversationId, _sourceId);
 
-  void _syncAspect({bool sourceChanged = false}) {
+  bool _syncAspect({bool sourceChanged = false}) {
     final storage =
         MarkdownLinkScope.read(context)?.imageStorage ??
         PageStorage.maybeOf(context);
-    if (!sourceChanged && identical(storage, _storage)) return;
+    if (!sourceChanged && identical(storage, _storage)) return false;
     _stopListening();
     _listenedProvider = null;
     _storage = storage;
     _aspect = storage?.readState(context, identifier: _aspectId) as double?;
+    return true;
   }
 
   @override
@@ -173,11 +213,11 @@ class _MarkdownImageState extends State<_MarkdownImage> {
     super.didChangeDependencies();
     final conversationId = MarkdownLinkScope.of(context)?.conversationId;
     final changed = conversationId != _conversationId;
-    if (_file == null || changed) {
-      _conversationId = conversationId;
+    _conversationId = conversationId;
+    final storageChanged = _syncAspect(sourceChanged: changed);
+    if (_file == null || changed || storageChanged) {
       _resolve();
     }
-    _syncAspect(sourceChanged: changed);
   }
 
   @override
@@ -186,9 +226,9 @@ class _MarkdownImageState extends State<_MarkdownImage> {
     final changed = oldWidget.url != widget.url;
     if (changed) {
       _sourceId = sha256.convert(utf8.encode(widget.url)).toString();
-      _resolve();
     }
-    _syncAspect(sourceChanged: changed);
+    final storageChanged = _syncAspect(sourceChanged: changed);
+    if (changed || storageChanged) _resolve();
   }
 
   void _stopListening() {
@@ -250,16 +290,53 @@ class _MarkdownImageState extends State<_MarkdownImage> {
   }
 
   void _resolve() {
-    _file = KelivoLink.tryParse(widget.url) == null
-        ? null
-        : resolveWorkspaceLinkedFile(
-            context,
-            widget.url,
-            conversationId: _conversationId,
-          ).then((file) {
-            if (mounted) preserveScrollLayoutAnchor(context);
-            return file;
-          });
+    final link = KelivoLink.tryParse(widget.url);
+    _cachedFile = null;
+    _fileCacheId = null;
+    if (link == null) {
+      _file = null;
+      return;
+    }
+    if (link.kind == KelivoLinkKind.workspaceFile) {
+      final chat = context.read<ChatService?>();
+      final id = _conversationId ?? chat?.currentConversationId;
+      final conversation = id == null ? null : chat?.getConversation(id);
+      final workspaceId = conversation?.extras[WorkspaceBinding.keyId];
+      final resolver = context.read<FileLinkResolver?>();
+      final workspaces =
+          resolver?.workspaces ?? context.read<WorkspaceProvider?>();
+      final workspace = workspaceId is String
+          ? workspaces?.byId(workspaceId)
+          : null;
+      // Retain only the resolved source, never image pixels. A different
+      // conversation, binding, workspace root or resolver starts a fresh view.
+      _fileCacheId = (
+        'markdown-workspace-image',
+        id,
+        _sourceId,
+        workspaceId,
+        workspace?.kind,
+        workspace?.hostPath,
+        resolver,
+      );
+      _cachedFile =
+          _storage?.readState(context, identifier: _fileCacheId) as File?;
+    }
+    final storage = _storage;
+    final cacheId = _fileCacheId;
+    final request = resolveWorkspaceLinkedFile(
+      context,
+      widget.url,
+      conversationId: _conversationId,
+    );
+    _file = request;
+    request.then((file) {
+      if (!mounted || !identical(_file, request)) return;
+      if (cacheId != null && identical(storage, _storage)) {
+        storage?.writeState(context, file, identifier: cacheId);
+      }
+      preserveScrollLayoutAnchor(context);
+    });
   }
 
   ImageProvider? _imageProvider(String source) {
@@ -282,48 +359,89 @@ class _MarkdownImageState extends State<_MarkdownImage> {
       child: Icon(Lucide.ImageOff, size: 22, color: widget.theme.colors.ink3),
     ),
   );
+
+  Widget _loading(BoxConstraints constraints) {
+    final size = _displaySize(constraints);
+    return SizedBox(
+      width: size.width ?? 36,
+      height: size.height ?? 36,
+      child: const Center(
+        child: SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+    );
+  }
+
+  bool _hasCachedPixels(ImageProvider provider) {
+    // FileImage/SvgImageProvider and their ResizeImage wrapper have synchronous
+    // keys. Check only the existing cache: an unvalidated path must not start
+    // a new file read or decode while workspace resolution is still pending.
+    var cached = false;
+    provider.obtainKey(createLocalImageConfiguration(context)).then((key) {
+      cached = PaintingBinding.instance.imageCache.statusForKey(key).keepAlive;
+    });
+    return cached;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_file == null) {
       return _image(widget.url, _imageProvider(widget.url));
     }
     return FutureBuilder<File?>(
+      key: ValueKey((_conversationId, _sourceId, _fileCacheId)),
       future: _file,
+      initialData: _cachedFile,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        final resolving = snapshot.connectionState != ConnectionState.done;
+        if (resolving && snapshot.data == null) {
           // File resolution runs again after recycling. Preserve the decoded
           // aspect (or explicit dimensions) while the file is being located.
           return LayoutBuilder(
-            builder: (context, constraints) {
-              final size = _displaySize(constraints);
-              return SizedBox(
-                width: size.width ?? 36,
-                height: size.height ?? 36,
-                child: const Center(
-                  child: SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              );
-            },
+            builder: (context, constraints) => _loading(constraints),
           );
         }
         final file = snapshot.data;
         return file == null
             ? _broken()
-            : _image(file.path, _imageProvider(file.path));
+            : _image(
+                file.path,
+                _imageProvider(file.path),
+                cacheOnly: resolving,
+              );
       },
     );
   }
 
-  Widget _image(String url, ImageProvider? provider) {
-    if (provider == null) return _broken();
+  Widget _image(String url, ImageProvider? provider, {bool cacheOnly = false}) {
+    if (provider == null) {
+      return cacheOnly
+          ? LayoutBuilder(
+              builder: (context, constraints) => _loading(constraints),
+            )
+          : _broken();
+    }
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () => _open(url),
+        onTap: () async {
+          if (!cacheOnly) {
+            _open(url);
+            return;
+          }
+          final request = _file;
+          final file = await request;
+          if (!mounted ||
+              !identical(_file, request) ||
+              file == null ||
+              ModalRoute.of(context)?.isCurrent == false) {
+            return;
+          }
+          _open(file.path);
+        },
         child: LayoutBuilder(
           builder: (context, constraints) {
             final width = _displaySize(constraints).width;
@@ -338,6 +456,9 @@ class _MarkdownImageState extends State<_MarkdownImage> {
               null,
               provider,
             );
+            if (cacheOnly && !_hasCachedPixels(resized)) {
+              return _loading(constraints);
+            }
             // Observe the same decoded stream as Image, without decoding a
             // second full-resolution copy or retaining image pixels in storage.
             _listenForAspect(resized);
@@ -355,10 +476,12 @@ class _MarkdownImageState extends State<_MarkdownImage> {
                 ),
               ),
               child: Image(
+                key: ValueKey(url),
                 image: resized,
                 width: width,
                 height: height,
                 fit: BoxFit.contain,
+                gaplessPlayback: true,
                 errorBuilder: (context, error, stack) => isSvgImageSource(url)
                     ? GestureDetector(
                         onTap: () async {
@@ -392,9 +515,11 @@ class _MarkdownImageState extends State<_MarkdownImage> {
     final urls = <String>[];
     if (source != null) {
       urls.addAll(
-        markdownImageSources(
-          source,
-        ).where((url) => KelivoLink.tryParse(url) == null),
+        markdownImageSources(source).where(
+          (url) =>
+              KelivoLink.tryParse(url) == null &&
+              !GeneratedImageMarkdownScope.covers(context, url, listen: false),
+        ),
       );
     }
     if (!urls.contains(url)) urls.insert(0, url);

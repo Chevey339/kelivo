@@ -88,6 +88,50 @@ Future<void> togglePromptSelection(
             assistantId: assistantId,
           );
   }
+  return _updateConversationSelection(context, conversationId, kind, (ids) {
+    final next = ids.toSet();
+    if (!next.remove(id)) next.add(id);
+    return next.toList();
+  });
+}
+
+Future<void> toggleWorldBookGroupSelection(
+  BuildContext context, {
+  required Set<String> bookIds,
+  required Set<String> enabledBookIds,
+  String? assistantId,
+  String? conversationId,
+}) {
+  List<String> toggle(List<String> ids) {
+    final next = ids.toSet();
+    if (next.containsAll(enabledBookIds)) {
+      next.removeAll(bookIds);
+    } else {
+      next.addAll(enabledBookIds);
+    }
+    return next.toList();
+  }
+
+  if (conversationId != null) {
+    return _updateConversationSelection(
+      context,
+      conversationId,
+      PromptSelectionKind.worldBook,
+      toggle,
+    );
+  }
+  return context.read<WorldBookProvider>().updateActiveBookIds(
+    toggle,
+    assistantId: assistantId,
+  );
+}
+
+Future<void> _updateConversationSelection(
+  BuildContext context,
+  String conversationId,
+  PromptSelectionKind kind,
+  List<String> Function(List<String>) update,
+) {
   final key = kind == PromptSelectionKind.worldBook
       ? ConversationPromptSettings.worldBookIdsKey
       : ConversationPromptSettings.instructionIdsKey;
@@ -95,12 +139,9 @@ Future<void> togglePromptSelection(
     extras,
   ) {
     final settings = ConversationPromptSettings.fromExtras(extras);
-    final ids =
-        (kind == PromptSelectionKind.worldBook
-                ? settings.worldBookIds
-                : settings.instructionIds)
-            .toSet();
-    if (!ids.remove(id)) ids.add(id);
-    return {...extras, key: ids.toList()};
+    final ids = kind == PromptSelectionKind.worldBook
+        ? settings.worldBookIds
+        : settings.instructionIds;
+    return {...extras, key: update(ids)};
   });
 }

@@ -9,6 +9,8 @@ import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
 import 'package:Kelivo/core/services/backup/local_copy_catalog.dart';
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
+import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
+import 'package:Kelivo/core/database/schema_migrations.dart';
 
 class _InterruptRetirement implements RestoreDurability {
   final delegate = RestorePlatformDurability();
@@ -82,8 +84,13 @@ void main() {
       final copy = copies.single.file;
       expect(await copy.readAsBytes(), originalMain);
       expect(await File('${copy.path}-wal').readAsBytes(), originalWal);
-      // Admission replays the pending retirement and refuses to silently build
-      // an empty database beside the retained history.
+      final stages = <DatabaseUpgradeStage>[];
+      await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: root,
+        onUpgradeStage: stages.add,
+      );
+      expect(stages, [DatabaseUpgradeStage.checking]);
+      // Admission refuses to build an empty database beside retained history.
       await expectLater(
         DatabaseInstallationGate.ensureReady(appDataDirectory: root),
         throwsStateError,

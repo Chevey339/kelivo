@@ -255,10 +255,10 @@ class DocumentSelectionBinding {
   final projections = <SelectionProjectionRegistration>{};
   final preparers = <_SourceRangePreparerState>{};
   void changed() => controller.changed();
-  List<_MarkstreamSelectionFragmentState> get _ordered => fragments.toList()
-    ..sort(
-      (a, b) => a.widget.node.span.start.compareTo(b.widget.node.span.start),
-    );
+  List<_MarkstreamSelectionFragmentState> get _ordered =>
+      fragments.toList()..sort(
+        (a, b) => a.widget.node.span.start.compareTo(b.widget.node.span.start),
+      );
   TextIndex get textIndex => TextIndex.fromSegments(
     _ordered.expand((fragment) => fragment.widget.segments),
   );
@@ -292,28 +292,31 @@ class DocumentSelectionBinding {
       // between generated field characters and characters in source code.
       segments.add(TextSegment(text: text, sourceSpan: node.span, node: node));
     }
-    segments.sort((a, b) => a.sourceSpan.start.compareTo(b.sourceSpan.start));
     if (segments.isEmpty) return null;
+    // Rendered separators belong at their display offsets even when they
+    // share a source anchor with earlier content.
+    final content = selection_slice.selectedDocument(
+      document,
+      segments,
+      replacements: replacements,
+      visible: {
+        for (final fragment in fragments) fragment.widget.node,
+        for (final fragment in fragments)
+          for (final segment in fragment.widget.segments)
+            if (segment.node != null) segment.node!,
+        for (final group in groups)
+          if (group.node() != null) group.node()!,
+      },
+      complete: {
+        for (final group in groups)
+          if (group.node() != null && group.complete) group.node()!,
+      },
+    );
+    segments.sort((a, b) => a.sourceSpan.start.compareTo(b.sourceSpan.start));
     return MarkstreamSelection(
       document: document,
       segments: segments,
-      content: selection_slice.selectedDocument(
-        document,
-        segments,
-        replacements: replacements,
-        visible: {
-          for (final fragment in fragments) fragment.widget.node,
-          for (final fragment in fragments)
-            for (final segment in fragment.widget.segments)
-              if (segment.node != null) segment.node!,
-          for (final group in groups)
-            if (group.node() != null) group.node()!,
-        },
-        complete: {
-          for (final group in groups)
-            if (group.node() != null && group.complete) group.node()!,
-        },
-      ),
+      content: content,
     );
   }
 }

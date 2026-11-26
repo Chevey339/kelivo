@@ -693,6 +693,73 @@ void main() {
     expect(saved.extraApiKeys, ['extra-key']);
   });
 
+  testWidgets('adds 4get only after entering an instance URL', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+    await tester.tap(find.text('4get'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    expect(result, isNull);
+
+    final urlField = find.byKey(const ValueKey('search-service-field-url'));
+    await tester.dragUntilVisible(
+      urlField,
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.enterText(urlField, 'https://search.example/4get');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    final saved = result!.service! as FourGetOptions;
+    expect(saved.url, 'https://search.example/4get');
+    expect(saved.scraper, isEmpty);
+    expect(saved.passToken, isEmpty);
+  });
+
+  testWidgets('4get test searches keep the pass scoped to its origin', (
+    tester,
+  ) async {
+    final requests = <FourGetOptions>[];
+    await _pumpEditor(
+      tester,
+      initialService: const FourGetOptions(
+        id: '4get',
+        url: 'https://search.example/4get',
+        passToken: 'saved-pass',
+      ),
+      searchFetcher: (_, options) async {
+        requests.add(options as FourGetOptions);
+        return SearchResult(items: const []);
+      },
+      onResult: (_) {},
+    );
+
+    final urlField = find.byKey(const ValueKey('search-service-field-url'));
+    final queryField = _testQueryField();
+    final list = find.byType(ListView);
+    await tester.enterText(urlField, 'https://search.example/search');
+    await tester.dragUntilVisible(queryField, list, const Offset(0, -200));
+    await tester.enterText(queryField, 'Flutter documentation');
+    await tester.pump();
+    await tester.tap(find.byIcon(Lucide.Play));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(urlField, list, const Offset(0, 200));
+    await tester.enterText(urlField, 'https://other.example/4get');
+    await tester.dragUntilVisible(queryField, list, const Offset(0, -200));
+    await tester.tap(find.byIcon(Lucide.Play));
+    await tester.pumpAndSettle();
+
+    expect(requests.map((options) => options.url), [
+      'https://search.example/search',
+      'https://other.example/4get',
+    ]);
+    expect(requests.map((options) => options.passToken), ['saved-pass', '']);
+  });
+
   testWidgets('selects You.com from the add page and saves', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(tester, onResult: (value) => result = value);

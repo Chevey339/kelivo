@@ -8,10 +8,11 @@ import '../../../core/models/mcp_presentation.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../desktop/setting/mcp_edit_dialog.dart';
 import '../../../desktop/desktop_context_menu.dart';
+import '../../../shared/widgets/collapsible_group_header.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/selection_back_scope.dart';
-import 'mcp_form.dart';
+import '../../../shared/widgets/adaptive_form.dart';
 import 'mcp_group_picker.dart';
 import '../../../desktop/setting/mcp_json_edit_dialog.dart';
 import '../../../desktop/setting/mcp_timeout_dialog.dart';
@@ -20,7 +21,6 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/action_sheet.dart';
 import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/snackbar.dart';
-import '../../../theme/app_font_weights.dart';
 import '../../../utils/provider_grouping_logic.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'mcp_error_details_sheet.dart';
@@ -30,7 +30,7 @@ import 'mcp_json_import.dart';
 import 'mcp_server_card.dart';
 import 'mcp_server_edit_sheet.dart';
 import 'mcp_timeout_sheet.dart';
-import 'mcp_text_dialog.dart';
+import '../../../shared/widgets/text_input_dialog.dart';
 
 const _other = '__ungrouped__';
 typedef _Row = ({String groupId, McpServerConfig? server});
@@ -263,7 +263,8 @@ class _McpManagementViewState extends State<McpManagementView> {
     final l10n = AppLocalizations.of(context)!;
     final name = await showDialog<String>(
       context: context,
-      builder: (_) => McpTextDialog(
+      builder: (_) => TextInputDialog(
+        cancelLabel: l10n.mcpPageCancel,
         title: group == null
             ? l10n.providerGroupsCreateDialogTitle
             : l10n.mcpRenameGroup,
@@ -304,10 +305,10 @@ class _McpManagementViewState extends State<McpManagementView> {
 
   Future<bool> _confirm(String title, String message) async {
     final l10n = AppLocalizations.of(context)!;
-    return await showMcpForm<bool>(
+    return await showAdaptiveForm<bool>(
           context,
           desktop: widget.desktop,
-          builder: (ctx) => McpForm(
+          builder: (ctx) => AdaptiveForm(
             desktop: widget.desktop,
             title: title,
             actions: FormSheetActions(
@@ -505,119 +506,71 @@ class _McpManagementViewState extends State<McpManagementView> {
     final all =
         members.isNotEmpty &&
         members.every((id) => _selected?.contains(id) ?? false);
-    Widget header = SizedBox(
-      height: 48,
-      child: Row(
-        children: [
-          Expanded(
-            child: IosCardPress(
-              focusable: true,
-              haptics: false,
-              baseColor: Colors.transparent,
-              pressedBlendStrength: 0,
-              borderRadius: BorderRadius.circular(10),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              onTap: () => _toggleGroup(mcp, id),
-              child: SizedBox(
-                height: 44,
-                child: Row(
-                  children: [
-                    AnimatedRotation(
-                      turns: _collapsed(mcp, id) ? 0 : .25,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutCubic,
-                      child: Icon(
-                        Lucide.ChevronRight,
-                        size: 14,
-                        color: cs.onSurface.withValues(alpha: .45),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        group?.name ?? l10n.providerGroupsOther,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: AppFontWeights.medium,
-                          color: cs.onSurface.withValues(alpha: .65),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${members.length}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: .4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (_selected != null)
-            IosTextButton(
-              label: all
-                  ? l10n.sideDrawerSelectionDeselectAll
-                  : l10n.sideDrawerSelectionSelectAll,
-              fontSize: 12,
-              onPressed: () => setState(() {
-                if (all) {
-                  _selected!.removeAll(members);
-                } else {
-                  _selected!.addAll(members);
-                }
-              }),
-            )
-          else if (group != null) ...[
-            if (widget.desktop)
-              ReorderableDragStartListener(
-                index: index,
-                enabled: !_busy,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.grab,
-                  child: SizedBox(
-                    width: 32,
-                    height: 44,
-                    child: Icon(
-                      Lucide.GripVertical,
-                      size: 15,
-                      color: cs.onSurface.withValues(alpha: .3),
-                    ),
+    Widget header = CollapsibleGroupHeader(
+      title: group?.name ?? l10n.providerGroupsOther,
+      count: '${members.length}',
+      collapsed: _collapsed(mcp, id),
+      onToggle: () => _toggleGroup(mcp, id),
+      actions: [
+        if (_selected != null)
+          IosTextButton(
+            label: all
+                ? l10n.sideDrawerSelectionDeselectAll
+                : l10n.sideDrawerSelectionSelectAll,
+            fontSize: 12,
+            onPressed: () => setState(() {
+              if (all) {
+                _selected!.removeAll(members);
+              } else {
+                _selected!.addAll(members);
+              }
+            }),
+          )
+        else if (group != null) ...[
+          if (widget.desktop)
+            ReorderableDragStartListener(
+              index: index,
+              enabled: !_busy,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.grab,
+                child: SizedBox(
+                  width: 32,
+                  height: 44,
+                  child: Icon(
+                    Lucide.GripVertical,
+                    size: 15,
+                    color: cs.onSurface.withValues(alpha: .3),
                   ),
                 ),
               ),
-            _menuButton(
-              tooltip: l10n.providerGroupsManageAction,
-              key: ValueKey('mcp-group-menu-$id'),
-              items: [
-                ActionSheetItem(
-                  icon: Lucide.Pencil,
-                  label: l10n.mcpRenameGroup,
-                  onTap: () => _groupName(group: group),
-                ),
-                ActionSheetItem(
-                  icon: Lucide.Trash2,
-                  label: l10n.mcpPageDelete,
-                  destructive: true,
-                  onTap: () async {
-                    if (await _confirm(
-                          l10n.providerGroupsDeleteConfirmTitle,
-                          l10n.mcpDeleteGroupConfirm,
-                        ) &&
-                        mounted) {
-                      await _run(() => mcp.deleteGroup(group.id));
-                    }
-                  },
-                ),
-              ],
             ),
-          ],
+          _menuButton(
+            tooltip: l10n.providerGroupsManageAction,
+            key: ValueKey('mcp-group-menu-$id'),
+            items: [
+              ActionSheetItem(
+                icon: Lucide.Pencil,
+                label: l10n.mcpRenameGroup,
+                onTap: () => _groupName(group: group),
+              ),
+              ActionSheetItem(
+                icon: Lucide.Trash2,
+                label: l10n.mcpPageDelete,
+                destructive: true,
+                onTap: () async {
+                  if (await _confirm(
+                        l10n.providerGroupsDeleteConfirmTitle,
+                        l10n.mcpDeleteGroupConfirm,
+                      ) &&
+                      mounted) {
+                    await _run(() => mcp.deleteGroup(group.id));
+                  }
+                },
+              ),
+            ],
+          ),
         ],
-      ),
+      ],
     );
     if (!widget.desktop && _selected == null && group != null) {
       header = ReorderableDelayedDragStartListener(

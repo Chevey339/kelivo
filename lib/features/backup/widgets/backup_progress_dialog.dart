@@ -2,27 +2,30 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/services/backup/backup_activity.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/backup_task_progress.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/utils/format_bytes.dart';
+import '../../../shared/utils/backup_progress_text.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/task_progress_dialog.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
 import '../backup_restore_error_message.dart';
+import '../import_toolbox_link.dart';
 
 final class BackupTaskHandle {
   BackupTaskHandle({required this.cancelToken, required this._progress});
 
   final BackupCancelToken cancelToken;
   final ValueNotifier<BackupProgress> _progress;
+  final _skippedEntries = <String>{};
 
   BackupProgress get current => _progress.value;
 
   void report(BackupProgress progress) {
+    _skippedEntries.addAll(progress.skippedEntries);
     _progress.value = progress;
     if (!progress.cancellable) {
       cancelToken.setCancellable(false);
@@ -65,8 +68,10 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
   required Future<T> Function(BackupTaskHandle handle) task,
   bool cancellable = true,
   String? backgroundLabel,
+  Future<void> Function(BackupTaskResult<T> result, bool detached)? onSettled,
   String Function(Object error)? errorMessage,
 }) async {
+  if (BackupActivity.externalActive) return BackupTaskResult<T>.cancelled();
   final token = BackupCancelToken();
   final progress = ValueNotifier(
     BackupProgress(
@@ -79,6 +84,24 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
   // Held here rather than inside the dialog so a backgrounded task can outlive
   // the widget that started it.
   Future<T>? running;
+  var detached = false;
+  Future<T> execute(BackupTaskHandle handle) async {
+    final T value;
+    try {
+      value = await task(handle);
+    } catch (error) {
+      await onSettled?.call(
+        error is BackupCancelledException
+            ? BackupTaskResult<T>.cancelled()
+            : BackupTaskResult<T>.failure(error),
+        detached,
+      );
+      rethrow;
+    }
+    await onSettled?.call(BackupTaskResult<T>.success(value), detached);
+    return value;
+  }
+
   // Claimed before the dialog and released only once the task settles, so a
   // task the user sent to the background still counts as in flight.
   BackupActivity.begin();
@@ -89,7 +112,8 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
       child: _BackupProgressDialogHost<T>(
         title: title,
         handle: handle,
-        task: task,
+        task: execute,
+        onDetached: () => detached = true,
         initiallyCancellable: cancellable,
         backgroundLabel: backgroundLabel,
         errorMessage: errorMessage,
@@ -123,6 +147,7 @@ class _BackupProgressDialogHost<T> extends StatefulWidget {
     required this.task,
     required this.initiallyCancellable,
     required this.onStarted,
+    required this.onDetached,
     this.backgroundLabel,
     this.errorMessage,
   });
@@ -134,6 +159,7 @@ class _BackupProgressDialogHost<T> extends StatefulWidget {
   final String? backgroundLabel;
   final String Function(Object error)? errorMessage;
   final void Function(Future<T> running) onStarted;
+  final VoidCallback onDetached;
 
   @override
   State<_BackupProgressDialogHost<T>> createState() =>
@@ -144,9 +170,47 @@ class _BackupProgressDialogHostState<T>
     extends State<_BackupProgressDialogHost<T>> {
   var _outcome = TaskProgressOutcome.running;
   var _started = false;
+  var _detached = false;
   Object? _error;
-  String? _errorMessage;
+  BackupTaskFailure? _failure;
   var _errorCopied = false;
+  late T _completedValue;
+
+  final _phaseTime = Stopwatch();
+  BackupPhase? _timedPhase;
+  Timer? _elapsedTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.handle._progress.addListener(_trackPhase);
+    _trackPhase();
+  }
+
+  void _trackPhase() {
+    final progress = widget.handle.current;
+    if (_timedPhase != progress.phase) {
+      _timedPhase = progress.phase;
+      _phaseTime
+        ..reset()
+        ..start();
+    }
+    if (progress.total != null || progress.phase == BackupPhase.scanning) {
+      _elapsedTimer?.cancel();
+      _elapsedTimer = null;
+    } else {
+      _elapsedTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (_outcome == TaskProgressOutcome.running) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.handle._progress.removeListener(_trackPhase);
+    _elapsedTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -158,23 +222,32 @@ class _BackupProgressDialogHostState<T>
 
   Future<void> _run() async {
     try {
-      final running = widget.task(widget.handle);
+      final task = widget.task;
+      final handle = widget.handle;
+      final running = Future<T>.microtask(() => task(handle));
       widget.onStarted(running);
       final value = await running;
-      if (!mounted) return;
+      if (!mounted || _detached) return;
+      if (widget.handle._skippedEntries.isNotEmpty) {
+        _completedValue = value;
+        setState(() => _outcome = TaskProgressOutcome.warning);
+        return;
+      }
       setState(() => _outcome = TaskProgressOutcome.success);
       await Future<void>.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
+      if (!mounted || _detached) return;
       Navigator.of(context).pop(BackupTaskResult.success(value));
     } on BackupCancelledException {
-      if (!mounted) return;
+      if (!mounted || _detached) return;
       Navigator.of(context).pop(BackupTaskResult<T>.cancelled());
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || _detached) return;
       _error = error;
-      _errorMessage =
-          widget.errorMessage?.call(error) ??
-          backupRestoreErrorMessage(AppLocalizations.of(context)!, error);
+      _failure = describeBackupTaskFailure(
+        AppLocalizations.of(context)!,
+        error,
+        errorMessage: widget.errorMessage,
+      );
       setState(() => _outcome = TaskProgressOutcome.failure);
       widget.handle.report(
         BackupProgress(
@@ -186,6 +259,8 @@ class _BackupProgressDialogHostState<T>
           detail: widget.handle.current.detail,
         ),
       );
+    } finally {
+      _elapsedTimer?.cancel();
     }
   }
 
@@ -194,6 +269,8 @@ class _BackupProgressDialogHostState<T>
   }
 
   void _background() {
+    _detached = true;
+    widget.onDetached();
     Navigator.of(context).pop(BackupTaskResult<T>.backgrounded());
   }
 
@@ -203,9 +280,15 @@ class _BackupProgressDialogHostState<T>
     );
   }
 
+  void _acknowledgeWarning() {
+    Navigator.of(context).pop(BackupTaskResult.success(_completedValue));
+  }
+
   Future<void> _copyError(String phaseLabel) async {
     await Clipboard.setData(
-      ClipboardData(text: '${widget.title}\n$phaseLabel\n\n$_errorMessage'),
+      ClipboardData(
+        text: '${widget.title}\n$phaseLabel\n\n${_failure!.message}',
+      ),
     );
     if (!mounted) return;
     setState(() => _errorCopied = true);
@@ -218,24 +301,53 @@ class _BackupProgressDialogHostState<T>
       valueListenable: widget.handle._progress,
       builder: (context, progress, _) {
         final failure = _outcome == TaskProgressOutcome.failure;
+        final warning = _outcome == TaskProgressOutcome.warning;
         final phaseLabel = backupPhaseLabel(l10n, progress.phase);
         final failedAt = l10n.backupProgressFailedAt(phaseLabel);
         return TaskProgressDialogCard(
           title: widget.title,
-          phaseLabel: failure ? l10n.backupProgressFailed : phaseLabel,
+          phaseLabel: failure
+              ? l10n.backupProgressFailed
+              : warning
+              ? l10n.backupProgressSkippedTitle
+              : phaseLabel,
           fraction: _outcome == TaskProgressOutcome.success
               ? 1
               : progress.fraction,
-          subtitle: failure ? failedAt : backupProgressSubtitle(l10n, progress),
+          subtitle: failure
+              ? failedAt
+              : warning
+              ? l10n.backupProgressSkippedMessage(
+                  widget.handle._skippedEntries.length,
+                )
+              : backupProgressSubtitle(
+                  l10n,
+                  progress,
+                  elapsed: _phaseTime.elapsed,
+                ),
           phaseIcon: backupPhaseIcon(progress.phase),
           cancellable: progress.cancellable && widget.initiallyCancellable,
           onCancel: _cancel,
-          onAcknowledge: failure ? _acknowledgeFailure : null,
+          onAcknowledge: failure
+              ? _acknowledgeFailure
+              : warning
+              ? _acknowledgeWarning
+              : null,
           cancelLabel: l10n.backupProgressCancel,
           acknowledgeLabel: l10n.commonClose,
           onBackground: widget.backgroundLabel == null ? null : _background,
           backgroundLabel: widget.backgroundLabel,
-          errorMessage: _errorMessage,
+          errorMessage: _failure?.message,
+          errorAction: _failure?.showToolbox == true
+              ? IosTileButton(
+                  icon: Lucide.ExternalLink,
+                  label: l10n.backupPageOpenImportToolbox,
+                  onTap: () => openImportToolbox(context),
+                )
+              : null,
+          warningMessage: warning
+              ? widget.handle._skippedEntries.join('\n')
+              : null,
           onCopyError: failure ? () => unawaited(_copyError(failedAt)) : null,
           copyErrorLabel: _errorCopied
               ? l10n.backupProgressErrorCopied
@@ -251,6 +363,10 @@ IconData backupPhaseIcon(BackupPhase phase) {
   return switch (phase) {
     BackupPhase.preparing => Lucide.Loader,
     BackupPhase.snapshottingDatabase => Lucide.Database,
+    BackupPhase.scanning => Lucide.Folder,
+    BackupPhase.checkingDatabase => Lucide.Database,
+    BackupPhase.saving => Lucide.HardDrive,
+    BackupPhase.choosingDestination => Lucide.FolderOpen,
     BackupPhase.packing => Lucide.Folder,
     BackupPhase.verifying => Lucide.Shield,
     BackupPhase.encrypting => Lucide.Lock,
@@ -274,6 +390,10 @@ String backupPhaseLabel(AppLocalizations l10n, BackupPhase phase) {
   return switch (phase) {
     BackupPhase.preparing => l10n.backupProgressPreparing,
     BackupPhase.snapshottingDatabase => l10n.backupProgressSnapshotting,
+    BackupPhase.scanning => l10n.backupProgressScanning,
+    BackupPhase.checkingDatabase => l10n.backupProgressCheckingDatabase,
+    BackupPhase.saving => l10n.backupProgressSavingFile,
+    BackupPhase.choosingDestination => l10n.backupProgressChoosingDestination,
     BackupPhase.packing => l10n.backupProgressPacking,
     BackupPhase.verifying => l10n.backupProgressVerifying,
     BackupPhase.encrypting => l10n.backupProgressEncrypting,
@@ -291,24 +411,4 @@ String backupPhaseLabel(AppLocalizations l10n, BackupPhase phase) {
     BackupPhase.listingRemote => l10n.backupProgressListingRemote,
     BackupPhase.finalizing => l10n.backupProgressFinalizing,
   };
-}
-
-String? backupProgressSubtitle(AppLocalizations l10n, BackupProgress progress) {
-  final total = progress.total;
-  if (total == null) return null;
-  switch (progress.unit) {
-    case BackupProgressUnit.bytes:
-      return l10n.backupProgressBytes(
-        formatBytes(progress.processed),
-        formatBytes(total),
-      );
-    case BackupProgressUnit.items:
-      final format = NumberFormat.decimalPattern();
-      return l10n.backupProgressItems(
-        format.format(progress.processed),
-        format.format(total),
-      );
-    case BackupProgressUnit.none:
-      return null;
-  }
 }

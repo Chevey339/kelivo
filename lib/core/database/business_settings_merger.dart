@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import '../models/mcp_presentation.dart';
+import '../models/world_book_grouping.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
 import 'business_settings_router.dart';
@@ -133,6 +134,17 @@ final class BusinessSettingsMerger {
               .map((row) => row.id)
               .toSet(),
         );
+      } else if (key == WorldBookGrouping.preferenceKey) {
+        preferences[key] = _mergeWorldBookGrouping(
+          preferences[key],
+          imported,
+          localBookIds: existing.entities[BusinessEntityKind.worldBook]!
+              .map((row) => row.id)
+              .toSet(),
+          mergedBookIds: entities[BusinessEntityKind.worldBook]!
+              .map((row) => row.id)
+              .toSet(),
+        );
       } else if (key == _pinnedModelsKey) {
         preferences[key] = _mergeStringLists(
           existing.preferences.containsKey(key)
@@ -200,6 +212,46 @@ final class BusinessSettingsMerger {
         },
       ).toJson(),
     );
+  }
+
+  static String _mergeWorldBookGrouping(
+    Object? localValue,
+    Object importedValue, {
+    required Set<String> localBookIds,
+    required Set<String> mergedBookIds,
+  }) {
+    final local = WorldBookGrouping.decode(localValue);
+    final imported = WorldBookGrouping.decode(importedValue);
+    final names = Map<String, String>.of(local.names);
+    final usedNames = names.values
+        .map((name) => name.trim().toLowerCase())
+        .toSet();
+    for (final group in imported.names.entries) {
+      if (names.containsKey(group.key)) continue;
+      final name = group.value.trim();
+      var distinctName = name;
+      for (
+        var suffix = 2;
+        !usedNames.add(distinctName.toLowerCase());
+        suffix++
+      ) {
+        distinctName = '$name ($suffix)';
+      }
+      names[group.key] = distinctName;
+    }
+
+    // World Book rows merge local-first, including books kept ungrouped here.
+    return WorldBookGrouping(
+      names: names,
+      memberships: {
+        for (final entry in local.memberships.entries)
+          if (localBookIds.contains(entry.key)) entry.key: entry.value,
+        for (final entry in imported.memberships.entries)
+          if (mergedBookIds.contains(entry.key) &&
+              !localBookIds.contains(entry.key))
+            entry.key: entry.value,
+      },
+    ).encode();
   }
 
   static List<BusinessEntityValue> _mergeAssistants(

@@ -578,7 +578,11 @@ Stream<StreamChunk> sendGoogleStream(
           if (desc.isNotEmpty) 'description': desc,
         };
         if (params != null) {
-          d['parameters'] = cleanSchemaForGemini(params, stringEnumOnly: true);
+          d['parameters'] = cleanSchemaForGemini(
+            params,
+            stringEnumOnly: true,
+            vertexAI: isVertex,
+          );
         }
         decls.add(d);
       }
@@ -1054,6 +1058,7 @@ Stream<StreamChunk> sendGoogleStream(
         final cleanedParams = cleanSchemaForGemini(
           params,
           stringEnumOnly: true,
+          vertexAI: isVertex,
         );
         d['parameters'] = cleanedParams;
       }

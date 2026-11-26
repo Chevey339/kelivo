@@ -9,6 +9,7 @@ import '../../extensions/registry.dart';
 import '../../interfaces/renderers.dart';
 import '../../theme/markstream_theme.dart';
 import '../chrome.dart';
+import '../../selection/selection_controller.dart';
 import 'code_content.dart';
 
 class MarkstreamCodeBlock extends StatefulWidget {
@@ -129,7 +130,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
       );
     }
     final body = Padding(padding: theme.bodyPadding, child: content);
-    return Container(
+    final contentBlock = Container(
       key: const ValueKey('markstream-code-surface'),
       margin: theme.margin,
       decoration: BoxDecoration(
@@ -280,6 +281,15 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
             ),
         ],
       ),
+    );
+    return SourceRangePreparer(
+      span: widget.node.span,
+      prepare: (range) {
+        if (expanded) return true;
+        toggle();
+        return false;
+      },
+      child: contentBlock,
     );
   }
 }

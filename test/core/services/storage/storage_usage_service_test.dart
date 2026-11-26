@@ -12,7 +12,7 @@ import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/services/backup/local_snapshot_schedule.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
-import 'package:Kelivo/core/services/storage/storage_image_usage.dart';
+import 'package:Kelivo/core/services/storage/storage_attachment_usage.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -76,6 +76,27 @@ void main() {
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
+  });
+
+  test('creation results and references are counted just once', () async {
+    await _writeSizedFile(tempDir, 'generations/batch/artwork.png', 27);
+    await _writeSizedFile(tempDir, 'generations/batch/refs/0.png', 15);
+    await _writeSizedFile(tempDir, 'unrelated.txt', 8);
+
+    final report = await StorageUsageService.computeReport();
+    final creations = report.categories.singleWhere(
+      (category) => category.key == StorageUsageCategoryKey.creations,
+    );
+    expect(creations.stats.bytes, 42);
+    expect(creations.stats.fileCount, 2);
+    final batch = creations.subcategories.single;
+    expect(batch.id, 'batch');
+    expect(batch.isDirectory, isTrue);
+    expect(batch.path, p.join(tempDir.path, 'generations', 'batch'));
+    expect(batch.stats.bytes, 42);
+    expect(batch.stats.fileCount, 2);
+    expect(report.totalBytes, 50);
+    expect(report.totalFiles, 3);
   });
 
   test(

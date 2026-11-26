@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/models/mcp_presentation.dart';
-import '../../../core/services/mcp/mcp_icon_cache.dart';
+import '../../../utils/icon_cache.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'mcp_resolved_icon.dart';
 
@@ -92,12 +92,12 @@ class McpServerAvatar extends StatelessWidget {
       for (final declaration in declarations)
         if ((declaration['theme'] == null ||
                 declaration['theme'] == themeName) &&
-            McpIconCache.acceptsDeclaredSource(
+            IconCache.acceptsDeclaredSource(
               declaration['src'] as String,
               server.url,
             ))
           declaration['src'] as String,
-      if (McpIconCache.faviconFor(server.url) case final favicon?)
+      if (IconCache.faviconFor(server.url) case final favicon?)
         favicon.toString(),
     ];
     final fallback = SvgPicture.asset(

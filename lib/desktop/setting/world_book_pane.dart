@@ -12,6 +12,10 @@ import '../../core/models/world_book.dart';
 import '../../core/providers/world_book_provider.dart';
 import '../../features/world_book/utils/world_book_import.dart';
 import '../../features/world_book/widgets/world_book_entry_actions.dart';
+import '../../features/world_book/widgets/world_book_library.dart';
+import '../../features/world_book/widgets/world_book_editor.dart';
+import '../../features/world_book/widgets/world_book_card_header.dart';
+import '../../shared/widgets/section_card.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_switch.dart';
@@ -79,7 +83,7 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
     return <String, dynamic>{'version': 1, 'type': 'lorebook', 'data': data};
   }
 
-  Future<void> _importFromFile() async {
+  Future<void> _importFromFile({String? groupId}) async {
     final l10n = AppLocalizations.of(context)!;
     final provider = context.read<WorldBookProvider>();
     await provider.initialize();
@@ -136,7 +140,7 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
       imported.book,
       existingBookIds: provider.books.map((e) => e.id).toSet(),
     );
-    await provider.addBook(normalized);
+    await provider.addBook(normalized, groupId: groupId);
     if (!mounted) return;
     if (imported.unsupportedEntryCount > 0) {
       showAppSnackBar(
@@ -218,13 +222,6 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
     return result == true;
   }
 
-  Future<WorldBook?> _showBookEditDialog({WorldBook? book}) async {
-    return showDialog<WorldBook>(
-      context: context,
-      builder: (ctx) => _WorldBookEditDialog(book: book),
-    );
-  }
-
   Future<WorldBookEntry?> _showEntryEditDialog({WorldBookEntry? entry}) async {
     return showDialog<WorldBookEntry>(
       context: context,
@@ -232,186 +229,76 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
     );
   }
 
+  Future<void> _addBook({String? groupId}) =>
+      editWorldBook(context, desktop: true, groupId: groupId);
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final provider = context.watch<WorldBookProvider>();
-    final books = provider.books;
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 36,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            l10n.worldBookTitle,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: AppFontWeights.regular,
-                              color: cs.onSurface.withValues(alpha: 0.9),
-                            ),
-                          ),
-                        ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.Import,
-                        onTap: _importFromFile,
-                        tooltip: l10n.providersPageImportTooltip,
-                      ),
-                      const SizedBox(width: 6),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.Plus,
-                        onTap: () async {
-                          final result = await _showBookEditDialog();
-                          if (!mounted) return;
-                          if (result == null) return;
-                          await provider.addBook(result);
-                        },
-                        tooltip: l10n.worldBookAdd,
-                      ),
-                    ],
-                  ),
-                ),
+    final provider = context.read<WorldBookProvider>();
+    return WorldBookLibrary(
+      desktop: true,
+      onAddBook: _addBook,
+      onImport: _importFromFile,
+      buildBook: (book, index, canReorder, selection) {
+        final card = _WorldBookCard(
+          book: book,
+          collapsed: provider.isBookCollapsed(book.id),
+          selection: selection,
+          onToggleCollapsed: () => provider.toggleBookCollapsed(book.id),
+          onAddEntry: () async {
+            final entry = await _showEntryEditDialog();
+            if (!mounted || entry == null) return;
+            await provider.updateBook(
+              book.id,
+              (current) =>
+                  current.copyWith(entries: [...current.entries, entry]),
+            );
+          },
+          onExport: () => _exportBook(book),
+          onConfig: () => editWorldBook(context, desktop: true, book: book),
+          onDelete: () async {
+            final confirm = await _confirmDeleteBook(book);
+            if (!mounted || !confirm) return;
+            await provider.deleteBook(book.id);
+          },
+          onEditEntry: (entry) async {
+            final edited = await _showEntryEditDialog(entry: entry);
+            if (!mounted || edited == null) return;
+            await provider.updateBook(
+              book.id,
+              (current) => current.copyWith(
+                entries: current.entries
+                    .map((e) => e.id == entry.id ? edited : e)
+                    .toList(growable: false),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
-              if (books.isEmpty)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            lucide.Lucide.BookOpen,
-                            size: 56,
-                            color: cs.onSurface.withValues(alpha: 0.28),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            l10n.worldBookEmptyMessage,
-                            style: TextStyle(
-                              color: cs.onSurface.withValues(alpha: 0.65),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+            );
+          },
+          onDeleteEntry: (entry) async {
+            await provider.updateBook(
+              book.id,
+              (current) => current.copyWith(
+                entries: current.entries
+                    .where((e) => e.id != entry.id)
+                    .toList(growable: false),
+              ),
+            );
+          },
+        );
+        return Padding(
+          key: ValueKey('desktop-world-book-${book.id}'),
+          padding: const EdgeInsets.only(bottom: 10),
+          child: canReorder
+              ? MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: ReorderableDragStartListener(
+                    key: ValueKey('desktop-world-book-drag-${book.id}'),
+                    index: index,
+                    child: card,
                   ),
                 )
-              else
-                SliverReorderableList(
-                  itemCount: books.length,
-                  onReorderStart: (_) => Tooltip.dismissAllToolTips(),
-                  proxyDecorator: (child, index, animation) =>
-                      TooltipVisibility(visible: false, child: child),
-                  onReorderItem: (oldIndex, newIndex) => provider.reorderBooks(
-                    oldIndex: oldIndex,
-                    newIndex: newIndex,
-                  ),
-                  itemBuilder: (context, index) {
-                    final book = books[index];
-                    final wbProvider = context.read<WorldBookProvider>();
-                    final card = _WorldBookCard(
-                      book: book,
-                      collapsed: provider.isBookCollapsed(book.id),
-                      onToggleCollapsed: () {
-                        context.read<WorldBookProvider>().toggleBookCollapsed(
-                          book.id,
-                        );
-                      },
-                      onAddEntry: () async {
-                        final entry = await _showEntryEditDialog();
-                        if (!mounted) return;
-                        if (entry == null) return;
-                        await wbProvider.updateBook(
-                          book.id,
-                          (current) => current.copyWith(
-                            entries: [...current.entries, entry],
-                          ),
-                        );
-                      },
-                      onExport: () async => _exportBook(book),
-                      onConfig: () async {
-                        final edited = await _showBookEditDialog(book: book);
-                        if (!mounted) return;
-                        if (edited == null) return;
-                        await wbProvider.updateBook(
-                          book.id,
-                          (current) => current.copyWith(
-                            name: edited.name,
-                            description: edited.description,
-                            enabled: edited.enabled,
-                          ),
-                        );
-                      },
-                      onDelete: () async {
-                        final confirm = await _confirmDeleteBook(book);
-                        if (!mounted) return;
-                        if (!confirm) return;
-                        await wbProvider.deleteBook(book.id);
-                      },
-                      onEditEntry: (entry) async {
-                        final edited = await _showEntryEditDialog(entry: entry);
-                        if (!mounted) return;
-                        if (edited == null) return;
-                        await wbProvider.updateBook(
-                          book.id,
-                          (current) => current.copyWith(
-                            entries: current.entries
-                                .map((e) => e.id == entry.id ? edited : e)
-                                .toList(growable: false),
-                          ),
-                        );
-                      },
-                      onDeleteEntry: (entry) async {
-                        await wbProvider.updateBook(
-                          book.id,
-                          (current) => current.copyWith(
-                            entries: current.entries
-                                .where((e) => e.id != entry.id)
-                                .toList(growable: false),
-                          ),
-                        );
-                      },
-                    );
-                    return Padding(
-                      key: ValueKey('desktop-world-book-${book.id}'),
-                      padding: EdgeInsets.only(
-                        bottom: index == books.length - 1 ? 0 : 12,
-                      ),
-                      child: books.length > 1
-                          ? MouseRegion(
-                              cursor: SystemMouseCursors.grab,
-                              child: ReorderableDragStartListener(
-                                key: ValueKey(
-                                  'desktop-world-book-drag-${book.id}',
-                                ),
-                                index: index,
-                                child: card,
-                              ),
-                            )
-                          : card,
-                    );
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
+              : card,
+        );
+      },
     );
   }
 }
@@ -427,9 +314,11 @@ class _WorldBookCard extends StatefulWidget {
     required this.onDelete,
     required this.onEditEntry,
     required this.onDeleteEntry,
+    this.selection,
   });
 
   final WorldBook book;
+  final WorldBookSelection? selection;
   final bool collapsed;
   final VoidCallback onToggleCollapsed;
   final VoidCallback onAddEntry;
@@ -444,7 +333,6 @@ class _WorldBookCard extends StatefulWidget {
 }
 
 class _WorldBookCardState extends State<_WorldBookCard> {
-  bool _hover = false;
   bool _selecting = false;
   bool _busy = false;
   final _selectedIds = <String>{};
@@ -474,208 +362,87 @@ class _WorldBookCardState extends State<_WorldBookCard> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = context.appColors.surfaceCard;
-    final borderColor = _hover
-        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
-
-    final title = widget.book.name.trim().isEmpty
-        ? l10n.worldBookUnnamed
-        : widget.book.name.trim();
-    final subtitle = widget.book.description.trim();
     final selectedIds = widget.book.entries
         .where((entry) => _selectedIds.contains(entry.id))
         .map((entry) => entry.id)
         .toSet();
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: Container(
-        decoration: BoxDecoration(
-          color: baseBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: borderColor, width: 1.0),
+    final selection = widget.selection;
+    return SectionCard(
+      radius: 14,
+      padding: const EdgeInsets.all(12),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        WorldBookCardHeader(
+          book: widget.book,
+          collapsed: widget.collapsed,
+          selection: selection,
+          onToggle: widget.onToggleCollapsed,
+          onAddEntry: widget.onAddEntry,
+          onExport: widget.onExport,
+          onEdit: widget.onConfig,
+          onDelete: widget.onDelete,
+          onSelectEntries: widget.book.entries.isEmpty || _selecting
+              ? null
+              : () {
+                  if (_busy) return;
+                  setState(() => _selecting = true);
+                  if (widget.collapsed) widget.onToggleCollapsed();
+                },
         ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    widget.onToggleCollapsed();
-                  },
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: Center(
-                      child: AnimatedRotation(
-                        turns: widget.collapsed ? 0.0 : 0.25,
-                        duration: const Duration(milliseconds: 240),
-                        curve: Curves.easeOutCubic,
-                        child: Icon(
-                          lucide.Lucide.ChevronRight,
-                          size: 16,
-                          color: cs.onSurface.withValues(alpha: 0.62),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(lucide.Lucide.BookOpen, size: 20, color: cs.primary),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: AppFontWeights.emphasis,
-                              ),
-                            ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.topCenter,
+          child: widget.collapsed || selection != null
+              ? const SizedBox(width: double.infinity, height: 0)
+              : SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Column(
+                      children: [
+                        if (_selecting)
+                          WorldBookEntrySelectionBar(
+                            busy: _busy,
+                            selectedCount: selectedIds.length,
+                            totalCount: widget.book.entries.length,
+                            onCancel: () => setState(() {
+                              _selecting = false;
+                              _selectedIds.clear();
+                            }),
+                            onSelectAll: () => setState(() {
+                              _selectedIds.clear();
+                              if (selectedIds.length !=
+                                  widget.book.entries.length) {
+                                _selectedIds.addAll(
+                                  widget.book.entries.map((entry) => entry.id),
+                                );
+                              }
+                            }),
+                            onCopy: () =>
+                                _transfer(copy: true, ids: selectedIds),
+                            onMove: () =>
+                                _transfer(copy: false, ids: selectedIds),
                           ),
-                          if (!widget.book.enabled) ...[
-                            const SizedBox(width: 8),
-                            _TagPill(
-                              text: l10n.worldBookDisabledTag,
-                              color: cs.error,
-                            ),
-                          ],
-                        ],
-                      ),
-                      if (subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: cs.onSurface.withValues(alpha: 0.72),
-                          ),
+                        _EntriesPanel(
+                          bookId: widget.book.id,
+                          entries: widget.book.entries,
+                          onEdit: widget.onEditEntry,
+                          onDelete: widget.onDeleteEntry,
+                          selecting: _selecting,
+                          selectedIds: selectedIds,
+                          busy: _busy,
+                          onToggle: _toggleEntry,
+                          onTransfer: (entry, copy) =>
+                              _transfer(copy: copy, ids: {entry.id}),
                         ),
                       ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${widget.book.enabledEntryCount}/${widget.book.entries.length}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: cs.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (widget.book.entries.isNotEmpty && !_selecting) ...[
-                  _SmallIconBtn(
-                    icon: lucide.Lucide.ListChecks,
-                    tooltip: l10n.worldBookSelectEntries,
-                    onTap: () {
-                      if (_busy) return;
-                      setState(() => _selecting = true);
-                      if (widget.collapsed) widget.onToggleCollapsed();
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                _SmallIconBtn(
-                  icon: lucide.Lucide.Plus,
-                  onTap: widget.onAddEntry,
-                  tooltip: l10n.worldBookAddEntry,
-                ),
-                const SizedBox(width: 6),
-                _SmallIconBtn(
-                  icon: lucide.Lucide.Share2,
-                  onTap: widget.onExport,
-                  tooltip: l10n.worldBookExport,
-                ),
-                const SizedBox(width: 6),
-                _SmallIconBtn(
-                  icon: lucide.Lucide.Settings2,
-                  onTap: widget.onConfig,
-                  tooltip: l10n.worldBookConfig,
-                ),
-                const SizedBox(width: 6),
-                _SmallIconBtn(
-                  icon: lucide.Lucide.Trash2,
-                  onTap: widget.onDelete,
-                  tooltip: l10n.worldBookDelete,
-                ),
-              ],
-            ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeInOutCubic,
-              alignment: Alignment.topCenter,
-              child: widget.collapsed
-                  ? const SizedBox(width: double.infinity, height: 0)
-                  : SizedBox(
-                      width: double.infinity,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Column(
-                          children: [
-                            if (_selecting)
-                              WorldBookEntrySelectionBar(
-                                busy: _busy,
-                                selectedCount: selectedIds.length,
-                                totalCount: widget.book.entries.length,
-                                onCancel: () => setState(() {
-                                  _selecting = false;
-                                  _selectedIds.clear();
-                                }),
-                                onSelectAll: () => setState(() {
-                                  _selectedIds.clear();
-                                  if (selectedIds.length !=
-                                      widget.book.entries.length) {
-                                    _selectedIds.addAll(
-                                      widget.book.entries.map(
-                                        (entry) => entry.id,
-                                      ),
-                                    );
-                                  }
-                                }),
-                                onCopy: () =>
-                                    _transfer(copy: true, ids: selectedIds),
-                                onMove: () =>
-                                    _transfer(copy: false, ids: selectedIds),
-                              ),
-                            _EntriesPanel(
-                              bookId: widget.book.id,
-                              entries: widget.book.entries,
-                              onEdit: widget.onEditEntry,
-                              onDelete: widget.onDeleteEntry,
-                              selecting: _selecting,
-                              selectedIds: selectedIds,
-                              busy: _busy,
-                              onToggle: _toggleEntry,
-                              onTransfer: (entry, copy) =>
-                                  _transfer(copy: copy, ids: {entry.id}),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
-            ),
-          ],
+                  ),
+                ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -984,139 +751,6 @@ class _TagPill extends StatelessWidget {
           fontWeight: AppFontWeights.semibold,
           color: fg,
           height: 1.0,
-        ),
-      ),
-    );
-  }
-}
-
-class _WorldBookEditDialog extends StatefulWidget {
-  const _WorldBookEditDialog({required this.book});
-  final WorldBook? book;
-
-  @override
-  State<_WorldBookEditDialog> createState() => _WorldBookEditDialogState();
-}
-
-class _WorldBookEditDialogState extends State<_WorldBookEditDialog> {
-  late final TextEditingController _nameController;
-  late final TextEditingController _descController;
-  late bool _enabled;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.book?.name ?? '');
-    _descController = TextEditingController(
-      text: widget.book?.description ?? '',
-    );
-    _enabled = widget.book?.enabled ?? true;
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    return Dialog(
-      backgroundColor: context.overlaySurface,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 58),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.book == null
-                              ? l10n.worldBookAdd
-                              : l10n.worldBookConfig,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(context).maybePop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _nameController,
-                    decoration: _deskInputDecoration(
-                      context,
-                    ).copyWith(hintText: l10n.worldBookNameLabel),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _descController,
-                    maxLines: 3,
-                    decoration: _deskInputDecoration(
-                      context,
-                    ).copyWith(hintText: l10n.worldBookDescriptionLabel),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.worldBookEnabledLabel,
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(alpha: 0.8),
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.semibold,
-                          ),
-                        ),
-                      ),
-                      IosSwitch(
-                        value: _enabled,
-                        onChanged: (v) => setState(() => _enabled = v),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              right: 12,
-              bottom: 12,
-              child: _DeskIosButton(
-                label: l10n.worldBookSave,
-                filled: true,
-                dense: true,
-                onTap: () {
-                  final base = widget.book;
-                  final id = base?.id ?? const Uuid().v4();
-                  Navigator.of(context).pop(
-                    WorldBook(
-                      id: id,
-                      name: _nameController.text.trim(),
-                      description: _descController.text.trim(),
-                      enabled: _enabled,
-                      entries: base?.entries ?? const <WorldBookEntry>[],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
         ),
       ),
     );

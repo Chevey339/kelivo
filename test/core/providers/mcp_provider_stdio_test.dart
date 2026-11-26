@@ -462,6 +462,75 @@ void main() {
     );
   }
 
+  test(
+    'an exited stdio process is recreated on next use, not while idle',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final harness = await BusinessTestHarness.create();
+      final environment = EnvironmentProvider(preferences: harness.preferences);
+      await environment.loaded;
+      await environment.setState(
+        const EnvironmentState(phase: EnvironmentPhase.ready),
+      );
+      final runtime = _McpRuntime(stallToolsList: true);
+      final runtimeProvider = WorkspaceRuntimeProvider()..register(runtime);
+      await runtimeProvider.refresh();
+      final provider = McpProvider(
+        preferences: harness.preferences,
+        workspaceRuntime: runtimeProvider,
+        environment: environment,
+      );
+      try {
+        await provider.replaceAllFromJson(
+          jsonEncode({
+            'mcpServers': {
+              'guest': {'command': 'server'},
+            },
+          }),
+        );
+        await _waitFor(() => provider.isConnected('guest'));
+        await runtime.toolsListStarted.future;
+        runtime.events[runtime.requests.single.runId]!.add(
+          CommandOutput(
+            OutputStreamKind.stdout,
+            Uint8List.fromList(
+              utf8.encode(
+                '${jsonEncode({'jsonrpc': '2.0', 'method': 'notifications/tools/list_changed'})}\n',
+              ),
+            ),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        runtime.failProcess(runtime.requests.single.runId);
+        await _waitFor(() => provider.statusFor('guest') == McpStatus.error);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(runtime.requests, hasLength(1));
+        runtime.stallToolsList = false;
+        await Future.wait([
+          provider.ensureConnected('guest'),
+          provider.ensureConnected('guest'),
+        ]);
+        expect(provider.isConnected('guest'), isTrue);
+        expect(runtime.requests, hasLength(2));
+        await provider.disconnect('guest');
+        await environment.setState(
+          const EnvironmentState(phase: EnvironmentPhase.patching),
+        );
+        await environment.setState(
+          const EnvironmentState(phase: EnvironmentPhase.ready),
+        );
+        await provider.ensureConnected('guest');
+        expect(runtime.requests, hasLength(2));
+      } finally {
+        provider.dispose();
+        runtimeProvider.dispose();
+        environment.dispose();
+        await harness.close();
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
   for (final disableBeforeCleanup in [false, true]) {
     test(
       'environment recovery cancels initialization and waits for process cleanup (disabled=$disableBeforeCleanup)',
@@ -615,11 +684,14 @@ class _McpRuntime extends FakeWorkspaceRuntime
     this.holdFirstInitialization = false,
     this.failInitialization = false,
     this.stallToolCalls = false,
+    this.stallToolsList = false,
     this.cancellationGate,
   });
   final bool holdFirstInitialization;
   final bool failInitialization;
   final bool stallToolCalls;
+  bool stallToolsList;
+  final toolsListStarted = Completer<void>();
   final Completer<void>? cancellationGate;
   final initializationStarted = Completer<void>();
   final releaseInitialization = Completer<void>();
@@ -652,6 +724,10 @@ class _McpRuntime extends FakeWorkspaceRuntime
   Future<void> writeStdin(String runId, Uint8List data) async {
     final request = jsonDecode(utf8.decode(data)) as Map<String, dynamic>;
     if (!request.containsKey('id')) return;
+    if (stallToolsList && request['method'] == 'tools/list') {
+      if (!toolsListStarted.isCompleted) toolsListStarted.complete();
+      return;
+    }
     if (stallToolCalls && request['method'] == 'tools/call') return;
     if (request['method'] == 'initialize' && runId == requests.first.runId) {
       if (failInitialization) {

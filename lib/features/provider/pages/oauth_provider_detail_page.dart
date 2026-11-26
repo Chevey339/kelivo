@@ -156,7 +156,10 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
       _modelError = null;
     });
     try {
-      await _service.syncModels(widget.providerId);
+      await _service.syncModels(
+        widget.providerId,
+        checkLatestCodexVersion: true,
+      );
     } catch (error) {
       if (mounted) setState(() => _modelError = error);
     } finally {

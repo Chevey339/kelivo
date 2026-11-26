@@ -262,6 +262,7 @@ class EnvironmentInstaller implements EnvironmentManager {
         Directory(p.join(_requireEnvDir().path, 'staging')),
       );
       await _deleteIfExists(downloadsDir);
+      await _deleteIfExists(tmpDir);
       await _setPhase(const EnvironmentState());
     } catch (_) {
       // Preserve readiness only if the active directory has not been retired.

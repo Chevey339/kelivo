@@ -7,7 +7,6 @@ const _claudeAccountBetas = [
   'redact-thinking-2026-02-12',
   'context-management-2025-06-27',
   'prompt-caching-scope-2026-01-05',
-  'mid-conversation-system-2026-04-07',
   'advanced-tool-use-2025-11-20',
   'effort-2025-11-24',
   'extended-cache-ttl-2025-04-11',

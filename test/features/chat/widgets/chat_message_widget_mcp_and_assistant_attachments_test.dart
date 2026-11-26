@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
+import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
+import 'package:Kelivo/features/chat/widgets/workspace_tool_detail.dart';
 import 'package:Kelivo/utils/safe_resize_image.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
@@ -12,6 +16,7 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as image;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -103,6 +108,180 @@ more text
       expect(clean.contains('shot'), isTrue);
       expect(clean.contains('done'), isTrue);
     });
+  });
+
+  testWidgets(
+    'view_image lays out a wide snapshot at its aspect and opens it',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final png = image.encodePng(image.Image(width: 480, height: 120));
+      final path = 'data:image/png;base64,${base64Encode(png)}';
+      await tester.pumpWidget(
+        _harness(
+          ChatMessageWidget(
+            showModelIcon: false,
+            message: ChatMessage(
+              id: 'assistant-view-image',
+              role: 'assistant',
+              content: 'Observed an image.',
+              conversationId: 'conversation-view-image',
+            ),
+            toolParts: [
+              ToolUIPart(
+                id: 'view-image',
+                toolName: 'view_image',
+                arguments: const {},
+                content: 'Image (480 x 120).\n![]($path)',
+              ),
+            ],
+          ),
+        ),
+      );
+
+      final thumbnail = find.byKey(
+        const ValueKey('tool-image-thumbnails:view-image'),
+      );
+      expect(tester.getSize(thumbnail), const Size(240, 60));
+      tester.view.physicalSize = const Size(280, 600);
+      await tester.pumpAndSettle();
+      expect(tester.getSize(thumbnail), const Size(192, 48));
+
+      await tester.tap(thumbnail);
+      await tester.pumpAndSettle();
+      final viewer = find.byType(ImageViewerPage);
+      expect(tester.widget<ImageViewerPage>(viewer).images, [path]);
+      Navigator.of(tester.element(viewer)).pop();
+      await tester.pumpAndSettle();
+      expect(tester.getSize(thumbnail), const Size(192, 48));
+
+      await tester.tap(find.text('View image'));
+      await tester.pumpAndSettle();
+      final details = find.byType(WorkspaceToolDetailBody);
+      expect(details, findsOneWidget);
+      Navigator.of(tester.element(details)).pop();
+      await tester.pumpAndSettle();
+      expect(tester.getSize(thumbnail), const Size(192, 48));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('a new view_image call keeps the pending question focused', (
+    tester,
+  ) async {
+    final includeImageTool = ValueNotifier(false);
+    addTearDown(includeImageTool.dispose);
+    final message = ChatMessage(
+      id: 'stream-with-pending-question',
+      role: 'assistant',
+      conversationId: 'conversation-first-image',
+      content: 'Check existing card',
+      isStreaming: true,
+    );
+    await tester.pumpWidget(
+      _harness(
+        ValueListenableBuilder<bool>(
+          valueListenable: includeImageTool,
+          builder: (_, showImageTool, _) => ChatMessageWidget(
+            message: message,
+            showModelIcon: false,
+            toolParts: [
+              const ToolUIPart(
+                id: 'ask-1',
+                toolName: 'ask_user_input_v0',
+                arguments: {
+                  'questions': [
+                    {
+                      'id': 'scope',
+                      'question': 'Choose scope?',
+                      'type': 'single',
+                      'options': ['Minimal', 'Complete'],
+                    },
+                  ],
+                },
+                loading: true,
+              ),
+              const ToolUIPart(
+                id: 'search',
+                toolName: 'search',
+                arguments: {},
+                content: 'Completed search',
+              ),
+              if (showImageTool)
+                const ToolUIPart(
+                  id: 'view-1',
+                  toolName: 'view_image',
+                  arguments: {'path': 'output.png'},
+                  loading: true,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    final edit = find.byType(EditableText);
+    await tester.showKeyboard(edit);
+    await tester.pump();
+    final original = tester.state<EditableTextState>(edit);
+    expect(original.widget.focusNode.hasFocus, isTrue);
+
+    includeImageTool.value = true;
+    await tester.pump();
+    final current = tester.state<EditableTextState>(edit);
+    expect(current, same(original));
+    expect(current.widget.focusNode.hasFocus, isTrue);
+  });
+
+  testWidgets('a completed view_image call grows in with its known size', (
+    tester,
+  ) async {
+    final completed = ValueNotifier(false);
+    addTearDown(completed.dispose);
+    final message = ChatMessage(
+      id: 'stream-with-snapshot',
+      role: 'assistant',
+      conversationId: 'conversation-snapshot',
+      content: 'Check the image.',
+      isStreaming: true,
+    );
+    await tester.pumpWidget(
+      _harness(
+        Column(
+          children: [
+            ValueListenableBuilder<bool>(
+              valueListenable: completed,
+              builder: (_, hasResult, _) => ChatMessageWidget(
+                message: message,
+                showModelIcon: false,
+                toolParts: [
+                  ToolUIPart(
+                    id: 'view-1',
+                    toolName: 'view_image',
+                    arguments: const {'path': 'output.png'},
+                    loading: !hasResult,
+                    content: hasResult
+                        ? 'Image (480 x 120).\n![]($_tinyPngDataUri)'
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+            const Text('Marker below the tool'),
+          ],
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    final marker = find.text('Marker below the tool');
+    final initial = tester.getTopLeft(marker).dy;
+
+    completed.value = true;
+    await tester.pump();
+    expect(tester.getTopLeft(marker).dy, closeTo(initial, .5));
+    await tester.pump(const Duration(milliseconds: 320));
+    await tester.pump(const Duration(milliseconds: 320));
+    expect(tester.getTopLeft(marker).dy, greaterThan(initial + 50));
   });
 
   testWidgets('MCP markdown images populate tool thumbnail list', (

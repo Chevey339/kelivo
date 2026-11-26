@@ -81,6 +81,39 @@ void main() {
     expect(resolved.modelId, 'conversation-model');
   });
 
+  test(
+    'a saved creation-only pin falls back while Gemini image chat stays available',
+    () async {
+      await settings.setPerChatModelEnabled(true);
+      final fallback = assistantWithModel(
+        providerKey: 'AssistantProvider',
+        modelId: 'assistant-model',
+      );
+      expect(
+        resolveChatModel(
+          settings,
+          conversation: conversationWithModel(
+            providerKey: 'OpenAI',
+            modelId: 'gpt-image-2',
+          ),
+          assistant: fallback,
+        ).modelId,
+        'assistant-model',
+      );
+      expect(
+        resolveChatModel(
+          settings,
+          conversation: conversationWithModel(
+            providerKey: 'Gemini',
+            modelId: 'gemini-2.5-flash-image',
+          ),
+          assistant: fallback,
+        ).modelId,
+        'gemini-2.5-flash-image',
+      );
+    },
+  );
+
   test('a conversation without an override follows the assistant', () {
     final resolved = resolveChatModel(
       settings,

@@ -303,6 +303,10 @@ class SseClientTransport implements ClientTransport {
 
       // Set up event handlers
       final endpointCompleter = Completer<String>();
+      // Before create returns, no client can observe these error channels.
+      // The awaited endpoint future remains the owner of startup failures.
+      endpointCompleter.future.ignore();
+      transport.onClose.ignore();
 
       await transport._eventSource.connect(
         sseUrlWithSession,
@@ -358,6 +362,7 @@ class SseClientTransport implements ClientTransport {
       return transport;
     } catch (e) {
       transport.close();
+      if (e is McpError) rethrow;
       throw McpError('Failed to establish SSE connection: $e');
     }
   }

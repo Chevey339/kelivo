@@ -101,12 +101,11 @@ void main() {
     expect(page.hasMore, isFalse);
   });
 
-  test('next page still sees newlines left in pending leftover', () async {
+  test('next page resumes at the unread byte boundary', () async {
     final file = fileWith('${line('1')}\n${line('2')}\n${line('3')}\n');
     final first = await ContextLogTailReader.readPage(file: file, limit: 1);
     expect(first.snapshots.single.conversationId, '3');
-    expect(first.cursor.pending, isNotEmpty);
-    expect(first.cursor.pending.contains(10), isTrue);
+    expect(first.cursor.position, greaterThan(0));
     expect(first.cursor.position, isNot(lessThan(0)));
 
     final second = await ContextLogTailReader.readPage(
@@ -124,7 +123,6 @@ void main() {
     expect(page.snapshots, isEmpty);
     expect(page.hasMore, isFalse);
     expect(page.cursor.position, 0);
-    expect(page.cursor.pending, isEmpty);
   });
 
   test('line larger than chunk size is still parsed', () async {
@@ -138,5 +136,57 @@ void main() {
     expect(page.snapshots.map((s) => s.conversationId), ['big', 'small']);
     expect(page.snapshots.first.assistantName.length, 200);
     expect(page.hasMore, isFalse);
+  });
+  test(
+    'byte budget stops after a large snapshot instead of filling 30 entries',
+    () async {
+      final huge = line('big', assistant: '中' * 100000);
+      final file = fileWith('${line('older')}\n$huge\n');
+      final first = await ContextLogTailReader.readPage(
+        file: file,
+        maxBytes: 1024,
+        chunkSize: 4096,
+      );
+      expect(first.snapshots.single.conversationId, 'big');
+      expect(first.snapshots.single.assistantName.length, 100000);
+      expect(first.hasMore, isTrue);
+      final second = await ContextLogTailReader.readPage(
+        file: file,
+        cursor: first.cursor,
+      );
+      expect(second.snapshots.single.conversationId, 'older');
+    },
+  );
+
+  test(
+    'invalid trailing records respect the byte budget and remain pageable',
+    () async {
+      final file = fileWith('${line('good')}\n${'bad\n' * 1000}');
+      var page = await ContextLogTailReader.readPage(file: file, maxBytes: 256);
+      expect(page.snapshots, isEmpty);
+      expect(page.hasMore, isTrue);
+      while (page.hasMore && page.snapshots.isEmpty) {
+        page = await ContextLogTailReader.readPage(
+          file: file,
+          cursor: page.cursor,
+          maxBytes: 256,
+        );
+      }
+      expect(page.snapshots.single.conversationId, 'good');
+    },
+  );
+  test('rotation requires refreshing instead of merging two files', () async {
+    final file = fileWith('${line('old-1')}\n${line('old-2')}\n');
+    final first = await ContextLogTailReader.readPage(file: file, limit: 1);
+    await file.rename('${tempDir.path}/rotated.txt');
+    await file.writeAsString(
+      '${line('replacement-1')}\n${line('replacement-2')}\n',
+    );
+    await expectLater(
+      ContextLogTailReader.readPage(file: file, cursor: first.cursor),
+      throwsA(isA<FileSystemException>()),
+    );
+    final refreshed = await ContextLogTailReader.readPage(file: file);
+    expect(refreshed.snapshots.first.conversationId, 'replacement-2');
   });
 }

@@ -1,5 +1,3 @@
-import 'dart:io' show File;
-
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
@@ -11,8 +9,7 @@ import '../../../core/models/assistant.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/emoji_text.dart';
-import '../../../utils/avatar_cache.dart';
-import '../../../utils/sandbox_path_resolver.dart';
+import '../../../shared/widgets/avatar_image.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
@@ -201,45 +198,14 @@ Widget _assistantAvatar(BuildContext context, Assistant a, {double size = 28}) {
   final cs = Theme.of(context).colorScheme;
   final av = (a.avatar ?? '').trim();
   if (av.isNotEmpty) {
-    if (av.startsWith('http')) {
-      return FutureBuilder<String?>(
-        future: AvatarCache.getPath(av),
-        builder: (ctx, snap) {
-          final p = snap.data;
-          if (p != null && File(p).existsSync()) {
-            return ClipOval(
-              child: Image(
-                image: FileImage(File(p)),
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-              ),
-            );
-          }
-          return ClipOval(
-            child: Image.network(
-              av,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => _assistantInitial(cs, a.name, size),
-            ),
-          );
-        },
+    if (av.startsWith('http') ||
+        (!kIsWeb && (av.startsWith('/') || av.contains(':')))) {
+      return AvatarImage(
+        source: av,
+        isNetwork: av.startsWith('http'),
+        size: size,
+        fallback: _assistantInitial(cs, a.name, size),
       );
-    } else if (!kIsWeb && (av.startsWith('/') || av.contains(':'))) {
-      final fixed = SandboxPathResolver.fix(av);
-      final f = File(fixed);
-      if (f.existsSync()) {
-        return ClipOval(
-          child: Image(
-            image: FileImage(f),
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-          ),
-        );
-      }
     } else {
       return Container(
         width: size,

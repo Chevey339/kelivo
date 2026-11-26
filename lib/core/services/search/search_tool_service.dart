@@ -25,7 +25,7 @@ Response format:
 - items[]: search results, each with index (result number), id (short unique id), title, url, text
 - answer: an optional pre-synthesized answer (may be absent)
 
-Cite: append [cite:id] immediately after each statement a result supports, using that result's exact `id` field.''';
+Cite supporting results with [cite:id] using the exact id from the tool result.''';
 
   static final RegExp _schemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 

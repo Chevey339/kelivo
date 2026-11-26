@@ -60,6 +60,7 @@ class _RenderParagraphRun extends RenderBox
   List<RichText> _paragraphs = const [];
   double _spacing = 0, _ratio = 1;
   bool _cull = true, _painted = false;
+  bool _hasRtl = false;
   List<RenderParagraph> _paintedChildren = const [];
   List<RenderParagraph>? _semanticChildren;
   ({Rect? paint, Rect? semantics}) get _clips =>
@@ -100,6 +101,11 @@ class _RenderParagraphRun extends RenderBox
     double ratio,
     bool cull,
   ) {
+    final hasRtl = paragraphs.any((p) => p.textDirection == TextDirection.rtl);
+    if (_hasRtl != hasRtl) {
+      _hasRtl = hasRtl;
+      markNeedsLayout();
+    }
     if (_cull != cull) {
       _cull = cull;
       markNeedsPaint();
@@ -144,6 +150,7 @@ class _RenderParagraphRun extends RenderBox
 
   BoxConstraints _childConstraints(BoxConstraints constraints) =>
       constraints.loosen().copyWith(maxHeight: double.infinity);
+
   @override
   void performLayout() {
     var width = 0.0, height = 0.0;
@@ -157,6 +164,19 @@ class _RenderParagraphRun extends RenderBox
       if (child != null) height += _spacing;
     }
     size = constraints.constrain(Size(width, height));
+    if (_hasRtl) {
+      for (child = firstChild; child != null; child = childAfter(child)) {
+        if (child.textDirection == TextDirection.rtl) {
+          final data = child.parentData! as _ParagraphParentData;
+          final extra = size.width - child.size.width;
+          data.offset = Offset(switch (child.textAlign) {
+            TextAlign.center => extra / 2,
+            TextAlign.left || TextAlign.end => 0,
+            _ => extra,
+          }, data.offset.dy);
+        }
+      }
+    }
   }
 
   @override

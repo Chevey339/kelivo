@@ -18,6 +18,7 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/tools/view_image_tool.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -387,7 +388,7 @@ void main() {
   for (final api in _Api.values) {
     for (final stream in [false, true]) {
       test(
-        '${api.name} stream=$stream exposes recall only after an image arrives',
+        '${api.name} stream=$stream keeps file viewing without redundant recall for visible images',
         () async {
           final file = File('${imageRoot.path}/images/mcp_img_recall.png');
           await file.writeAsBytes(
@@ -441,8 +442,7 @@ void main() {
             },
           );
           final candidates = [
-            ..._imageTools('view_image'),
-            ..._imageTools('read_chat_image'),
+            ViewImageTool.withHistory(_imageTools('view_image').single),
           ];
           final original = jsonEncode(candidates);
           for (final allowRecall in [true, false]) {
@@ -476,11 +476,11 @@ void main() {
             expect(requests, hasLength(2));
             expect(
               jsonEncode(requests.first['tools']),
-              isNot(contains('read_chat_image')),
+              isNot(contains('image_id')),
             );
             expect(
-              jsonEncode(requests.last['tools']).contains('read_chat_image'),
-              allowRecall,
+              jsonEncode(requests.last['tools']).contains('image_id'),
+              isFalse,
             );
             expect(_imagePayloads(requests.last), isNotEmpty);
             expect(context.images, isNotEmpty);
@@ -495,7 +495,7 @@ void main() {
             messages: const [
               {'role': 'user', 'content': 'Hello'},
             ],
-            tools: _imageTools('read_chat_image'),
+            tools: [ViewImageTool.withHistory()],
             imageContext: RequestImageContext(
               settings: const ImageContextSettings(),
               images: [],

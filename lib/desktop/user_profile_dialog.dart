@@ -1,4 +1,3 @@
-import 'dart:io' show File;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +11,7 @@ import '../icons/lucide_adapter.dart' as lucide;
 import '../shared/widgets/emoji_text.dart';
 import '../shared/widgets/emoji_picker_dialog.dart';
 import '../shared/widgets/snackbar.dart';
-import '../utils/sandbox_path_resolver.dart';
+import '../shared/widgets/avatar_image.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -87,31 +86,15 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
           nudge: Offset.zero, // dialog avatar: no extra nudge
         ),
       );
-    } else if (type == 'url' && value != null && value.isNotEmpty) {
-      avatarWidget = ClipOval(
-        child: Image.network(
-          value,
-          width: 84,
-          height: 84,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _initialAvatar(up.name, cs, size: 84),
-        ),
+    } else if ((type == 'file' || type == 'url') &&
+        value != null &&
+        value.isNotEmpty) {
+      avatarWidget = AvatarImage(
+        source: value,
+        isNetwork: type == 'url',
+        size: 84,
+        fallback: _initialAvatar(up.name, cs, size: 84),
       );
-    } else if (type == 'file' && value != null && value.isNotEmpty) {
-      final fixed = SandboxPathResolver.fix(value);
-      final f = File(fixed);
-      if (f.existsSync()) {
-        avatarWidget = ClipOval(
-          child: Image(
-            image: FileImage(f),
-            width: 84,
-            height: 84,
-            fit: BoxFit.cover,
-          ),
-        );
-      } else {
-        avatarWidget = _initialAvatar(up.name, cs, size: 84);
-      }
     } else {
       avatarWidget = _initialAvatar(up.name, cs, size: 84);
     }

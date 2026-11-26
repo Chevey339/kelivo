@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import '../models/assistant.dart';
+import '../models/provider_balance_refresh_interval.dart';
+import '../models/world_book_grouping.dart';
 import 'business_data.dart';
 
 enum BusinessKeyDisposition {
@@ -16,6 +18,24 @@ enum BusinessKeyDisposition {
 
 final class BusinessKeyRegistry {
   BusinessKeyRegistry._();
+
+  static const balanceRefreshIntervalKey = 'balance_refresh_interval_v1';
+  static const balanceRefreshOnReplyKey = 'balance_refresh_on_reply_v1';
+  static const codexClientVersionCacheKey = 'codex_client_version_v1';
+  static const modelListMetadataCacheKey = 'model_list_metadata_v1';
+  static const mobileSidebarStyleKey = 'mobile_sidebar_style_v1';
+  static const mobileSidebarBlockOrderKey = 'mobile_sidebar_block_order_v1';
+  static const mobileSidebarEntriesKey = 'mobile_sidebar_entries_v1';
+  static const mobileSidebarShowCustomizeKey =
+      'mobile_sidebar_show_customize_in_more_v1';
+  static const mobileSidebarHideSingleAssistantKey =
+      'mobile_sidebar_hide_assistant_when_single_v1';
+  static const desktopRailEntriesKey = 'desktop_rail_entries_v1';
+  static const mediaEntrySeenKey = 'media_entry_seen_v1';
+  static const creationComposerKey = 'creation_composer_v1';
+  static const creationAutoTitleKey = 'creation_auto_title_v1';
+  static const creationTopicViewKey = 'creation_topic_view_v1';
+  static const creationWaitGameKey = 'creation_wait_game_v1';
 
   static const localOnlyKeys = <String>{
     'window_width_v1',
@@ -33,6 +53,9 @@ final class BusinessKeyRegistry {
     'ios_native_selection_menu_enabled_v1',
     'flutter_log_enabled_v1',
     'model_catalog_auto_update_v1',
+    'ollama_model_metadata_v1',
+    codexClientVersionCacheKey,
+    modelListMetadataCacheKey,
   };
 
   static const discardedKeys = <String>{
@@ -46,6 +69,17 @@ final class BusinessKeyRegistry {
   };
 
   static const preferenceKeys = <String>{
+    mobileSidebarStyleKey,
+    mobileSidebarBlockOrderKey,
+    mobileSidebarEntriesKey,
+    mobileSidebarShowCustomizeKey,
+    mobileSidebarHideSingleAssistantKey,
+    desktopRailEntriesKey,
+    mediaEntrySeenKey,
+    creationComposerKey,
+    creationAutoTitleKey,
+    creationTopicViewKey,
+    creationWaitGameKey,
     'desktop_scheduled_tasks_v1',
     'scheduled_task_results_v1',
     'current_assistant_id_v1',
@@ -56,12 +90,15 @@ final class BusinessKeyRegistry {
     'provider_group_map_v1',
     'provider_group_collapsed_v1',
     'provider_ungrouped_position_v1',
+    balanceRefreshIntervalKey,
+    balanceRefreshOnReplyKey,
     'assistant_tag_map_v1',
     'assistant_tag_collapsed_v1',
     'instruction_injections_active_ids_by_assistant_v1',
     'instruction_injection_group_collapsed_v1',
     'world_books_active_ids_by_assistant_v1',
     'world_books_collapsed_v1',
+    WorldBookGrouping.preferenceKey,
     'search_common_v1',
     'search_selected_v1',
     'search_enabled_v1',
@@ -72,6 +109,7 @@ final class BusinessKeyRegistry {
     'tts_auto_play_assistant_replies_v1',
     'tts_text_selection_mode_v1',
     'tts_speech_rate_v1',
+    'tts_playback_speed_v1',
     'tts_pitch_v1',
     'tts_engine_v1',
     'tts_language_v1',
@@ -81,6 +119,17 @@ final class BusinessKeyRegistry {
     'webdav_config_v1',
     's3_config_v1',
     'backup_encryption_enabled_v1',
+    'backup_auto_enabled_v1',
+    'backup_auto_destination_v1',
+    'backup_auto_last_destination_v1',
+    'backup_auto_local_dir_v1',
+    'backup_auto_local_bookmark_v1',
+    'backup_auto_local_retention_v1',
+    'backup_password_forget_pending_v1',
+    'backup_password_remember_manual_v1',
+    'backup_password_verifier_v1',
+    'backup_install_id_v1',
+    'backup_outstanding_partial_v1',
     'backup_reminder_enabled_v1',
     'backup_reminder_interval_days_v1',
     'backup_reminder_minutes_of_day_v1',
@@ -94,6 +143,10 @@ final class BusinessKeyRegistry {
     'use_dynamic_color_v1',
     'app_locale_v1',
     'title_model_v1',
+    'image_model_v1',
+    'video_model_v1',
+    'prompt_enhance_model_v1',
+    'prompt_enhance_prompt_v1',
     'title_generation_enabled_v1',
     'title_prompt_v1',
     'title_generation_thinking_enabled_v1',
@@ -105,6 +158,7 @@ final class BusinessKeyRegistry {
     'translate_model_v1',
     'translate_prompt_v1',
     'translate_target_lang_v1',
+    'translate_visible_language_codes_v1',
     'ocr_model_v1',
     'ocr_prompt_v1',
     'ocr_enabled_v1',
@@ -190,6 +244,7 @@ final class BusinessKeyRegistry {
     'memory_migration_batch_size_v1',
     'chat_bubble_style_overrides_v1',
     'chat_bubble_style_overrides_user_v1',
+    'chat_bubble_style_thinking_tool_card_v1',
     'tool_schema_overrides_v1',
     'environment_state_v1',
     'environment_mirrors_v1',
@@ -612,6 +667,7 @@ final class BusinessSettingsRouter {
             'multiKeyEnabled',
             'aihubmixAppCodeEnabled',
             'balanceEnabled',
+            'balanceRefreshOnReply',
             'claudePromptCachingEnabled',
           },
           lists: const {'models', 'apiKeys', 'customHeaders', 'customBody'},
@@ -623,6 +679,10 @@ final class BusinessSettingsRouter {
             'requestBudget',
           },
         );
+        final interval = payload['balanceRefreshInterval'];
+        if (interval != null && !isBalanceRefreshInterval(interval)) {
+          throw FormatException(kind.sourceKey);
+        }
         _validateProviderChildren(kind, payload);
         return;
       case BusinessEntityKind.providerGroup:
@@ -1064,6 +1124,13 @@ final class BusinessSettingsRouter {
           strings: const {'apiKey', 'url'},
           stringLists: const {'apiKeys'},
         );
+      case 'keenable':
+        _validateKnownFields(
+          kind,
+          payload,
+          strings: const {'apiKey'},
+          stringLists: const {'apiKeys'},
+        );
       case 'zhipu':
       case 'linkup':
       case 'metaso':
@@ -1093,6 +1160,13 @@ final class BusinessSettingsRouter {
           payload,
           requiredStrings: const {'url'},
           strings: const {'engines', 'language', 'username', 'password'},
+        );
+      case '4get':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'url'},
+          strings: const {'scraper', 'passToken'},
         );
       case 'duckduckgo':
         _validateKnownFields(kind, payload, strings: const {'region'});
@@ -1259,6 +1333,11 @@ final class BusinessSettingsRouter {
   }
 
   static Object _validatePreferenceValue(String key, Object value) {
+    if (key == BusinessKeyRegistry.balanceRefreshIntervalKey &&
+            !isBalanceRefreshInterval(value) ||
+        key == BusinessKeyRegistry.balanceRefreshOnReplyKey && value is! bool) {
+      throw FormatException(key);
+    }
     if (value is bool || value is int || value is double || value is String) {
       return value;
     }

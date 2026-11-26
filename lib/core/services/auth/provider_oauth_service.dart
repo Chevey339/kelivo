@@ -14,6 +14,8 @@ import '../../providers/settings_provider.dart';
 import '../model_spec/model_spec_resolver.dart';
 import '../api/request_image_context.dart';
 import '../network/dio_http_client.dart';
+import '../network/media_http_log.dart';
+import 'codex_client_version.dart';
 import 'codex_request.dart';
 import 'codex_turn_state.dart';
 import 'claude_oauth_request.dart';
@@ -25,14 +27,20 @@ export 'oauth_cancellation.dart';
 export 'provider_oauth_adapter.dart' show OAuthLoginPrompt;
 
 class ProviderOAuthService extends ChangeNotifier {
-  ProviderOAuthService({http.Client Function(ProviderConfig)? clientFactory})
-    : _clientFactory = clientFactory ?? _clientFor;
+  ProviderOAuthService({
+    http.Client Function(ProviderConfig)? clientFactory,
+    this._codexVersion,
+  }) : _clientFactory = clientFactory ?? _clientFor;
 
-  static final instance = ProviderOAuthService();
+  static final instance = ProviderOAuthService(
+    codexVersion: CodexClientVersion(),
+  );
   final http.Client Function(ProviderConfig) _clientFactory;
+  final CodexClientVersion? _codexVersion;
   SettingsProvider? _settings;
   final _refreshes = <String, Future<ProviderConfig>>{};
-  final _modelSyncs = <(SettingsProvider, String), Future<void>>{};
+  final _modelSyncs =
+      <(SettingsProvider, String, CodexVersionSnapshot?), Future<void>>{};
   final _usage = <String, ProviderUsageSnapshot>{};
   final _usageRequests = <String, Future<ProviderUsageSnapshot>>{};
   OAuthCancellation? _login;
@@ -80,7 +88,7 @@ class ProviderOAuthService extends ChangeNotifier {
     final host = config.proxyHost?.trim() ?? '';
     final port = int.tryParse(config.proxyPort ?? '');
     return DioHttpClient(
-      logRequests: false,
+      logMode: HttpLogMode.disabled,
       timeout: const Duration(seconds: 30),
       proxy: config.proxyEnabled == true && host.isNotEmpty && port != null
           ? NetworkProxyConfig(
@@ -339,19 +347,33 @@ class ProviderOAuthService extends ChangeNotifier {
     ProviderConfig original,
     Future<T> Function(OAuthWire, ProviderConfig) operation, {
     bool usageProbe = false,
+    bool Function()? isCurrent,
   }) async {
+    void checkCurrent() {
+      if (isCurrent?.call() == false) {
+        throw ProviderOAuthException(
+          ProviderOAuthFailure.cancelled,
+          providerId: original.id,
+        );
+      }
+    }
+
     try {
+      checkCurrent();
       var config = await resolve(original, usageProbe: usageProbe);
       final client = _clientFactory(config);
       try {
         try {
           return await operation(OAuthWire(client), config);
         } on ProviderOAuthException catch (error) {
+          checkCurrent();
           if (error.kind != ProviderOAuthFailure.loginRequired) rethrow;
           config = await resolve(config, force: true, usageProbe: usageProbe);
+          checkCurrent();
           try {
             return await operation(OAuthWire(client), config);
           } on ProviderOAuthException catch (error) {
+            checkCurrent();
             if (!usageProbe &&
                 error.kind == ProviderOAuthFailure.loginRequired) {
               await markLoginRequired(config);
@@ -378,82 +400,238 @@ class ProviderOAuthService extends ChangeNotifier {
     }
   }
 
-  Future<List<ModelSpec>> models(ProviderConfig original) =>
-      _authenticated(original, (wire, config) async {
-        final rows = await ProviderOAuthAdapter.forProvider(
-          config.oauthProvider!,
-        ).models(wire, config.oauthCredentials!);
-        final ids = <String>{};
-        return [
+  CodexVersionSnapshot get _effectiveCodexVersion =>
+      _codexVersion?.snapshot ?? bundledCodexVersion;
+
+  Future<String> _currentCodexVersion() async =>
+      await _codexVersion?.current() ?? defaultCodexClientVersion;
+
+  Future<List<ModelSpec>> models(ProviderConfig original) async => _models(
+    original,
+    original.oauthProvider == OAuthProvider.chatgpt
+        ? await _currentCodexVersion()
+        : null,
+  );
+
+  Future<List<ModelSpec>> _models(
+    ProviderConfig original,
+    String? codexVersion, {
+    bool Function()? isCurrent,
+  }) async {
+    final settings = _settings;
+    final replaceMetadata = await ModelSpecResolver.instance
+        .startModelListRefresh(original);
+    return _authenticated(original, (wire, config) async {
+      final rows = await ProviderOAuthAdapter.forProvider(
+        config.oauthProvider!,
+        codexVersion: codexVersion,
+      ).models(wire, config.oauthCredentials!);
+      final current = _current(config.id);
+      if (identical(settings, _settings) &&
+          current != null &&
+          current.oauthProvider == config.oauthProvider &&
+          current.oauthCredentials?.sessionId ==
+              config.oauthCredentials?.sessionId &&
+          // A superseded Codex list can still seed the initial catalog.
+          (isCurrent?.call() != false ||
+              current.oauthModelsClientVersion == null && rows.isNotEmpty)) {
+        await replaceMetadata([
           for (final row in rows)
-            if (oauthString(row['id']) != null &&
-                ids.add(row['id'] as String) &&
+            if (oauthString(row['id']) case final id?) (id: id, json: row),
+        ]);
+      }
+      final ids = <String>{};
+      return [
+        for (final row in rows)
+          if (oauthString(row['id']) case final id?)
+            if (ids.add(id) &&
                 (config.oauthProvider != OAuthProvider.grok ||
-                    !RegExp(
-                      r'grok-(?:imagine|stt|voice|tts)',
-                    ).hasMatch(row['id'] as String)))
+                    !RegExp(r'grok-(?:stt|voice|tts)').hasMatch(id)))
               _modelFromRow(config, row),
-        ];
-      });
+        if (config.oauthProvider == OAuthProvider.chatgpt &&
+            ids.add(codexImageModelId))
+          _modelFromRow(config, {'id': codexImageModelId}),
+      ];
+    }, isCurrent: isCurrent);
+  }
 
   _OAuthModelSpec _modelFromRow(
     ProviderConfig config,
     Map<String, dynamic> row,
-  ) => _OAuthModelSpec(
-    row: row,
-    base: _oauthDiscoveredSpec(
-      ModelSpecResolver.instance.spec(
-        config,
-        row['id'] as String,
-        displayName:
-            oauthString(row['display_name']) ??
-            oauthString(row['name']) ??
-            row['id'] as String,
-      ),
-      row,
-    ),
-  );
+  ) {
+    final id = row['id'] as String;
+    final resolved = ModelSpecResolver.instance.resolve(
+      config,
+      id,
+      displayName:
+          oauthString(row['display_name']) ?? oauthString(row['name']) ?? id,
+    );
+    var spec = resolved.override.applyTo(
+      _oauthDiscoveredSpec(resolved.base, row),
+      applyDisplayName: true,
+    );
+    if (_usesGrokComposerMetadata(config.oauthProvider, spec)) {
+      spec = spec.copyWith(
+        input: const [Modality.text],
+        abilities: {...spec.abilities, ModelAbility.reasoning}.toList(),
+        reasoning: _grokComposerReasoning.applyTo(spec.reasoning),
+      );
+    }
+    return _OAuthModelSpec(row: row, base: spec);
+  }
 
   /// Like OMP's versioned Codex cache, refresh each account after a client
   /// version change. Keep its saved models usable if discovery is unavailable.
   Future<void> syncOutdatedModels(SettingsProvider settings) async {
     await settings.loaded;
-    if (!identical(settings, _settings)) return;
-    // Startup discovery can run before the first rebuild applies the proxy.
+    if (!identical(settings, _settings) ||
+        !settings.providerConfigs.values.any(_canSyncCodexModels)) {
+      return;
+    }
     settings.applyGlobalProxyOverridesIfNeeded();
+    await _currentCodexVersion();
+    if (!identical(settings, _settings)) return;
+    await Future.wait([
+      _syncOutdatedCodexAccounts(settings),
+      _checkForCodexUpdate(settings),
+    ]);
+  }
+
+  static bool _canSyncCodexModels(ProviderConfig config) =>
+      config.enabled &&
+      config.oauthProvider == OAuthProvider.chatgpt &&
+      config.oauthCredentials?.requiresLogin == false;
+
+  static bool _hasCurrentCodexModels(ProviderConfig config, String version) =>
+      config.oauthModelsClientVersion == version &&
+      config.models.contains(codexImageModelId) &&
+      config.models.every((model) {
+        final override = config.modelOverrides[model];
+        return override is Map &&
+            override['oauthServiceTierSessionId'] ==
+                config.oauthCredentials?.sessionId;
+      });
+
+  Future<void> _checkForCodexUpdate(SettingsProvider settings) async {
+    final before = _effectiveCodexVersion;
+    await _codexVersion?.refresh();
+    if (before != _effectiveCodexVersion) {
+      await _syncOutdatedCodexAccounts(settings);
+    }
+  }
+
+  Future<void> _syncOutdatedCodexAccounts(SettingsProvider settings) async {
     for (final id in settings.providerConfigs.keys.toList()) {
       if (!identical(settings, _settings)) return;
       final config = _current(id);
       if (config == null ||
-          !config.enabled ||
-          config.oauthProvider != OAuthProvider.chatgpt ||
-          config.oauthCredentials == null ||
-          config.oauthCredentials!.requiresLogin ||
-          (config.oauthModelsClientVersion == codexClientVersion &&
-              config.models.every((model) {
-                final override = config.modelOverrides[model];
-                return override is Map &&
-                    override['oauthServiceTierSessionId'] ==
-                        config.oauthCredentials!.sessionId;
-              }))) {
+          !_canSyncCodexModels(config) ||
+          _hasCurrentCodexModels(config, _effectiveCodexVersion.version)) {
         continue;
       }
       try {
-        await syncModels(id);
+        await _syncAccountModels(settings, config);
       } catch (_) {
         // Leave the version unchanged so the next launch or manual sync retries.
       }
     }
   }
 
-  Future<void> syncModels(String id) async {
+  Future<void> syncModels(
+    String id, {
+    bool checkLatestCodexVersion = false,
+  }) async {
     final settings = _settings;
     final before = _current(id);
     if (settings == null || before == null) return;
-    final key = (settings, _sessionKey(before));
+    if (before.oauthProvider != OAuthProvider.chatgpt) {
+      return _syncAccountModels(settings, before);
+    }
+    await _currentCodexVersion();
+    if (!identical(settings, _settings)) return;
+    settings.applyGlobalProxyOverridesIfNeeded();
+    final initialVersion = _effectiveCodexVersion;
+    if (checkLatestCodexVersion) {
+      await _codexVersion?.refresh(force: true);
+    }
+    if (!identical(settings, _settings)) return;
+    final versionChanged = initialVersion != _effectiveCodexVersion;
+    final sync = _syncAccountModels(
+      settings,
+      before,
+      allowFallback: !checkLatestCodexVersion,
+    );
+    if (versionChanged) {
+      unawaited(_syncOutdatedCodexAccounts(settings));
+    } else if (!checkLatestCodexVersion && _codexVersion != null) {
+      unawaited(_checkForCodexUpdate(settings));
+    }
+    return sync;
+  }
+
+  Future<void> _syncAccountModels(
+    SettingsProvider settings,
+    ProviderConfig before, {
+    bool allowFallback = true,
+  }) async {
+    if (before.oauthProvider != OAuthProvider.chatgpt) {
+      return _syncAccountModelsForVersion(settings, before, null);
+    }
+    Future<void>? previousSync;
+    while (identical(settings, _settings)) {
+      final version = _effectiveCodexVersion;
+      final changed = Completer<void>();
+      void onVersionChanged() {
+        if (!changed.isCompleted) changed.complete();
+      }
+
+      final fallback = previousSync;
+      final sync = _syncAccountModelsForVersion(settings, before, version);
+      previousSync = sync;
+      _codexVersion?.addListener(onVersionChanged);
+      try {
+        await Future.any([sync, changed.future]);
+      } catch (_) {
+        if (!identical(settings, _settings)) rethrow;
+        if (version == _effectiveCodexVersion) {
+          final needsCatalog =
+              before.oauthModelsClientVersion == null || before.models.isEmpty;
+          if (!allowFallback || !needsCatalog || fallback == null) {
+            rethrow;
+          }
+          try {
+            await Future.any([fallback, changed.future]);
+          } catch (_) {}
+          if (version == _effectiveCodexVersion) {
+            if (!identical(settings, _settings)) rethrow;
+            final current = _requireCurrentSession(before);
+            if (current.oauthModelsClientVersion == null ||
+                current.models.isEmpty) {
+              rethrow;
+            }
+          }
+        }
+      } finally {
+        _codexVersion?.removeListener(onVersionChanged);
+      }
+      if (version == _effectiveCodexVersion ||
+          !identical(settings, _settings)) {
+        return;
+      }
+      before = _requireCurrentSession(before);
+    }
+  }
+
+  Future<void> _syncAccountModelsForVersion(
+    SettingsProvider settings,
+    ProviderConfig before,
+    CodexVersionSnapshot? codexVersion,
+  ) async {
+    if (!identical(settings, _settings)) return;
+    final key = (settings, _sessionKey(before), codexVersion);
     final pending = _modelSyncs[key];
     if (pending != null) return pending;
-    final request = _syncModels(settings, before);
+    final request = _syncModelsForVersion(settings, before, codexVersion);
     _modelSyncs[key] = request;
     try {
       await request;
@@ -462,11 +640,20 @@ class ProviderOAuthService extends ChangeNotifier {
     }
   }
 
-  Future<void> _syncModels(
+  Future<void> _syncModelsForVersion(
     SettingsProvider settings,
     ProviderConfig before,
+    CodexVersionSnapshot? codexVersion,
   ) async {
-    final list = await models(before);
+    final list = await _models(
+      before,
+      codexVersion?.version,
+      isCurrent: codexVersion == null
+          ? null
+          : () =>
+                identical(settings, _settings) &&
+                codexVersion == _effectiveCodexVersion,
+    );
     final current = _current(before.id);
     if (!identical(settings, _settings) ||
         current == null ||
@@ -475,18 +662,29 @@ class ProviderOAuthService extends ChangeNotifier {
             before.oauthCredentials?.sessionId) {
       return;
     }
+    if (codexVersion != null &&
+        codexVersion != _effectiveCodexVersion &&
+        (current.oauthModelsClientVersion != null || list.isEmpty)) {
+      return;
+    }
     final overrides = Map<String, dynamic>.from(current.modelOverrides);
     final provider = current.oauthProvider!;
     for (final model in list) {
       final row = model is _OAuthModelSpec
           ? model.row
           : const <String, dynamic>{};
+      // Model edits can land while discovery is in flight.
+      final discovered = model is _OAuthModelSpec
+          ? _modelFromRow(current, row)
+          : model;
+      final composer = _usesGrokComposerMetadata(provider, discovered);
       overrides[model.id] = mergeOAuthModelOverride(
         existing: overrides[model.id],
-        // Model edits can land while discovery is in flight.
-        model: model is _OAuthModelSpec ? _modelFromRow(current, row) : model,
-        reasoning: oauthDiscoveredReasoning(provider, row),
-        contextWindow: _oauthContextWindow(row),
+        model: discovered,
+        reasoning: composer
+            ? _grokComposerReasoning
+            : oauthDiscoveredReasoning(provider, row),
+        refreshCapabilities: composer,
         extra: {
           if (provider == OAuthProvider.chatgpt) ...{
             'oauthServiceTiers': [
@@ -508,9 +706,7 @@ class ProviderOAuthService extends ChangeNotifier {
         models: list.map((e) => e.id).toList(),
         modelOverrides: overrides,
         oauthModelsSyncedAt: DateTime.now(),
-        oauthModelsClientVersion: provider == OAuthProvider.chatgpt
-            ? codexClientVersion
-            : null,
+        oauthModelsClientVersion: codexVersion?.version,
       ),
     );
   }
@@ -520,8 +716,11 @@ class ProviderOAuthService extends ChangeNotifier {
     if (_usageRequests[key] case final pending?) return pending;
     final request = _authenticated(
       original,
-      (wire, config) => ProviderOAuthAdapter.forProvider(
+      (wire, config) async => ProviderOAuthAdapter.forProvider(
         config.oauthProvider!,
+        codexVersion: config.oauthProvider == OAuthProvider.chatgpt
+            ? await _currentCodexVersion()
+            : null,
       ).usage(wire, config.oauthCredentials!),
       usageProbe: true,
     );
@@ -598,6 +797,23 @@ bool? oauthRowReasoningSupport(Map<String, dynamic> row) {
   return null;
 }
 
+bool _usesGrokComposerMetadata(OAuthProvider? provider, ModelSpec model) =>
+    provider == OAuthProvider.grok &&
+    model.id == grokComposerFastModelId &&
+    model.upstreamId == grokComposerFastModelId;
+
+const _grokComposerReasoning = ReasoningSpecOverride(
+  dialect: ReasoningDialect.openaiResponsesReasoning,
+  levels: [
+    ReasoningLevel.minimal,
+    ReasoningLevel.low,
+    ReasoningLevel.medium,
+    ReasoningLevel.high,
+    ReasoningLevel.xhigh,
+  ],
+  canDisable: false,
+);
+
 /// Maps an OAuth catalog row onto [ReasoningSpecOverride].
 ReasoningSpecOverride? oauthDiscoveredReasoning(
   OAuthProvider provider,
@@ -644,7 +860,7 @@ Map<String, dynamic> mergeOAuthModelOverride({
   required Object? existing,
   required ModelSpec model,
   ReasoningSpecOverride? reasoning,
-  int? contextWindow,
+  bool refreshCapabilities = false,
   Map<String, dynamic> extra = const {},
 }) {
   final current = existing is Map
@@ -654,13 +870,14 @@ Map<String, dynamic> mergeOAuthModelOverride({
   nextExtra.removeWhere((key, _) => _deletedOAuthThinkingKeys.contains(key));
   return current
       .copyWith(
-        displayName: model.displayName,
-        type: model.type,
-        input: List<Modality>.from(model.input),
-        output: List<Modality>.from(model.output),
-        abilities: List<ModelAbility>.from(model.abilities),
+        displayName: current.displayName ?? model.displayName,
+        type: current.type ?? model.type,
+        input: refreshCapabilities ? model.input : current.input ?? model.input,
+        output: current.output ?? model.output,
+        abilities: refreshCapabilities
+            ? model.abilities
+            : current.abilities ?? model.abilities,
         reasoning: _mergeReasoningOverride(current.reasoning, reasoning),
-        contextWindow: contextWindow,
         extra: nextExtra,
       )
       .toJson();
@@ -732,21 +949,13 @@ String? _oauthDefaultLevel(Map<String, dynamic> row) {
   return null;
 }
 
-int? _oauthContextWindow(Map<String, dynamic> row) {
-  final value = oauthNumber(row['context_window']);
-  if (value == null || value <= 0 || value != value.truncateToDouble()) {
-    return null;
-  }
-  return value.toInt();
-}
-
 ModelSpec _oauthDiscoveredSpec(ModelSpec resolved, Map<String, dynamic> row) {
+  final inputModalities = row['input_modalities'];
   final imageIn =
       row['supports_image_in'] == true ||
-      (row['input_modalities'] as List? ?? const []).contains('image');
+      inputModalities is List && inputModalities.contains('image');
   final support = oauthRowReasoningSupport(row);
   return resolved.copyWith(
-    contextWindow: _oauthContextWindow(row),
     input: <Modality>[...resolved.input, if (imageIn) Modality.image],
     abilities: <ModelAbility>[
       ...resolved.abilities.where(
@@ -782,6 +991,16 @@ class _OAuthModelSpec extends ModelSpec {
 
 /// Attaches current credentials and enforces each subscription wire contract
 /// after custom request overrides, for initial requests and tool follow-ups.
+bool _isGrokMediaPath(String method, String path) => switch (method) {
+  'POST' => const {
+    '/v1/images/generations',
+    '/v1/images/edits',
+    '/v1/videos/generations',
+  }.contains(path),
+  'GET' => RegExp(r'^/v1/(?:images|videos)/[a-zA-Z0-9_-]+$').hasMatch(path),
+  _ => false,
+};
+
 class _ProviderOAuthHttpClient extends http.BaseClient {
   _ProviderOAuthHttpClient(
     this.inner,
@@ -830,17 +1049,33 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     await _resolve();
     final base = Uri.parse(config.oauthProvider!.baseUrl);
-    if (request.url.origin != base.origin ||
-        !request.url.path.startsWith('${base.path}/') ||
+    final grokMedia =
+        config.oauthProvider == OAuthProvider.grok &&
+        _isGrokMediaPath(request.method, request.url.path);
+    final grokMediaOrigin =
+        grokMedia &&
+        request.url.origin == Uri.parse(grokMediaBaseUrl).origin &&
+        request.url.userInfo.isEmpty;
+    final regularOrigin =
+        request.url.origin == base.origin &&
+        request.url.path.startsWith('${base.path}/');
+    if (!(regularOrigin || grokMediaOrigin) ||
         request is! http.Request &&
             config.oauthProvider != OAuthProvider.claude) {
       throw const ProviderOAuthException(ProviderOAuthFailure.invalidResponse);
     }
+    final codexResponses =
+        config.oauthProvider == OAuthProvider.chatgpt &&
+        (request.url.path == '${base.path}/responses' ||
+            request.url.path.startsWith('${base.path}/responses/'));
     final body = request is http.Request
         ? request.bodyBytes
         : await request.finalize().toBytes();
     final isClaude = config.oauthProvider == OAuthProvider.claude;
     final claudeMessages = isClaude && request.url.path.endsWith('/messages');
+    final codexVersion = config.oauthProvider == OAuthProvider.chatgpt
+        ? await service._currentCodexVersion()
+        : null;
     http.Request build() {
       // Recheck immediately before every send, including after refresh awaits.
       _checkSession();
@@ -861,6 +1096,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
             ..bodyBytes = body;
       final authHeaders = ProviderOAuthAdapter.forProvider(
         config.oauthProvider!,
+        codexVersion: codexVersion,
       ).headers(config.oauthCredentials!);
       final existingBeta = result.headers['anthropic-beta'];
       final existingContentType = result.headers['content-type'];
@@ -868,7 +1104,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
         result.headers.remove(name);
       }
       result.headers.addAll(authHeaders);
-      if (config.oauthProvider == OAuthProvider.chatgpt) {
+      if (codexResponses) {
         _codexTurnState.apply(result.headers, config);
       }
       if (isClaude) {
@@ -896,10 +1132,16 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
           request.url.path.endsWith('/messages')) {
         result.headers['x-api-key'] = config.oauthCredentials!.accessToken;
       }
-      if (request.method == 'POST' && (!isClaude || claudeMessages)) {
+      final rewriteBody =
+          codexResponses ||
+          claudeMessages ||
+          config.oauthProvider == OAuthProvider.kimi &&
+              request.url.path.endsWith('/messages') ||
+          config.oauthProvider == OAuthProvider.grok && !grokMedia;
+      if (request.method == 'POST' && rewriteBody) {
         final payload = (jsonDecode(utf8.decode(body)) as Map)
             .cast<String, dynamic>();
-        if (config.oauthProvider == OAuthProvider.chatgpt) {
+        if (codexResponses) {
           applyCodexRequest(
             payload,
             result.headers,
@@ -945,6 +1187,9 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
             : jsonEncode(payload);
         RequestImageContext.current?.validateBodyBytes(result.bodyBytes.length);
       }
+      if (identical(result.bodyBytes, body)) {
+        MediaHttpLog.copyDescription(request, result);
+      }
       return result;
     }
 
@@ -954,7 +1199,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
       final requestVersion = claudeCodeVersion;
       final requestConfig = config;
       final response = await inner.send(build());
-      if (requestConfig.oauthProvider == OAuthProvider.chatgpt &&
+      if (codexResponses &&
           response.statusCode >= 200 &&
           response.statusCode < 300) {
         _codexTurnState.capture(response.headers, requestConfig);

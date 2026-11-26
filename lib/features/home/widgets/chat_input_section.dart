@@ -1,3 +1,4 @@
+import '../services/composer_document_route.dart';
 import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 import 'dart:io';
 
@@ -10,6 +11,7 @@ import '../../../core/models/conversation_mcp_settings.dart';
 import '../../../core/services/api/reasoning/reasoning_level_options.dart';
 import '../../../core/services/api/reasoning/reasoning_dialects.dart';
 import '../../../core/services/api/reasoning/reasoning_selection.dart';
+import '../../../core/services/api/response_speed.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/models/skills_binding.dart';
@@ -47,6 +49,7 @@ class ChatInputSection extends StatelessWidget {
   const ChatInputSection({
     super.key,
     required this.inputBarKey,
+    this.documentRoute = regularDocumentRoute,
     this.chatModelProviderKey,
     this.chatModelId,
     this.chatModelIsConversationOverride = false,
@@ -98,6 +101,7 @@ class ChatInputSection extends StatelessWidget {
   });
 
   final GlobalKey inputBarKey;
+  final ComposerDocumentRoute documentRoute;
   final FocusNode inputFocus;
   final TextEditingController inputController;
   final ChatInputBarController mediaController;
@@ -174,10 +178,18 @@ class ChatInputSection extends StatelessWidget {
     final mid = chatModelId;
     final supportsModelTools =
         pk != null && mid != null && isToolModel(pk, mid);
+    final supportsReasoning =
+        pk != null && mid != null && isReasoningModel(pk, mid);
+    final config = pk == null ? null : settings.getProviderConfig(pk);
     final selectedReasoning = _selectedReasoning(settings, a, pk, mid);
-    final reasoningSpec = (pk != null && mid != null)
-        ? ModelSpecResolver.instance.spec(settings.getProviderConfig(pk), mid)
+    final reasoningSpec = (config != null && mid != null)
+        ? ModelSpecResolver.instance.spec(config, mid)
         : null;
+    final showResponseSpeedAction =
+        !supportsReasoning &&
+        config != null &&
+        mid != null &&
+        ResponseSpeedCapabilities.resolve(config, mid).tiers.isNotEmpty;
     final effectiveReasoning = reasoningSpec == null
         ? selectedReasoning
         : ReasoningRequest(
@@ -196,13 +208,18 @@ class ChatInputSection extends StatelessWidget {
     final hasWorldBooks =
         isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
     final showWorkspaceButton = isDesktop && onOpenWorkspace != null;
+    final openSkills = isDesktop || isTablet ? onOpenSkills : null;
     final showEnvChip = !isDesktop && (Platform.isAndroid || Platform.isIOS);
     var workspaceBound = false;
     if (showWorkspaceButton || showEnvChip) {
       workspaceBound = _isWorkspaceBound(context);
     }
 
+    final tools = supportsModelTools
+        ? _toolsState(context, a, workspaceBound)
+        : (active: false, connectionIssue: false);
     final bar = ChatInputBar(
+      documentRoute: documentRoute,
       chatModelProviderKey: pk,
       chatModelId: mid,
       onMore: onMore,
@@ -214,9 +231,8 @@ class ChatInputSection extends StatelessWidget {
       onOpenWorkspace: onOpenWorkspace,
       showWorkspaceButton: showWorkspaceButton,
       workspaceActive: workspaceBound,
-      onOpenSkills: isDesktop ? onOpenSkills : null,
-      skillsActive:
-          isDesktop && onOpenSkills != null && _isSkillsActive(context, a),
+      onOpenSkills: openSkills,
+      skillsActive: openSkills != null && _isSkillsActive(context, a),
       onStop: onStop,
       modelIcon: (pk != null && mid != null)
           ? CurrentModelIcon(
@@ -239,9 +255,8 @@ class ChatInputSection extends StatelessWidget {
       reasoningCustomBudget: reasoningSpec != null
           ? isCustomBudgetSelection(reasoningSpec, selectedReasoning)
           : false,
-      supportsReasoning: (pk != null && mid != null)
-          ? isReasoningModel(pk, mid)
-          : false,
+      supportsReasoning: supportsReasoning,
+      showResponseSpeedAction: showResponseSpeedAction,
       onOpenSearch: onOpenSearch,
       onSend: onSend,
       loading: isLoading,
@@ -254,8 +269,8 @@ class ChatInputSection extends StatelessWidget {
       onCancelQueuedInput: onCancelQueuedInput,
       onExpandedChanged: onExpandedChanged,
       showToolsButton: supportsModelTools,
-      toolsActive:
-          supportsModelTools && _isToolsActive(context, a, workspaceBound),
+      toolsActive: tools.active,
+      toolsConnectionIssue: tools.connectionIssue,
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
@@ -415,10 +430,12 @@ class ChatInputSection extends StatelessWidget {
     );
   }
 
-  bool _isToolsActive(BuildContext context, Assistant? a, bool workspaceBound) {
-    if (workspaceBound) return true;
-    if ((a?.localToolIds ?? const <String>[]).isNotEmpty) return true;
-    final connected = context.watch<McpProvider>().connectedServers;
+  ({bool active, bool connectionIssue}) _toolsState(
+    BuildContext context,
+    Assistant? a,
+    bool workspaceBound,
+  ) {
+    final mcp = context.watch<McpProvider>();
     final selected = a?.allowConversationMcp == true && conversationId != null
         ? context.select<ChatService, List<String>>(
             (chat) => ConversationMcpSettings.effectiveServerIds(
@@ -427,8 +444,23 @@ class ChatInputSection extends StatelessWidget {
             ),
           )
         : a?.mcpServerIds ?? const <String>[];
-    if (selected.isEmpty || connected.isEmpty) return false;
-    return connected.any((s) => selected.contains(s.id));
+    final servers = mcp.servers.where(
+      (s) => s.enabled && selected.contains(s.id),
+    );
+    return (
+      active:
+          workspaceBound ||
+          (a?.localToolIds.isNotEmpty ?? false) ||
+          servers.isNotEmpty,
+      connectionIssue: servers.any(
+        (s) => switch (mcp.statusFor(s.id)) {
+          McpStatus.idle ||
+          McpStatus.error ||
+          McpStatus.needsAuthorization => true,
+          _ => false,
+        },
+      ),
+    );
   }
 
   bool _hasQuickPhrases(BuildContext context, Assistant? a) {

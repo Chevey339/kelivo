@@ -8,6 +8,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:markstream/markstream.dart' as ms;
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/markdown/math_adapter.dart';
+import 'package:Kelivo/shared/markdown/chat_prose_direction.dart';
 import 'genui_theme.dart';
 import 'genui_clipboard.dart';
 import 'genui_source_selection.dart';
@@ -37,8 +38,8 @@ class GenUiText extends StatelessWidget {
   );
 }
 
-/// A deliberately isolated Markdown renderer. Empty extensions ensure nested
-/// kelivo-ui/kelivo-web fences remain code, and images use the library's alt text.
+/// A deliberately isolated Markdown renderer. Nested kelivo-ui/kelivo-web
+/// fences remain code, and images use the library's alt text.
 class GenUiMarkdown extends StatelessWidget {
   const GenUiMarkdown({
     super.key,
@@ -49,9 +50,13 @@ class GenUiMarkdown extends StatelessWidget {
   final String text;
   final ms.LinkHandler? linkHandler;
   final bool exporting;
+  static final _extensions = ms.MarkstreamExtensions(
+    proseDirection: chatProseDirection,
+  );
   @override
   Widget build(BuildContext context) => ms.MarkstreamView(
     source: text,
+    extensions: _extensions,
     theme: GenUiTheme.of(context).markdown,
     options: genUiMarkdownOptions,
     mathRenderer: const _GenUiMathRenderer(),

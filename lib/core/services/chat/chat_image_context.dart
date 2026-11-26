@@ -10,9 +10,7 @@ extension ChatImageContext on ChatService {
       return temporary ?? const ImageContextSettings();
     }
     if (temporary != null) {
-      await _repo.saveImageContextSettings(id, temporary);
-      _temporaryImageSettings.remove(id);
-      return temporary;
+      return _updateStoredImageContextSettings(id, (settings) => settings);
     }
     return _repo.readImageContextSettings(id);
   }
@@ -21,12 +19,41 @@ extension ChatImageContext on ChatService {
     String id,
     ImageContextSettings settings,
   ) async {
+    await updateImageContextSettings(id, (_) => settings);
+  }
+
+  Future<ImageContextSettings> updateImageContextSettings(
+    String id,
+    ImageContextSettings Function(ImageContextSettings) update,
+  ) async {
+    final ImageContextSettings settings;
     if (isTemporaryConversation(id) || _draftConversations.containsKey(id)) {
-      _temporaryImageSettings[id] = settings;
+      settings = _temporaryImageSettings[id] = update(
+        _temporaryImageSettings[id] ?? const ImageContextSettings(),
+      );
     } else {
-      await _repo.saveImageContextSettings(id, settings);
+      settings = await _updateStoredImageContextSettings(id, update);
     }
     _notifyContextChanged(id);
+    return settings;
+  }
+
+  Future<ImageContextSettings> _updateStoredImageContextSettings(
+    String id,
+    ImageContextSettings Function(ImageContextSettings) update,
+  ) async {
+    ImageContextSettings? pending;
+    try {
+      return await _repo.updateImageContextSettings(id, (stored) {
+        pending = _temporaryImageSettings.remove(id);
+        return update(pending ?? stored);
+      });
+    } catch (_) {
+      if (pending case final settings?) {
+        _temporaryImageSettings.putIfAbsent(id, () => settings);
+      }
+      rethrow;
+    }
   }
 
   /// Original selected branch, bounded by clear and regeneration, but not by

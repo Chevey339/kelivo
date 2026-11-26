@@ -95,7 +95,7 @@ class ProviderUrlEditor extends ChangeNotifier {
 
   void sync(ProviderConfig config) {
     if (dirty) return;
-    autoVersionDisabled = config.autoVersionDisabled;
+    autoVersionDisabled = config.isFal || config.autoVersionDisabled;
     if (_acceptedText != config.baseUrl) _write(config.baseUrl);
   }
 

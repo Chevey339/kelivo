@@ -96,6 +96,26 @@ void main() {
     },
   );
 
+  test(
+    'disabling drains queued writes and reopening keeps the next sink usable',
+    () async {
+      RequestLogger.logLine('last-before-disable');
+      final closing = RequestLogger.setEnabled(false);
+      RequestLogger.logLine('while-disabled');
+      await RequestLogger.setEnabled(true);
+      RequestLogger.logLine('first-after-enable');
+      await closing;
+      await RequestLogger.setEnabled(false);
+      final text = await File('${tempDir.path}/logs/logs.txt').readAsString();
+      expect(text, contains('last-before-disable'));
+      expect(text, isNot(contains('while-disabled')));
+      expect(
+        text.indexOf('first-after-enable'),
+        greaterThan(text.indexOf('last-before-disable')),
+      );
+    },
+  );
+
   Future<String> waitForLog(List<String> expected) async {
     final file = File('${tempDir.path}/logs/logs.txt');
     for (var attempt = 0; attempt < 50; attempt++) {

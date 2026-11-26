@@ -1,4 +1,8 @@
+import 'dart:isolate';
 import '../../models/compression_config.dart';
+import '../../models/native_compaction.dart';
+import '../../models/carried_original.dart';
+import '../api/request_history_context.dart';
 import '../../models/message_part.dart';
 import '../api/request_image_context.dart';
 import 'dart:async';
@@ -18,6 +22,10 @@ import 'compression_engine.dart';
 import '../../models/token_usage.dart';
 import '../api/chat_api_service.dart';
 import 'chat_service.dart';
+
+Future<int> _estimateMaterials(List<String> materials) => Isolate.run(
+  () => materials.fold<int>(0, (sum, part) => sum + estimateTokens(part)),
+);
 
 /// Owns only compression work. User input stays in HomeViewModel's existing
 /// QueuedChatInput/DraftSubmission path and is never copied into this service.
@@ -81,6 +89,473 @@ class ContextCompressionService extends ChangeNotifier {
     bool? fixedContextStart,
   })?
   estimateCandidate;
+
+  /// Shared by the manual preview and the task, including native wire estimates.
+  Future<CarrySelection> previewCarried(
+    String id,
+    CompressionRequest request, {
+    ConversationContextSnapshot? snapshot,
+  }) async {
+    if (snapshot == null) return _previewCarriedPages(id, request);
+    final source = ContextHistory.throughMessage(
+      snapshot.messages,
+      request.beforeMessageId,
+    );
+    final selection = selectCompressionHistory(
+      source,
+      snapshot.operations,
+      request.options,
+      protectedMessageId: request.beforeMessageId,
+      effectiveMessageIds: request.effectiveMessageIds,
+    );
+    return _selectCarried(id, request, source, snapshot.operations, selection);
+  }
+
+  /// Read candidate bodies in pages instead of hydrating all the old assistant
+  /// and tool output. Range selection continues to use the original metadata.
+  Future<CarrySelection> _previewCarriedPages(
+    String id,
+    CompressionRequest request,
+  ) async {
+    final options = request.options;
+    final setting = _carrySetting(request);
+    if (!_carryEnabled(request, setting)) return const CarrySelection();
+    final history = await chat.loadCompressionHistory(id);
+    final range = selectCompressionRange(
+      history.messages,
+      history.operations,
+      options,
+      protectedMessageId: request.beforeMessageId,
+      effectiveMessageIds: request.effectiveMessageIds,
+    );
+    if (range.covered.isEmpty) return const CarrySelection();
+
+    // Native media projection depends on the whole selected prefix (the last
+    // user and image eviction can both change if each page is sent separately).
+    if (request.codex) {
+      return previewCarried(
+        id,
+        request,
+        snapshot: await chat.loadContextSnapshot(id),
+      );
+    }
+    final metadata = history.messages;
+    final positions = {for (final (i, m) in metadata.indexed) m.id: i};
+    final loaded = <String, ChatMessage>{};
+    Future<void> load(Iterable<String> ids) async {
+      final needed = ids
+          .where((m) => positions.containsKey(m) && !loaded.containsKey(m))
+          .toSet();
+      if (needed.isEmpty) return;
+      for (final message in await chat.loadMessagesByIds(needed.toList())) {
+        loaded[message.id] = message;
+      }
+    }
+
+    final tail = range.retained.map((m) => m.id).toSet();
+    final deps = range.dependencies.toSet();
+    // Old native windows have no source IDs. Only the users in their covered
+    // groups are needed to recover them.
+    final legacyGroups = {
+      for (final op in history.operations)
+        if (deps.contains(op.id) &&
+            op.nativePayload?.output.any((w) => w['role'] == 'user') == true)
+          ...op.sourceGroups,
+    };
+    await load(
+      metadata
+          .where((m) => m.isUserMessage && legacyGroups.contains(m.groupId))
+          .map((m) => m.id),
+    );
+    final inherited = await _inheritedCarry(
+      [
+        for (final m in metadata)
+          if (loaded[m.id] case final original?) original,
+      ],
+      history.operations,
+      range.dependencies,
+      availableRevisionIds: positions.keys.toSet(),
+    );
+    final copies = {
+      for (final list in inherited.values)
+        for (final item in list) item.sourceMessageId: item,
+    };
+    final order = orderedCarryIds(
+      messages: metadata,
+      operations: history.operations,
+      dependencies: range.dependencies,
+      direct: range.effective.where((m) => m.isUserMessage).map((m) => m.id),
+      covered: range.covered,
+      retained: tail,
+      fromSummaries: options.carryFromSummaries,
+      inherited: inherited,
+    );
+    if (order.isEmpty) return const CarrySelection();
+
+    await load(tail);
+    for (final op in history.operations.where(
+      (op) => tail.contains(op.summaryMessageId),
+    )) {
+      await load(
+        (op.carried?.items ?? const <CarriedOriginal>[])
+            .where((i) => i.imageHandles.isNotEmpty)
+            .map((i) => i.sourceMessageId),
+      );
+    }
+    // Budget assembly needs physical anchor positions and the retained bodies.
+    // The newly summarized prefix itself is replaced by a reservation.
+    final source = [
+      for (final m in metadata)
+        loaded[m.id] ??
+            ChatMessage(
+              id: m.id,
+              groupId: m.groupId,
+              role: m.role,
+              content: '',
+              conversationId: id,
+            ),
+    ];
+    final budget = await _carryBudget(
+      id,
+      request,
+      source,
+      history.operations,
+      range.covered.map((m) => m.groupId).toList(),
+      range.dependencies,
+    );
+    final excluded = options.carryExcluded.toSet();
+    final all = setting.mode == CarryMode.all;
+    final limit = all ? order.length : setting.count.clamp(0, order.length);
+    final tailReplies = range.retained
+        .where((m) => m.role == 'assistant')
+        .map((m) => m.id)
+        .toSet();
+    final items = <CarriedOriginal>[];
+    final rows = <CarryRow>[];
+    var total = 0;
+    var fitCount = 0;
+    var notFit = 0;
+    var exhausted = false;
+    for (var offset = 0; offset < limit; offset += 50) {
+      final end = (offset + 50).clamp(0, limit);
+      final page = order.sublist(offset, end);
+      final needed = <String>{...page};
+      for (final id in page) {
+        final position = positions[id];
+        if (position == null) continue;
+        for (
+          var i = position + 1;
+          i < metadata.length && !metadata[i].isUserMessage;
+          i++
+        ) {
+          if (metadata[i].role == 'assistant') needed.add(metadata[i].id);
+        }
+      }
+      await load(needed);
+      final local = needed.where(loaded.containsKey).toList()
+        ..sort((a, b) => positions[a]!.compareTo(positions[b]!));
+      final messages = local.map((id) => loaded[id]!).toList();
+      final pageIds = page.toSet();
+      final selection = (
+        effective: messages,
+        covered: messages,
+        input: messages.where((m) => pageIds.contains(m.id)).toList(),
+        retained: messages.where((m) => tailReplies.contains(m.id)).toList(),
+        dependencies: range.dependencies,
+        needsRegeneration: false,
+        missingOriginals: false,
+      );
+      final subset = <String, List<CarriedOriginal>>{};
+      for (final id in page) {
+        if (copies[id] case final copy?) {
+          (subset[copy.fromOperationId!] ??= []).add(copy);
+        }
+      }
+      final next = await _selectCarried(
+        id,
+        request,
+        messages,
+        history.operations,
+        selection,
+        orderedIds: page,
+        inherited: subset,
+        pageBudget: budget == null ? null : budget - total,
+        isPage: true,
+      );
+      if (fitCount == offset) fitCount += next.fitCount;
+      items.addAll(next.items.reversed);
+      rows.addAll(next.rows);
+      total += next.totalTokens;
+      if (next.reachedBudget) {
+        notFit =
+            next.notFit +
+            order.skip(end).where((id) => !excluded.contains(id)).length;
+        exhausted = true;
+        break;
+      }
+    }
+    return CarrySelection(
+      rows: rows,
+      items: items.reversed.toList(),
+      totalTokens: total,
+      fitCount: fitCount,
+      notFit: notFit,
+      reachedBudget: exhausted,
+      overBudget: !all && items.isNotEmpty && budget != null && total > budget,
+    );
+  }
+
+  CarrySetting _carrySetting(CompressionRequest request) =>
+      request.options.carry ??
+      (request.options.native
+          ? request.config.nativeCarryOriginals
+          : request.config.carryOriginals);
+
+  bool _carryEnabled(CompressionRequest request, CarrySetting setting) =>
+      (!request.options.native || request.codex) &&
+      setting.mode != CarryMode.off &&
+      (setting.mode != CarryMode.unset || request.codex);
+
+  Future<int?> _carryBudget(
+    String id,
+    CompressionRequest request,
+    List<ChatMessage> source,
+    List<ContextOperation> operations,
+    List<String> covered,
+    List<String> dependencies,
+  ) async {
+    final setting = _carrySetting(request);
+    if (request.codex && setting.mode == CarryMode.unset) return 64000;
+    int? budget = request.carryBudgetTokens;
+    if (budget == null && estimateCandidate != null) {
+      final empty = ContextOperation(
+        id: 'carry-planning',
+        kind: ContextOperationKind.compress,
+        anchorGroupId: covered.last,
+        appliedAfterGroupId: ContextHistory.group(source.last),
+        sourceGroups: covered,
+        dependencies: dependencies,
+        createdAt: DateTime.now(),
+        compressionDetails: const {'envelope': 'history-v1'},
+      );
+      final estimate = await _estimate(
+        id,
+        ContextHistory.resolve(source, [...operations, empty]),
+      );
+      if (estimate case (
+        contextWindow: final int window,
+        usedTokens: final used,
+      )) {
+        budget =
+            window -
+            used -
+            (request.options.native ? 0 : request.config.summaryTokens);
+      }
+    }
+    if (request.codex) return (budget ?? 64000).clamp(0, 64000);
+    return budget ?? (setting.mode == CarryMode.all ? 64000 : null);
+  }
+
+  Future<Map<String, List<CarriedOriginal>>> _inheritedCarry(
+    List<ChatMessage> source,
+    List<ContextOperation> operations,
+    List<String> dependencies, {
+    List<ChatMessage> input = const [],
+    Set<String>? availableRevisionIds,
+  }) async {
+    final legacy = operations
+        .where(
+          (op) =>
+              dependencies.contains(op.id) &&
+              op.nativePayload?.output.any((item) => item['role'] == 'user') ==
+                  true,
+        )
+        .toList();
+    if (legacy.isEmpty) {
+      return inheritedCarryItems(source, operations, dependencies);
+    }
+    final groups = {for (final op in legacy) ...op.sourceGroups};
+    final prompts = await chat.legacyCarryPrompts(
+      source
+          .where(
+            (m) => m.role == 'user' && groups.contains(ContextHistory.group(m)),
+          )
+          .map((m) => m.id),
+    );
+    final summaries = {
+      for (final message in input)
+        if (ContextOperation.isSummary(message)) message.id: message,
+    };
+    for (final op in legacy) {
+      final summary = summaries[op.summaryMessageId];
+      if (summary == null) continue;
+      final keys = op.legacyUserSources(source, frozenPrompts: prompts);
+      summary.hydrateProviderArtifacts({
+        ...summary.providerArtifactSnapshot,
+        nativeUserSourcesKey: jsonEncode({
+          for (final entry in keys.entries) entry.key.toString(): entry.value,
+        }),
+      });
+    }
+    return inheritedCarryItems(
+      source,
+      operations,
+      dependencies,
+      frozenPrompts: prompts,
+      availableRevisionIds: availableRevisionIds,
+    );
+  }
+
+  Future<CarrySelection> _selectCarried(
+    String id,
+    CompressionRequest request,
+    List<ChatMessage> source,
+    List<ContextOperation> operations,
+    CompressionSelection selection, {
+    List<String>? orderedIds,
+    Map<String, List<CarriedOriginal>>? inherited,
+    bool isPage = false,
+    int? pageBudget,
+  }) async {
+    final options = request.options;
+    final setting = _carrySetting(request);
+    if (!_carryEnabled(request, setting) ||
+        (!isPage && selection.covered.isEmpty)) {
+      return const CarrySelection();
+    }
+    final automaticWire = request.codex && setting.mode == CarryMode.unset;
+    final budget = isPage
+        ? pageBudget
+        : await _carryBudget(
+            id,
+            request,
+            source,
+            operations,
+            selection.covered.map(ContextHistory.group).toList(),
+            selection.dependencies,
+          );
+    final copies =
+        inherited ??
+        await _inheritedCarry(
+          source,
+          operations,
+          selection.dependencies,
+          input: selection.input,
+        );
+    final order =
+        orderedIds ??
+        orderedCarryIds(
+          messages: source.map(ContextMessageMetadata.fromMessage).toList(),
+          operations: operations,
+          dependencies: selection.dependencies,
+          direct: selection.effective
+              .where(isCompressionUserMessage)
+              .map((m) => m.id),
+          covered: selection.covered.map(ContextMessageMetadata.fromMessage),
+          retained: selection.retained.map((m) => m.id).toSet(),
+          fromSummaries:
+              !request.automatic &&
+              !automaticWire &&
+              options.carryFromSummaries,
+          inherited: copies,
+        );
+    final ids =
+        (setting.mode == CarryMode.count ? order.take(setting.count) : order)
+            .toSet();
+    final candidates = source.where((m) => ids.contains(m.id)).toList();
+    final wires = <String, Map<String, dynamic>>{};
+    if (options.native && request.prepareNative != null) {
+      // Explicit choices use the original user text while borrowing the
+      // provider's media representation. Unset preserves the exact input.
+      final frozen = {
+        for (final list in copies.values)
+          for (final item in list)
+            if (item.wire != null) item.sourceMessageId,
+      };
+      final wireSelection = automaticWire
+          ? selection
+          : (
+              effective: selection.effective,
+              covered: selection.covered,
+              input: candidates.where((m) => !frozen.contains(m.id)).toList(),
+              retained: selection.retained,
+              dependencies: selection.dependencies,
+              needsRegeneration: false,
+              missingOriginals: false,
+            );
+      final body = await request.prepareNative!(wireSelection);
+      for (final raw in (body['input'] as List? ?? const []).whereType<Map>()) {
+        if (raw['role'] != 'user' || raw[historySourceKey] is! String) continue;
+        final key = carriedSourceId(raw[historySourceKey] as String);
+        if (!ids.contains(key)) continue;
+        wires[key] = Map<String, dynamic>.from(
+          (RequestHistoryContext.stripSources({
+                        'input': [raw],
+                      })['input']
+                      as List)
+                  .single
+              as Map,
+        );
+      }
+    }
+    final attachmentTexts = await chat.carriedUserTexts(
+      candidates,
+      includeAttachments: options.includeAttachmentsAndTools,
+      quoteMarker: request.quoteMarker,
+    );
+    final images = <String, List<CarrySourceImage>>{};
+    if (options.includeAttachmentsAndTools) {
+      for (final image in await RequestImageContext.collectHistory(
+        candidates,
+        parseMarkdownImages: true,
+        allowRemoteImages: true,
+      )) {
+        (images[image.identity.messageId] ??= []).add((
+          handle: image.handle,
+          uri: image.uri,
+          available: !image.unavailable,
+        ));
+      }
+    }
+    final job = CarriedSelectionJob(
+      messages: source,
+      operations: operations,
+      selection: selection,
+      options: options,
+      setting: automaticWire
+          ? const CarrySetting(mode: CarryMode.all)
+          : setting,
+      budgetTokens: budget,
+      kind: request.carryProviderKind,
+      wires: wires,
+      automaticWire: automaticWire,
+      attachmentTexts: attachmentTexts,
+      plainTexts: {
+        for (final m in candidates) m.id: m.quotedContent(request.quoteMarker),
+      },
+      orderedIds: automaticWire && request.prepareNative != null
+          ? wires.keys.toList().reversed.toList()
+          : order,
+      inheritedItems: copies,
+      images: images,
+      automatic: request.automatic,
+    );
+    var selected = await Isolate.run(job.call);
+    if (request.automatic && selected.overBudget) {
+      var total = selected.totalTokens;
+      var dropped = 0;
+      while (dropped < selected.items.length && total > (budget ?? total)) {
+        total -= selected.items[dropped++].estimatedTokens;
+      }
+      selected = CarrySelection(
+        items: selected.items.sublist(dropped),
+        totalTokens: total,
+        notFit: selected.notFit + dropped,
+      );
+    }
+    return selected;
+  }
+
   bool _disposed = false;
   Iterable<ContextCompressionTask> get tasks => _tasks.values;
   ContextCompressionTask? taskFor(String id) => _tasks[id];
@@ -349,18 +824,29 @@ class ContextCompressionService extends ChangeNotifier {
       final covered = selection.covered;
       final dependencies = selection.dependencies;
       task.anchorGroupId = ContextHistory.group(covered.last);
+      final carry = await _selectCarried(
+        task.conversationId,
+        request,
+        sourceMessages,
+        snapshot.operations,
+        selection,
+      );
+      _check(task);
+      final setting = _carrySetting(request);
+      final automaticWire = request.codex && setting.mode == CarryMode.unset;
+      final carried = carry.freeze(
+        setting,
+        fromSummaries: !automaticWire && task.options.carryFromSummaries,
+        origin: automaticWire ? 'auto' : 'explicit',
+      );
       if (task.options.native) {
-        await _runNative(task, snapshot, sourceMessages, selection);
+        await _runNative(task, snapshot, sourceMessages, selection, carried);
         return;
       }
-      try {
-        task.previousBudget = await estimateCandidate?.call(
-          task.conversationId,
-          selection.effective,
-        );
-      } catch (_) {
-        /* An unavailable before-estimate must not fail compression. */
-      }
+      task.previousBudget = await _estimate(
+        task.conversationId,
+        selection.effective,
+      );
       final textMessages = await chat.messagesForCompression(
         selection.input,
         includeAttachmentsAndTools: task.options.includeAttachmentsAndTools,
@@ -368,10 +854,35 @@ class ContextCompressionService extends ChangeNotifier {
       );
       _check(task);
       final background = await request.loadReference?.call(selection) ?? '';
-      task.referenceFingerprint = sha256
-          .convert(utf8.encode(background))
-          .toString();
-      if (request.loadReference != null) {
+      final chunks = buildCompressRequestContents(
+        textMessages,
+        task.options,
+        quoteMarker: request.quoteMarker,
+      );
+      if (chunks.isEmpty) throw StateError('no_messages');
+      final result = await const CompressionEngine().run(
+        task: task,
+        request: request,
+        summaryTokens:
+            request.automatic &&
+                carry.totalTokens > 0 &&
+                request.carryBudgetTokens != null
+            ? (request.carryBudgetTokens! + 128 - carry.totalTokens).clamp(
+                128,
+                request.config.summaryTokens,
+              )
+            : null,
+        materials: chunks,
+        background: background,
+        check: () => _check(task),
+        publish: () => _publish(task),
+      );
+      _check(task);
+      final summary = result.summary;
+      if (result.referenceUsed) {
+        task.referenceFingerprint = sha256
+            .convert(utf8.encode(background))
+            .toString();
         task.validateReferences = () async {
           final latest = await request.loadReference!(selection);
           if (sha256.convert(utf8.encode(latest)).toString() !=
@@ -380,30 +891,7 @@ class ContextCompressionService extends ChangeNotifier {
           }
         };
       }
-      final previousSummary = textMessages
-          .where(ContextOperation.isSummary)
-          .map((m) => m.content)
-          .join('\n\n');
-      final chunks = buildCompressRequestContents(
-        textMessages.where((m) => !ContextOperation.isSummary(m)).toList(),
-        task.options,
-        quoteMarker: request.quoteMarker,
-      );
-      if (chunks.isEmpty && previousSummary.isEmpty) {
-        throw StateError('no_messages');
-      }
-      final inputTokens =
-          estimateTokens(previousSummary) +
-          chunks.fold<int>(0, (sum, part) => sum + estimateTokens(part));
-      final summary = await const CompressionEngine().run(
-        task: task,
-        request: request,
-        materials: chunks,
-        previousSummary: previousSummary,
-        background: background,
-        check: () => _check(task),
-        publish: () => _publish(task),
-      );
+      final inputTokens = await _estimateMaterials(chunks);
       _check(task);
       task.summary = summary;
       task.sourceFingerprint = ContextHistory.fingerprint(
@@ -437,6 +925,8 @@ class ContextCompressionService extends ChangeNotifier {
         inputParts: task.completedParts,
         compressionDetails: {
           'envelope': 'history-v1',
+          if (carried.items.isNotEmpty || carried.notFit > 0)
+            'carried': carried.toJson(),
           'sourceRevisionIds': covered.map((m) => m.id).toList(),
           'imageSources': {
             for (final image in sourceImages)
@@ -450,7 +940,7 @@ class ContextCompressionService extends ChangeNotifier {
           'template': task.templateSnapshot,
           'settings': task.settingsSnapshot,
           'referenceFingerprint': task.referenceFingerprint,
-          'referenceUsed': background.isNotEmpty,
+          'referenceUsed': result.referenceUsed,
           'automatic': task.automatic,
           'requestAttempts': task.requestAttempts,
           'usage': task.usage?.toJson(),
@@ -473,29 +963,60 @@ class ContextCompressionService extends ChangeNotifier {
           task.sourceFingerprint) {
         throw StateError('context_changed');
       }
-      if (request.loadReference != null &&
-          sha256
-                  .convert(utf8.encode(await request.loadReference!(selection)))
-                  .toString() !=
-              task.referenceFingerprint) {
-        task.phase = CompressionPhase.review;
-        task.error = 'compression_reference_changed';
-        await _publish(task);
-        return;
-      }
+      await task.validateReferences?.call();
       final withinWindow = await _checkBudget(task, (
         messages: sourceMessages,
         operations: snapshot.operations,
         fingerprint: task.sourceFingerprint!,
       ));
       _check(task);
-      final accepted =
+      var accepted =
           await request.acceptCandidate?.call(task.candidate!) ?? true;
-      // In-turn acceptance uses the full provider request, including its live
-      // suffix and image projection. The generic UI estimate is informational.
-      final fitsBudget =
-          (request.automatic && request.acceptCandidate != null) ||
-          withinWindow;
+      final originalCandidate = task.candidate!;
+      final originals = originalCandidate.carried;
+      if (request.automatic &&
+          !accepted &&
+          originals != null &&
+          originals.items.isNotEmpty) {
+        // The live request includes calibrated usage and its active tool suffix.
+        // If that last check is stricter, keep the largest fitting newest suffix
+        // without spending another summary request.
+        var low = 0;
+        var high = originals.items.length - 1;
+        ContextOperation? best;
+        while (low <= high) {
+          _check(task);
+          final keep = (low + high) ~/ 2;
+          final dropped = originals.items.length - keep;
+          final candidate = originalCandidate.withCarried(
+            originals.withItems(
+              originals.items.skip(dropped).toList(),
+              notFit: originals.notFit + dropped,
+            ),
+          );
+          if (await request.acceptCandidate!(candidate)) {
+            best = candidate;
+            low = keep + 1;
+          } else {
+            high = keep - 1;
+          }
+        }
+        if (best != null) {
+          task.candidate = best;
+          accepted = await request.acceptCandidate!(best);
+          await _checkBudget(task, (
+            messages: sourceMessages,
+            operations: snapshot.operations,
+            fingerprint: task.sourceFingerprint!,
+          ));
+        }
+      }
+      // An actual overflow recovery can try the rebuilt request on the server.
+      // Direct manual runs let the user review a result with a high estimate.
+      final needsBudgetReview =
+          !request.automatic && !request.ownsContinuation && !withinWindow;
+      final summaryNotSmaller =
+          !request.ownsContinuation && estimateTokens(summary) >= inputTokens;
       _check(task);
       task.candidate = task.candidate!.copyWith(
         compressionDetails: {
@@ -504,17 +1025,17 @@ class ContextCompressionService extends ChangeNotifier {
         },
       );
       if (task.options.previewOnly ||
-          estimateTokens(summary) >= inputTokens ||
-          !fitsBudget ||
+          summaryNotSmaller ||
+          needsBudgetReview ||
           !accepted) {
         task.phase = CompressionPhase.review;
         task.error = task.options.previewOnly
             ? null
             : !accepted
             ? 'compression_target_not_reached'
-            : fitsBudget
-            ? 'summary_not_smaller'
-            : 'context_budget_exceeded';
+            : needsBudgetReview
+            ? 'context_budget_exceeded'
+            : 'summary_not_smaller';
         await _publish(task);
         return;
       }
@@ -578,6 +1099,7 @@ class ContextCompressionService extends ChangeNotifier {
     ConversationContextSnapshot snapshot,
     List<ChatMessage> source,
     CompressionSelection selection,
+    CarriedOriginals carried,
   ) async {
     final request = task.request!;
     if (request.compactNative == null) {
@@ -600,7 +1122,64 @@ class ContextCompressionService extends ChangeNotifier {
     task.totalParts = 1;
     task.requestAttempts = 1;
     await _publish(task);
-    final result = await request.compactNative!(selection, task.id);
+    final nativeResult = await request.compactNative!(selection, task.id);
+    final result = nativeResult.payload;
+    if (carried.origin == 'auto') {
+      // The response-side retention was computed on the exact submitted input.
+      // Key the frozen wire by source so even a boundary change never reassigns
+      // a user's reply, edits or link to another message.
+      final originals = {for (final m in source) m.id: m};
+      final copies = {
+        for (final list in inheritedCarryItems(
+          source,
+          snapshot.operations,
+          selection.dependencies,
+        ).values)
+          for (final item in list) item.sourceMessageId: item,
+        for (final item in carried.items) item.sourceMessageId: item,
+      };
+      final actual = <CarriedOriginal>[];
+      for (final entry in nativeResult.retained) {
+        final id = carriedSourceId(entry.sourceKey);
+        final original = originals[id];
+        final base =
+            copies[id] ??
+            (original != null ? carriedFromMessage(original) : null);
+        if (base == null) continue;
+        final text = carriedWireText(entry.wire);
+        var item = base.copyWith(
+          wire: entry.wire,
+          text: text,
+          clearEdit: true,
+          removeReply: true,
+          truncated:
+              base.truncated ||
+              text.contains('\n[…truncated…]\n') && text != base.text,
+        );
+        if (task.options.newConversation) item = item.textOnly();
+        actual.add(
+          item.copyWith(
+            estimatedTokens: countCarriedTokens(
+              item,
+              request.carryProviderKind,
+            ),
+          ),
+        );
+      }
+      carried = carried.withItems(
+        actual,
+        notFit: (carried.items.length + carried.notFit - actual.length).clamp(
+          0,
+          1 << 30,
+        ),
+      );
+    }
+    _check(task);
+    final sourceImages = await RequestImageContext.collectHistory(
+      selection.covered,
+      parseMarkdownImages: true,
+      allowRemoteImages: true,
+    );
     _check(task);
     task.completedParts = 1;
     task.usage = result.usage;
@@ -619,6 +1198,17 @@ class ContextCompressionService extends ChangeNotifier {
       inputParts: 1,
       compressionDetails: {
         'nativeCompaction': result.toJson(),
+        if (carried.items.isNotEmpty)
+          'imageSources': {
+            for (final image in sourceImages)
+              image.handle: {
+                'messageId': image.identity.messageId,
+                'slot': image.identity.slot,
+                'imageIndex': image.identity.imageIndex,
+              },
+          },
+        if (carried.items.isNotEmpty || carried.notFit > 0)
+          'carried': carried.toJson(),
         'sourceRevisionIds': selection.covered.map((m) => m.id).toList(),
         'automatic': request.automatic,
         'requestAttempts': task.requestAttempts,
@@ -667,9 +1257,8 @@ class ContextCompressionService extends ChangeNotifier {
             task.sourceFingerprint) {
           throw StateError('context_changed');
         }
-        final withinWindow = await _checkBudget(task, snapshot);
+        await _checkBudget(task, snapshot);
         _check(task);
-        if (!withinWindow) throw StateError('context_budget_exceeded');
         task.error = null;
         final selection = selectCompressionHistory(
           sourceMessages,
@@ -748,15 +1337,29 @@ class ContextCompressionService extends ChangeNotifier {
     ConversationContextSnapshot snapshot,
   ) async {
     if (task.options.newConversation) return true;
-    final estimate = estimateCandidate;
-    if (estimate == null) return false;
     final projected = ContextHistory.resolve(snapshot.messages, [
       ...snapshot.operations,
       task.candidate!,
     ]);
-    task.budget = await estimate(task.conversationId, projected);
-    final limit = task.budget!.contextWindow;
-    return limit == null || task.budget!.usedTokens <= limit;
+    final budget = task.budget = await _estimate(
+      task.conversationId,
+      projected,
+    );
+    return budget == null ||
+        budget.contextWindow == null ||
+        budget.usedTokens <= budget.contextWindow!;
+  }
+
+  Future<CompressionBudget?> _estimate(
+    String id,
+    List<ChatMessage> history,
+  ) async {
+    try {
+      return await estimateCandidate?.call(id, history);
+    } catch (_) {
+      // This estimate is advisory. It may be unavailable for gateway models.
+      return null;
+    }
   }
 
   Future<void> dismiss(String id) async {

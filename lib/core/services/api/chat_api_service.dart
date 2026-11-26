@@ -3,7 +3,8 @@ import 'providers/openai/responses_request.dart';
 import '../../models/native_compaction.dart';
 import 'native_compaction_context.dart';
 import 'generation/model_request_attempts.dart';
-import '../../models/compress_context_options.dart' show isContextLengthError;
+import '../../models/compress_context_options.dart'
+    show isCompressionCapacityError;
 import 'request_history_context.dart';
 import 'request_image_context.dart';
 import 'request_timeout.dart';
@@ -26,14 +27,15 @@ import 'stream/stream_chunk_handler.dart';
 
 import '../../models/auto_retry_options.dart';
 import '../../models/reasoning_request.dart';
+import '../model_override_payload_parser.dart';
 import '../model_spec/model_spec_resolver.dart';
+import 'builtin_tools.dart';
 import 'chat_api_helpers.dart';
 import 'provider_request_headers.dart';
 import 'providers/claude_official.dart';
 import 'providers/google_gemini.dart';
 import 'providers/google_vertex.dart';
 import 'providers/openai_chat_completions.dart';
-import 'providers/openai_images.dart';
 import 'providers/openai_responses.dart';
 import 'providers/zhipu_layout_parsing.dart';
 import 'retry_policy.dart';
@@ -46,8 +48,33 @@ export 'generation/text_generation_result.dart';
 export 'generation/tool_loop_runner.dart';
 export 'stream/stream_chunk_emit.dart';
 
+/// Controls which built-in tools are available to a generation request.
+enum BuiltInToolMode { configured, searchOnly, none }
+
 class ChatApiService {
-  static Future<NativeCompactionPayload> compactHistory({
+  static Future<Map<String, dynamic>> prepareNativeCompactionBody({
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    List<Map<String, dynamic>>? tools,
+    RequestImageContext? imageContext,
+    bool stream = false,
+  }) {
+    Future<Map<String, dynamic>> build() async {
+      final body = await buildOpenAIResponsesBody(
+        nativeResponsesConfig(config),
+        modelId,
+        RequestHistoryContext.identify(messages),
+        tools: tools,
+        stream: stream,
+      );
+      return await imageContext?.project(body, preserveSources: true) ?? body;
+    }
+
+    return imageContext?.runFuture(build) ?? build();
+  }
+
+  static Future<NativeCompactionResult> compactHistory({
     required ProviderConfig config,
     required String modelId,
     required List<Map<String, dynamic>> messages,
@@ -58,6 +85,7 @@ class ChatApiService {
     Map<String, String>? extraHeaders,
     bool Function()? isCancelled,
     Duration? requestTimeout,
+    NativeUserRetention retention = NativeUserRetention.auto,
   }) async {
     final token = CancelToken();
     _activeCancelTokens.remove(requestId)?.cancel('replaced');
@@ -83,28 +111,31 @@ class ChatApiService {
       check();
       validateNativeCompactionScope(messages, config);
       config = nativeResponsesConfig(config);
-      final body = await buildOpenAIResponsesBody(
-        config,
-        modelId,
-        RequestHistoryContext.identify(messages),
+      final projected = await prepareNativeCompactionBody(
+        config: config,
+        modelId: modelId,
+        messages: messages,
         tools: tools,
+        imageContext: imageContext,
         stream: config.oauthProvider == OAuthProvider.chatgpt,
       );
       check();
-      final projected =
-          await imageContext?.project(body, preserveSources: true) ?? body;
-      check();
       client = ProviderOAuthService.instance.authenticatedClient(
-        providerHttpClient(config, cancelToken: token, logRequests: false),
+        providerHttpClient(
+          config,
+          cancelToken: token,
+          logMode: HttpLogMode.disabled,
+        ),
         config,
         cancelToken: token,
       );
       final authenticatedClient = client;
-      Future<NativeCompactionPayload> sendCompact() => requestNativeCompaction(
+      Future<NativeCompactionResult> sendCompact() => requestNativeCompaction(
         authenticatedClient,
         config,
         modelId,
         projected,
+        retention: retention,
         extraHeaders: providerSessionHeaders(
           config,
           conversationId: conversationId,
@@ -112,9 +143,8 @@ class ChatApiService {
         ),
         conversationId: conversationId,
       );
-      final result = await (imageContext == null
-          ? sendCompact()
-          : imageContext.run(() => Stream.fromFuture(sendCompact())).first);
+      final result =
+          await (imageContext?.runFuture(sendCompact) ?? sendCompact());
       check();
       return result;
     } catch (_) {
@@ -139,18 +169,6 @@ class ChatApiService {
   @visibleForTesting
   static String normalizeClaudeImageMimeForTest(String mime) =>
       normalizeClaudeImageMime(mime);
-
-  static bool supportsOpenAIImagesApiRouting(
-    ProviderConfig config,
-    String modelId,
-  ) {
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    return kind == ProviderKind.openai &&
-        shouldUseOpenAIImagesApi(config, modelId);
-  }
 
   static void cancelRequest(String requestId) {
     final key = requestId.trim();
@@ -312,6 +330,27 @@ class ChatApiService {
     );
   }
 
+  static ProviderConfig _withoutBuiltInTools(
+    ProviderConfig config,
+    String modelId,
+  ) {
+    final override = ModelOverridePayloadParser.modelOverride(
+      config.modelOverrides,
+      modelId,
+    );
+    return config.copyWith(
+      // The filtered, merged body is passed through extraBody for this request.
+      customBody: const [],
+      modelOverrides: {
+        ...config.modelOverrides,
+        modelId: {...override, 'builtInTools': const <String>[]}
+          ..remove('tools') // Older model overrides store tool switches here.
+          ..remove('webSearch')
+          ..remove('body'),
+      },
+    );
+  }
+
   static Stream<StreamChunk> sendMessageStream({
     required ProviderConfig config,
     required String modelId,
@@ -329,9 +368,8 @@ class ChatApiService {
     String? requestId,
     String? conversationId,
     String? serviceTier,
-    bool allowImagesApiRouting = true,
     bool ocrActive = false,
-    bool builtInSearchOnly = false,
+    BuiltInToolMode builtInToolMode = BuiltInToolMode.configured,
     bool skipImageParsing = false,
     bool parseMarkdownImageLinks = true,
     // Disallow media, tools and body overrides for detached text generation.
@@ -340,6 +378,7 @@ class ChatApiService {
     RequestImageContext? imageContext,
     RequestHistoryContext? historyContext,
     Duration? requestTimeout,
+    void Function()? onRequestDispatched,
   }) async* {
     final sessionToken = CancelToken();
     final toolCancellation = ToolCallCancellation(
@@ -366,7 +405,14 @@ class ChatApiService {
       ]);
       checkRequestTimeout(sessionToken);
       if (sessionToken.isCancelled) return;
-      if (textOnly) config = _textOnlyConfig(config, modelId);
+      if (textOnly) {
+        config = _textOnlyConfig(config, modelId);
+      } else if (builtInToolMode == BuiltInToolMode.none) {
+        final body = customBody(config, modelId, assistantBody: extraBody);
+        BuiltInToolsHelper.removeToolOverrides(body, config);
+        extraBody = body;
+        config = _withoutBuiltInTools(config, modelId);
+      }
       if (config.oauthProvider == OAuthProvider.chatgpt) stream = true;
       config = config.forModelProtocol(modelId);
       final nativeHistory = hasNativeCompaction(messages);
@@ -389,13 +435,6 @@ class ChatApiService {
         config.id,
         explicitType: config.providerType,
       );
-      final useOpenAIImagesApi =
-          !nativeTransport &&
-          imageContext?.omitImages != true &&
-          !textOnly &&
-          kind == ProviderKind.openai &&
-          allowImagesApiRouting &&
-          shouldUseOpenAIImagesApi(config, modelId);
       final useZhipuLayoutParsing =
           !nativeTransport &&
           imageContext?.omitImages != true &&
@@ -410,10 +449,7 @@ class ChatApiService {
         spec: ModelSpecResolver.instance.spec(config, modelId),
         keepImages:
             !textOnly &&
-            (skipImageParsing ||
-                ocrActive ||
-                useOpenAIImagesApi ||
-                useZhipuLayoutParsing),
+            (skipImageParsing || ocrActive || useZhipuLayoutParsing),
       );
       final safeMessages = await stripUnsupportedMediaFromMessages(
         spec.supportsImageInput
@@ -431,8 +467,7 @@ class ChatApiService {
           .spec(config, modelId)
           .output
           .contains(Modality.image);
-      final retryNetworkErrors =
-          !useOpenAIImagesApi && !useZhipuLayoutParsing && !imageOutput;
+      final retryNetworkErrors = !useZhipuLayoutParsing && !imageOutput;
       final emitRetryUi = options.enabled && options.maxRetries > 0;
       Stream<StreamChunk> retryRound(Stream<StreamChunk> Function() sendRound) {
         return retryingStream<StreamChunk>(
@@ -440,7 +475,7 @@ class ChatApiService {
           isCancelled: () => sessionToken.isCancelled,
           cancelled: _whenCancelled(sessionToken),
           shouldRetry: (error) =>
-              !isContextLengthError(error) &&
+              !isCompressionCapacityError(error) &&
               shouldRetryError(
                 error,
                 options,
@@ -500,13 +535,13 @@ class ChatApiService {
               serviceTier: textOnly ? null : serviceTier,
               conversationId: conversationId,
               stream: stream,
-              builtInSearchOnly: builtInSearchOnly,
+              builtInSearchOnly: builtInToolMode == BuiltInToolMode.searchOnly,
               skipImageParsing:
                   textOnly || skipImageParsing || !parseMarkdownImageLinks,
               kind: kind,
-              useOpenAIImagesApi: useOpenAIImagesApi,
               useZhipuLayoutParsing: useZhipuLayoutParsing,
               sessionToken: sessionToken,
+              onRequestDispatched: onRequestDispatched,
               codexTurnState: codexTurnState,
               retryRound: retryRound,
             ),
@@ -584,9 +619,9 @@ class ChatApiService {
     required bool builtInSearchOnly,
     required bool skipImageParsing,
     required ProviderKind kind,
-    required bool useOpenAIImagesApi,
     required bool useZhipuLayoutParsing,
     required CancelToken sessionToken,
+    required void Function()? onRequestDispatched,
     required CodexTurnState? codexTurnState,
     required StreamRoundRunner retryRound,
   }) async* {
@@ -597,7 +632,26 @@ class ChatApiService {
     _bridgeCancel(sessionToken, cancelToken);
     final client = ProviderOAuthService.instance.authenticatedClient(
       ModelRequestAttempts.wrap(
-        providerHttpClient(config, cancelToken: cancelToken),
+        providerHttpClient(
+          config,
+          cancelToken: cancelToken,
+          onRequestDispatched: onRequestDispatched == null
+              ? null
+              : (request) {
+                  // Claude can upload code-execution attachments before the
+                  // first Messages request. Only count the model attempt.
+                  final claudeUpload =
+                      kind == ProviderKind.claude &&
+                      request.url.pathSegments.lastOrNull == 'files' &&
+                      request.headers['content-type']?.startsWith(
+                            'multipart/form-data',
+                          ) ==
+                          true;
+                  if (request.method == 'POST' && !claudeUpload) {
+                    onRequestDispatched();
+                  }
+                },
+        ),
       ),
       config,
       codexTurnState: codexTurnState,
@@ -614,17 +668,7 @@ class ChatApiService {
           extraHeaders: extraHeaders,
         );
       } else if (kind == ProviderKind.openai) {
-        if (useOpenAIImagesApi) {
-          yield* sendOpenAIImagesStream(
-            client,
-            config,
-            modelId,
-            messages,
-            userImagePaths: userImagePaths,
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-          );
-        } else if (config.useResponseApi == true) {
+        if (config.useResponseApi == true) {
           yield* sendOpenAIResponsesStream(
             client,
             config,
@@ -773,9 +817,8 @@ class ChatApiService {
     Map<String, dynamic>? extraBody,
     String? requestId,
     String? conversationId,
-    bool allowImagesApiRouting = true,
     bool ocrActive = false,
-    bool builtInSearchOnly = false,
+    BuiltInToolMode builtInToolMode = BuiltInToolMode.configured,
     bool skipImageParsing = false,
     bool parseMarkdownImageLinks = true,
     bool textOnly = false,
@@ -803,9 +846,8 @@ class ChatApiService {
       stream: false,
       requestId: requestId,
       conversationId: conversationId,
-      allowImagesApiRouting: allowImagesApiRouting,
       ocrActive: ocrActive,
-      builtInSearchOnly: builtInSearchOnly,
+      builtInToolMode: builtInToolMode,
       skipImageParsing: skipImageParsing,
       parseMarkdownImageLinks: parseMarkdownImageLinks,
       textOnly: textOnly,
@@ -845,9 +887,8 @@ class ChatApiService {
       reasoning: reasoning,
       // Utility calls only ever want search; never image generation or a
       // code interpreter.
-      builtInSearchOnly: true,
+      builtInToolMode: BuiltInToolMode.searchOnly,
       skipImageParsing: skipImageParsing,
-      allowImagesApiRouting: !skipImageParsing,
     );
     return result.text;
   }

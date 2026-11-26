@@ -4,11 +4,181 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:Kelivo/core/services/tts/network_tts.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 void main() {
   group('TtsServiceOptions', () {
+    test('DeepSeek restores its defaults and round-trips custom settings', () {
+      final defaults =
+          TtsServiceOptions.fromJson({'kind': 'deepseek'})
+              as DeepSeekTtsOptions;
+      expect(defaults.baseUrl, 'https://api.deepseek.com/v1');
+      expect(defaults.voiceId, 'stella');
+      final options = DeepSeekTtsOptions(
+        id: 'saved-voice',
+        enabled: true,
+        name: 'My voice',
+        apiKey: 'test-key',
+        baseUrl: 'https://example.com/proxy/v1',
+        voiceId: 'tide',
+      );
+      expect(
+        TtsServiceOptions.fromJson(options.toJson()).toJson(),
+        options.toJson(),
+      );
+    });
+
+    test(
+      'saved official Speech configurations use Realtime after upgrading',
+      () {
+        for (final kind in [null, 'openai']) {
+          for (final model in [
+            null,
+            'gpt-4o-mini-tts',
+            'gpt-4o-mini-tts-2025-03-20',
+            'gpt-4o-mini-tts-2025-12-15',
+            'tts-1',
+            'tts-1-hd',
+          ]) {
+            final options = TtsServiceOptions.fromJson({
+              if (kind != null) 'kind': kind,
+              if (model != null) 'model': model,
+              if (kind != null) 'baseUrl': 'https://API.OPENAI.COM:443/v1/',
+              'id': 'selected-voice',
+              'name': 'My reader',
+              'apiKey': 'saved-key',
+              'enabled': false,
+              'voice': 'coral',
+            });
+            expect(options.toJson(), {
+              'id': 'selected-voice',
+              'name': 'My reader',
+              'apiKey': 'saved-key',
+              'enabled': false,
+              'kind': 'openai_realtime',
+              'websocketUrl': 'wss://api.openai.com/v1/realtime',
+              'model': 'gpt-realtime-2.1-mini',
+              'voice': 'coral',
+              'instruction': '',
+            });
+          }
+        }
+        for (final voice in ['fable', 'nova', 'onyx']) {
+          final options = TtsServiceOptions.fromJson({
+            'kind': 'openai',
+            'voice': voice,
+          });
+          expect((options as OpenAiRealtimeTtsOptions).voice, 'alloy');
+        }
+      },
+    );
+
+    test(
+      'preserves older third-party endpoints and explicit Speech services',
+      () {
+        for (final kind in [null, 'openai']) {
+          for (final url in [
+            'https://tts.example.com/v1',
+            'https://api.openai.com.example.com/v1',
+            'https://api.openai.com:8443/v1',
+            'https://api.openai.com/custom/v1',
+          ]) {
+            final options =
+                TtsServiceOptions.fromJson({
+                      if (kind != null) 'kind': kind,
+                      'baseUrl': url,
+                      'voice': 'nova',
+                    })
+                    as OpenAiTtsOptions;
+            expect(options.model, 'gpt-4o-mini-tts');
+            expect(options.baseUrl, url);
+            expect(options.voice, 'nova');
+            expect(
+              TtsServiceOptions.fromJson(options.toJson()).toJson(),
+              options.toJson(),
+            );
+          }
+        }
+        final explicitSpeech = OpenAiTtsOptions(
+          enabled: true,
+          name: 'HTTP Speech',
+          apiKey: 'key',
+          baseUrl: 'https://api.openai.com/v1',
+          model: 'tts-1',
+          voice: 'nova',
+        );
+        expect(
+          (TtsServiceOptions.fromJson(explicitSpeech.toJson())
+                  as OpenAiTtsOptions)
+              .toJson(),
+          explicitSpeech.toJson(),
+        );
+      },
+    );
+
     test('deserializes RikkaHub-aligned provider defaults', () {
+      final openAiRealtime = TtsServiceOptions.fromJson({
+        'kind': 'openai_realtime',
+        'enabled': true,
+      });
+      expect(openAiRealtime, isA<OpenAiRealtimeTtsOptions>());
+      expect(
+        (openAiRealtime as OpenAiRealtimeTtsOptions).websocketUrl,
+        'wss://api.openai.com/v1/realtime',
+      );
+      expect(openAiRealtime.model, 'gpt-realtime-2.1-mini');
+      expect(openAiRealtime.voice, 'alloy');
+      expect(openAiRealtime.instruction, isEmpty);
+      expect(
+        networkTtsKindDisplayName(NetworkTtsKind.openaiRealtime),
+        'OpenAI Realtime',
+      );
+      expect(
+        networkTtsKindDisplayName(NetworkTtsKind.openai),
+        'OpenAI Compatible',
+      );
+      expect(
+        isValidOpenAiRealtimeTtsEndpoint('wss://api.openai.com/v1/realtime'),
+        isTrue,
+      );
+      expect(
+        isValidOpenAiRealtimeTtsEndpoint('ws://127.0.0.1:8080/realtime'),
+        isTrue,
+      );
+      expect(
+        isValidOpenAiRealtimeTtsEndpoint('https://api.openai.com/v1/realtime'),
+        isFalse,
+      );
+      expect(
+        isValidOpenAiRealtimeTtsEndpoint(
+          'wss://user:pass@api.openai.com/v1/realtime',
+        ),
+        isFalse,
+      );
+      expect(
+        isValidOpenAiRealtimeTtsEndpoint(
+          'wss://api.openai.com/v1/realtime#frag',
+        ),
+        isFalse,
+      );
+
+      final openAiCompatible = TtsServiceOptions.fromJson({
+        'kind': 'openai_compatible',
+        'enabled': true,
+      });
+      expect(openAiCompatible, isA<OpenAiTtsOptions>());
+      expect((openAiCompatible as OpenAiTtsOptions).name, 'OpenAI Compatible');
+      expect(openAiCompatible.model, 'tts-1');
+      final openAiCustom = TtsServiceOptions.fromJson({
+        'kind': 'openai',
+        'enabled': true,
+        'model': 'kokoro',
+      });
+      expect((openAiCustom as OpenAiTtsOptions).model, 'kokoro');
+
       final qwen = TtsServiceOptions.fromJson({
         'kind': 'qwen',
         'enabled': true,
@@ -94,6 +264,21 @@ void main() {
     });
 
     test('round-trips advanced fields for new TTS providers', () {
+      final openAiRealtime = OpenAiRealtimeTtsOptions(
+        id: 'rt-1',
+        enabled: true,
+        name: 'Realtime Voice',
+        apiKey: 'rt-key',
+        websocketUrl: 'wss://proxy.example.com/v1/realtime',
+        model: 'gpt-realtime-2.1',
+        voice: 'coral',
+        instruction: 'Speak warmly',
+      );
+      final openAiRealtimeAgain =
+          TtsServiceOptions.fromJson(openAiRealtime.toJson())
+              as OpenAiRealtimeTtsOptions;
+      expect(openAiRealtimeAgain.toJson(), openAiRealtime.toJson());
+
       final miniMax = MiniMaxTtsOptions(
         enabled: true,
         name: 'MiniMax',
@@ -218,10 +403,10 @@ void main() {
       );
       final openAi = OpenAiTtsOptions(
         enabled: true,
-        name: 'OpenAI',
+        name: 'OpenAI Compatible',
         apiKey: 'key',
         baseUrl: 'https://api.openai.com/v1',
-        model: 'gpt-4o-mini-tts',
+        model: 'tts-1',
         voice: 'alloy',
       );
 
@@ -231,6 +416,166 @@ void main() {
   });
 
   group('NetworkTtsService', () {
+    test(
+      'DeepSeek sends the selected voice and returns a playable WAV',
+      () async {
+        const text = '你好，[原文](https://example.com)！';
+        final targets = <String>[];
+        final server = await _bindServer((request) async {
+          targets.add(request.uri.toString());
+          expect(request.method, 'POST');
+          expect(
+            request.headers.value(HttpHeaders.authorizationHeader),
+            'Bearer test-key',
+          );
+          expect(request.headers.contentType?.mimeType, 'application/json');
+          expect(jsonDecode(await utf8.decoder.bind(request).join()), {
+            'text': text,
+            'voice_id': 'tide',
+            'format': 'pcm',
+            'filter_markdown': false,
+          });
+          request.response.headers.contentType = ContentType('audio', 'pcm');
+          request.response.add([1]);
+          await request.response.flush();
+          request.response.add([2, 3, 4]);
+          await request.response.close();
+        });
+        addTearDown(() => server.close(force: true));
+
+        for (final base in [
+          _hostOnlyBaseUrl(server),
+          '${_baseUrl(server)}/?tenant=voice',
+          '${_baseUrl(server)}/tools/tts?tenant=voice',
+        ]) {
+          final result = await NetworkTtsService.synthesize(
+            options: DeepSeekTtsOptions(
+              enabled: true,
+              name: 'DeepSeek',
+              apiKey: 'test-key',
+              baseUrl: base,
+              voiceId: 'tide',
+            ),
+            text: text,
+          );
+          expect(result.mime, 'audio/wav');
+          expect(
+            result.bytes,
+            _buildWav([
+              ('fmt ', _pcmFormat(24000)),
+              ('data', [1, 2, 3, 4]),
+            ]),
+          );
+        }
+        expect(targets, [
+          '/v1/tools/tts',
+          '/api/v1/tools/tts?tenant=voice',
+          '/api/v1/tools/tts?tenant=voice',
+        ]);
+      },
+    );
+
+    test(
+      'DeepSeek rejects failed, interrupted and malformed responses',
+      () async {
+        final options = DeepSeekTtsOptions(
+          enabled: true,
+          name: 'DeepSeek',
+          apiKey: 'k',
+        );
+        Future<NetworkTtsResult> synthesize(http.StreamedResponse response) {
+          return NetworkTtsService.synthesize(
+            options: options,
+            text: 'Hello',
+            client: MockClient.streaming((request, _) async {
+              expect(
+                request.url.toString(),
+                'https://api.deepseek.com/v1/tools/tts',
+              );
+              return response;
+            }),
+          );
+        }
+
+        await expectLater(
+          synthesize(
+            http.StreamedResponse(
+              Stream.value(utf8.encode('invalid key')),
+              401,
+            ),
+          ),
+          throwsA(predicate((e) => e.toString().contains('401 invalid key'))),
+        );
+        Stream<List<int>> interrupted() async* {
+          yield [1, 2];
+          throw const HttpException(
+            'Connection closed before response completed',
+          );
+        }
+
+        const pcmHeaders = {'content-type': 'audio/pcm'};
+        await expectLater(
+          synthesize(
+            http.StreamedResponse(interrupted(), 200, headers: pcmHeaders),
+          ),
+          throwsA(isA<HttpException>()),
+        );
+        for (final bytes in [
+          <int>[],
+          [1],
+        ]) {
+          await expectLater(
+            synthesize(
+              http.StreamedResponse(
+                Stream.value(bytes),
+                200,
+                headers: pcmHeaders,
+              ),
+            ),
+            throwsFormatException,
+          );
+        }
+      },
+    );
+
+    test(
+      'DeepSeek stops waiting for audio when playback is cancelled',
+      () async {
+        final bodyStarted = Completer<void>();
+        final release = Completer<void>();
+        final server = await _bindServer((request) async {
+          await request.drain<void>();
+          request.response.headers.contentType = ContentType('audio', 'pcm');
+          request.response.add([1, 2]);
+          await request.response.flush();
+          bodyStarted.complete();
+          await release.future;
+          await request.response.close();
+        });
+        addTearDown(() async {
+          release.complete();
+          await server.close(force: true);
+        });
+        var cancelled = false;
+        final synthesis = NetworkTtsService.synthesize(
+          options: DeepSeekTtsOptions(
+            enabled: true,
+            name: 'DeepSeek',
+            apiKey: 'k',
+            baseUrl: _hostOnlyBaseUrl(server),
+          ),
+          text: 'Hello',
+          cancelled: () => cancelled,
+        );
+        await bodyStarted.future.timeout(const Duration(seconds: 2));
+        cancelled = true;
+        await expectLater(
+          synthesis,
+          throwsA(isA<Exception>()),
+        ).timeout(const Duration(seconds: 2));
+      },
+    );
+
     test('Azure sends escaped SSML and returns MP3 audio', () async {
       late HttpRequest captured;
       late String requestBody;
@@ -700,7 +1045,7 @@ void main() {
           sampleRate: 22050,
         ),
         text: 'hello',
-        qwenAudioWebSocketConnector: (_, {headers}) => WebSocket.connect(
+        webSocketConnector: (_, {headers}) => WebSocket.connect(
           'ws://${server.address.address}:${server.port}',
           headers: headers,
         ),
@@ -722,6 +1067,400 @@ void main() {
       expect(result.bytes, <int>[1, 2, 3, 4, 5]);
       expect(result.mime, 'audio/mpeg');
     });
+
+    test(
+      'OpenAI Realtime synthesizes PCM audio chunks into a 24kHz WAV',
+      () async {
+        late HttpRequest upgradeRequest;
+        final clientEvents = <Map<String, dynamic>>[];
+        final server = await _bindServer((request) async {
+          upgradeRequest = request;
+          final socket = await WebSocketTransformer.upgrade(request);
+          socket.add(jsonEncode({'type': 'session.created'}));
+          await for (final event in socket) {
+            if (event is! String) continue;
+            final decoded = jsonDecode(event) as Map<String, dynamic>;
+            clientEvents.add(decoded);
+            final type = decoded['type'];
+            if (type == 'session.update') {
+              socket.add(jsonEncode({'type': 'session.updated'}));
+            } else if (type == 'response.create') {
+              socket.add(
+                jsonEncode({
+                  'type': 'response.output_audio.delta',
+                  'delta': base64Encode(<int>[1, 2]),
+                }),
+              );
+              socket.add(
+                jsonEncode({
+                  'type': 'response.audio.delta',
+                  'delta': base64Encode(<int>[3, 4]),
+                }),
+              );
+              socket.add(
+                jsonEncode({
+                  'type': 'response.done',
+                  'response': {'status': 'completed'},
+                }),
+              );
+            }
+          }
+        });
+        addTearDown(() async => server.close(force: true));
+
+        final result = await NetworkTtsService.synthesize(
+          options: OpenAiRealtimeTtsOptions(
+            enabled: true,
+            name: 'OpenAI Realtime',
+            apiKey: 'rt-secret-key',
+            websocketUrl:
+                'ws://${server.address.address}:${server.port}/v1/realtime?model=&scope=a&scope=b',
+            model: 'gpt-realtime-2.1-mini',
+            voice: 'coral',
+            instruction: 'Calm and steady',
+          ),
+          text: 'Hello realtime world',
+        );
+
+        expect(upgradeRequest.uri.path, '/v1/realtime');
+        expect(upgradeRequest.uri.queryParametersAll['scope'], ['a', 'b']);
+        expect(
+          upgradeRequest.uri.queryParameters['model'],
+          'gpt-realtime-2.1-mini',
+        );
+        expect(
+          upgradeRequest.headers.value(HttpHeaders.authorizationHeader),
+          'Bearer rt-secret-key',
+        );
+        expect(upgradeRequest.headers.value('OpenAI-Beta'), isNull);
+        expect(clientEvents.map((e) => e['type']).toList(), <String>[
+          'session.update',
+          'conversation.item.create',
+          'response.create',
+        ]);
+        final session = clientEvents.first['session'] as Map<String, dynamic>;
+        expect(session['type'], 'realtime');
+        expect(session['output_modalities'], <String>['audio']);
+        expect(session['instructions'], contains('Calm and steady'));
+        final audioOutput =
+            (session['audio'] as Map<String, dynamic>)['output']
+                as Map<String, dynamic>;
+        expect(audioOutput['voice'], 'coral');
+        expect(audioOutput['format'], <String, dynamic>{
+          'type': 'audio/pcm',
+          'rate': 24000,
+        });
+        final item = clientEvents[1]['item'] as Map<String, dynamic>;
+        final content =
+            (item['content'] as List).single as Map<String, dynamic>;
+        expect(content['text'], '<text>\nHello realtime world\n</text>');
+        expect(result.mime, 'audio/wav');
+        expect(result.sampleRate, 24000);
+        expect(
+          result.bytes,
+          _buildWav([
+            ('fmt ', _pcmFormat(24000)),
+            ('data', <int>[1, 2, 3, 4]),
+          ]),
+        );
+      },
+    );
+
+    test(
+      'OpenAI Realtime preserves an explicit model query param and surfaces redacted errors',
+      () async {
+        late Uri capturedUri;
+        final server = await _bindServer((request) async {
+          capturedUri = request.uri;
+          final socket = await WebSocketTransformer.upgrade(request);
+          await for (final event in socket) {
+            if (event is! String) continue;
+            final decoded = jsonDecode(event) as Map<String, dynamic>;
+            if (decoded['type'] == 'session.update') {
+              socket.add(
+                jsonEncode({
+                  'type': 'error',
+                  'error': {'message': 'Rejected key sk-secret-123'},
+                }),
+              );
+            }
+          }
+        });
+        addTearDown(() async => server.close(force: true));
+
+        await expectLater(
+          () => NetworkTtsService.synthesize(
+            options: OpenAiRealtimeTtsOptions(
+              enabled: true,
+              name: 'OpenAI Realtime',
+              apiKey: 'sk-secret-123',
+              websocketUrl:
+                  'ws://${server.address.address}:${server.port}/v1/realtime?model=custom-rt',
+              model: 'gpt-realtime-2.1-mini',
+            ),
+            text: 'hello',
+          ),
+          throwsA(
+            predicate(
+              (error) =>
+                  error.toString().contains('Rejected key [REDACTED]') &&
+                  !error.toString().contains('sk-secret-123'),
+            ),
+          ),
+        );
+        expect(capturedUri.queryParameters['model'], 'custom-rt');
+      },
+    );
+
+    test(
+      'OpenAI Realtime reports a rejected handshake without exposing the endpoint query',
+      () async {
+        final server = await _bindServer((request) async {
+          request.response.statusCode = HttpStatus.unauthorized;
+          await request.response.close();
+        });
+        addTearDown(() => server.close(force: true));
+
+        await expectLater(
+          NetworkTtsService.synthesize(
+            options: OpenAiRealtimeTtsOptions(
+              enabled: true,
+              name: 'Realtime',
+              apiKey: 'header-key',
+              websocketUrl:
+                  'ws://127.0.0.1:${server.port}/v1/realtime?token=secret%2Fvalue',
+            ),
+            text: 'hello',
+          ),
+          throwsA(
+            isA<WebSocketException>()
+                .having(
+                  (e) => e.httpStatusCode,
+                  'HTTP status',
+                  HttpStatus.unauthorized,
+                )
+                .having(
+                  (e) => e.toString(),
+                  'diagnostic',
+                  isNot(contains('secret')),
+                ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'OpenAI Realtime limits the handshake even without a cancellation callback',
+      () {
+        fakeAsync((clock) {
+          Object? error;
+          NetworkTtsService.synthesize(
+            options: OpenAiRealtimeTtsOptions(
+              enabled: true,
+              name: 'Realtime',
+              apiKey: 'key',
+            ),
+            text: 'hello',
+            webSocketConnector: (_, {headers}) => Completer<WebSocket>().future,
+          ).then<void>(
+            (_) => fail('Expected a handshake timeout'),
+            onError: (Object e) {
+              error = e;
+            },
+          );
+          clock.elapse(const Duration(seconds: 30));
+          expect(error, isA<TimeoutException>());
+        });
+      },
+    );
+
+    test(
+      'cancelling an OpenAI Realtime handshake closes its TCP connection',
+      () async {
+        final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+        final started = Completer<void>();
+        final disconnected = Completer<void>();
+        server.listen((socket) {
+          addTearDown(socket.destroy);
+          socket.listen((_) {
+            if (!started.isCompleted) started.complete();
+          }, onDone: disconnected.complete);
+        });
+        addTearDown(server.close);
+
+        var cancelled = false;
+        final pending = NetworkTtsService.synthesize(
+          options: OpenAiRealtimeTtsOptions(
+            enabled: true,
+            name: 'Realtime',
+            apiKey: 'key',
+            websocketUrl: 'ws://127.0.0.1:${server.port}/v1/realtime',
+          ),
+          text: 'hello',
+          cancelled: () => cancelled,
+        );
+        await started.future.timeout(const Duration(seconds: 3));
+        cancelled = true;
+        await expectLater(pending, throwsException);
+        await disconnected.future.timeout(const Duration(seconds: 3));
+      },
+    );
+
+    test(
+      'OpenAI Realtime rejects invalid endpoints, failed responses, odd PCM, and cancellation',
+      () async {
+        expect(
+          () => NetworkTtsService.synthesize(
+            options: OpenAiRealtimeTtsOptions(
+              enabled: true,
+              name: 'OpenAI Realtime',
+              apiKey: 'key',
+              websocketUrl: 'https://api.openai.com/v1/realtime',
+            ),
+            text: 'hello',
+          ),
+          throwsArgumentError,
+        );
+
+        Object? terminalResponse;
+        final failServer = await _bindServer((request) async {
+          final socket = await WebSocketTransformer.upgrade(request);
+          await for (final event in socket) {
+            if (event is! String) continue;
+            final type = (jsonDecode(event) as Map<String, dynamic>)['type'];
+            if (type == 'session.update') {
+              socket.add(jsonEncode({'type': 'session.updated'}));
+            } else if (type == 'response.create') {
+              socket.add(
+                jsonEncode({
+                  'type': 'response.output_audio.delta',
+                  'delta': base64Encode([1, 2]),
+                }),
+              );
+              socket.add(
+                jsonEncode({
+                  'type': 'response.done',
+                  'response': terminalResponse,
+                }),
+              );
+            }
+          }
+        });
+        addTearDown(() async => failServer.close(force: true));
+        for (final (response, matcher) in <(Object?, Matcher)>[
+          (
+            {
+              'status': 'failed',
+              'status_details': {
+                'error': {'message': 'quota exceeded'},
+              },
+            },
+            throwsA(
+              predicate((error) => error.toString().contains('quota exceeded')),
+            ),
+          ),
+          (
+            {'status': 'in_progress'},
+            throwsA(
+              predicate((error) => error.toString().contains('in_progress')),
+            ),
+          ),
+          ({}, throwsFormatException),
+          ([], throwsFormatException),
+          (null, throwsFormatException),
+        ]) {
+          terminalResponse = response;
+          await expectLater(
+            NetworkTtsService.synthesize(
+              options: OpenAiRealtimeTtsOptions(
+                enabled: true,
+                name: 'OpenAI Realtime',
+                apiKey: 'key',
+                websocketUrl:
+                    'ws://${failServer.address.address}:${failServer.port}/v1/realtime',
+              ),
+              text: 'hello',
+            ),
+            matcher,
+          );
+        }
+
+        final oddPcmServer = await _bindServer((request) async {
+          final socket = await WebSocketTransformer.upgrade(request);
+          await for (final event in socket) {
+            if (event is! String) continue;
+            final type = (jsonDecode(event) as Map<String, dynamic>)['type'];
+            if (type == 'session.update') {
+              socket.add(jsonEncode({'type': 'session.updated'}));
+            } else if (type == 'response.create') {
+              socket.add(
+                jsonEncode({
+                  'type': 'response.output_audio.delta',
+                  'delta': base64Encode(<int>[1]),
+                }),
+              );
+              socket.add(
+                jsonEncode({
+                  'type': 'response.done',
+                  'response': {'status': 'completed'},
+                }),
+              );
+            }
+          }
+        });
+        addTearDown(() async => oddPcmServer.close(force: true));
+        await expectLater(
+          () => NetworkTtsService.synthesize(
+            options: OpenAiRealtimeTtsOptions(
+              enabled: true,
+              name: 'OpenAI Realtime',
+              apiKey: 'key',
+              websocketUrl:
+                  'ws://${oddPcmServer.address.address}:${oddPcmServer.port}/v1/realtime',
+            ),
+            text: 'hello',
+          ),
+          throwsFormatException,
+        );
+
+        final stalledClosed = Completer<void>();
+        final responseRequested = Completer<void>();
+        final stalledServer = await _bindServer((request) async {
+          final socket = await WebSocketTransformer.upgrade(request);
+          socket.listen(
+            (event) {
+              final type =
+                  (jsonDecode(event as String) as Map<String, dynamic>)['type'];
+              if (type == 'session.update') {
+                socket.add(jsonEncode({'type': 'session.updated'}));
+              } else if (type == 'response.create') {
+                responseRequested.complete();
+              }
+            },
+            onDone: () {
+              if (!stalledClosed.isCompleted) stalledClosed.complete();
+            },
+          );
+        });
+        addTearDown(() async => stalledServer.close(force: true));
+        var cancelled = false;
+        final pending = NetworkTtsService.synthesize(
+          options: OpenAiRealtimeTtsOptions(
+            enabled: true,
+            name: 'OpenAI Realtime',
+            apiKey: 'key',
+            websocketUrl:
+                'ws://${stalledServer.address.address}:${stalledServer.port}/v1/realtime',
+          ),
+          text: 'hello',
+          cancelled: () => cancelled,
+        );
+        await responseRequested.future.timeout(const Duration(seconds: 3));
+        cancelled = true;
+        await expectLater(pending, throwsA(anything));
+        await stalledClosed.future.timeout(const Duration(seconds: 2));
+      },
+    );
 
     test(
       'MiniMax omits automatic emotion and sends advanced settings',

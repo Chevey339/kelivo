@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'database_family_preserver.dart';
+import 'database_upgrade_io.dart';
 
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
@@ -10,6 +12,7 @@ import '../services/backup/recovery_file_discovery.dart';
 import '../services/backup/restore_durability.dart';
 import 'app_database.dart';
 import 'chat_database_repository.dart';
+import 'schema_migrations.dart';
 import '../../utils/app_directories.dart';
 
 final class DatabaseInstallationReceipt {
@@ -112,12 +115,14 @@ final class DatabaseInstallationGate {
     bool allowDatabaseIdentityChange = false,
     bool allowEmptyInitialization = false,
     RestoreDurability? durability,
+    DatabaseUpgradeStageSink? onUpgradeStage,
   }) async {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     await appDataDirectory.create(recursive: true);
     await DatabaseFamilyPreserver.resume(
       appDataDirectory,
       durability: resolvedDurability,
+      onUpgradeStage: onUpgradeStage,
     );
     final databaseFile = File(
       p.join(appDataDirectory.path, AppDatabase.databaseFileName),
@@ -126,9 +131,10 @@ final class DatabaseInstallationGate {
     // one -- can leave the pre-migration copy behind. Resolve it before the
     // migration below writes a fresh one; this may restore the database from
     // that copy, so it has to run before we decide the database is missing.
-    await _sweepPreMigrationBackups(
+    await recoverPreMigrationBackups(
       appDataDirectory,
       durability: resolvedDurability,
+      onUpgradeStage: onUpgradeStage,
     );
     final receipts = await _readReceipts(appDataDirectory);
     final databaseType = await FileSystemEntity.type(
@@ -162,6 +168,7 @@ final class DatabaseInstallationGate {
         await ChatDatabaseRepository.migrateInstalledDatabase(
           databaseFile,
           durability: resolvedDurability,
+          onUpgradeStage: onUpgradeStage,
         );
       }
 
@@ -723,34 +730,63 @@ final class DatabaseInstallationGate {
   /// removed but the copy not yet written back — the copy is the only
   /// surviving good state and is restored instead. Deleting unconditionally
   /// would turn a recoverable crash into permanent data loss.
-  static Future<void> _sweepPreMigrationBackups(
+  static Future<void> recoverPreMigrationBackups(
     Directory appDataDirectory, {
-    required RestoreDurability durability,
+    RestoreDurability? durability,
+    DatabaseUpgradeStageSink? onUpgradeStage,
   }) async {
-    final prefix =
-        '${AppDatabase.databaseFileName}'
-        '${ChatDatabaseRepository.premigrationBackupPrefix}';
     final backups = <File>[];
     await for (final entity in appDataDirectory.list(followLinks: false)) {
       if (entity is! File) continue;
-      if (!p.basename(entity.path).startsWith(prefix)) continue;
-      backups.add(entity);
+      if (ChatDatabaseRepository.isPremigrationBackup(
+        p.basename(entity.path),
+      )) {
+        backups.add(entity);
+      }
     }
     if (backups.isEmpty) return;
 
+    onUpgradeStage?.report(DatabaseUpgradeStage.checking);
     final databaseFile = File(
       p.join(appDataDirectory.path, AppDatabase.databaseFileName),
     );
+    await runDatabaseUpgradeIo(
+      (databaseFile: databaseFile, backups: backups),
+      _recoverPreMigrationBackups,
+      durability: durability ?? RestorePlatformDurability(),
+      onStage: onUpgradeStage,
+    );
+  }
+
+  static Future<void> _recoverPreMigrationBackups(
+    ({File databaseFile, List<File> backups}) files,
+    RestoreDurability durability,
+    DatabaseUpgradeStageSink? onUpgradeStage,
+  ) async {
+    final (:databaseFile, :backups) = files;
     switch (ChatDatabaseRepository.classifyInstalledDatabase(databaseFile)) {
+      case InstalledDatabaseDisposition.busy:
+        throw StateError('database_upgrade_busy');
       case InstalledDatabaseDisposition.usable:
+        final version = SchemaMigrations.readSchemaVersion(databaseFile);
+        final expectedBackup =
+            '${databaseFile.path}${ChatDatabaseRepository.premigrationBackupPrefix}$version';
         for (final backup in backups) {
+          // Older builds could also leave a partial file copy. Reclaim only
+          // pages that are still present in the checkpointed live database.
+          if (backup.path == expectedBackup &&
+              await _matchesLivePrefix(databaseFile, backup)) {
+            await durability.syncFile(databaseFile, fullBarrier: true);
+            await backup.delete();
+            continue;
+          }
           await durability.renameAndSync(
             source: backup,
             targetPath:
                 '${databaseFile.path}$displacedDatabasePrefix${DateTime.now().microsecondsSinceEpoch}',
           );
         }
-        await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+        await durability.syncDirectory(databaseFile.parent, fullBarrier: true);
 
       case InstalledDatabaseDisposition.foreignSchema:
         // A newer build migrated this database and left its copy behind, and
@@ -766,6 +802,7 @@ final class DatabaseInstallationGate {
         if (backups.length != 1) {
           throw StateError('database_premigration_ambiguous');
         }
+        onUpgradeStage?.call(DatabaseUpgradeStage.restoring);
         await ChatDatabaseRepository.restorePreMigrationBackup(
           backup: backups.single,
           target: databaseFile,
@@ -779,6 +816,30 @@ final class DatabaseInstallationGate {
               _displaceDatabaseFamily(file, durability: durability),
         );
     }
+  }
+
+  static Future<bool> _matchesLivePrefix(File live, File copy) async {
+    final length = await copy.length();
+    return length <= await live.length() &&
+        await sha256.bind(_databaseBytes(live, length)).first ==
+            await sha256.bind(_databaseBytes(copy, length)).first;
+  }
+
+  static Stream<List<int>> _databaseBytes(File file, int length) async* {
+    final end = length.clamp(0, 100);
+    final header = await file
+        .openRead(0, end)
+        .expand((chunk) => chunk)
+        .toList();
+    if (header.length == 100) {
+      // sqlite3_backup writes its own change counter, schema cookie and
+      // writer version. Compare all schema and data pages.
+      header.fillRange(24, 28, 0);
+      header.fillRange(40, 44, 0);
+      header.fillRange(92, 100, 0);
+    }
+    yield header;
+    if (end < length) yield* file.openRead(end, length);
   }
 
   static Future<void> _removeStaleReceipts(

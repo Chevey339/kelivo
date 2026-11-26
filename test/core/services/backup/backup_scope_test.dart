@@ -16,13 +16,18 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/extension_entity_store.dart';
+import 'package:Kelivo/core/database/media_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/utils/app_directories.dart';
+import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 class _Paths extends PathProviderPlatform {
@@ -67,6 +72,39 @@ class _MergingChat extends ChatService {
 BackupScope _only(Set<BackupCategory> categories) =>
     BackupScope(excluded: BackupCategory.values.toSet().difference(categories));
 
+Future<void> _addCreation(AppDatabase database, String id) async {
+  final repository = MediaRepository(database);
+  final date = DateTime.utc(2026);
+  await repository.enqueue(
+    GenerationBatchRowsCompanion.insert(
+      id: id,
+      providerId: 'provider',
+      modelId: 'model',
+      mode: MediaMode.image,
+      prompt: 'Paint a bird',
+      paramsJson: '{}',
+      referencesJson: '[]',
+      status: GenerationStatus.succeeded,
+      source: GenerationSource.workbench,
+      createdAt: date,
+    ),
+  );
+  await repository.addItem(
+    GenerationItemRow(
+      id: '$id-image',
+      batchId: id,
+      ordinal: 0,
+      mode: MediaMode.image,
+      path: 'kelivo-file:///generations/$id/image.png',
+      mime: 'image/png',
+      byteSize: 3,
+      favorite: false,
+      status: GenerationItemStatus.ready,
+      createdAt: date,
+    ),
+  );
+}
+
 Map<String, Object?> _fixture(String prefix) => {
   'provider_configs_v1': jsonEncode({
     prefix: {'id': prefix, 'apiKey': '$prefix-provider-secret'},
@@ -82,6 +120,10 @@ Map<String, Object?> _fixture(String prefix) => {
   'world_books_v1': jsonEncode([
     {'id': prefix, 'name': '$prefix book'},
   ]),
+  'world_books_grouping_v1': jsonEncode({
+    'names': {'$prefix-group': '$prefix folder'},
+    'memberships': {prefix: '$prefix-group'},
+  }),
   'skills_v1': jsonEncode([
     {
       'id': prefix,
@@ -171,6 +213,208 @@ void main() {
     await root.delete(recursive: true);
   });
 
+  for (final mode in RestoreMode.values) {
+    test('creations-only $mode restores both metadata and files', () async {
+      final chat = ChatService(
+        existingRepository: ChatDatabaseRepository(target),
+      );
+      try {
+        final sourceContent = Directory('${root.path}/source-content');
+        PathProviderPlatform.instance = _Paths(sourceContent.path);
+        await _addCreation(source, 'incoming');
+        await source.customStatement(
+          "UPDATE generation_item_rows SET id='image' WHERE batch_id='incoming'",
+        );
+        await ExtensionEntityStore(source).upsert(
+          'contextCompressionTask',
+          'chat-only',
+          {'summary': 'Private chat summary'},
+        );
+        final incoming = File(
+          '${sourceContent.path}/generations/incoming/image.png',
+        );
+        await incoming.parent.create(recursive: true);
+        await incoming.writeAsString('new');
+        await File(
+          '${incoming.parent.path}/unfinished.part',
+        ).writeAsString('pending');
+        final backup = await exporter.prepareBackupFile(
+          WebDavConfig(scope: _only({BackupCategory.creations})),
+        );
+        final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+        final snapshot = AppDatabase.open(
+          file: await File(
+            '${root.path}/creations.db',
+          ).writeAsBytes(archive.findFile('database/kelivo.db')!.readBytes()!),
+        );
+        try {
+          expect(
+            await snapshot.select(snapshot.extensionEntityRows).get(),
+            isEmpty,
+          );
+        } finally {
+          await snapshot.close();
+        }
+        await expectLater(
+          DataSync.inspectRecoverySnapshot(backup),
+          throwsFormatException,
+        );
+        expect(archive.findFile('generations/incoming/image.png'), isNotNull);
+        expect(
+          archive.findFile('generations/incoming/unfinished.part'),
+          isNull,
+        );
+
+        PathProviderPlatform.instance = _Paths(root.path);
+        await _addCreation(target, 'local');
+        final local = File('${root.path}/generations/local/image.png');
+        await local.parent.create(recursive: true);
+        await local.writeAsString('old');
+        final oldIncoming = File('${root.path}/generations/incoming/image.png');
+        if (mode == RestoreMode.overwrite) {
+          await _addCreation(target, 'incoming');
+          await oldIncoming.parent.create(recursive: true);
+          await oldIncoming.writeAsString('old version');
+        }
+        final sync = DataSync(
+          chatService: chat,
+          businessRepository: targetRepository,
+        );
+        await sync.restoreFromLocalFile(
+          backup,
+          const WebDavConfig(),
+          mode: mode,
+        );
+        final restored = MediaRepository(target);
+        final restoredPath = (await restored.itemsForBatch(
+          'incoming',
+        )).single.path;
+        final installed = KelivoFileUri.resolveToAbsolute(
+          restoredPath,
+          root: root.path,
+        )!;
+        expect(await File(installed).readAsString(), 'new');
+        expect(await oldIncoming.exists(), mode == RestoreMode.merge);
+        expect(
+          await restored.batch('local') != null,
+          mode == RestoreMode.merge,
+        );
+        expect(await local.exists(), mode == RestoreMode.merge);
+        expect(await targetRepository.getPreference('theme_mode_v1'), 'light');
+        if (mode == RestoreMode.overwrite) {
+          // A second device edited the same original, under its pre-restore name.
+          PathProviderPlatform.instance = _Paths(sourceContent.path);
+          await _addCreation(source, 'edit');
+          const oldUri = 'kelivo-file:///generations/incoming/image.png';
+          await source.customStatement(
+            'UPDATE generation_batch_rows SET references_json=? WHERE id=?',
+            [
+              jsonEncode([
+                {'path': oldUri, 'role': 'image'},
+              ]),
+              'edit',
+            ],
+          );
+          final updated = await exporter.prepareBackupFile(
+            WebDavConfig(scope: _only({BackupCategory.creations})),
+          );
+          PathProviderPlatform.instance = _Paths(root.path);
+          await sync.restoreFromLocalFile(
+            updated,
+            const WebDavConfig(),
+            mode: RestoreMode.merge,
+          );
+          final edit = await restored.batch('edit');
+          expect(
+            (jsonDecode(edit!.referencesJson) as List).single['path'],
+            restoredPath,
+          );
+          expect(await oldIncoming.exists(), isFalse);
+          await restored.deleteItem('image');
+          await File(installed).delete();
+          expect(
+            (jsonDecode((await restored.batch('edit'))!.referencesJson) as List)
+                .single['unavailable'],
+            true,
+          );
+          await sync.restoreFromLocalFile(
+            updated,
+            const WebDavConfig(),
+            mode: RestoreMode.merge,
+          );
+          final revived =
+              (jsonDecode((await restored.batch('edit'))!.referencesJson)
+                      as List)
+                  .single;
+          expect(revived['path'], oldUri);
+          expect(revived['unavailable'], isNot(true));
+          expect(await restored.ownsImage(oldUri), isTrue);
+        }
+      } finally {
+        await chat.close();
+        chat.dispose();
+      }
+    });
+  }
+
+  test(
+    'explicit empty creation backup clears local creations on overwrite',
+    () async {
+      final chat = ChatService(
+        existingRepository: ChatDatabaseRepository(target),
+      );
+      try {
+        final scope = _only({BackupCategory.creations});
+        final backup = await exporter.prepareBackupFile(
+          WebDavConfig(scope: scope),
+        );
+        final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+        expect(archive.findFile('database/kelivo.db'), isNull);
+        await _addCreation(target, 'local');
+        final asset = File('${root.path}/generations/local/image.png');
+        await asset.parent.create(recursive: true);
+        await asset.writeAsString('old');
+        final sync = DataSync(
+          chatService: chat,
+          businessRepository: targetRepository,
+        );
+        await sync.restoreFromLocalFile(backup, const WebDavConfig());
+        expect(await MediaRepository(target).hasCreations, isFalse);
+        expect(await asset.exists(), isFalse);
+      } finally {
+        await chat.close();
+        chat.dispose();
+      }
+    },
+  );
+
+  test(
+    'excluding creations removes rows and assets from a chat backup',
+    () async {
+      await _addCreation(source, 'incoming');
+      final asset = File('${root.path}/generations/incoming/image.png');
+      await asset.parent.create(recursive: true);
+      await asset.writeAsString('new');
+      final backup = await exporter.prepareBackupFile(
+        const WebDavConfig(
+          scope: BackupScope(excluded: {BackupCategory.creations}),
+        ),
+      );
+      final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+      expect(archive.findFile('generations/incoming/image.png'), isNull);
+      final snapshot = File('${root.path}/exported.db');
+      await snapshot.writeAsBytes(
+        archive.findFile('database/kelivo.db')!.readBytes()!,
+      );
+      final database = AppDatabase.open(file: snapshot);
+      try {
+        expect(await MediaRepository(database).hasCreations, isFalse);
+      } finally {
+        await database.close();
+      }
+    },
+  );
+
   for (final platform in [
     TargetPlatform.android,
     TargetPlatform.iOS,
@@ -232,8 +476,13 @@ void main() {
             BackupCategory.providers,
             BackupCategory.settings,
           });
-          final backup = await exporter.prepareBackupFile(
+          final stagedBackup = await exporter.prepareBackupFile(
             WebDavConfig(scope: scope),
+          );
+          final backup = File('${root.path}/exported.zip');
+          await DataSync.completeLocalFileExport(
+            exported: stagedBackup,
+            persist: (file) => file.copy(backup.path),
           );
           final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
           for (final entry in assets.entries) {
@@ -308,17 +557,59 @@ void main() {
         BackupCategory.environmentVariables,
       });
       expect(
-        WebDavConfig.fromJsonString(
+        WebDavConfig.fromPreference(
           WebDavConfig(scope: scope).toJsonString(),
         ).scope.excluded,
         scope.excluded,
       );
       expect(
-        S3Config.fromJsonString(
+        S3Config.fromPreference(
           S3Config(scope: scope).toJsonString(),
         ).scope.excluded,
         scope.excluded,
       );
+    },
+  );
+
+  test(
+    'file export honors an exclusion that survives only in the S3 settings',
+    () async {
+      const scope = BackupScope(
+        excluded: {
+          BackupCategory.chats,
+          BackupCategory.files,
+          BackupCategory.workspaces,
+        },
+      );
+      final flags = {...scope.toJson(), 'chats': 'invalid'};
+      final prefs = BusinessPreferences(sourceRepository);
+      await prefs.setMany({
+        'webdav_config_v1': jsonEncode({'scope': flags}),
+        's3_config_v1': const S3Config(scope: scope).toJsonString(),
+      });
+      final settings = SettingsProvider(prefs);
+      final config = settings.webDavConfig;
+      await settings.loaded;
+      for (final name in [
+        'images/photo.png',
+        'workspaces/example/file',
+        'skills/example/SKILL.md',
+      ]) {
+        final file = File('${root.path}/$name');
+        await file.parent.create(recursive: true);
+        await file.writeAsString('fixture');
+      }
+      final exported = await exporter.exportToFile(config);
+      final archive = ZipDecoder().decodeBytes(await exported.readAsBytes());
+      final manifest = jsonDecode(
+        utf8.decode(archive.findFile('manifest.json')!.readBytes()!),
+      );
+      expect(manifest['scope'], scope.toJson());
+      expect(archive.findFile('database/kelivo.db'), isNull);
+      expect(archive.findFile('images/photo.png'), isNull);
+      expect(archive.findFile('workspaces/example/file'), isNull);
+      expect(archive.findFile('skills/example/SKILL.md'), isNotNull);
+      expect(() => BackupScope.fromJson(flags), throwsFormatException);
     },
   );
 
@@ -364,6 +655,10 @@ void main() {
               exported.containsKey('orphaned_conversations_assistant_id_v1'),
               category == BackupCategory.assistants,
             );
+            expect(
+              exported.containsKey('world_books_grouping_v1'),
+              category == BackupCategory.worldBooks,
+            );
             for (final entry in keys.entries) {
               expect(
                 exported.containsKey(entry.value),
@@ -390,6 +685,12 @@ void main() {
             after['orphaned_conversations_assistant_id_v1'],
             category == BackupCategory.assistants ? 'source' : 'local',
           );
+          expect(
+            after['world_books_grouping_v1'],
+            category == BackupCategory.worldBooks
+                ? incoming['world_books_grouping_v1']
+                : before['world_books_grouping_v1'],
+          );
           for (final entry in keys.entries) {
             expect(
               after[entry.value],
@@ -403,6 +704,32 @@ void main() {
       );
     }
   }
+
+  test('merging a World Book backup retains both libraries’ folders', () async {
+    final scope = _only({BackupCategory.worldBooks});
+    final config = WebDavConfig(scope: scope);
+    final backup = await exporter.prepareBackupFile(config);
+
+    await importer.restoreFromLocalFile(
+      backup,
+      config,
+      mode: RestoreMode.merge,
+    );
+
+    final restored = await BusinessRestoreService(
+      targetRepository,
+    ).exportSettings();
+    expect(jsonDecode(restored['world_books_grouping_v1']! as String), {
+      'names': {'local-group': 'local folder', 'source-group': 'source folder'},
+      'memberships': {'local': 'local-group', 'source': 'source-group'},
+    });
+    expect(
+      (await targetRepository.readEntities(
+        BusinessEntityKind.worldBook,
+      )).map((row) => row.id),
+      ['local', 'source'],
+    );
+  });
 
   for (final category in [
     BackupCategory.files,

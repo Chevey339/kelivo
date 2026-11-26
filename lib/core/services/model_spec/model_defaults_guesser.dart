@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../models/model_spec.dart';
+import '../media/gemini_media_models.dart';
 
 /// Model-id-derived defaults. Host/protocol defaults live in [VendorDefaults].
 @immutable
@@ -196,6 +197,21 @@ class ModelDefaultsGuesser {
       apply: _claudeFamily,
     ),
     _ReasoningRule(matches: _isGemma4, apply: _gemma4),
+    _ReasoningRule(
+      matches: isNanoBanana21,
+      apply: (_) => _fixed(
+        dialect: ReasoningDialect.geminiThinkingLevel,
+        levels: const [
+          ReasoningLevel.minimal,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+        ],
+        canDisable: false,
+        defaultLevel: ReasoningLevel.medium,
+        sampling: SamplingPolicy.never,
+        replay: ReasoningReplayPolicy.all,
+      ),
+    ),
     _ReasoningRule(matches: _isGemini3FlashImage, apply: _gemini3FlashImage),
     _ReasoningRule(matches: _isGemini3Pro, apply: _gemini3Pro),
     _ReasoningRule(matches: _isGemini3Flash, apply: _gemini3Flash),
@@ -231,8 +247,18 @@ class ModelDefaultsGuesser {
       if (rule.terminal) break;
     }
 
-    if (_isImagesApiId(id)) {
+    final mediaId = id.split('/').last;
+    if (!forceEmbedding &&
+        !_isImageModelId(mediaId) &&
+        _isVideoModelId(mediaId)) {
+      draft.type = ModelType.video;
+      draft.input
+        ..clear()
+        ..add(Modality.text);
+      draft.abilities.clear();
+    } else if (!forceEmbedding && _isImageModelId(mediaId)) {
       draft.type = ModelType.image;
+      draft.abilities.clear();
       // dall-e-2 accepts reference images on the edits endpoint; the others
       // in this set are generation-only (agnes / SenseNova never allowed edits).
       if (id == 'dall-e-2') {
@@ -248,7 +274,8 @@ class ModelDefaultsGuesser {
 
     // The catalog remains authoritative; these cover manually added models
     // and relays without a catalog entry.
-    if (!forceEmbedding && !draft.output.contains(Modality.image)) {
+    if (draft.type == ModelType.chat &&
+        !draft.output.contains(Modality.image)) {
       if (_matches(
             id,
             r'(^|/)gemini-(1\.5-|[2-9][.-]|flash-latest|pro-latest)',
@@ -292,7 +319,7 @@ class ModelDefaultsGuesser {
     ReasoningReplayPolicy? replay;
     ReasoningReplayField? replayField;
 
-    if (normalized.type != ModelType.embedding) {
+    if (normalized.type == ModelType.chat) {
       for (final rule in _reasoningRules) {
         if (!rule.matches(id)) continue;
         final hit = rule.apply(id);
@@ -344,6 +371,17 @@ class ModelDefaultsGuesser {
         terminal: true,
       ),
       _CapRule(
+        matches: isNanoBanana21,
+        apply: (draft) {
+          draft.input.addAll([Modality.image, Modality.video, Modality.pdf]);
+          draft.output.add(Modality.image);
+          draft.abilities
+            ..clear()
+            ..add(ModelAbility.reasoning);
+        },
+        terminal: true,
+      ),
+      _CapRule(
         matches: _isGemini3FlashImage,
         apply: (draft) {
           if (!draft.input.contains(Modality.image)) {
@@ -379,7 +417,7 @@ class ModelDefaultsGuesser {
         terminal: true,
       ),
       _CapRule(
-        matches: (id) => id.contains('image'),
+        matches: (id) => id.contains('image') || isGeminiImageModel(id),
         apply: (draft) {
           if (!draft.input.contains(Modality.image)) {
             draft.input.add(Modality.image);
@@ -446,14 +484,36 @@ class ModelDefaultsGuesser {
   }
 }
 
-bool _isImagesApiId(String id) {
-  return id.startsWith('gpt-image-') ||
+bool _isImageModelId(String id) {
+  return id == 'glm-image' ||
+      id.startsWith('gpt-image-') ||
       id.startsWith('chatgpt-image-') ||
+      id.startsWith('grok-imagine-image') ||
+      id.startsWith('doubao-seedream-') ||
+      id.startsWith('dola-seedream-') ||
+      id.startsWith('doubao-seededit-') ||
+      id.startsWith('seededit-') ||
+      id.startsWith('seedream-') ||
+      id.startsWith('kling-image-') ||
+      id.startsWith('minimax-h3-image') ||
+      id.startsWith('qwen-image') ||
+      id.startsWith('imagen-') ||
+      id.startsWith('flux') ||
+      id.startsWith('kolors') ||
+      id == 'z-image-turbo' ||
+      _matches(id, r'^wan.*-(?:t2i|i2i|image|imageedit)(?:-|$)') ||
       id.startsWith('agnes-image-') ||
       id == 'sensenova-u1-fast' ||
       id == 'dall-e-2' ||
       id == 'dall-e-3';
 }
+
+bool _isVideoModelId(String id) =>
+    isGeminiOmniVideoModel(id) ||
+    _matches(
+      id,
+      r'^(?:ltx-2\.3(?:$|-)|cogvideox-3(?:$|-)|grok-imagine-video|veo-|sora-|(?:doubao-|dreamina-)?seedance-|kling[-_]?(?:v?\d|video|avatar|effects)|hailuo|happyhorse-.*-(?:t2v|i2v|r2v|video-edit)$|wan.*-(?:t2v|i2v|r2v|kf2v|video)(?:-|$)|minimax(?:.*video|-h3))',
+    );
 
 bool _matches(String id, String pattern) {
   return RegExp(pattern, caseSensitive: false).hasMatch(id);

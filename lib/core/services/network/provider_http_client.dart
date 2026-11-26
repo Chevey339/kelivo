@@ -4,12 +4,16 @@ import 'package:http/http.dart' as http;
 import '../../providers/settings_provider.dart';
 import 'dio_http_client.dart';
 
+export 'dio_http_client.dart' show HttpLogMode;
+
 /// HTTP client for requests to [config]'s endpoint, routed through the
 /// provider's proxy when one is configured.
 http.Client providerHttpClient(
   ProviderConfig config, {
   CancelToken? cancelToken,
-  bool logRequests = true,
+  Duration? timeout,
+  HttpLogMode logMode = HttpLogMode.standard,
+  void Function(http.BaseRequest)? onRequestDispatched,
 }) {
   final host = (config.proxyHost ?? '').trim();
   final port = (config.proxyPort ?? '').trim();
@@ -26,8 +30,15 @@ http.Client providerHttpClient(
         password: pass.isEmpty ? null : pass,
       ),
       cancelToken: cancelToken,
-      logRequests: logRequests,
+      timeout: timeout,
+      logMode: logMode,
+      onRequestDispatched: onRequestDispatched,
     );
   }
-  return DioHttpClient(cancelToken: cancelToken, logRequests: logRequests);
+  return DioHttpClient(
+    cancelToken: cancelToken,
+    timeout: timeout,
+    logMode: logMode,
+    onRequestDispatched: onRequestDispatched,
+  );
 }

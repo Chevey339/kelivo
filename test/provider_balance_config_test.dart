@@ -66,9 +66,13 @@ void main() {
         {'name': '', 'value': ''},
       ],
       balanceBody: '{"account":"main"}',
+      balanceRefreshInterval: 0,
+      balanceRefreshOnReply: false,
     );
     final snapshot = BusinessSettingsRouter.normalizeAndRoute({
       'provider_configs_v1': jsonEncode({'OpenAI': config.toJson()}),
+      BusinessKeyRegistry.balanceRefreshIntervalKey: 15,
+      BusinessKeyRegistry.balanceRefreshOnReplyKey: true,
     });
     final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
     final providers =
@@ -77,12 +81,17 @@ void main() {
       ProviderConfig.fromJson(providers['OpenAI']).toJson(),
       config.toJson(),
     );
+    expect(exported[BusinessKeyRegistry.balanceRefreshIntervalKey], 15);
+    expect(exported[BusinessKeyRegistry.balanceRefreshOnReplyKey], true);
   });
 
   test('rejects malformed balance settings before restoring a snapshot', () {
     for (final invalid in <Map<String, Object?>>[
       {'balanceMethod': 1},
       {'balanceMethod': 'DELETE'},
+      {'balanceRefreshInterval': -1},
+      {'balanceRefreshInterval': 0.5},
+      {'balanceRefreshOnReply': 'true'},
       {'balanceBody': <String, Object>{}},
       {'balanceHeaders': <String, Object>{}},
       {
@@ -139,5 +148,58 @@ void main() {
     addTearDown(reloaded.dispose);
     await reloaded.loaded;
     expect(reloaded.getProviderConfig('OpenAI').toJson(), config.toJson());
+  });
+
+  test(
+    'refresh overrides distinguish disabling from inheritance across reload',
+    () async {
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      addTearDown(settings.dispose);
+      await settings.loaded;
+      expect(settings.balanceRefreshInterval, 0);
+      expect(settings.balanceRefreshOnReply, isTrue);
+      await settings.setBalanceRefreshInterval(10);
+      final config = settings
+          .getProviderConfig('OpenAI')
+          .copyWith(balanceRefreshInterval: 0, balanceRefreshOnReply: false);
+      await settings.setProviderConfig('OpenAI', config);
+
+      final reloaded = SettingsProvider(
+        BusinessPreferences(harness.repository),
+      );
+      addTearDown(reloaded.dispose);
+      await reloaded.loaded;
+      final override = reloaded.getProviderConfig('OpenAI');
+      expect(reloaded.balanceRefreshIntervalFor(override), 0);
+      expect(reloaded.balanceRefreshOnReplyFor(override), isFalse);
+      final inherit = override.copyWith(
+        balanceRefreshInterval: null,
+        balanceRefreshOnReply: null,
+      );
+      expect(reloaded.balanceRefreshIntervalFor(inherit), 10);
+      expect(reloaded.balanceRefreshOnReplyFor(inherit), isTrue);
+    },
+  );
+
+  test('explicitly disabling reply refresh survives reload', () async {
+    final harness = await createBusinessTestHarness();
+    final settings = SettingsProvider(harness.preferences);
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setBalanceRefreshOnReply(false);
+
+    final reloaded = SettingsProvider(BusinessPreferences(harness.repository));
+    addTearDown(reloaded.dispose);
+    await reloaded.loaded;
+    expect(reloaded.balanceRefreshOnReply, isFalse);
+    final config = reloaded.getProviderConfig('OpenAI');
+    expect(reloaded.balanceRefreshOnReplyFor(config), isFalse);
+    expect(
+      reloaded.balanceRefreshOnReplyFor(
+        config.copyWith(balanceRefreshOnReply: true),
+      ),
+      isTrue,
+    );
   });
 }

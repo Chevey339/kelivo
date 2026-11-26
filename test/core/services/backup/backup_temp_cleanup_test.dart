@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_isolate_runner.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
+import 'package:Kelivo/core/services/backup/backup_staging.dart';
 
 void main() {
   test(
@@ -70,31 +71,35 @@ void main() {
     );
   });
 
-  test('age cleaner skips a registered work dir older than 6 hours', () async {
-    final tmp = await Directory.systemTemp.createTemp('kelivo_backup_tmp_');
-    addTearDown(() async {
-      DataSync.unregisterLiveTempPath(
-        '${tmp.path}/kelivo_backup_2000-01-01T00-00-00.000000',
+  test(
+    'staging sweep protects a registered directory until released',
+    () async {
+      final tmp = await Directory.systemTemp.createTemp('kelivo_backup_tmp_');
+      addTearDown(() async {
+        DataSync.unregisterLiveTempPath(
+          '${tmp.path}/kelivo_backup_2000-01-01T00-00-00.000000',
+        );
+        if (await tmp.exists()) await tmp.delete(recursive: true);
+      });
+      final staging = await BackupStaging.root(temporary: tmp);
+      final stale = Directory(
+        '${staging.path}/kelivo_backup_2000-01-01T00-00-00.000000',
       );
-      if (await tmp.exists()) await tmp.delete(recursive: true);
-    });
-    final stale = Directory(
-      '${tmp.path}/kelivo_backup_2000-01-01T00-00-00.000000',
-    );
-    await stale.create(recursive: true);
-    await File('${stale.path}/orphan.zip').writeAsString('old', flush: true);
-    DataSync.registerLiveTempPath(stale.path);
+      await stale.create(recursive: true);
+      await File('${stale.path}/orphan.zip').writeAsString('old', flush: true);
+      DataSync.registerLiveTempPath(stale.path);
 
-    await DataSync.debugCleanupPreviousBackupTempFiles(tmp);
+      await DataSync.debugCleanupPreviousBackupTempFiles(tmp);
 
-    expect(await stale.exists(), isTrue);
-    expect(await File('${stale.path}/orphan.zip').exists(), isTrue);
+      expect(await stale.exists(), isTrue);
+      expect(await File('${stale.path}/orphan.zip').exists(), isTrue);
 
-    DataSync.unregisterLiveTempPath(stale.path);
-    await DataSync.debugCleanupPreviousBackupTempFiles(tmp);
+      DataSync.unregisterLiveTempPath(stale.path);
+      await DataSync.debugCleanupPreviousBackupTempFiles(tmp);
 
-    expect(await stale.exists(), isFalse);
-  });
+      expect(await stale.exists(), isFalse);
+    },
+  );
 
   test(
     'local export helper deletes the temp zip on every persist outcome',

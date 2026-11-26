@@ -312,8 +312,17 @@ class InlineSpanBuilder {
         );
       }
       if (node.tag == 'code' || node.tag == 'kbd') {
-        emit(toPlainText(node), node);
-        return codeAtom(toPlainText(node), keyboard: node.tag == 'kbd');
+        final code = plainTextIndex(node);
+        projection?.addAll(
+          code.entries.map(
+            (entry) => TextSegment(
+              text: entry.segment.text,
+              sourceSpan: entry.sourceSpan,
+              node: node,
+            ),
+          ),
+        );
+        return codeAtom(code.text, keyboard: node.tag == 'kbd');
       }
       if (node.tag == 'sub' || node.tag == 'sup') {
         emit(toPlainText(node), node);

@@ -1,19 +1,24 @@
+import 'package:Kelivo/features/chat/services/conversation_find_service.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/gen_ui_derived_schema.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/storage/data_directory_paths.dart';
 import 'package:Kelivo/features/search/services/global_session_search_service.dart';
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_catalog.dart';
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_budgets.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_state.dart';
+import 'package:Kelivo/features/intelligent_ui/storage/ui_search_index.dart';
 
 String _fence(String body) => '```kelivo-ui\n${UiCatalog.header}\n$body\n```';
 const _body = r'''$a: number = 7
@@ -109,8 +114,294 @@ void main() {
     }
   }
 
+  Future<List<ConversationFindHit>> conversationFind(String query) async =>
+      (await const ConversationFindService().search(
+        repo.conversationFindCandidates('c'),
+        query,
+        defaultFindOptions,
+      )).values.expand((h) => h).toList();
+
   Future<List<GlobalSessionSearchResult>> search(String query) =>
       GlobalSessionSearchService.search(chatService: service, query: query);
+
+  Future<File> copyDatabase() async {
+    final directory = await Directory.systemTemp.createTemp('kelivo_search_');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File.fromUri(
+      directory.uri.resolve(AppDatabase.databaseFileName),
+    );
+    await db.customStatement('VACUUM INTO ?', [file.path]);
+    return file;
+  }
+
+  Future<T> withDatabaseFile<T>(
+    File file,
+    Future<T> Function(AppDatabase database, ChatDatabaseRepository repository)
+    run,
+  ) async {
+    final database = AppDatabase.open(file: file);
+    final repository = ChatDatabaseRepository(database);
+    try {
+      return await run(database, repository);
+    } finally {
+      await repository.close();
+    }
+  }
+
+  Future<int> schemaVersion(AppDatabase database) async =>
+      (await database.customSelect('PRAGMA schema_version').getSingle())
+          .read<int>('schema_version');
+
+  test(
+    'minimap searches cold and partially indexed cards without rebuilding other conversations',
+    () async {
+      await repo.putConversation(Conversation(id: 'other', title: 'Other'));
+      await put('unrelated', _fence(_body), conversation: 'other');
+      final cards = [
+        'Alpha',
+        'Beta',
+        'Gamma',
+      ].map((label) => _fence('root = Text(text="$label 明白")')).join('\n\n');
+      await put('local', cards);
+      await put(
+        'unfinished',
+        _fence('root = Text(text="明白")'),
+        completed: false,
+      );
+      final states = db.genUiSurfaceStateRows;
+      await (db.delete(states)..where(
+            (s) =>
+                s.revisionId.equals('unrelated') |
+                (s.revisionId.equals('local') & s.surfaceKey.equals('0:1')),
+          ))
+          .go();
+      await (db.update(states)..where(
+            (s) => s.revisionId.equals('local') & s.surfaceKey.equals('0:2'),
+          ))
+          .write(
+            const GenUiSurfaceStateRowsCompanion(
+              sourceHash: Value('stale'),
+              searchText: Value('obsolete'),
+            ),
+          );
+      // This database has no global backfill receipt. A local search must be
+      // able to finish even when a global index build cannot write to it.
+      await db.customStatement("""
+      CREATE TRIGGER reject_global_backfill BEFORE INSERT ON chat_storage_meta_rows
+      WHEN NEW.key = '${GenUiDerivedSchema.searchBackfillKey}'
+      BEGIN SELECT RAISE(ABORT, 'unexpected global backfill'); END
+    """);
+      const finder = ConversationFindService();
+      final previews = await finder
+          .searchPreviews(
+            repo.conversationFindCandidates(
+              'c',
+              prefilter: finder.previewPrefilter('明白'),
+            ),
+            '明白',
+          )
+          .expand((page) => page)
+          .toList();
+      expect(previews.map((p) => (p.hit.messageId, p.matchCount)), [
+        ('local', 3),
+      ]);
+      expect((await conversationFind('Beta')).single.surfaceKey, '0:1');
+      expect((await conversationFind('Gamma')).single.surfaceKey, '0:2');
+      expect(await conversationFind('obsolete'), isEmpty);
+      final remaining = await db.select(states).get();
+      expect(remaining.where((s) => s.revisionId == 'unrelated'), isEmpty);
+      expect(remaining.where((s) => s.revisionId == 'local'), hasLength(2));
+    },
+  );
+
+  test('the first sidebar search after reopening reuses the index', () async {
+    await put('r', _fence(_body));
+    final file = await copyDatabase();
+    final indexed = await withDatabaseFile(file, (database, repository) async {
+      final matches = await repository.searchConversationMatches(
+        tokens: ['14'],
+      );
+      expect(matches.single.messageId, 'r');
+      return schemaVersion(database);
+    });
+    await withDatabaseFile(file, (database, reopened) async {
+      final matches = await reopened.searchConversationMatches(tokens: ['14']);
+      expect(matches.single.matchedSurfaceKey, '0:0');
+      expect(await schemaVersion(database), indexed);
+    });
+  });
+
+  test(
+    'preview prefilter retains a web card with an escaped Chinese title',
+    () async {
+      await put('web', r'''```kelivo-web
+{"version":1,"title":"\u660e\u767d","summary":"Charts"}
+<p>Chart</p>
+```''');
+      const finder = ConversationFindService();
+      final preview = await finder
+          .searchPreviews(
+            repo.conversationFindCandidates(
+              'c',
+              prefilter: finder.previewPrefilter('明白'),
+            ),
+            '明白',
+          )
+          .expand((page) => page)
+          .single;
+      expect(preview.hit.messageId, 'web');
+      expect(preview.hit.part, FindPart.surface);
+    },
+  );
+
+  test(
+    'restart restores card search for an abandoned tool continuation',
+    () async {
+      await put('resumed', _fence(_body));
+      expect((await search('14')).single.firstMatchedMessageId, 'resumed');
+      // An in-place tool continuation reuses the completed generation run.
+      await repo.updateMessageFields('resumed', isStreaming: true);
+      expect(await search('14'), isEmpty);
+
+      final reopened = ChatDatabaseRepository(db);
+      expect(await reopened.resetStaleStreamingState(), 0);
+      final matches = await reopened.searchConversationMatches(tokens: ['14']);
+      expect(matches.single.messageId, 'resumed');
+      expect(matches.single.matchedSurfaceKey, '0:0');
+    },
+  );
+
+  test('repairs a missing index even after a completed backfill', () async {
+    await put('r', _fence(_body));
+    expect((await search('14')).single.firstMatchedMessageId, 'r');
+    await db.customStatement('DROP TABLE gen_ui_surface_search');
+    final reopened = ChatDatabaseRepository(db);
+    final matches = await reopened.searchConversationMatches(tokens: ['14']);
+    expect(matches.single.matchedSurfaceKey, '0:0');
+  });
+
+  test(
+    'sidebar search repairs damaged GenUI postings on the SQLite worker',
+    () async {
+      await put('r', _fence(_body));
+      expect((await search('14')).single.firstMatchedMessageId, 'r');
+      final file = await copyDatabase();
+      await withDatabaseFile(file, (copy, reopened) async {
+        // Damage only the FTS segment. The schema and backfill receipt stay valid.
+        await copy.customStatement(
+          "UPDATE gen_ui_surface_search_data SET block=x'80' WHERE id>10",
+        );
+        final matches = await reopened.searchConversationMatches(
+          tokens: ['14'],
+        );
+        expect(matches.single.messageId, 'r');
+        expect(matches.single.matchedSurfaceKey, '0:0');
+      });
+    },
+  );
+
+  test(
+    'rewriting a data-directory path restores search for the changed card',
+    () async {
+      await put(
+        'r',
+        _fence('root = Metric(label="C:/Data/upload/file.txt",value=7*2)'),
+      );
+      expect((await search('14')).single.firstMatchedMessageId, 'r');
+      final file = await copyDatabase();
+      await DataDirectoryPaths(
+        r'C:\Data',
+        r'D:\Moved',
+      ).rewriteCopy(file.parent);
+      await withDatabaseFile(file, (_, reopened) async {
+        expect(
+          (await reopened.getMessage('r'))!.content,
+          contains('D:/Moved/'),
+        );
+        final matches = await reopened.searchConversationMatches(
+          tokens: ['14'],
+        );
+        expect(
+          matches.single.searchableText,
+          contains('D:/Moved/upload/file.txt'),
+        );
+        expect(matches.single.matchedSurfaceKey, '0:0');
+      });
+    },
+  );
+
+  test(
+    'damage in the message FTS leaves the healthy GenUI index intact',
+    () async {
+      await put('r', _fence(_body));
+      expect((await search('14')).single.firstMatchedMessageId, 'r');
+      final before = await schemaVersion(db);
+      await db.customStatement(
+        "UPDATE message_search_fts_data SET block=x'80' WHERE id>10",
+      );
+      await expectLater(search('Projected'), throwsA(anything));
+      expect(await schemaVersion(db), before);
+    },
+  );
+
+  test(
+    'a failed receipt invalidation cannot suppress a requested repair',
+    () async {
+      await put('r', _fence(_body));
+      expect((await search('14')).single.firstMatchedMessageId, 'r');
+      await db.delete(db.genUiSurfaceStateRows).go();
+      await db.customStatement('''
+      CREATE TRIGGER fail_invalidation BEFORE DELETE ON chat_storage_meta_rows
+      BEGIN SELECT RAISE(ABORT, 'injected receipt failure'); END
+    ''');
+      await expectLater(repo.rebuildGenUiSearchIndex(), throwsA(anything));
+      await db.customStatement('DROP TRIGGER fail_invalidation');
+      expect((await search('14')).single.firstMatchedMessageId, 'r');
+    },
+  );
+
+  test('a failed explicit backfill is retried by the next search', () async {
+    await put('r', _fence(_body));
+    expect((await search('14')).single.firstMatchedMessageId, 'r');
+    await db.delete(db.genUiSurfaceStateRows).go();
+    await db.customStatement('''
+      CREATE TRIGGER fail_projection BEFORE INSERT ON gen_ui_surface_state_rows
+      BEGIN SELECT RAISE(ABORT, 'injected backfill failure'); END
+    ''');
+    await expectLater(repo.rebuildGenUiSearchIndex(), throwsA(anything));
+    await db.customStatement('DROP TRIGGER fail_projection');
+    expect((await search('14')).single.firstMatchedMessageId, 'r');
+  });
+
+  test(
+    'a rolled-back FTS reset is retried after reopening the database',
+    () async {
+      await put('r', _fence(_body));
+      expect((await search('14')).single.firstMatchedMessageId, 'r');
+      await db.delete(db.genUiSurfaceStateRows).go();
+      final file = await copyDatabase();
+      await withDatabaseFile(file, (database, repository) async {
+        final interrupted = UiSearchIndex(
+          database,
+          readMessages: repository.getMessagesByIds,
+          transaction: (action) => database.transaction(() async {
+            final before = await schemaVersion(database);
+            await action();
+            if (await schemaVersion(database) != before) {
+              throw StateError('injected FTS rollback');
+            }
+          }),
+        );
+        await expectLater(interrupted.rebuild(), throwsStateError);
+      });
+      await withDatabaseFile(file, (_, reopened) async {
+        final matches = await reopened.searchConversationMatches(
+          tokens: ['14'],
+        );
+        expect(matches.single.messageId, 'r');
+      });
+    },
+  );
 
   test(
     'completion seals unseen initial computed values and global reconciliation uses them',
@@ -130,7 +421,7 @@ void main() {
       expect(result.matchedSurfaceKey, '0:0');
       expect(result.snippet, contains('14'));
       expect(await search('rowKey'), isEmpty);
-      expect(await repo.searchMiniMapMatches('c', 'rowKey'), isEmpty);
+      expect(await conversationFind('rowKey'), isEmpty);
     },
   );
   test(
@@ -164,10 +455,10 @@ void main() {
       expect((await search('概览 净利润')).single.conversationId, 'c');
       expect((await search('净利润 50%_')).single.firstMatchedMessageId, 'r');
       expect(await search('净利润 51%_'), isEmpty);
-      final mini = (await repo.searchMiniMapMatches('c', '净利润')).single;
-      expect(mini.matchedSurfaceKey, '0:0');
-      expect(mini.snippet, contains('净利润'));
-      expect(mini.searchableText, isNot(contains('Text(text=')));
+      final hit = (await conversationFind('净利润')).single;
+      expect(hit.surfaceKey, '0:0');
+      expect(hit.range.length, '净利润'.length);
+      expect(await conversationFind('Text(text='), isEmpty);
     },
   );
   test(
@@ -575,17 +866,13 @@ void main() {
     },
   );
   test(
-    'minimap snippets never split an emoji at either projected boundary',
+    'surface hits retain UTF-16 offsets after supplementary characters',
     () async {
       await put('r', _fence('root = Text(text="🙂🙂Target🙂🙂")'));
-      final hit = (await repo.searchMiniMapMatches(
-        'c',
-        'Target',
-        snippetRadius: 1,
-        snippetLength: 7,
-      )).single;
-      expect(hit.snippet, 'Target');
-      expect(hit.matchedSurfaceKey, '0:0');
+      final hit = (await conversationFind('Target')).single;
+      expect(hit.range.start, greaterThanOrEqualTo('🙂🙂'.length));
+      expect(hit.range.length, 'Target'.length);
+      expect(hit.surfaceKey, '0:0');
     },
   );
 }

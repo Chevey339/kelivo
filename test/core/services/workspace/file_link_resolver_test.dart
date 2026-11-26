@@ -70,6 +70,16 @@ void main() {
       expect(terminal?.relativePath, '');
     });
 
+    test('malformed terminal query escapes are ignored', () {
+      for (final cmd in ['100%', '%GG', '%FF']) {
+        expect(KelivoLink.tryParse('KELIVO://terminal?cmd=$cmd'), isNull);
+      }
+      expect(
+        KelivoLink.tryParse('kelivo://terminal?cmd=100%25')?.terminalCommand,
+        '100%',
+      );
+    });
+
     test('directory references retain complete guest paths for copying', () {
       const cases = {
         'kelivo://workspace/reports': '/workspace/reports',

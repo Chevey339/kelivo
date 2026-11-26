@@ -13,6 +13,7 @@ import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/services/mcp/mcp_image_snapshot.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/storage/attachment_file_lock.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import '../../../support/claude_test_api.dart' show FakePathProviderPlatform;
 
@@ -29,6 +30,8 @@ void main() {
     SandboxPathResolver.debugSetDirs(docsDir: root.path, supportDir: root.path);
     service = ChatService();
     await service.init();
+    await service.runAssetReferenceMaintenance();
+    await service.runAssetMaintenance();
   });
   tearDown(() async {
     await service.close();
@@ -226,6 +229,7 @@ void main() {
           parts: [ToolCallPart(jsonEncode(event(saved.uri)))],
         );
         await service.deleteConversation(old.id);
+        await AttachmentFileLock.synchronized(() async {});
         final past = DateTime.now().toUtc().subtract(const Duration(days: 8));
         await file.setLastModified(past);
         final db = sqlite.sqlite3.open(
@@ -238,6 +242,12 @@ void main() {
         } finally {
           db.close();
         }
+        final next = await service.createConversation(title: 'Next');
+        final pending = await service.addMessage(
+          conversationId: next.id,
+          role: 'assistant',
+          isStreaming: true,
+        );
         if (cached) {
           expect(await McpImageSnapshot.reuseLocalFile(saved.uri), isNotNull);
         } else {
@@ -249,7 +259,6 @@ void main() {
         // The tool has a result, but the next message checkpoint has not landed.
         await service.runAssetMaintenance();
         expect(await file.exists(), isTrue);
-        final next = await service.createConversation(title: 'Next');
         final message = await service.addMessage(
           conversationId: next.id,
           role: 'assistant',
@@ -261,6 +270,7 @@ void main() {
           ),
           hasLength(1),
         );
+        await service.deleteMessage(pending.id);
         await service.deleteConversation(next.id);
         await service.runAssetMaintenance(
           now: DateTime.now().toUtc().add(const Duration(days: 8)),

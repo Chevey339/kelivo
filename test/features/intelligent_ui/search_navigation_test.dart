@@ -43,6 +43,18 @@ void main() {
       navigation.reveal('wrong', 'r', '0:1');
       await tester.pumpAndSettle();
       expect(scroll.offset, 0);
+      final missing = navigation.revealMatch('wrong', 'r', '0:1', () => true);
+      await tester.pump();
+      expect(await missing, isFalse);
+      expect(navigation.value, isNull);
+      expect(scroll.offset, 0);
+      final match = navigation.revealMatch('c', 'r', '0:1', () => true);
+      await tester.pump();
+      expect(await match, isTrue);
+      expect(scroll.offset, greaterThan(1000));
+      expect(scroll.position.isScrollingNotifier.value, isFalse);
+      scroll.jumpTo(0);
+      await tester.pump();
       navigation.reveal('c', 'r', '0:1');
       await tester.pumpAndSettle();
       expect(scroll.offset, greaterThan(1000));

@@ -21,6 +21,7 @@ class IosIconButton extends StatefulWidget {
     this.minSize,
     this.visualSize,
     this.borderRadius = 8,
+    this.shape = BoxShape.rectangle,
     this.semanticLabel,
     this.tooltip,
     this.enabled = true,
@@ -42,6 +43,7 @@ class IosIconButton extends StatefulWidget {
   final Color?
   pressedColor; // override pressed color; defaults to blend with primary
   final double borderRadius;
+  final BoxShape shape;
   final double? minSize; // min tap target (e.g., 44 for AppBar)
   /// Optional painted feedback size within the unchanged full touch target.
   final double? visualSize;
@@ -170,7 +172,10 @@ class _IosIconButtonState extends State<IosIconButton> {
                   curve: Curves.easeOutCubic,
                   decoration: BoxDecoration(
                     color: bgTarget,
-                    borderRadius: BorderRadius.circular(widget.borderRadius),
+                    shape: widget.shape,
+                    borderRadius: widget.shape == BoxShape.rectangle
+                        ? BorderRadius.circular(widget.borderRadius)
+                        : null,
                   ),
                   child: Padding(
                     padding: widget.padding,
@@ -198,7 +203,9 @@ class _IosIconButtonState extends State<IosIconButton> {
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         triggerMode: TooltipTriggerMode.longPress,
         showDuration: const Duration(milliseconds: 1500),
-        waitDuration: const Duration(milliseconds: 400),
+        waitDuration:
+            TooltipTheme.of(context).waitDuration ??
+            const Duration(milliseconds: 400),
         child: content,
       );
     }
@@ -377,7 +384,9 @@ class _IosCardPressState extends State<IosCardPress> {
         ? pressTarget
         : (_hovered || _focused ? hoverTarget : base);
     final double scale = _pressed ? (widget.pressedScale ?? 1.0) : 1.0;
-    final Duration dur = widget.duration ?? const Duration(milliseconds: 200);
+    final Duration dur = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : widget.duration ?? const Duration(milliseconds: 200);
     final omitScale = (widget.pressedScale ?? 1.0) == 1.0;
     final omitColor = widget.pressedBlendStrength == 0;
 
@@ -427,10 +436,15 @@ class _IosCardPressState extends State<IosCardPress> {
         if (!_hovered) return;
         setState(() => _hovered = false);
       },
-      child: RawGestureDetector(
-        behavior: HitTestBehavior.opaque,
-        gestures: _gestures,
-        child: painted,
+      child: Semantics(
+        onTap: widget.onTap == null ? null : _handleTap,
+        onLongPress: widget.onLongPress,
+        child: RawGestureDetector(
+          excludeFromSemantics: true,
+          behavior: HitTestBehavior.opaque,
+          gestures: _gestures,
+          child: painted,
+        ),
       ),
     );
     if (!widget.focusable) return interactiveContent;

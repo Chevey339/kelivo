@@ -3,20 +3,45 @@ import 'package:flutter/widgets.dart';
 import '../runtime/ui_surface_state.dart';
 
 final class UiSearchTarget {
-  UiSearchTarget(this.conversationId, this.owner);
+  UiSearchTarget(this.conversationId, this.owner, {this.animate = true});
   final String conversationId;
   final UiSurfaceOwner owner;
+  final bool animate;
 }
 
 /// The message-list jump mounts the revision first; this subsequent request
 /// reveals the actual block. No semantic character offset enters Markdown.
 final class UiSearchNavigation extends ValueNotifier<UiSearchTarget?> {
   UiSearchNavigation() : super(null);
-  void reveal(String conversationId, String revisionId, String surfaceKey) {
+  void reveal(
+    String conversationId,
+    String revisionId,
+    String surfaceKey, {
+    bool animate = true,
+  }) {
     value = UiSearchTarget(
       conversationId,
       UiSurfaceOwner(revisionId: revisionId, surfaceKey: surfaceKey),
+      animate: animate,
     );
+  }
+
+  /// For in-conversation find, let the indexed navigator mount the message
+  /// if there is no surface to consume the request in this layout.
+  Future<bool> revealMatch(
+    String conversationId,
+    String revisionId,
+    String surfaceKey,
+    bool Function() isCurrent,
+  ) async {
+    reveal(conversationId, revisionId, surfaceKey, animate: false);
+    final target = value;
+    await WidgetsBinding.instance.endOfFrame;
+    if (identical(value, target)) {
+      clear();
+      return false;
+    }
+    return isCurrent() && value == null;
   }
 
   void clear() => value = null;
@@ -80,7 +105,7 @@ class _UiSearchRevealState extends State<UiSearchReveal> {
         Scrollable.ensureVisible(
           context,
           alignment: 0.15,
-          duration: MediaQuery.disableAnimationsOf(context)
+          duration: !target.animate || MediaQuery.disableAnimationsOf(context)
               ? Duration.zero
               : const Duration(milliseconds: 180),
         ),

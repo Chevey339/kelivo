@@ -75,7 +75,8 @@ void main() {
     expect(find.text('Title Summary Model'), findsOneWidget);
     expect(
       find.text(
-        'Summarizes conversation titles using the current chat model by default, or a selected model.',
+        'Summarizes conversation titles using the current chat model by default, or a selected model. '
+        'Creation also uses it to name topics automatically.',
       ),
       findsOneWidget,
     );

@@ -13,7 +13,9 @@ void main() {
   const runId = '0123456789abcdef0123456789abcdef';
 
   setUp(() async {
-    root = await Directory.systemTemp.createTemp('kelivo_restore_traces_');
+    // Unix socket addresses need a short path even when TMPDIR is long.
+    final temp = Platform.isWindows ? Directory.systemTemp : Directory('/tmp');
+    root = await temp.createTemp('kelivo_restore_traces_');
     completedRun = Directory(
       p.join(
         root.path,
@@ -69,16 +71,12 @@ void main() {
         (await Process.run('mkfifo', [p.join(previous.path, 'pipe')])).exitCode,
         0,
       );
-      final socketRoot = await Directory.systemTemp.createTemp('ks_');
-      final socketPath = p.join(socketRoot.path, 's');
+      final socketPath = p.join(root.path, 's');
       final socket = await ServerSocket.bind(
         InternetAddress(socketPath, type: InternetAddressType.unix),
         0,
       );
-      addTearDown(() async {
-        await socket.close();
-        await socketRoot.delete(recursive: true);
-      });
+      addTearDown(socket.close);
       await File(socketPath).rename(p.join(previous.path, 'socket'));
 
       final service = RestoreTraceService(root);

@@ -4,6 +4,308 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/home/services/tool_handler_service.dart';
 
 void main() {
+  const fields = {
+    'email': {'type': 'string'},
+    'name': {'type': 'string', 'description': 'Full name'},
+    'domain': {'type': 'string'},
+    'source': {'type': 'string'},
+    'info': {
+      'type': 'object',
+      'properties': {
+        'tags': {
+          'type': 'array',
+          'items': {'type': 'string'},
+        },
+      },
+    },
+  };
+  const nonBlank = {'pattern': r'\S'};
+  const item = {
+    'type': 'object',
+    'properties': fields,
+    'additionalProperties': false,
+    'required': ['source'],
+    'anyOf': [
+      {
+        'required': ['email'],
+        'properties': {'email': nonBlank},
+      },
+      {
+        'required': ['name', 'domain'],
+        'properties': {'name': nonBlank, 'domain': nonBlank},
+      },
+    ],
+  };
+  const schema = <String, dynamic>{
+    r'$id': 'https://example.test/tools/enrich',
+    r'$schema': 'http://json-schema.org/draft-07/schema#',
+    'type': 'object',
+    'properties': {
+      'people': {'type': 'array', 'items': item},
+    },
+  };
+  test('Gemini keeps every identifier set of an MCP record', () {
+    for (final (kind, id, family) in [
+      (ProviderKind.google, 'gemini-4', null),
+      (ProviderKind.openai, 'google/gemini-4', null),
+      (ProviderKind.openai, 'databricks-gemini-3-1-pro', null),
+      (ProviderKind.openai, 'deep-research-max-preview-04-2026', 'gemini-pro'),
+    ]) {
+      final output = ToolHandlerService.sanitizeToolParametersForProvider(
+        schema,
+        kind,
+        upstreamModelId: id,
+        upstreamModelFamily: family,
+      );
+      final items = output['properties']['people']['items'] as Map;
+      expect(items.keys, ['anyOf']);
+      final branches = items['anyOf'] as List;
+      expect(branches, hasLength(2));
+      for (final (index, keys) in [
+        ['email'],
+        ['name', 'domain'],
+      ].indexed) {
+        expect(branches[index], {
+          'type': 'object',
+          if (kind == ProviderKind.openai) 'additionalProperties': false,
+          'properties': {
+            for (final field in fields.entries)
+              field.key: {
+                ...field.value,
+                if (keys.contains(field.key)) ...nonBlank,
+              },
+          },
+          'required': ['source', ...keys],
+        });
+      }
+    }
+    for (final (kind, id) in [
+      (ProviderKind.openai, 'gpt-5'),
+      (ProviderKind.openai, 'my-gemini-router/gpt-5'),
+      (ProviderKind.openai, 'notgemini-4'),
+      (ProviderKind.claude, 'google/gemini-4'),
+    ]) {
+      expect(
+        ToolHandlerService.sanitizeToolParametersForProvider(
+          schema,
+          kind,
+          upstreamModelId: id,
+        ),
+        schema,
+      );
+    }
+    const withPointer = {
+      r'$schema': 'http://json-schema.org/draft-07/schema#',
+      'type': 'object',
+      'properties': {
+        'people': {'type': 'array', 'items': item},
+        'alsoEmail': {r'$ref': '#/properties/people/items/properties/email'},
+      },
+    };
+    expect(
+      ToolHandlerService.sanitizeToolParametersForProvider(
+        withPointer,
+        ProviderKind.openai,
+        upstreamModelId: 'gemini-4',
+      ),
+      withPointer,
+      reason: 'The original location is still used by a JSON Pointer',
+    );
+  });
+
+  for (final kind in [ProviderKind.google, ProviderKind.openai]) {
+    test(
+      '$kind keeps null and all identifier alternatives in a nullable record',
+      () {
+        for (final keyword in ['anyOf', 'oneOf']) {
+          for (final nullFirst in [false, true]) {
+            final output = ToolHandlerService.sanitizeToolParametersForProvider(
+              {
+                'type': 'object',
+                'properties': {
+                  'who': {
+                    'description': 'Optional identifier',
+                    keyword: [
+                      if (nullFirst) {'type': 'null'},
+                      item,
+                      if (!nullFirst) {'type': 'null'},
+                    ],
+                  },
+                },
+              },
+              kind,
+              upstreamModelId: 'gemini-4',
+            );
+            final who = output['properties']['who'] as Map;
+            expect(who.keys, ['anyOf']);
+            final branches = (who['anyOf'] as List).cast<Map>();
+            expect(
+              branches.map((b) => b['type']),
+              nullFirst
+                  ? ['null', 'object', 'object']
+                  : ['object', 'object', 'null'],
+            );
+            expect(
+              branches
+                  .where((b) => b['type'] == 'object')
+                  .map((b) => b['required']),
+              [
+                ['source', 'email'],
+                ['source', 'name', 'domain'],
+              ],
+            );
+            expect(
+              branches.every((b) => b['description'] == 'Optional identifier'),
+              isTrue,
+            );
+          }
+        }
+      },
+    );
+  }
+
+  test('native composition selection also normalizes a selected record', () {
+    final output = ToolHandlerService.sanitizeToolParametersForProvider({
+      r'$defs': {
+        'Person': {
+          ...item,
+          'examples': [
+            {'email': 'person@example.test'},
+          ],
+        },
+      },
+      'type': 'object',
+      'properties': {
+        'who': {
+          'description': 'Contact',
+          'default': {'name': 'unassigned'},
+          'allOf': [
+            {r'$ref': r'#/$defs/Person'},
+          ],
+        },
+      },
+    }, ProviderKind.google);
+    final options = output['properties']['who']['anyOf'] as List;
+    expect(
+      options.every(
+        (branch) =>
+            branch['description'] == 'Contact' &&
+            !branch.containsKey('default') &&
+            !branch.containsKey('examples'),
+      ),
+      isTrue,
+    );
+    expect(options.map((branch) => branch['required']), [
+      ['source', 'email'],
+      ['source', 'name', 'domain'],
+    ]);
+  });
+
+  test('native selection preserves parent and child composition scopes', () {
+    final output = ToolHandlerService.sanitizeToolParametersForProvider({
+      'type': 'object',
+      'properties': {
+        'size': {
+          'allOf': [
+            {
+              'type': 'string',
+              'enum': ['small', 'large'],
+            },
+          ],
+          'anyOf': [
+            {
+              'allOf': [
+                {'type': 'string', 'description': 'Size'},
+              ],
+            },
+            {'type': 'null'},
+          ],
+        },
+      },
+    }, ProviderKind.google);
+    expect(output['properties']['size'], {
+      'type': 'string',
+      'description': 'Size',
+      'enum': ['small', 'large'],
+    });
+  });
+
+  test('native resolves the non-null record reference in either position', () {
+    for (final nullFirst in [false, true]) {
+      final output = ToolHandlerService.sanitizeToolParametersForProvider({
+        r'$defs': {
+          'Record': item,
+          'Alias': {r'$ref': r'#/$defs/Record'},
+        },
+        'type': 'object',
+        'properties': {
+          'who': {
+            'anyOf': [
+              if (nullFirst) {'type': 'null'},
+              {r'$ref': r'#/$defs/Alias'},
+              if (!nullFirst) {'type': 'null'},
+            ],
+          },
+        },
+      }, ProviderKind.google);
+      final variants = (output['properties']['who']['anyOf'] as List)
+          .cast<Map>();
+      expect(
+        variants.map((v) => v['type']),
+        nullFirst ? ['null', 'object', 'object'] : ['object', 'object', 'null'],
+      );
+      expect(
+        variants.where((v) => v['type'] == 'object').map((v) => v['required']),
+        [
+          ['source', 'email'],
+          ['source', 'name', 'domain'],
+        ],
+      );
+    }
+  });
+
+  test('Gemini relay keeps contains bounds scoped to their own subschema', () {
+    const tags = {
+      'type': 'array',
+      'contains': {'const': 'known'},
+      'maxContains': 3,
+    };
+    final output = ToolHandlerService.sanitizeToolParametersForProvider(
+      {
+        'type': 'object',
+        'properties': {
+          'entry': {
+            'type': 'object',
+            'properties': {
+              'tags': tags,
+              'id': {'type': 'string'},
+            },
+            'anyOf': [
+              {
+                'required': ['tags'],
+                'properties': {
+                  'tags': {'minContains': 2, 'maxContains': 2},
+                },
+              },
+              {
+                'required': ['id'],
+              },
+            ],
+          },
+        },
+      },
+      ProviderKind.openai,
+      upstreamModelId: 'gemini-4',
+    );
+    final branches = (output['properties']['entry']['anyOf'] as List)
+        .cast<Map>();
+    expect(branches.map((b) => b['properties']['tags']), [tags, tags]);
+    expect(branches.map((b) => b['required']), [
+      ['tags'],
+      ['id'],
+    ]);
+  });
+
   for (final kind in [ProviderKind.openai, ProviderKind.claude]) {
     for (final entry in <String, List<Map<String, dynamic>>>{
       'pattern': [

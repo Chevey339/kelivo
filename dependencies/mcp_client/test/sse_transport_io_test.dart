@@ -11,6 +11,31 @@ import 'package:test/test.dart';
 
 void main() {
   group('Native SSE transport', () {
+    test(
+      'preserves HTTP connection errors for the retry and authorization policy',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          request.response.statusCode = HttpStatus.forbidden;
+          request.response.write('Access denied');
+          await request.response.close();
+        });
+        await expectLater(
+          SseClientTransport.create(
+            serverUrl: 'http://${server.address.address}:${server.port}/sse',
+          ),
+          throwsA(
+            isA<McpHttpError>().having(
+              (error) => error.statusCode,
+              'statusCode',
+              403,
+            ),
+          ),
+        );
+      },
+    );
+
     test('shared parser preserves opaque IDs and rejects malformed retry', () {
       final parser = SseParser();
       final events = <SseEvent>[

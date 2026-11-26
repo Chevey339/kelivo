@@ -6,6 +6,7 @@
  import SwiftUI
  import Translation
  import UniformTypeIdentifiers
+ import Photos
 
 
 @main
@@ -83,8 +84,9 @@
 
       let fileSaveChannel = FlutterMethodChannel(name: "app.file_save", binaryMessenger: controller.binaryMessenger)
       fileSaveHandler.presentingViewController = controller
+      fileSaveHandler.channel = fileSaveChannel
       fileSaveChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
-        guard call.method == "saveFileFromPath" else {
+        guard ["saveFileFromPath", "saveImageToGallery", "cancelSave"].contains(call.method) else {
           result(FlutterMethodNotImplemented)
           return
         }
@@ -400,6 +402,10 @@ private final class IosOAuthHandler: NSObject, ASWebAuthenticationPresentationCo
 
 private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
   weak var presentingViewController: UIViewController?
+  var channel: FlutterMethodChannel?
+  private var progressId: Int?
+  private var cancellation: Progress?
+  private weak var activePicker: UIDocumentPickerViewController?
   private var pendingResult: FlutterResult?
   private var externalBackupSource: URL?
   private var initialDirectory: URL?
@@ -407,6 +413,19 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
   private static let backupDirectoryKey = "backup_export_directory_bookmark"
 
   func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    if call.method == "cancelSave" {
+      if let id = call.arguments as? Int, id == progressId {
+        cancellation?.cancel()
+        if let picker = activePicker {
+          activePicker = nil
+          picker.dismiss(animated: true) { [weak self] in
+            if self?.progressId == id { self?.finish(with: false) }
+          }
+        }
+      }
+      result(nil)
+      return
+    }
     if pendingResult != nil {
       result(FlutterError(code: "busy", message: "Another save operation is already in progress.", details: nil))
       return
@@ -429,12 +448,19 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
       return
     }
 
+    if call.method == "saveImageToGallery" {
+      saveImageToGallery(at: sourceURL, result: result)
+      return
+    }
+
     guard let presenter = topViewController(from: presentingViewController) else {
       result(FlutterError(code: "unavailable", message: "Unable to present document picker.", details: nil))
       return
     }
 
     pendingResult = result
+    progressId = args["progressId"] as? Int
+    cancellation = progressId == nil ? nil : Progress(totalUnitCount: 1)
     externalBackupSource = args["requireOutsideAppContainer"] as? Bool == true ? sourceURL : nil
 
     backupQueue.async { [weak self] in
@@ -454,6 +480,10 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
       let directory = preferredDirectory
       DispatchQueue.main.async {
         self.initialDirectory = directory
+        if self.cancellation?.isCancelled == true {
+          self.finish(with: false)
+          return
+        }
         let picker: UIDocumentPickerViewController
         if self.externalBackupSource != nil {
           picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
@@ -466,6 +496,7 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
           picker = UIDocumentPickerViewController(url: sourceURL, in: .exportToService)
         }
 
+        self.activePicker = picker
         picker.delegate = self
         picker.modalPresentationStyle = .formSheet
         if let popover = picker.popoverPresentationController {
@@ -479,23 +510,64 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
     }
   }
 
+  private func saveImageToGallery(at source: URL, result: @escaping FlutterResult) {
+    PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+      guard status == .authorized else {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "photo_permission_denied", message: "Permission to add photos was denied.", details: nil))
+        }
+        return
+      }
+
+      PHPhotoLibrary.shared().performChanges({
+        PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: source, options: nil)
+      }) { success, error in
+        // Saving only needs add access. Reading the asset back would fail when
+        // Photos read access is denied, even though the original was saved.
+        DispatchQueue.main.async {
+          if success {
+            result(true)
+          } else {
+            result(FlutterError(code: "save_failed", message: error?.localizedDescription ?? "Unable to save image to Photos.", details: nil))
+          }
+        }
+      }
+    }
+  }
+
   func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    guard controller === activePicker else { return }
     finish(with: false)
   }
 
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    guard controller === activePicker else { return }
+    activePicker = nil
     if let source = externalBackupSource, let directory = urls.first {
+      let token = cancellation
+      let id = progressId
       backupQueue.async {
         let accessed = directory.startAccessingSecurityScopedResource()
         defer { if accessed { directory.stopAccessingSecurityScopedResource() } }
         do {
-          try BackupExportDestination.copy(source: source, to: directory)
+          try BackupExportDestination.copy(source: source, to: directory, cancellation: token) { written, total in
+            guard let id else { return }
+            DispatchQueue.main.async {
+              if self.progressId == id {
+                self.channel?.invokeMethod("saveProgress", arguments: [Int64(id), written, total])
+              }
+            }
+          }
           if let bookmark = try? directory.bookmarkData(options: [.minimalBookmark],
                                                         includingResourceValuesForKeys: nil, relativeTo: nil) {
             UserDefaults.standard.set(bookmark, forKey: Self.backupDirectoryKey)
           }
           DispatchQueue.main.async { self.finish(with: true) }
         } catch {
+          if (error as? CocoaError)?.code == .userCancelled {
+            DispatchQueue.main.async { self.finish(with: false) }
+            return
+          }
           let code = error is BackupExportDestination.ExportError
             ? "backup_destination_inside_app" : "save_failed"
           DispatchQueue.main.async {
@@ -516,6 +588,9 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
     let result = pendingResult
     pendingResult = nil
     externalBackupSource = nil
+    activePicker = nil
+    progressId = nil
+    cancellation = nil
     initialDirectory?.stopAccessingSecurityScopedResource()
     initialDirectory = nil
     result?(value)

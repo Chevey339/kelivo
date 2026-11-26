@@ -25,51 +25,64 @@ void main() {
       addTearDown(listController.dispose);
       final processing = ValueNotifier<String?>(null);
       addTearDown(processing.dispose);
+      final inputFocus = FocusNode();
+      addTearDown(inputFocus.dispose);
       var userScrollIntentCount = 0;
+      final desktop =
+          platform == TargetPlatform.macOS ||
+          platform == TargetPlatform.windows ||
+          platform == TargetPlatform.linux;
 
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: MessageListView(
-              scrollController: scrollController,
-              listController: listController,
-              messages: const [],
-              byGroup: const {},
-              versionSelections: const {},
-              reasoning: const {},
-              reasoningSegments: const {},
-              contentSplits: const {},
-              toolParts: const {},
-              translations: const {},
-              selecting: false,
-              selectedItems: const {},
-              dividerPadding: EdgeInsets.zero,
-              processingFilesMessageId: processing,
-              onUserScrollIntent: () => userScrollIntentCount++,
+            body: Column(
+              children: [
+                Expanded(
+                  child: MessageListView(
+                    scrollController: scrollController,
+                    listController: listController,
+                    messages: const [],
+                    byGroup: const {},
+                    versionSelections: const {},
+                    reasoning: const {},
+                    reasoningSegments: const {},
+                    contentSplits: const {},
+                    toolParts: const {},
+                    translations: const {},
+                    selecting: false,
+                    selectedItems: const {},
+                    dividerPadding: EdgeInsets.zero,
+                    processingFilesMessageId: processing,
+                    onUserScrollIntent: () => userScrollIntentCount++,
+                    footer: const SizedBox(height: 1200),
+                  ),
+                ),
+                TextField(focusNode: inputFocus),
+              ],
             ),
           ),
         ),
       );
 
-      final list = tester.widget<SuperListView>(find.byType(SuperListView));
-      final desktop =
-          platform == TargetPlatform.macOS ||
-          platform == TargetPlatform.windows ||
-          platform == TargetPlatform.linux;
-      expect(
-        list.keyboardDismissBehavior,
-        desktop
-            ? ScrollViewKeyboardDismissBehavior.manual
-            : ScrollViewKeyboardDismissBehavior.onDrag,
-      );
+      final list = find.byType(SuperListView);
       expect(find.byType(Scrollbar), desktop ? findsOneWidget : findsNothing);
 
       if (desktop) {
-        await tester.tap(find.byType(SuperListView));
+        await tester.tap(list);
         await tester.sendKeyDownEvent(LogicalKeyboardKey.pageUp);
         await tester.sendKeyUpEvent(LogicalKeyboardKey.pageUp);
         await tester.pump();
         expect(userScrollIntentCount, greaterThanOrEqualTo(1));
+      } else {
+        await tester.showKeyboard(find.byType(TextField));
+        expect(inputFocus.hasFocus, isTrue);
+        expect(tester.testTextInput.isVisible, isTrue);
+        await tester.drag(list, const Offset(0, -100));
+        await tester.pumpAndSettle();
+        expect(scrollController.offset, greaterThan(0));
+        expect(inputFocus.hasFocus, isFalse);
+        expect(tester.testTextInput.isVisible, isFalse);
       }
       debugDefaultTargetPlatformOverride = null;
     });

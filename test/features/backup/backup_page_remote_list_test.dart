@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/providers/external_backup_auto_provider.dart';
 import 'dart:async';
 
 import 'dart:io';
@@ -34,7 +35,8 @@ class _HangingBackupProvider extends BackupProvider {
   var started = false;
 
   @override
-  Future<List<BackupFileItem>> listRemote({
+  Future<List<BackupFileItem>> listRemote(
+    WebDavConfig cfg, {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) {
@@ -55,7 +57,8 @@ class _HangingS3BackupProvider extends S3BackupProvider {
   var started = false;
 
   @override
-  Future<List<BackupFileItem>> listRemote({
+  Future<List<BackupFileItem>> listRemote(
+    S3Config cfg, {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) {
@@ -155,8 +158,20 @@ Future<void> _expectNoSetStateAfterDispose(
             autoLoad: false,
           ),
         ),
+        ChangeNotifierProvider<BackupProvider>.value(value: webDav),
+        ChangeNotifierProvider<S3BackupProvider>.value(value: s3),
+        ChangeNotifierProvider(
+          create: (ctx) => ExternalBackupAutoProvider(
+            preferences: business.preferences,
+            settings: ctx.read<SettingsProvider>(),
+            reminder: ctx.read<BackupReminderProvider>(),
+            webdav: ctx.read<BackupProvider>(),
+            s3: ctx.read<S3BackupProvider>(),
+            desktop: false,
+          ),
+        ),
       ],
-      child: BackupPage(debugBackupProvider: webDav, debugS3BackupProvider: s3),
+      child: const BackupPage(),
     ),
   );
 

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../utils/avatar_cache.dart';
+import '../../utils/avatar_file_image.dart';
 import '../../utils/safe_resize_image.dart';
 import '../../utils/sandbox_path_resolver.dart';
 
@@ -80,13 +81,22 @@ class _AvatarImageState extends State<AvatarImage> {
       if (path == null && !widget.isNetwork) return widget.fallback;
       final pixels = (widget.size * MediaQuery.devicePixelRatioOf(context))
           .ceil();
-      _image = SafeResizeImage.display(
-        path == null ? NetworkImage(widget.source) : FileImage(File(path)),
-        width: pixels,
-        height: pixels,
-        fit: SafeResizeFit.cover,
-        cacheRevision: widget.isNetwork ? AvatarCache.revision : null,
-      );
+      final image = path == null
+          // When the disk cache is unavailable all sizes share one URL fetch.
+          ? SafeResizeImage.wrap(
+              NetworkImage(widget.source),
+              width: 256,
+              height: 256,
+              fit: SafeResizeFit.cover,
+              maxPixels: 2 * 256 * 256,
+              cacheRevision: AvatarCache.revision,
+            )
+          : AvatarFileImage(
+              File(path),
+              pixels: pixels,
+              cacheRevision: widget.isNetwork ? AvatarCache.revision : null,
+            );
+      if (_image != image) _image = image;
       return ClipOval(
         child: Image(
           image: _image!,

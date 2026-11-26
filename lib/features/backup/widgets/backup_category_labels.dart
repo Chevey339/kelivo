@@ -7,6 +7,7 @@ import '../../../l10n/app_localizations.dart';
 extension BackupCategoryLabels on BackupCategory {
   String label(AppLocalizations l10n) => switch (this) {
     BackupCategory.chats => l10n.backupPageChatsLabel,
+    BackupCategory.creations => l10n.backupScopeCreations,
     BackupCategory.files => l10n.backupPageFilesLabel,
     BackupCategory.assistants => l10n.backupPageAssistantsLabel,
     BackupCategory.providers => l10n.backupPageProvidersLabel,
@@ -26,6 +27,7 @@ extension BackupCategoryLabels on BackupCategory {
 
   IconData get icon => switch (this) {
     BackupCategory.chats => Lucide.MessageSquare,
+    BackupCategory.creations => Lucide.Palette,
     BackupCategory.files => Lucide.FileText,
     BackupCategory.assistants => Lucide.Bot,
     BackupCategory.providers => Lucide.Network,

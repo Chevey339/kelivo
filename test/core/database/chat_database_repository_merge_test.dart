@@ -1,4 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:drift/drift.dart' show Value;
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/models/media_creation.dart';
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -446,6 +450,69 @@ void main() {
       expect(await live.getAllConversations(), hasLength(1));
     });
 
+    test(
+      'relocated generated attachments and reader observations deduplicate on every merge',
+      () async {
+        const item = 'artwork';
+        for (final repo in [live, source]) {
+          final local = identical(repo, live);
+          final image = ImagePart(
+            uri: local
+                ? 'kelivo-file:///generations/batch/artwork.png'
+                : 'kelivo-file:///upload/old.png',
+            generationItemId: item,
+            assetId: local ? null : 'old-upload',
+            mime: 'image/png',
+          );
+          await putConversationWithAttachments(
+            repo,
+            conversationId: 'same',
+            messageId: 'm',
+            content: 'Draw a bird',
+            parts: [
+              image,
+              ToolCallPart(
+                jsonEncode({
+                  'name': 'generate_image',
+                  'metadata': {
+                    'generationBatchId': 'batch',
+                    'generatedImage': image.encodePayload(),
+                  },
+                }),
+              ),
+              ToolCallPart(
+                jsonEncode({
+                  'name': 'view_image',
+                  'metadata': {
+                    'chatImage': {
+                      'version': 1,
+                      'sourceKey': 'm|creation:artwork|0',
+                      'directAsset': true,
+                      'mime': 'image/png',
+                    },
+                    'mcpResult': {
+                      'imageUris': [image.uri],
+                    },
+                  },
+                }),
+              ),
+            ],
+          );
+        }
+        await source.close();
+        sourceClosed = true;
+        for (var round = 0; round < 2; round++) {
+          expect(
+            (await live.mergeBackupSnapshot(
+              sourceFile,
+            )).deduplicatedConversations,
+            1,
+          );
+        }
+        expect(await live.getAllConversations(), hasLength(1));
+      },
+    );
+
     test('仅 sender_id 不同不会被误判为重复', () async {
       for (final repository in [live, source]) {
         await putConversation(
@@ -714,6 +781,22 @@ void main() {
         messageId: 'imported-message',
         content: 'imported',
       );
+      await source.mediaRepository.enqueue(
+        GenerationBatchRowsCompanion.insert(
+          id: 'new-art',
+          conversationId: const Value('collision'),
+          messageId: const Value('imported-message'),
+          providerId: 'demo',
+          modelId: 'demo',
+          mode: MediaMode.image,
+          prompt: 'art',
+          paramsJson: '{}',
+          referencesJson: '[]',
+          status: GenerationStatus.failed,
+          source: GenerationSource.chat,
+          createdAt: DateTime.utc(2026),
+        ),
+      );
       await source.close();
       sourceClosed = true;
 
@@ -722,9 +805,23 @@ void main() {
       expect(remappedId, isNotNull);
       final remapped = await live.getConversation(remappedId!);
       expect(remapped?.title, 'Imported');
-      expect(remapped?.messageIds.single, startsWith('merge-'));
-      expect(remapped?.versionSelections.keys.single, startsWith('merge-'));
-      expect(await live.getToolEvents(remapped!.messageIds.single), const [
+      final incoming = ChatDatabaseRepository.open(file: sourceFile);
+      try {
+        await live.mediaRepository.importFrom(
+          incoming.mediaRepository,
+          overwrite: false,
+          remappedConversations: first.remappedConversationIds,
+          mergedMessages: first.mergedMessageIds,
+        );
+      } finally {
+        await incoming.close();
+      }
+      final importedArt = await live.mediaRepository.batch('new-art');
+      expect(importedArt?.conversationId, remappedId);
+      expect(importedArt?.messageId, remapped!.messageIds.single);
+      expect(remapped.messageIds.single, startsWith('merge-'));
+      expect(remapped.versionSelections.keys.single, startsWith('merge-'));
+      expect(await live.getToolEvents(remapped.messageIds.single), const [
         {'id': 'tool', 'content': 'imported'},
       ]);
 

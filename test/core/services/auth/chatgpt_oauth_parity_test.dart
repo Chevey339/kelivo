@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:Kelivo/core/models/provider_oauth.dart';
+import 'package:Kelivo/core/services/auth/codex_client_version.dart';
 import 'package:Kelivo/core/services/auth/oauth_cancellation.dart';
 import 'package:Kelivo/core/services/auth/provider_oauth_adapter.dart';
 import 'package:fake_async/fake_async.dart';
@@ -210,8 +211,11 @@ void main() {
         OAuthWire(
           MockClient((request) async {
             expect(request.url.path, '/backend-api/codex/models');
-            expect(request.url.queryParameters['client_version'], '0.159.0');
-            expect(request.headers['version'], '0.159.0');
+            expect(
+              request.url.queryParameters['client_version'],
+              defaultCodexClientVersion,
+            );
+            expect(request.headers['version'], defaultCodexClientVersion);
             expect(request.headers, isNot(contains('openai-beta')));
             return json({
               'models': [

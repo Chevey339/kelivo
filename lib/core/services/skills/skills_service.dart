@@ -40,6 +40,7 @@ class SkillsService extends ChangeNotifier {
   final http.Client _httpClient;
   final bool _ownsHttpClient;
   final List<Skill> _skills = <Skill>[];
+  final _linkedEntrypointTargets = <String, String>{};
 
   late final Future<void> loaded;
 
@@ -47,7 +48,7 @@ class SkillsService extends ChangeNotifier {
   Future<void> _mutationTail = Future<void>.value();
   bool _disposed = false;
 
-  // Command-triggered rescans share the same queue as imports and settings
+  // Rescans share the same queue as imports and settings
   // changes so an older disk snapshot cannot replace newer user choices.
   Future<T> _serializeMutation<T>(Future<T> Function() operation) {
     final result = _mutationTail.then((_) => operation());
@@ -59,6 +60,9 @@ class SkillsService extends ChangeNotifier {
   }
 
   List<Skill> get skills => List.unmodifiable(_skills);
+
+  bool isLinkedEntrypointTarget(String resolvedHostPath) =>
+      _linkedEntrypointTargets.containsValue(resolvedHostPath);
 
   Directory get skillsDirectory {
     final dir = _skillsDirectory ?? _injectedSkillsDirectory;
@@ -102,7 +106,7 @@ class SkillsService extends ChangeNotifier {
   ) async {
     // Receipts travel with skill backups, including a user's deletion choice.
     // Existing Skill documents and settings always remain user-owned.
-    final receipt = File(p.join(root.path, '.bundled-$id'));
+    final receipt = File(p.join(root.path, '$bundledSkillStoragePrefix$id'));
     final receiptType = await FileSystemEntity.type(
       receipt.path,
       followLinks: false,
@@ -134,7 +138,7 @@ class SkillsService extends ChangeNotifier {
       if (errors.isNotEmpty) {
         throw FormatException('Invalid bundled SKILL.md: ${errors.join(', ')}');
       }
-      final staging = await root.createTemp('.bundled-');
+      final staging = await root.createTemp(bundledSkillStoragePrefix);
       final installedFiles = <File>[];
       final installedDirectories = <Directory>[];
       var movedDirectory = false;
@@ -236,7 +240,9 @@ class SkillsService extends ChangeNotifier {
     File receipt,
     String state,
   ) async {
-    final staging = await root.createTemp('.bundled-receipt-');
+    final staging = await root.createTemp(
+      '${bundledSkillStoragePrefix}receipt-',
+    );
     try {
       final file = File(p.join(staging.path, 'state'));
       await file.writeAsString(state, flush: true);
@@ -300,14 +306,31 @@ class SkillsService extends ChangeNotifier {
     }
 
     final next = <Skill>[];
+    final linkedEntrypointTargets = <String, String>{};
     for (final record in records.values) {
-      next.add(await _skillFromDisk(root, record));
+      final skill = await _skillFromDisk(root, record);
+      next.add(skill);
+      final entrypoint = File(skill.skillMdPath);
+      // An existing record can also have a linked parent directory.
+      if (!diskIds.contains(record.id) ||
+          await FileSystemEntity.isLink(entrypoint.path)) {
+        try {
+          linkedEntrypointTargets[record.id] = p.canonicalize(
+            await entrypoint.resolveSymbolicLinks(),
+          );
+        } on FileSystemException {
+          // The target disappeared during the scan.
+        }
+      }
     }
     next.sort((a, b) => a.record.id.compareTo(b.record.id));
     if (_disposed) return;
     _skills
       ..clear()
       ..addAll(next);
+    _linkedEntrypointTargets
+      ..clear()
+      ..addAll(linkedEntrypointTargets);
     notifyListeners();
   }
 
@@ -462,6 +485,7 @@ class SkillsService extends ChangeNotifier {
         await dir.delete(recursive: true);
       }
       _skills.removeWhere((skill) => skill.record.id == id);
+      _linkedEntrypointTargets.remove(id);
       notifyListeners();
     });
   }

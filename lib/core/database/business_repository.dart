@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
@@ -5,6 +6,7 @@ import 'package:drift/drift.dart';
 import '../models/memory_entry.dart';
 import 'app_database.dart';
 import 'business_data.dart';
+import 'media_repository.dart';
 
 final class BusinessRepository {
   BusinessRepository(this._database);
@@ -13,10 +15,46 @@ final class BusinessRepository {
 
   final AppDatabase _database;
 
+  Future<bool> get hasCreations => MediaRepository(_database).hasCreations;
+
   /// Used by cross-domain coordinators to fail closed unless both
   /// repositories are backed by the exact same Drift database instance.
   bool sharesDatabaseIdentity(Object identity) =>
       identical(_database, identity);
+
+  /// Compare on this live connection: total_changes covers our own writes
+  /// and data_version also observes commits made by other connections in WAL.
+  Future<(int, int)> readStorageChangeVersion() async {
+    final row = await _database
+        .customSelect(
+          'SELECT total_changes() AS local_changes, data_version FROM pragma_data_version',
+        )
+        .getSingle();
+    return (row.read<int>('local_changes'), row.read<int>('data_version'));
+  }
+
+  /// Drift announces managed writes. Raw SQL and other WAL connections only
+  /// change SQLite's counters, so also sample them while the detail is open.
+  Stream<void> get attachmentChanges {
+    final ticks = Stream<void>.multi((controller) {
+      void tick() {
+        if (!controller.isPaused) controller.add(null);
+      }
+
+      tick();
+      final updates = _database.tableUpdates().listen((_) => tick());
+      final timer = Timer.periodic(const Duration(seconds: 1), (_) => tick());
+      controller.onCancel = () {
+        timer.cancel();
+        return updates.cancel();
+      };
+    });
+    return ticks
+        .asyncMap((_) => readStorageChangeVersion())
+        .distinct()
+        .skip(1)
+        .map((_) {});
+  }
 
   Future<List<BusinessEntityValue>> readEntities(BusinessEntityKind kind) =>
       _readEntities(kind);

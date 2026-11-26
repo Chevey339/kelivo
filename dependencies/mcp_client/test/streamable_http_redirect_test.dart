@@ -162,6 +162,36 @@ void main() {
     },
   );
 
+  test(
+    'stream resumption ignores HTTP Retry-After without reposting the tool',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final openStreams = <HttpResponse>[];
+      var posts = 0;
+      var resumes = 0;
+      final serving = _serveInterruptedPost(
+        server,
+        openStreams: openStreams,
+        onToolPost: () => posts++,
+        onResumeGet: () => resumes++,
+        failFirstResume: true,
+      );
+      final client = await _connectClient(server, requestTimeoutSeconds: 5);
+      addTearDown(() async {
+        client.dispose();
+        for (final stream in openStreams) {
+          await stream.close();
+        }
+        await server.close(force: true);
+        await serving;
+      });
+      final result = await client.callTool('interrupted', const {});
+      expect(result.isError, isFalse);
+      expect(posts, 1);
+      expect(resumes, 2);
+    },
+  );
+
   test('final POST SSE response releases the request slot', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final openStreams = <HttpResponse>[];
@@ -401,7 +431,9 @@ Future<void> _serveInterruptedPost(
   required List<HttpResponse> openStreams,
   required void Function() onToolPost,
   required void Function() onResumeGet,
+  bool failFirstResume = false,
 }) async {
+  var resumes = 0;
   await for (final request in server) {
     if (request.method == 'GET') {
       final cursor = request.headers.value('Last-Event-ID');
@@ -415,6 +447,12 @@ Future<void> _serveInterruptedPost(
         openStreams.add(request.response);
       } else {
         onResumeGet();
+        if (failFirstResume && resumes++ == 0) {
+          request.response.statusCode = HttpStatus.serviceUnavailable;
+          request.response.headers.set(HttpHeaders.retryAfterHeader, '3600');
+          await request.response.close();
+          continue;
+        }
         request.response.write(
           'id: interrupted-done\n'
           'data: ${jsonEncode({

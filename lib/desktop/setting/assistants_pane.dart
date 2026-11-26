@@ -665,46 +665,13 @@ class _AssistantAvatarDesktop extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final av = (item.avatar ?? '').trim();
     if (av.isNotEmpty) {
-      if (av.startsWith('http')) {
-        return FutureBuilder<String?>(
-          future: AvatarCache.getPath(av),
-          builder: (ctx, snap) {
-            final p = snap.data;
-            if (p != null && File(p).existsSync()) {
-              return ClipOval(
-                child: Image(
-                  image: FileImage(File(p)),
-                  width: size,
-                  height: size,
-                  fit: BoxFit.cover,
-                ),
-              );
-            }
-            return ClipOval(
-              child: Image.network(
-                av,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => _initial(cs),
-              ),
-            );
-          },
+      if (av.startsWith('http') || (av.startsWith('/') || av.contains(':'))) {
+        return AvatarImage(
+          source: av,
+          isNetwork: av.startsWith('http'),
+          size: size,
+          fallback: _initial(cs),
         );
-      } else if (av.startsWith('/') || av.contains(':')) {
-        final fixed = SandboxPathResolver.fix(av);
-        final f = File(fixed);
-        if (f.existsSync()) {
-          return ClipOval(
-            child: Image(
-              image: FileImage(f),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-            ),
-          );
-        }
-        return _initial(cs);
       } else {
         return _emoji(cs, av);
       }

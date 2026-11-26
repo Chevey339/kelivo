@@ -1,9 +1,15 @@
+import '../../../utils/kelivo_file_uri.dart';
+import '../../models/carried_original.dart';
 import '../../models/native_compaction.dart';
 import 'request_history_context.dart';
+import 'request_tool_declarations.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' as math;
+
+import 'package:crypto/crypto.dart';
 
 import '../../../features/intelligent_ui/host/ui_user_context_parts.dart';
 import '../../models/chat_message.dart';
@@ -16,11 +22,20 @@ import '../../utils/chat_image_result.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../mcp/mcp_image_snapshot.dart';
+import '../tools/view_image_tool.dart';
 import 'chat_api_helpers.dart';
 
 /// Kept out of prompts and removed before a provider serializes a request.
 const imageContextOwnerKey = '_kelivo_image_owner';
+const imageContextCallKey = '_kelivo_image_call';
 const _referencePrefix = 'kelivo-image-ref:';
+const excludedImageContextText = '[Image excluded from context by the user.]';
+
+String _markdownExclusionKey(String owner, String uri) =>
+    ContextImageIdentity.markdown(
+      owner,
+      SandboxPathResolver.canonicalize(uri),
+    ).key;
 
 /// App requests identify persisted messages, while utility/API callers may
 /// supply plain role/content maps. Injected lore must never receive the
@@ -34,6 +49,7 @@ bool isUserInputMessage(
   final owner = message[imageContextOwnerKey];
   return owner is String &&
       owner.isNotEmpty &&
+      !isCarriedMessageId(owner) &&
       !owner.startsWith(ContextOperation.summaryPrefix);
 }
 
@@ -55,6 +71,7 @@ class ChatContextImage {
     this.workspaceSnapshot = false,
     this.unavailable = false,
     this.materializationKey,
+    this.sourceContextKey,
     this.partOrdinal,
   });
 
@@ -67,9 +84,37 @@ class ChatContextImage {
   final bool workspaceSnapshot;
   final bool unavailable;
   final String? materializationKey;
+  final String? sourceContextKey;
   final int? partOrdinal;
+  // Structured user attachments, generated parts and the built-in reader can
+  // refer to an original. A Markdown link or ordinary tool URI grants no access.
+  late final String _canonicalUri = uri.startsWith('data:')
+      ? uri
+      : SandboxPathResolver.canonicalize(uri);
+  late final String? _pathItemId = KelivoFileUri.generationImageItemId(
+    _canonicalUri,
+  );
+  late final String? creationItemId = switch (source) {
+    ContextImageSource.user when identity.slot.startsWith('part:') =>
+      _pathItemId,
+    ContextImageSource.assistant when identity.slot.startsWith('creation:') =>
+      identity.slot.substring('creation:'.length),
+    ContextImageSource.tool when workspaceSnapshot => creationItemFromSourceKey(
+      materializationKey,
+    ),
+    _ => null,
+  };
+  late final bool invalidCreationOrigin = creationItemId != _pathItemId;
+  String? get creationUri =>
+      creationItemId == null || invalidCreationOrigin ? null : _canonicalUri;
   String get key => identity.key;
   String get handle => identity.handle;
+  late final String exclusionKey = chatImageExclusionKey(key, uri);
+  late final String? storedExclusionSourceKey =
+      sourceContextKey ??
+      (materializationKey == null
+          ? null
+          : chatImageExclusionKey(materializationKey!, uri));
   String get mediaType => mime.isNotEmpty
       ? mime
       : inferMediaMimeFromSource(uri, fallbackMime: 'image/png');
@@ -81,12 +126,16 @@ class ImageContextPreviewItem {
     this.image, {
     required this.included,
     required this.pinned,
+    this.excluded = false,
+    this.inheritedExclusion = false,
     this.bytes,
     this.sizeIsEstimate = false,
   });
   final ChatContextImage image;
   final bool included;
   final bool pinned;
+  final bool excluded;
+  final bool inheritedExclusion;
   final int? bytes;
   final bool sizeIsEstimate;
 }
@@ -105,13 +154,15 @@ class RequestImageContext {
     bool canRecall = true,
     this.canImageInput = true,
     this.loader,
+    this.ownsCreationImage,
     this.inlineRemoteUsers = false,
     this.allowsRemoteUserImages = true,
     Map<String, String?> userTurns = const {},
     this.omitUserImages = false,
     this.omitImages = false,
     this.viewImageUris = const {},
-  }) : canRecall =
+  }) : canViewNewOutput = canRecall && canImageInput && !omitImages,
+       canRecall =
            canRecall && canImageInput && settings.allowRecall && !omitImages,
        images = List.of(images),
        _userTurns = Map.of(userTurns) {
@@ -134,8 +185,14 @@ class RequestImageContext {
   // Lower sending limits also constrain retention, so old images can be trimmed.
   final RequestBudget historyBudget;
   final bool canRecall;
-  bool get hasRecallableImages =>
-      canRecall && images.any((image) => !_isUnavailable(image));
+  final bool canViewNewOutput;
+  final _newOutputHandles = <String>{};
+  bool _freshOutput(ChatContextImage image) =>
+      canViewNewOutput &&
+      image.identity.messageId == targetMessageId &&
+      _newOutputHandles.contains(image.handle);
+
+  bool get hasRecallableImages => canRecall && images.any(_isRecallable);
   final bool canImageInput;
   final bool inlineRemoteUsers;
   final bool allowsRemoteUserImages;
@@ -148,17 +205,68 @@ class RequestImageContext {
   int lastRequestImageCount = 0;
   final Set<String> viewImageUris;
   final activeHandles = <String>{};
+  final _generatedReferencesInRequest = <String>{};
   final compressedOwners = <String>{};
   final Future<String?> Function(ChatContextImage)? loader;
+  final Future<bool> Function(String uri)? ownsCreationImage;
   final _byHandle = <String, ChatContextImage>{};
   final _loads = <String, Future<String?>>{};
   final _sizes = <String, Future<int?>>{};
+  final _localImageHashes = <String, Future<Digest?>>{};
+  final _inlineImageHashes = <String, Future<Digest?>>{};
   final _unavailableSources = <String>{};
+  final _legacyImageOrigins = <String, String?>{};
   final _parsedText = Expando<String>();
 
   bool _isUnavailable(ChatContextImage image) =>
       image.unavailable ||
+      image.invalidCreationOrigin ||
       _unavailableSources.contains(image.materializationKey ?? image.key);
+
+  bool isGeneratedHandle(String handle) =>
+      _byHandle[handle]?.identity.slot.startsWith('creation:') == true;
+
+  String? _exclusionSourceKey(ChatContextImage image) {
+    final sourceKey = image.storedExclusionSourceKey;
+    if (image.sourceContextKey != null || sourceKey == null) {
+      return sourceKey;
+    }
+    return _legacyImageOrigins.putIfAbsent(image.key, () {
+      if (images.any((candidate) => candidate.exclusionKey == sourceKey)) {
+        return sourceKey;
+      }
+      final separator = sourceKey.indexOf('|');
+      if (separator < 0) return sourceKey;
+      final slot = sourceKey.substring(separator);
+      final uri = SandboxPathResolver.dedupeKey(image.uri);
+      final matches = images
+          .where(
+            (candidate) =>
+                candidate.materializationKey == null &&
+                candidate.exclusionKey.endsWith(slot) &&
+                SandboxPathResolver.dedupeKey(candidate.uri) == uri,
+          )
+          .take(2)
+          .toList();
+      // Older forks copied the snapshot's original id. Recover the link only
+      // when there is exactly one local occurrence with the same URI and slot.
+      return matches.length == 1 ? matches.single.exclusionKey : sourceKey;
+    });
+  }
+
+  bool _inheritsExclusion(ChatContextImage image, Set<String> keys) =>
+      keys.isNotEmpty &&
+      (keys.contains(image.storedExclusionSourceKey) ||
+          keys.contains(_exclusionSourceKey(image)));
+
+  bool _isExcluded(ChatContextImage image, [Set<String>? exclusions]) {
+    final keys = exclusions ?? settings.excluded;
+    return keys.isNotEmpty &&
+        (keys.contains(image.exclusionKey) || _inheritsExclusion(image, keys));
+  }
+
+  bool _isRecallable(ChatContextImage image) =>
+      !_isUnavailable(image) && !_isExcluded(image);
   static bool isRemoteHttpUrl(String value) =>
       Uri.tryParse(value)?.isScheme('https') == true ||
       Uri.tryParse(value)?.isScheme('http') == true;
@@ -167,6 +275,8 @@ class RequestImageContext {
       Zone.current[_zoneKey] as RequestImageContext?;
 
   Stream<T> run<T>(Stream<T> Function() action) => _run(this, action);
+  Future<T> runFuture<T>(Future<T> Function() action) =>
+      runZoned(action, zoneValues: {_zoneKey: this});
   static Stream<T> without<T>(Stream<T> Function() action) =>
       _run(null, action);
   static Stream<T> _run<T>(
@@ -203,7 +313,12 @@ class RequestImageContext {
           }
           out.add(
             ChatContextImage(
-              identity: ContextImageIdentity(message.id, 'part:$ordinal'),
+              identity: _attachmentIdentity(
+                message.id,
+                part,
+                ordinal,
+                user: message.role == 'user',
+              ),
               partOrdinal: ordinal,
               uri: uri,
               mime: mime ?? '',
@@ -242,7 +357,11 @@ class RequestImageContext {
             final call = (event['id'] ?? 'part:$ordinal').toString();
             for (var i = 0; i < uris.length; i++) {
               final restored = readChatImageMetadata(name, metadata);
-              if (name == 'read_chat_image' && restored == null) continue;
+              if (name == 'view_image' &&
+                  metadata?['chatImage'] != null &&
+                  restored == null) {
+                continue;
+              }
               out.add(
                 ChatContextImage(
                   identity: ContextImageIdentity(message.id, 'tool:$call', i),
@@ -252,6 +371,7 @@ class RequestImageContext {
                   label: '$name · ${i + 1}',
                   toolCallId: call,
                   materializationKey: restored?.sourceKey,
+                  sourceContextKey: restored?.contextKey,
                   mime: restored?.mime ?? '',
                   workspaceSnapshot:
                       workspace != null || restored?.directAsset == true,
@@ -265,6 +385,163 @@ class RequestImageContext {
       }
     }
     return out;
+  }
+
+  /// Mask attachments in the request's copy of history before attachment
+  /// processing, so OCR and the dedicated image endpoints respect exclusions.
+  static ({List<ChatMessage> messages, Set<String> affectedRevisions})
+  withoutExcludedAttachments(List<ChatMessage> messages, Set<String> excluded) {
+    if (excluded.isEmpty) {
+      return (messages: messages, affectedRevisions: const {});
+    }
+    final affectedRevisions = <String>{};
+    final filtered = messages.map((message) {
+      List<MessagePart>? parts;
+      for (final (ordinal, part) in message.parts.indexed) {
+        if (part is! ImagePart && part is! FilePart) continue;
+        if (!excluded.contains(
+          _attachmentIdentity(
+            message.id,
+            part,
+            ordinal,
+            user: message.role == 'user',
+          ).key,
+        )) {
+          continue;
+        }
+        // Keep part ordinals and leave original text intact for prompt rules.
+        (parts ??= message.parts.toList())[ordinal] = const TextPart('');
+      }
+      if (parts == null) return message;
+      affectedRevisions.add(message.id);
+      return message.copyWith(parts: parts);
+    }).toList();
+    return (messages: filtered, affectedRevisions: affectedRevisions);
+  }
+
+  static ContextImageIdentity _attachmentIdentity(
+    String messageId,
+    MessagePart part,
+    int ordinal, {
+    bool user = false,
+  }) => switch (part) {
+    ImagePart(generationItemId: final itemId?) when !user =>
+      ContextImageIdentity(messageId, 'creation:$itemId'),
+    _ => ContextImageIdentity(messageId, 'part:$ordinal'),
+  };
+
+  String registerGeneratedImage(ImagePart part) {
+    final image = _add(
+      ChatContextImage(
+        identity: _attachmentIdentity(targetMessageId, part, 0),
+        uri: part.uri,
+        source: ContextImageSource.assistant,
+        label: 'Generated image',
+        mime: part.mime ?? '',
+      ),
+    );
+    _newOutputHandles.add(image.handle);
+    return image.handle;
+  }
+
+  ChatContextImage? generationReference(
+    String handle, {
+    required Set<String> allowedMessages,
+    required ImageContextSettings currentSettings,
+  }) {
+    final image = _byHandle[handle];
+    if (omitImages ||
+        image == null ||
+        !allowedMessages.contains(image.identity.messageId) ||
+        !_isRecallable(image) ||
+        _isExcluded(image, currentSettings.excluded)) {
+      return null;
+    }
+    final latestAttachment =
+        image.source == ContextImageSource.user &&
+        image.identity.messageId == latestUserId &&
+        activeHandles.contains(handle);
+    if (!currentSettings.allowRecall &&
+        !_isGeneratedImageInRequest(image) &&
+        !latestAttachment) {
+      return null;
+    }
+    return image;
+  }
+
+  // An edit uses the image produced by the conversation's own tool. Only
+  // outputs in the selected request window qualify without history recall.
+  bool _isGeneratedImageInRequest(ChatContextImage image) =>
+      image.source == ContextImageSource.assistant &&
+      image.identity.slot.startsWith('creation:') &&
+      (image.identity.messageId == targetMessageId ||
+          (_generatedReferencesInRequest.contains(image.handle) &&
+              !compressedOwners.contains(image.identity.messageId)));
+
+  List<String> get currentGenerationReferenceIds => omitImages
+      ? const []
+      : [
+          for (final image in images)
+            if (image.source == ContextImageSource.user &&
+                image.identity.messageId == latestUserId &&
+                activeHandles.contains(image.handle) &&
+                _isRecallable(image))
+              image.handle,
+        ];
+
+  static Future<void> omitExcludedMarkdownImages(
+    List<Map<String, dynamic>> messages,
+    List<ChatMessage> original,
+    Set<String> excluded,
+  ) async {
+    if (excluded.isEmpty) return;
+    final owners = {for (final key in excluded) key.split('|').first};
+    final partsByOwner = <String, List<ChatContextImage>>{};
+    for (final image in collect(
+      original.where((m) => owners.contains(m.id)).toList(),
+    )) {
+      if (image.source == ContextImageSource.tool) continue;
+      partsByOwner.putIfAbsent(image.identity.messageId, () => []).add(image);
+    }
+    for (final message in messages) {
+      final owner = message[imageContextOwnerKey];
+      final raw = message['content'];
+      if (owner is! String ||
+          !owners.contains(owner) ||
+          raw is! String ||
+          !raw.contains('![')) {
+        continue;
+      }
+      final parsed = await parseTextAndImages(
+        raw,
+        literalText: internalLiteralText(message),
+        allowRemoteImages: true,
+        allowLocalImages: true,
+        validateRemoteImages: false,
+      );
+      var previous = 0;
+      final kept = StringBuffer();
+      for (final ref in parsed.images) {
+        final normalized = SandboxPathResolver.dedupeKey(ref.src);
+        final matching = partsByOwner[owner]?.where(
+          (image) => SandboxPathResolver.dedupeKey(image.uri) == normalized,
+        );
+        final selected =
+            excluded.contains(_markdownExclusionKey(owner, ref.src)) ||
+            (matching != null &&
+                matching.isNotEmpty &&
+                matching.every(
+                  (image) => excluded.contains(image.exclusionKey),
+                ));
+        if (!selected) continue;
+        kept.write(raw.substring(previous, ref.offset!));
+        kept.write(excludedImageContextText);
+        previous = ref.endOffset!;
+      }
+      if (previous > 0) {
+        message['content'] = (kept..write(raw.substring(previous))).toString();
+      }
+    }
   }
 
   static Map<String, String?> userTurnsFor(List<ChatMessage> messages) {
@@ -283,21 +560,32 @@ class RequestImageContext {
     List<ChatMessage> messages, {
     required bool parseMarkdownImages,
     required bool allowRemoteImages,
+    Set<String> excluded = const {},
   }) async {
-    if (!parseMarkdownImages) return collect(messages);
+    final excludedMarkdownOwners = {
+      for (final key in excluded)
+        if (key.contains('|markdown:')) key.split('|').first,
+    };
+    if (!parseMarkdownImages && excludedMarkdownOwners.isEmpty) {
+      return collect(messages);
+    }
     final result = <ChatContextImage>[];
     for (final message in messages) {
       final items = collect([message]);
       final order = {
         for (final image in items) image.key: image.partOrdinal ?? 0,
       };
-      if (message.content.contains('![')) {
+      final hasExcludedMarkdown = excludedMarkdownOwners.contains(message.id);
+      if ((parseMarkdownImages || hasExcludedMarkdown) &&
+          message.content.contains('![') &&
+          message.providerArtifactSnapshot[carriedTextOnlyArtifactKind] !=
+              'true') {
         final parsed = await parseTextAndImages(
           message.content,
           literalText: message.role == 'user'
               ? UiUserContextParts.read(message.parts).context?.exactText
               : null,
-          allowRemoteImages: allowRemoteImages,
+          allowRemoteImages: allowRemoteImages || hasExcludedMarkdown,
           allowLocalImages: true,
           validateRemoteImages: false,
         );
@@ -320,6 +608,11 @@ class RequestImageContext {
           }
           final ordinal = spans.isEmpty ? 0 : spans[span].ordinal;
           final normalized = SandboxPathResolver.dedupeKey(ref.src);
+          if ((!parseMarkdownImages ||
+                  (!allowRemoteImages && isRemoteHttpUrl(ref.src))) &&
+              !excluded.contains(_markdownExclusionKey(message.id, ref.src))) {
+            continue;
+          }
           final existing = items
               .where(
                 (im) =>
@@ -332,10 +625,7 @@ class RequestImageContext {
             continue;
           }
           final image = ChatContextImage(
-            identity: ContextImageIdentity(
-              message.id,
-              'markdown:${base64Url.encode(utf8.encode(normalized))}',
-            ),
+            identity: ContextImageIdentity.markdown(message.id, normalized),
             uri: ref.src,
             source: source,
             label: 'Image',
@@ -376,28 +666,61 @@ class RequestImageContext {
     ContextImageSource source,
   ) {
     final normalized = SandboxPathResolver.dedupeKey(uri);
+    ChatContextImage? firstMatch;
     for (final image in images) {
       if (image.identity.messageId == owner &&
           image.source == source &&
           SandboxPathResolver.dedupeKey(image.uri) == normalized) {
-        activeHandles.add(image.handle);
-        return image;
+        firstMatch ??= image;
+        // Providers deduplicate copies of the same URI within one message.
+        // Use a remaining occurrence if the user excluded one of the copies.
+        if (!_isExcluded(image)) {
+          firstMatch = image;
+          break;
+        }
       }
     }
-    final added = _add(
-      ChatContextImage(
-        identity: ContextImageIdentity(
-          owner,
-          'markdown:${base64Url.encode(utf8.encode(normalized))}',
-        ),
-        uri: uri,
-        mime: mime,
-        source: source,
-        label: 'Image',
-      ),
-    );
+    final added =
+        firstMatch ??
+        _add(
+          ChatContextImage(
+            identity: ContextImageIdentity.markdown(owner, normalized),
+            uri: uri,
+            mime: mime,
+            source: source,
+            label: 'Image',
+          ),
+        );
     activeHandles.add(added.handle);
     return added;
+  }
+
+  // Keep IDs with the reply that produced them, including when the chat model
+  // accepts text only or tool replay is disabled. A cropped or compressed
+  // message then loses its hint along with the rest of its content.
+  void _identifyGeneratedOutputs(List<Map<String, dynamic>> messages) {
+    final outputs = <String, List<String>>{};
+    for (final image in images) {
+      if (image.source == ContextImageSource.assistant &&
+          image.identity.slot.startsWith('creation:') &&
+          _isRecallable(image)) {
+        (outputs[image.identity.messageId] ??= []).add(image.handle);
+      }
+    }
+    for (final message in messages.reversed) {
+      if (outputs.isEmpty) break;
+      if (message['role'] != 'assistant') continue;
+      final ids = outputs.remove(message[imageContextOwnerKey]);
+      if (ids == null) continue;
+      _generatedReferencesInRequest.addAll(ids);
+      // A tool-only reply already exposes the IDs in its tool result.
+      if (message.containsKey('tool_calls')) continue;
+      final content = message['content'];
+      if (content is String) {
+        final hint = '[Generated image IDs: ${ids.join(', ')}]';
+        message['content'] = content.isEmpty ? hint : '$content\n\n$hint';
+      }
+    }
   }
 
   /// Runs after OCR and attachment descriptions, before any local inlining.
@@ -408,7 +731,12 @@ class RequestImageContext {
     List<String> userPaths, {
     required bool parseMarkdownImages,
     required bool allowRemoteImages,
+    bool includeGeneratedReferences = false,
   }) async {
+    _generatedReferencesInRequest.clear();
+    if (includeGeneratedReferences && !omitImages) {
+      _identifyGeneratedOutputs(messages);
+    }
     for (final message in messages) {
       if (message['role'] == 'tool') {
         final metadata = (message['metadata'] as Map?)?.cast<String, dynamic>();
@@ -435,6 +763,31 @@ class RequestImageContext {
       final source = message['role'] == 'user'
           ? ContextImageSource.user
           : ContextImageSource.assistant;
+      if (owner.startsWith(carriedPrefix)) {
+        // Recover the frozen occurrences from the original history. Edits change
+        // only the text, so a new Markdown link can never authorize new pixels.
+        final handles =
+            (message[carriedImageHandlesKey] as List?)?.whereType<String>() ??
+            const <String>[];
+        final sourceId = carriedSourceId(owner);
+        final refs = <Map<String, dynamic>>[];
+        for (final handle in handles) {
+          final image = _byHandle[handle];
+          if (image == null ||
+              image.identity.messageId != sourceId ||
+              image.source != ContextImageSource.user ||
+              _isUnavailable(image) ||
+              (!parseMarkdownImages &&
+                  image.identity.slot.startsWith('markdown:')) ||
+              (!allowRemoteImages && isRemoteHttpUrl(image.uri))) {
+            continue;
+          }
+          activeHandles.add(handle);
+          refs.add({'uri': image.reference, 'mime': image.mediaType});
+        }
+        message[multimodalInternalMediaPathsKey] = refs;
+        continue;
+      }
       final raw = message['content'];
       if (raw is String && parseMarkdownImages) {
         final parsed = await parseTextAndImages(
@@ -511,11 +864,15 @@ class RequestImageContext {
     String? callId,
   ) {
     final restored = readChatImageMetadata(name, metadata);
-    if (name == 'read_chat_image' && restored == null) return [];
+    if (name == 'view_image' &&
+        metadata?['chatImage'] != null &&
+        restored == null) {
+      return [];
+    }
     final owner =
         metadata?[imageContextOwnerKey]?.toString() ?? targetMessageId;
     final call =
-        metadata?['_kelivo_image_call']?.toString() ??
+        metadata?[imageContextCallKey]?.toString() ??
         callId ??
         '$name:${uris.join('|')}';
     return [
@@ -528,6 +885,7 @@ class RequestImageContext {
             label: '$name · ${i + 1}',
             toolCallId: call,
             materializationKey: restored?.sourceKey,
+            sourceContextKey: restored?.contextKey,
             mime: restored?.mime ?? '',
             workspaceSnapshot:
                 metadata?['workspace'] != null || restored?.directAsset == true,
@@ -541,24 +899,26 @@ class RequestImageContext {
   ClientToolResult readImage(
     String handle, {
     Set<String>? allowedMessages,
+    Set<String> excluded = const {},
     int offset = 0,
+    bool allowHistory = true,
   }) {
-    if (!canRecall) {
+    if (!(canRecall && allowHistory) &&
+        !_newOutputHandles.any((h) => _freshOutput(_byHandle[h]!))) {
       return const ClientToolResult(
         'Image recall is disabled for this request. Ask the user to attach the image again if needed.',
       );
     }
+    bool available(ChatContextImage image) =>
+        (canRecall && allowHistory || _freshOutput(image)) &&
+        _isRecallable(image) &&
+        !_isExcluded(image, excluded) &&
+        (allowedMessages == null ||
+            allowedMessages.contains(image.identity.messageId));
     if (handle.isEmpty) {
-      final available = images
-          .where(
-            (image) =>
-                !_isUnavailable(image) &&
-                (allowedMessages == null ||
-                    allowedMessages.contains(image.identity.messageId)),
-          )
-          .toList();
-      final start = offset.clamp(0, available.length);
-      final page = available.skip(start).take(30).toList();
+      final found = images.where(available).toList();
+      final start = offset.clamp(0, found.length);
+      final page = found.skip(start).take(30).toList();
       return ClientToolResult(
         jsonEncode({
           'images': [
@@ -569,28 +929,35 @@ class RequestImageContext {
                 'label': image.label,
               },
           ],
-          if (start + page.length < available.length)
+          if (start + page.length < found.length)
             'next_offset': start + page.length,
         }),
       );
     }
     final source = _byHandle[handle];
-    if (source == null ||
-        _isUnavailable(source) ||
-        (allowedMessages != null &&
-            !allowedMessages.contains(source.identity.messageId))) {
+    if (source == null || !available(source)) {
       return ClientToolResult(
         'Image is unavailable in the current conversation context. '
-        '${hasRecallableImages ? 'Call read_chat_image without image_id to list available images.' : 'Ask the user to attach it again.'}',
+        '${images.any(available) ? 'Call view_image without image_id to list available images.' : 'Ask the user to attach it again.'}',
       );
     }
     return ClientToolResult(
       'Image $handle',
       metadata: {
-        kMcpResultMetadataKey: mcpResultMetadata([source.uri]),
+        kMcpResultMetadataKey: mcpResultMetadata([
+          source.creationUri ?? source.uri,
+        ]),
         'chatImage': {
           'version': 1,
-          'sourceKey': source.materializationKey ?? source.key,
+          'sourceKey':
+              source.materializationKey ??
+              (source.creationItemId == null
+                  ? source.key
+                  : ContextImageIdentity(
+                      source.identity.messageId,
+                      'creation:${source.creationItemId}',
+                    ).key),
+          'contextKey': _exclusionSourceKey(source) ?? source.exclusionKey,
           'directAsset':
               source.source != ContextImageSource.tool ||
               source.workspaceSnapshot,
@@ -612,6 +979,10 @@ class RequestImageContext {
 
   String omittedText(String handle, {String? reason}) {
     if (omitImages) return '[Image omitted for this request by the user.]';
+    final image = _byHandle[handle];
+    if (image != null && _isExcluded(image)) {
+      return excludedImageContextText;
+    }
     if (reason == 'unavailable') {
       return '[Image $handle unavailable. Ask the user to attach it again.]';
     }
@@ -619,23 +990,39 @@ class RequestImageContext {
         canImageInput && viewImageUris.contains(_byHandle[handle]?.uri)
         ? 'Use view_image on the attached Path when needed.'
         : hasRecallableImages
-        ? 'Use read_chat_image with this image_id when needed.'
+        ? 'Use view_image with this image_id when needed.'
         : 'Ask the user to attach it again if needed.';
     return '[Image $handle omitted. $instruction]';
   }
 
-  Future<String?> _load(ChatContextImage image) =>
-      _loads.putIfAbsent(image.key, () async {
-        final data = await _readPixels(image);
-        if (data == null) {
-          _unavailableSources.add(image.materializationKey ?? image.key);
-        }
-        return data;
-      });
+  Future<String?> _load(ChatContextImage image) async {
+    if (_isUnavailable(image)) return null;
+    // Deletion can happen between tool rounds while encoded pixels are cached.
+    final original = image.creationItemId == null
+        ? null
+        : await _localAssetFile(image);
+    if (image.creationItemId != null && original == null) {
+      _loads.remove(image.key);
+      _unavailableSources.add(image.materializationKey ?? image.key);
+      return null;
+    }
+    return _loads.putIfAbsent(image.key, () async {
+      final data = await _readPixels(image, original);
+      if (data == null) {
+        _unavailableSources.add(image.materializationKey ?? image.key);
+      }
+      return data;
+    });
+  }
 
-  Future<String?> _readPixels(ChatContextImage source) async {
-    if (_isUnavailable(source)) return null;
+  Future<String?> _readPixels(ChatContextImage source, File? original) async {
     if (loader != null) return loader!(source);
+    if (original != null) {
+      return tryEncodeBase64DataUrl(
+        original.path,
+        explicitMime: source.mediaType,
+      );
+    }
     if (source.source == ContextImageSource.tool) {
       if (source.workspaceSnapshot) {
         if (source.uri.startsWith('data:')) return source.uri;
@@ -668,6 +1055,13 @@ class RequestImageContext {
   }
 
   Future<File?> _localAssetFile(ChatContextImage image) async {
+    if (image.invalidCreationOrigin) return null;
+    if (image.creationUri case final uri?) {
+      if (ownsCreationImage case final check? when !await check(uri)) {
+        return null;
+      }
+      return SandboxPathResolver.managedFile(uri);
+    }
     final path = SandboxPathResolver.resolveForIo(image.uri);
     if (path == null) return null;
     if (image.source == ContextImageSource.tool && !image.workspaceSnapshot) {
@@ -676,9 +1070,10 @@ class RequestImageContext {
     return File(path);
   }
 
-  Future<int?> estimatedBytes(
-    ChatContextImage image,
-  ) => _sizes.putIfAbsent(image.key, () async {
+  Future<int?> estimatedBytes(ChatContextImage image) =>
+      _sizes.putIfAbsent(image.key, () => _estimateBytes(image));
+
+  Future<int?> _estimateBytes(ChatContextImage image) async {
     if (_isUnavailable(image)) return null;
     if (image.uri.startsWith('data:')) return wireImageBytes(image.uri);
     if (isRemoteHttpUrl(image.uri)) {
@@ -693,12 +1088,207 @@ class RequestImageContext {
     return stat.type == FileSystemEntityType.file
         ? ImageContextPlanner.base64Bytes(stat.size)
         : null;
+  }
+
+  /// Native compaction can retain encoded pixels without their local reference.
+  /// Only compare local candidates of matching size. If any readable image is
+  /// definitely absent, recall is still needed and no content hashing is needed.
+  Future<void> _includeInlineImageSources(
+    Set<String> externalUrls,
+    Set<String> included,
+  ) async {
+    final inlineBySize = <int, List<String>>{};
+    for (final url in externalUrls) {
+      if (!url.startsWith('data:image/')) continue;
+      final comma = url.indexOf(',');
+      if (comma < 0 || !url.substring(0, comma).endsWith(';base64')) continue;
+      inlineBySize.putIfAbsent(wireImageBytes(url), () => []).add(url);
+    }
+    if (inlineBySize.isEmpty) return;
+
+    final candidates = <int, List<ChatContextImage>>{};
+    for (final image in images) {
+      final sourceKey = image.materializationKey ?? image.key;
+      if (included.contains(sourceKey) || !_isRecallable(image)) continue;
+      // Do not fetch remote images merely to discover whether they are visible.
+      if (image.uri.startsWith('data:') || isRemoteHttpUrl(image.uri)) return;
+      try {
+        final size = await estimatedBytes(image);
+        if (size == null || !inlineBySize.containsKey(size)) return;
+        candidates.putIfAbsent(size, () => []).add(image);
+      } on FileSystemException {
+        return;
+      }
+    }
+    for (final group in candidates.entries) {
+      final inlineHashes = (await Future.wait([
+        for (final url in inlineBySize[group.key]!)
+          _inlineImageHashes.putIfAbsent(url, () => _hashInlineImage(url)),
+      ])).whereType<Digest>().toSet();
+      for (final image in group.value) {
+        final sourceKey = image.materializationKey ?? image.key;
+        final hash = await _localImageHash(image);
+        if (hash == null || !inlineHashes.contains(hash)) return;
+        included.add(sourceKey);
+      }
+    }
+  }
+
+  Future<Digest?> _localImageHash(ChatContextImage image) => _localImageHashes
+      .putIfAbsent(image.materializationKey ?? image.key, () async {
+        try {
+          final file = await _localAssetFile(image);
+          return file == null ? null : await sha256.bind(file.openRead()).first;
+        } on FileSystemException {
+          return null;
+        }
+      });
+
+  Future<bool> _matchesRetainedImage(ChatContextImage image, String url) async {
+    if (image.uri == url) return true;
+    if (!url.startsWith('data:image/')) {
+      return SandboxPathResolver.dedupeKey(image.uri) ==
+          SandboxPathResolver.dedupeKey(url);
+    }
+    final inline = image.uri.startsWith('data:');
+    try {
+      final size = inline
+          ? wireImageBytes(image.uri)
+          : await estimatedBytes(image);
+      if (size == null || size != wireImageBytes(url)) return false;
+      final hash = await _inlineImageHashes.putIfAbsent(
+        url,
+        () => _hashInlineImage(url),
+      );
+      return hash != null &&
+          hash ==
+              (inline
+                  ? await _inlineImageHashes.putIfAbsent(
+                      image.uri,
+                      () => _hashInlineImage(image.uri),
+                    )
+                  : await _localImageHash(image));
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  /// Responses can replay plaintext user and tool items next to the opaque
+  /// compaction result. Check their pixels within the recorded owner's images
+  /// when available, and leave the opaque item itself untouched.
+  Future<Map<String, dynamic>> _omitExcludedRetainedImages(
+    Map<String, dynamic> body,
+  ) async {
+    final input = body['input'];
+    bool retainedItem(Object? item) =>
+        item is Map &&
+        (item[nativeCompactionWireKey] == true || item[carriedWireKey] == true);
+    if (settings.excluded.isEmpty ||
+        input is! List ||
+        !input.any(retainedItem) ||
+        !images.any(_isExcluded)) {
+      return body;
+    }
+    final byOwner = <String, List<ChatContextImage>>{};
+    for (final image in images) {
+      byOwner.putIfAbsent(image.identity.messageId, () => []).add(image);
+    }
+    Future<int?> retainedLimit(
+      String url,
+      List<ChatContextImage>? ownerImages,
+    ) async {
+      for (final candidates in [if (ownerImages != null) ownerImages, images]) {
+        var hasExcluded = false;
+        var allowed = 0;
+        for (final image in candidates) {
+          if (!await _matchesRetainedImage(image, url)) continue;
+          if (_isExcluded(image)) {
+            hasExcluded = true;
+          } else {
+            allowed++;
+          }
+        }
+        if (!hasExcluded && allowed == 0) continue;
+        // Responses can append assistant images to a user item. If its owner
+        // has no matching image, mask only when every known copy is excluded.
+        return hasExcluded &&
+                (identical(candidates, ownerImages) || allowed == 0)
+            ? allowed
+            : null;
+      }
+      return null;
+    }
+
+    final retained = <dynamic>[];
+    for (final item in input) {
+      if (item is! Map || !retainedItem(item)) {
+        retained.add(item);
+        continue;
+      }
+      final field =
+          item['type'] == 'function_call_output' ||
+              item['type'] == 'custom_tool_call_output'
+          ? 'output'
+          : 'content';
+      final parts = item[field];
+      if (parts is! List) {
+        retained.add(item);
+        continue;
+      }
+      final rawOwner = item[historySourceKey];
+      final ownerImages = rawOwner is String
+          ? byOwner[carriedSourceId(rawOwner)]
+          : null;
+      final remainingByUrl = <String, int?>{};
+      final updated = <dynamic>[];
+      for (final part in parts) {
+        final url = part is Map && part['type'] == 'input_image'
+            ? userImageUrl(part)
+            : null;
+        if (url == null || url.isEmpty) {
+          updated.add(part);
+          continue;
+        }
+        if (!remainingByUrl.containsKey(url)) {
+          remainingByUrl[url] = await retainedLimit(url, ownerImages);
+        }
+        final remaining = remainingByUrl[url];
+        if (remaining != null && remaining > 0) {
+          remainingByUrl[url] = remaining - 1;
+        }
+        updated.add(
+          remaining == 0
+              ? _textPart(
+                  Map<String, dynamic>.from(part as Map),
+                  excludedImageContextText,
+                )
+              : part,
+        );
+      }
+      retained.add({...item, field: updated});
+    }
+    return {...body, 'input': retained};
+  }
+
+  // Capture only the immutable URL, never the generation's context/asset cache.
+  static Future<Digest?> _hashInlineImage(String url) => Isolate.run(() {
+    try {
+      return sha256.convert(UriData.parse(url).contentAsBytes());
+    } on FormatException {
+      // Opaque provider content must still be sent unchanged.
+      return null;
+    }
   });
 
   Future<Set<String>> historyOmissions() async {
-    if (!settings.automatic) return {};
+    final excluded = {
+      for (final image in images)
+        if (_isExcluded(image)) image.key,
+    };
+    if (!settings.automatic) return excluded;
     final candidates = <ImageContextCandidate>[];
     for (final image in images) {
+      if (excluded.contains(image.key)) continue;
       if (image.source != ContextImageSource.tool &&
           isRemoteHttpUrl(image.uri) &&
           !allowsRemoteUserImages) {
@@ -722,16 +1312,74 @@ class RequestImageContext {
         ),
       );
     }
-    return ImageContextPlanner.historyOmissions(
-      candidates,
-      maxBytes: math.min(budget.totalImageBytes, historyBudget.totalImageBytes),
-      maxSingleBytes: math.min(
-        budget.singleImageBytes,
-        historyBudget.singleImageBytes,
+    return excluded..addAll(
+      ImageContextPlanner.historyOmissions(
+        candidates,
+        maxBytes: math.min(
+          budget.totalImageBytes,
+          historyBudget.totalImageBytes,
+        ),
+        maxSingleBytes: math.min(
+          budget.singleImageBytes,
+          historyBudget.singleImageBytes,
+        ),
+        maxImages: math.min(budget.imageCount, historyBudget.imageCount),
+        latestUserId: latestUserId,
       ),
-      maxImages: math.min(budget.imageCount, historyBudget.imageCount),
-      latestUserId: latestUserId,
     );
+  }
+
+  /// Match a deferred occurrence from an earlier carried turn to the frozen
+  /// handles of its original user. Only user images may cross compression.
+  bool matchesCarriedImage(
+    String handle,
+    Set<String> originals,
+    String sourceId,
+  ) {
+    final img = _byHandle[handle];
+    if (img == null ||
+        img.source != ContextImageSource.user ||
+        carriedSourceId(img.identity.messageId) != sourceId) {
+      return false;
+    }
+    return originals.contains(
+      ContextImageIdentity(
+        sourceId,
+        img.identity.slot,
+        img.identity.imageIndex,
+      ).handle,
+    );
+  }
+
+  static String? userImageUrl(Map part) {
+    if (part['type'] == 'input_image') {
+      return (part['image_url'] ?? '').toString();
+    }
+    if (part['type'] == 'image_url' && part['image_url'] is Map) {
+      return (part['image_url']['url'] ?? '').toString();
+    }
+    final source = part['source'];
+    if (part['type'] == 'image' && source is Map) {
+      if (source['url'] case final String url) return url;
+      if (source['data'] case final String data) {
+        return 'data:${source['media_type']};base64,$data';
+      }
+    }
+    final data =
+        part['inlineData'] ??
+        part['inline_data'] ??
+        part['fileData'] ??
+        part['file_data'];
+    if (data is Map) {
+      final mime = data['mimeType'] ?? data['mime_type'];
+      if (mime is String && mime.startsWith('image/')) {
+        return (data['fileUri'] ??
+                data['file_uri'] ??
+                'data:$mime;base64,${data['data']}')
+            .toString();
+      }
+    }
+    return null;
   }
 
   static String? referenceHandle(String value) {
@@ -762,44 +1410,8 @@ class RequestImageContext {
   ) {
     if (value is! Map) return value;
     final part = Map<String, dynamic>.from(value);
-    final source = part['source'];
-    final inline = part['inlineData'] ?? part['inline_data'];
-    if (part['type'] == 'image_url' && part['image_url'] is Map) {
-      return image(part, (part['image_url']['url'] ?? '').toString());
-    }
-    if (part['type'] == 'input_image') {
-      return image(part, (part['image_url'] ?? '').toString());
-    }
-    if (part['type'] == 'image' &&
-        source is Map &&
-        source['type'] == 'base64') {
-      return image(
-        part,
-        'data:${source['media_type']};base64,${source['data']}',
-      );
-    }
-    if (part['type'] == 'image' && source is Map) {
-      return image(part, (source['url'] ?? '').toString());
-    }
-    final file = part['fileData'] ?? part['file_data'];
-    if (file is Map &&
-        (file['mimeType'] ?? file['mime_type'] ?? '').toString().startsWith(
-          'image/',
-        )) {
-      return image(
-        part,
-        (file['fileUri'] ?? file['file_uri'] ?? '').toString(),
-      );
-    }
-    if (inline is Map &&
-        (inline['mimeType'] ?? inline['mime_type'] ?? '').toString().startsWith(
-          'image/',
-        )) {
-      return image(
-        part,
-        'data:${inline['mimeType'] ?? inline['mime_type']};base64,${inline['data']}',
-      );
-    }
+    final url = userImageUrl(part);
+    if (url != null) return image(part, url);
     if (part['type'] == 'tool_result') {
       part['content'] = _mapContent(part['content'], image);
     }
@@ -823,7 +1435,8 @@ class RequestImageContext {
               final message = Map<String, dynamic>.from(value)
                 ..remove(imageContextOwnerKey)
                 ..remove(multimodalInternalImageReferencesKey);
-              if (message[nativeCompactionWireKey] == true &&
+              if ((message[nativeCompactionWireKey] == true ||
+                      message[carriedWireKey] == true) &&
                   !mapNativeImages) {
                 if (nativeImage != null) {
                   dynamic observe(Map<String, dynamic> part, String url) {
@@ -916,7 +1529,7 @@ class RequestImageContext {
   }
 
   Future<Map<String, dynamic>> project(
-    Map<String, dynamic> body, {
+    Map<String, dynamic> sourceBody, {
     Set<String> excludedOwners = const {},
     bool preserveSources = false,
   }) async {
@@ -924,7 +1537,7 @@ class RequestImageContext {
       lastRequestImageCount = 0;
       final projected = _projectTools(
         _mapBody(
-          body,
+          sourceBody,
           (part, _) =>
               _textPart(part, '[Image omitted for this request by the user.]'),
           mapNativeImages: true,
@@ -936,6 +1549,7 @@ class RequestImageContext {
         preserveSources: preserveSources,
       );
     }
+    final body = await _omitExcludedRetainedImages(sourceBody);
     final handles = <String>{};
     final occurrences = <String, int>{};
     final external = <String, String>{};
@@ -958,11 +1572,22 @@ class RequestImageContext {
       }
       return part;
     }, nativeImage: addExternal);
+    final carriedHandles = {
+      for (final field in ['input', 'messages', 'contents'])
+        if (body[field] case final List items)
+          for (final item in items.whereType<Map>())
+            if (item[historySourceKey] case final String owner
+                when owner.startsWith(carriedPrefix))
+              if (item[carriedImageHandlesKey] case final List handles)
+                ...handles.whereType<String>(),
+    };
     final omittedByCount = {
-      ...await historyOmissions(),
+      if (handles.isNotEmpty) ...await historyOmissions(),
       for (final image in images)
-        if (compressedOwners.contains(image.identity.messageId) ||
-            excludedOwners.contains(image.identity.messageId))
+        if ((compressedOwners.contains(image.identity.messageId) ||
+                excludedOwners.contains(image.identity.messageId)) &&
+            !(image.source == ContextImageSource.user &&
+                carriedHandles.contains(image.handle)))
           image.key,
     };
     final positions = <String, int>{};
@@ -1094,6 +1719,12 @@ class RequestImageContext {
     // The deterministic history replay owns eviction. The final wire check is
     // a hard guard, so a changing text size cannot silently resurrect images.
     final toolNotes = <String, List<String>>{};
+    final externalUrls = external.values.toSet();
+    final includedImageSources = <String>{
+      for (final image in images)
+        if (externalUrls.contains(image.uri))
+          image.materializationKey ?? image.key,
+    };
     lastRequestImageCount = 0;
     final projected = _mapBody(body, (part, url) {
       final handle = referenceHandle(url);
@@ -1105,6 +1736,7 @@ class RequestImageContext {
       final resolved = urls[handle];
       if (entry != null && !omitted.contains(entry.key) && resolved != null) {
         lastRequestImageCount++;
+        includedImageSources.add(entry.materializationKey ?? entry.key);
         return _replaceImage(part, resolved);
       }
       final text = omittedText(
@@ -1185,7 +1817,23 @@ class RequestImageContext {
       );
       projected['messages'] = messages;
     }
-    final projectedTools = _projectTools(projected, this);
+    if (canRecall &&
+        body['tools'] is List &&
+        (body['tools'] as List).any(
+          (tool) => tool is Map && _containsRecallTool(tool),
+        ) &&
+        images.any(
+          (image) => !includedImageSources.contains(
+            image.materializationKey ?? image.key,
+          ),
+        )) {
+      await _includeInlineImageSources(externalUrls, includedImageSources);
+    }
+    final projectedTools = _projectTools(
+      projected,
+      this,
+      includedImageSources: includedImageSources,
+    );
     return _validateProjectedBody(
       projectedTools,
       preserveSources: preserveSources,
@@ -1260,8 +1908,19 @@ class RequestImageContext {
   static List<Map<String, dynamic>> toolsForRequest(
     List<Map<String, dynamic>> tools, {
     required RequestImageContext? imageContext,
+    Set<String> includedImageSources = const {},
   }) {
-    if (imageContext?.hasRecallableImages == true) return tools;
+    if (imageContext != null &&
+        imageContext.images.any(
+          (image) =>
+              (imageContext.canRecall || imageContext._freshOutput(image)) &&
+              imageContext._isRecallable(image) &&
+              !includedImageSources.contains(
+                image.materializationKey ?? image.key,
+              ),
+        )) {
+      return tools;
+    }
     return [
       for (final tool in tools)
         if (_withoutRecallTool(tool) case final filtered?) filtered,
@@ -1269,12 +1928,21 @@ class RequestImageContext {
   }
 
   static bool _isRecallTool(Map tool) =>
-      tool['name'] == 'read_chat_image' ||
-      (tool['function'] is Map &&
-          tool['function']['name'] == 'read_chat_image');
+      tool['name'] == 'view_image' ||
+      (tool['function'] is Map && tool['function']['name'] == 'view_image');
+
+  static bool _containsRecallTool(Map tool) =>
+      _isRecallTool(tool) ||
+      ['function_declarations', 'functionDeclarations'].any(
+        (key) =>
+            tool[key] is List &&
+            (tool[key] as List).any(
+              (declaration) => declaration is Map && _isRecallTool(declaration),
+            ),
+      );
 
   static Map<String, dynamic>? _withoutRecallTool(Map<String, dynamic> tool) {
-    if (_isRecallTool(tool)) return null;
+    if (_isRecallTool(tool)) return ViewImageTool.withoutHistory(tool);
     var result = tool;
     for (final key in ['function_declarations', 'functionDeclarations']) {
       final declarations = tool[key];
@@ -1284,7 +1952,13 @@ class RequestImageContext {
       }
       final filtered = [
         for (final declaration in declarations)
-          if (declaration is! Map || !_isRecallTool(declaration)) declaration,
+          if (declaration is! Map)
+            declaration
+          else if (ViewImageTool.withoutHistory(
+                declaration.cast<String, dynamic>(),
+              )
+              case final kept?)
+            kept,
       ];
       result = {...result}..remove(key);
       if (filtered.isNotEmpty) result[key] = filtered;
@@ -1294,13 +1968,15 @@ class RequestImageContext {
 
   static Map<String, dynamic> _projectTools(
     Map<String, dynamic> body,
-    RequestImageContext? imageContext,
-  ) {
+    RequestImageContext? imageContext, {
+    Set<String> includedImageSources = const {},
+  }) {
     final candidates = body['tools'];
     if (candidates is! List) return body;
     final tools = toolsForRequest(
       candidates.cast<Map<String, dynamic>>(),
       imageContext: imageContext,
+      includedImageSources: includedImageSources,
     );
     if (tools.length == candidates.length &&
         Iterable<int>.generate(
@@ -1315,7 +1991,9 @@ class RequestImageContext {
     } else {
       result['tools'] = tools;
       final choice = result['tool_choice'];
-      if (choice is Map && _isRecallTool(choice)) {
+      if (choice is Map &&
+          _isRecallTool(choice) &&
+          !tools.any(_containsRecallTool)) {
         result.remove('tool_choice');
       }
     }
@@ -1339,15 +2017,18 @@ class RequestImageContext {
     return result;
   }
 
-  static Future<String> encodeBody(Map<String, dynamic> body) async {
+  static Future<String> encodeBody(
+    Map<String, dynamic> body, {
+    bool claudeOAuth = false,
+  }) async {
     final context = current;
     final history = RequestHistoryContext.current;
     final prepared = history == null ? body : await history.prepare(body);
-    return jsonEncode(
-      context == null
-          ? RequestHistoryContext.stripSources(_projectTools(prepared, null))
-          : await context.project(prepared),
-    );
+    final request = context == null
+        ? RequestHistoryContext.stripSources(_projectTools(prepared, null))
+        : await context.project(prepared);
+    RequestToolDeclarations.current?.record(request, claudeOAuth: claudeOAuth);
+    return jsonEncode(request);
   }
 
   Map<String, dynamic> previewMessage(Map<String, dynamic> message) {
@@ -1370,6 +2051,8 @@ class RequestImageContext {
               !_isUnavailable(image) &&
               !omitted.contains(image.key),
           pinned: settings.pinned.contains(image.key),
+          excluded: _isExcluded(image),
+          inheritedExclusion: _inheritsExclusion(image, settings.excluded),
           bytes: bytes,
           sizeIsEstimate:
               isRemoteHttpUrl(image.uri) &&

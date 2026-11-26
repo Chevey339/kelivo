@@ -16,6 +16,7 @@
 #include <flutter/standard_method_codec.h>
 #include <flutter_windows.h>
 #include <flutter_inappwebview_windows/flutter_inappwebview_windows_plugin_c_api.h>
+#include <webview_windows/webview_windows_plugin.h>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -108,6 +109,8 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   webview_registrar_ = flutter_controller_->engine()->GetRegistrarForPlugin(
       "FlutterInappwebviewWindowsPluginCApi");
+  webview_windows_registrar_ = flutter_controller_->engine()->GetRegistrarForPlugin(
+      "WebviewWindowsPlugin");
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   auto window_channel =
@@ -452,6 +455,8 @@ void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
     engine_shutdown_.Run(
         [this] {
+          // Close WebViews borrowing the browser's queue before it is drained.
+          WebviewWindowsPluginPrepareForShutdown(webview_windows_registrar_);
           // Draining the WebView dispatcher can run queued Flutter channel
           // calls. Do it before ANY plugin registrar/handler is destroyed.
           FlutterInappwebviewWindowsPluginCApiPrepareForShutdown(
@@ -459,6 +464,7 @@ void FlutterWindow::OnDestroy() {
         },
         [this] {
           webview_registrar_ = nullptr;
+          webview_windows_registrar_ = nullptr;
           flutter_controller_ = nullptr;
         });
   }

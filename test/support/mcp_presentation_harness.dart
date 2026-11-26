@@ -8,6 +8,7 @@ import 'package:Kelivo/core/models/mcp_presentation.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/palettes.dart';
 
@@ -210,6 +211,7 @@ class McpPresentationHarness {
       ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<McpProvider>.value(value: mcp),
+      ChangeNotifierProvider<ChatService>(create: (_) => ChatService()),
     ],
     child: MaterialApp(
       debugShowCheckedModeBanner: false,

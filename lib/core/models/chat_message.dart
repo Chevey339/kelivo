@@ -10,6 +10,13 @@ import '../database/generation_run.dart';
 
 part 'chat_message.g.dart';
 
+typedef ChatMessageText = ({
+  String id,
+  String role,
+  String text,
+  bool isStreaming,
+});
+
 @HiveType(typeId: 0)
 class ChatMessage extends HiveObject {
   @HiveField(0)
@@ -75,6 +82,9 @@ class ChatMessage extends HiveObject {
       .join();
 
   String get content => _content;
+
+  ChatMessageText get textProjection =>
+      (id: id, role: role, text: content, isStreaming: isStreaming);
 
   final List<QuoteRef> quotes;
   String quotedContent(String Function(int) quoteMarker) =>

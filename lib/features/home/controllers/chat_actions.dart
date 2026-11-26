@@ -1,3 +1,7 @@
+import '../services/composer_document_route.dart';
+import '../../../core/services/chat/document_text_extractor.dart';
+import '../../../core/models/carried_original.dart';
+import '../../../core/services/tools/view_image_tool.dart';
 import '../../../core/models/image_context.dart';
 import '../../chat/utils/image_context_budget_error.dart';
 import '../../chat/utils/image_generation_error.dart';
@@ -25,6 +29,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/utf16_safe_cut.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -55,7 +60,7 @@ import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'home_view_model.dart';
 import 'latest_wins_checkpoint_writer.dart';
-import '../../../core/models/tool_event_snapshot.dart';
+import 'streaming_tool_events.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
 final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
@@ -116,6 +121,28 @@ class _GenerationCheckpointCursor {
   GenerationRunState state;
   int stateRevision;
   int nextSeq;
+  Future<void>? pendingTransition;
+
+  Future<void> advance(ChatService service, GenerationRunState next) async {
+    final settled = Completer<void>();
+    pendingTransition = settled.future;
+    try {
+      final run = await service.transitionGenerationRun(
+        id: runId,
+        expectedState: state,
+        expectedStateRevision: stateRevision,
+        nextState: next,
+      );
+      state = run.state;
+      stateRevision = run.stateRevision;
+      if (next == GenerationRunState.requesting) {
+        nextSeq = run.checkpointSeq + 1;
+      }
+    } finally {
+      pendingTransition = null;
+      settled.complete();
+    }
+  }
 }
 
 /// Result of a send/regenerate action.
@@ -247,7 +274,7 @@ class ChatActions {
       try {
         await cancelActive();
       } finally {
-        await Future.wait(actions._finishStreamingFutures.values.toList());
+        await Future.wait(actions._terminalOperations.values.toList());
       }
     }
   }
@@ -403,9 +430,8 @@ class ChatActions {
   }
 
   void _scheduleBackgroundGenerationUpdate(stream_ctrl.StreamingState state) {
-    final tools = streamController.toolParts[state.messageId] ?? const [];
-    final loadingTools = tools.where((tool) => tool.loading);
-    final activeTool = loadingTools.isEmpty ? null : loadingTools.last;
+    if (!_background.supported) return;
+    final activeTool = streamController.lastLoadingTool(state.messageId);
     _background.update(
       _backgroundTaskId(state.ctx),
       phase: state.retryStatus != null
@@ -420,15 +446,11 @@ class ChatActions {
     );
   }
 
-  /// Track in-flight _finishStreaming futures so _handleStreamDone can await
-  /// completion before removing notifiers or triggering rebuild.
-  final Map<String, Future<void>> _finishStreamingFutures =
-      <String, Future<void>>{};
+  final Map<String, Future<void>> _terminalOperations = {};
   final Map<String, LatestWinsCheckpointWriter<_StreamingCheckpoint>>
   _checkpointWriters =
       <String, LatestWinsCheckpointWriter<_StreamingCheckpoint>>{};
-  final Map<String, List<Map<String, dynamic>>> _streamingToolEvents =
-      <String, List<Map<String, dynamic>>>{};
+  final _streamingToolEvents = <String, StreamingToolEvents>{};
   final Map<String, _GenerationCheckpointCursor> _generationCheckpointCursors =
       <String, _GenerationCheckpointCursor>{};
   final ActiveStreamingMessageStore _activeAssistantMessages =
@@ -556,25 +578,18 @@ class ChatActions {
     onLoadingChanged?.call(conversationId, loading);
   }
 
-  List<Map<String, dynamic>> _copyToolEvents(String messageId) {
-    return _toolEventSnapshots[messageId] ??= ToolEventSnapshot(
-      _streamingToolEvents[messageId] ?? const <Map<String, dynamic>>[],
-    );
-  }
+  List<Map<String, dynamic>> _copyToolEvents(String messageId) =>
+      _streamingToolEvents[messageId]?.snapshot ?? const [];
 
-  final _toolEventSnapshots = <String, List<Map<String, dynamic>>>{};
+  StreamingToolEvents _eventsFor(String messageId) =>
+      _streamingToolEvents.putIfAbsent(messageId, StreamingToolEvents.new);
 
   ChatMessage _messageWithCurrentReasoning(ChatMessage message) {
     final messageId = message.id;
     final reasoning = streamController.reasoning[messageId];
-    final segments = streamController.reasoningSegments[messageId];
-    final details = streamController.reasoningDetails[messageId];
-    final reasoningSegmentsJson = segments != null || details != null
-        ? streamController.serializeReasoningSegmentsWithSplits(
-            segments ?? const [],
-            reasoningDetails: details,
-          )
-        : message.reasoningSegmentsJson;
+    final reasoningSegmentsJson =
+        streamController.reasoningSegmentsForCheckpoint(messageId) ??
+        message.reasoningSegmentsJson;
     return message.copyWith(
       reasoningText: reasoning?.text,
       reasoningStartAt: reasoning?.startAt,
@@ -606,7 +621,7 @@ class ChatActions {
 
   void _scheduleStreamingCheckpoint(stream_ctrl.StreamingState state) {
     final writer = _checkpointWriters[state.messageId];
-    if (writer == null || state.finishHandled) return;
+    if (writer == null || state.finishHandled || state.stopRequested) return;
     writer.add(() {
       final message = _streamingMessageSnapshot(state);
       _activeAssistantMessages.put(message);
@@ -649,6 +664,21 @@ class ChatActions {
     );
   }
 
+  // Finish, stream close, failure and stop can arrive for the same message.
+  // The first terminal handler owns persistence and publication together.
+  Future<void> _runTerminalOperation(
+    String messageId,
+    Future<void> Function() run,
+  ) {
+    final existing = _terminalOperations[messageId];
+    if (existing != null) return existing;
+    final operation = Future<void>.microtask(run).whenComplete(() {
+      _terminalOperations.remove(messageId);
+    });
+    _terminalOperations[messageId] = operation;
+    return operation;
+  }
+
   Future<void> _finalizeStreamingCheckpoint(
     ChatMessage message, {
     required GenerationRunState terminalState,
@@ -656,12 +686,14 @@ class ChatActions {
   }) async {
     final writer = _checkpointWriters.remove(message.id);
     final cursor = _generationCheckpointCursors[message.id];
-    final checkpointSeq =
-        cursor == null || cursor.state == GenerationRunState.preparing
-        ? null
-        : cursor.nextSeq++;
     final toolEvents = _copyToolEvents(message.id);
     Future<void> writeFinal() async {
+      // A transition can be committed before its revision reaches this isolate.
+      if (cursor?.pendingTransition case final transition?) await transition;
+      final checkpointSeq =
+          cursor == null || cursor.state == GenerationRunState.preparing
+          ? null
+          : cursor.nextSeq++;
       await chatService.finalizeGenerationRunSilent(
         message: message,
         toolEvents: toolEvents,
@@ -674,16 +706,10 @@ class ChatActions {
       );
     }
 
-    var committed = false;
-    try {
-      if (writer == null) {
-        await writeFinal();
-      } else {
-        await writer.finalize(writeFinal);
-      }
-      committed = true;
-    } finally {
-      if (committed) _clearGenerationRuntimeState(message);
+    if (writer == null) {
+      await writeFinal();
+    } else {
+      await writer.finalize(writeFinal);
     }
   }
 
@@ -692,29 +718,52 @@ class ChatActions {
     _contextReaders.remove(message.id);
     _generationCheckpointCursors.remove(message.id);
     _streamingToolEvents.remove(message.id);
-    _toolEventSnapshots.remove(message.id);
     _streamingStates.remove(message.id);
     _activeAssistantMessages.removeIfMatches(message);
+    if (!_messages.any((item) => item.id == message.id)) {
+      // Switching away keeps a running turn alive. Once its terminal write is
+      // durable, its decoded tool results and reasoning can be restored on demand.
+      streamController.pruneOffWindowState({
+        ...activeStreamingMessageIds,
+        for (final item in _messages) item.id,
+      });
+    }
   }
 
-  Future<void> _finishPrepareError(
+  Future<PrepareErrorAction> _finishPrepareError(
     String conversationId,
     ChatMessage fallback,
     PrepareErrorAction action,
+    Object cause,
   ) async {
-    switch (action) {
-      case PrepareErrorAction.skip:
-        return;
-      case PrepareErrorAction.cancelled:
-        await _finishPreparingMessage(
-          conversationId,
-          fallback,
-          terminalState: GenerationRunState.cancelled,
-          errorCode: null,
-        );
-      case PrepareErrorAction.failed:
-        await _finishPreparingMessage(conversationId, fallback);
+    try {
+      switch (action) {
+        case PrepareErrorAction.skip:
+          return action;
+        case PrepareErrorAction.cancelled:
+          await _finishPreparingMessage(
+            conversationId,
+            fallback,
+            terminalState: GenerationRunState.cancelled,
+            errorCode: null,
+          );
+        case PrepareErrorAction.failed:
+          await _finishPreparingMessage(
+            conversationId,
+            fallback,
+            // generation_runs.error_code is limited to 128 characters. Keep the
+            // full filename on the live error channel, and both ends in history.
+            errorCode: cause is AttachmentReadError
+                ? truncateHeadTailUtf16Safe(cause.toString(), 128, marker: '…')
+                : 'preparation_failed',
+          );
+      }
+    } catch (_) {
+      // The failed write left the run active. The pending Stop will persist it.
+      if (isStopping(conversationId)) return PrepareErrorAction.skip;
+      rethrow;
     }
+    return action;
   }
 
   Future<void> _finishPreparingMessage(
@@ -722,7 +771,7 @@ class ChatActions {
     ChatMessage fallback, {
     GenerationRunState terminalState = GenerationRunState.failed,
     String? errorCode = 'preparation_failed',
-  }) async {
+  }) => _runTerminalOperation(fallback.id, () async {
     final active = _activeAssistantMessages[conversationId];
     final message = _messageWithCurrentReasoning(
       active?.id == fallback.id ? active! : fallback,
@@ -730,99 +779,24 @@ class ChatActions {
     streamController.markStreamingEnded(message.id);
     streamController.cleanupTimers(message.id);
     streamController.removeStreamingNotifier(message.id);
+    var persisted = false;
     try {
       await _finalizeStreamingCheckpoint(
         message,
         terminalState: terminalState,
         errorCode: errorCode,
       );
+      persisted = true;
     } finally {
-      _clearGenerationRuntimeState(message);
-      if (chatController.publishTerminalMessage(message)) {
-        onMessagesChanged?.call();
-      }
-      _setConversationLoading(conversationId, false);
-    }
-  }
-
-  void _upsertStreamingToolEvent(
-    String messageId, {
-    required String id,
-    required String name,
-    required Map<String, dynamic> arguments,
-    String? content,
-    Map<String, dynamic>? metadata,
-  }) {
-    _toolEventSnapshots.remove(messageId);
-    final events = _streamingToolEvents.putIfAbsent(
-      messageId,
-      () => <Map<String, dynamic>>[],
-    );
-    var index = id.isEmpty
-        ? -1
-        : events.indexWhere((event) => '${event['id'] ?? ''}' == id);
-    if (index < 0) {
-      index = events.indexWhere(
-        (event) =>
-            '${event['name'] ?? ''}' == name &&
-            (event['content'] == null || '${event['content']}'.isEmpty),
-      );
-    }
-    final record = <String, dynamic>{
-      'id': id,
-      'name': name,
-      'arguments': arguments,
-      'content': content,
-      if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
-    };
-    if (index < 0) {
-      events.add(record);
-    } else {
-      events[index] = mergeStreamingToolEventRecord(events[index], record);
-    }
-  }
-
-  @visibleForTesting
-  static Map<String, dynamic> mergeStreamingToolEventRecord(
-    Map<String, dynamic> existing,
-    Map<String, dynamic> incoming,
-  ) {
-    final merged = Map<String, dynamic>.from(existing);
-    for (final entry in incoming.entries) {
-      if (entry.key == 'metadata') continue;
-      if (_isEmptyToolOverlay(entry.value) &&
-          !_isEmptyToolOverlay(merged[entry.key])) {
-        continue;
-      }
-      merged[entry.key] = entry.value;
-    }
-    if (existing['server'] == true && incoming['server'] != false) {
-      merged['server'] = true;
-    }
-    final incomingMetadata = incoming['metadata'];
-    if (incomingMetadata is Map && incomingMetadata.isNotEmpty) {
-      final existingMetadata = merged['metadata'];
-      merged['metadata'] = <String, dynamic>{
-        if (existingMetadata is Map)
-          ...Map<String, dynamic>.from(existingMetadata),
-        ...Map<String, dynamic>.from(incomingMetadata),
-      };
-    } else if (!merged.containsKey('metadata')) {
-      final existingMetadata = existing['metadata'];
-      if (existingMetadata is Map) {
-        merged['metadata'] = Map<String, dynamic>.from(existingMetadata);
+      if (persisted || !isStopping(conversationId)) {
+        _clearGenerationRuntimeState(message);
+        if (chatController.publishTerminalMessage(message)) {
+          onMessagesChanged?.call();
+        }
+        _setConversationLoading(conversationId, false);
       }
     }
-    return merged;
-  }
-
-  static bool _isEmptyToolOverlay(Object? value) {
-    if (value == null) return true;
-    if (value is String) return value.isEmpty;
-    if (value is Map) return value.isEmpty;
-    if (value is List) return value.isEmpty;
-    return false;
-  }
+  });
 
   bool _isReasoningModel(String providerKey, String modelId) {
     return generationController.isReasoningModel(providerKey, modelId);
@@ -1160,6 +1134,7 @@ class ChatActions {
           uri: SandboxPathResolver.canonicalize(saved),
           mime: part.mime ?? (mime.isEmpty ? 'image/png' : mime),
           assetId: part.assetId,
+          generationItemId: part.generationItemId,
           unavailable: part.unavailable,
         ),
       );
@@ -1284,6 +1259,40 @@ class ChatActions {
     late final ChatMessage assistantMessage;
     String? generationRunId;
     try {
+      // A queued turn can start under a different model/workspace from the
+      // one on its composer card. Validate the route this generation captured
+      // before inserting either message. Cached local texts need only a stat.
+      if (input.documents.isNotEmpty) {
+        ComposerDocumentRoute routeNow() => resolveComposerDocumentRoute(
+          contextProvider,
+          conversation:
+              chatService.getConversation(conversation.id) ?? conversation,
+          assistant: assistant,
+          settings: settings,
+          model: (providerKey: providerKey, modelId: modelId),
+        );
+        var route = routeNow();
+        while (true) {
+          AttachmentReadError? failure;
+          try {
+            await route.validate(
+              input.documents,
+              messageGenerationService.messageBuilderService.documentCache,
+            );
+          } on AttachmentReadError catch (e) {
+            failure = e;
+          }
+          if (!contextProvider.mounted) {
+            return ChatActionResult.error('context_changed');
+          }
+          final current = routeNow();
+          if (current == route) {
+            if (failure != null) throw failure;
+            break;
+          }
+          route = current;
+        }
+      }
       final begin = await messageGenerationService.beginSendGeneration(
         conversationId: conversation.id,
         input: input,
@@ -1439,7 +1448,6 @@ class ChatActions {
         assistantMessage: assistantMessage,
         prepared: prepared,
         userImagePaths: userImagePaths,
-        allowImagesApiRouting: input.allowImagesApiRouting,
         providerKey: providerKey,
         modelId: modelId,
         assistant: assistant,
@@ -1458,6 +1466,7 @@ class ChatActions {
       }
       await _executeGeneration(ctx);
     } catch (e) {
+      if (!_activeAssistantMessages.isActive(assistantMessage)) return;
       await handleSendGenerationFailure(
         error: e,
         conversationId: conversation.id,
@@ -1480,12 +1489,17 @@ class ChatActions {
   }) async {
     // Ensure file processing indicator is cleared on error
     onFileProcessingFinished?.call(assistantMessage.id);
-    final action = prepareErrorAction(
+    var action = prepareErrorAction(
       error,
       requestCancelled: isStopping(conversationId),
     );
     try {
-      await _finishPrepareError(conversationId, assistantMessage, action);
+      action = await _finishPrepareError(
+        conversationId,
+        assistantMessage,
+        action,
+        error,
+      );
     } catch (cleanupError, stackTrace) {
       FlutterLogger.log(
         '[ChatActions] finishPreparingMessage failed after send error: '
@@ -1569,7 +1583,6 @@ class ChatActions {
     required ChatMessage message,
     required Conversation conversation,
     bool assistantAsNewReply = false,
-    bool allowImagesApiRouting = true,
     bool omitImages = false,
     Assistant? assistantOverride,
     ({String providerKey, String modelId})? modelOverride,
@@ -1595,7 +1608,6 @@ class ChatActions {
         message: message,
         conversation: conversation,
         assistantAsNewReply: assistantAsNewReply,
-        allowImagesApiRouting: allowImagesApiRouting,
         assistantOverride: assistantOverride,
         modelOverride: modelOverride,
         preserveFollowingMessages: preserveFollowingMessages,
@@ -1622,7 +1634,6 @@ class ChatActions {
     required ChatMessage message,
     required Conversation conversation,
     bool assistantAsNewReply = false,
-    bool allowImagesApiRouting = true,
     bool omitImages = false,
     Assistant? assistantOverride,
     ({String providerKey, String modelId})? modelOverride,
@@ -1885,7 +1896,6 @@ class ChatActions {
           assistantMessage: assistantMessage,
           prepared: prepared,
           userImagePaths: userImagePaths,
-          allowImagesApiRouting: allowImagesApiRouting,
           providerKey: providerKey,
           modelId: modelId,
           assistant: assistant,
@@ -1911,11 +1921,17 @@ class ChatActions {
           generationRunId: begin.runId,
         );
       } catch (e) {
-        final action = prepareErrorAction(
+        final action = await _finishPrepareError(
+          conversation.id,
+          assistantMessage,
+          prepareErrorAction(
+            e,
+            requestCancelled:
+                isStopping(conversation.id) ||
+                !_activeAssistantMessages.isActive(assistantMessage),
+          ),
           e,
-          requestCancelled: isStopping(conversation.id),
         );
-        await _finishPrepareError(conversation.id, assistantMessage, action);
         if (action != PrepareErrorAction.failed) {
           return ChatActionResult.success(
             assistantMessage,
@@ -1941,7 +1957,6 @@ class ChatActions {
   Future<ChatActionResult> continueAssistantMessageAfterToolAnswer({
     required ChatMessage message,
     required Conversation conversation,
-    bool allowImagesApiRouting = true,
   }) async {
     if (AppExitFlush.isExiting) return ChatActionResult.inFlight();
     final preparation = Completer<void>();
@@ -1950,7 +1965,6 @@ class ChatActions {
       return await _continueAssistantMessageAfterToolAnswer(
         message: message,
         conversation: conversation,
-        allowImagesApiRouting: allowImagesApiRouting,
       );
     } finally {
       _generationPreparations.remove(preparation);
@@ -1961,8 +1975,13 @@ class ChatActions {
   Future<ChatActionResult> _continueAssistantMessageAfterToolAnswer({
     required ChatMessage message,
     required Conversation conversation,
-    bool allowImagesApiRouting = true,
   }) async {
+    // A continuation reuses the revision ID, including for preparation
+    // failures. Wait for the previous owner before it can share that ID.
+    if (_terminalOperations[message.id] case final previous?) await previous;
+    if (!contextProvider.mounted) {
+      return ChatActionResult.error('context_changed');
+    }
     final compression = chatService.contextCompression.taskFor(conversation.id);
     if (isSendInFlight(conversation.id) ||
         (compression != null &&
@@ -2052,32 +2071,36 @@ class ChatActions {
         conversation: conversation,
         assistantAsNewReply: true,
         preserveFollowingMessages: true,
-        allowImagesApiRouting: allowImagesApiRouting,
         assistantOverride: assistant,
         modelOverride: (providerKey: providerKey, modelId: modelId),
       );
     }
     final streamingMessage = answeredMessage.copyWith(isStreaming: true);
     _activeAssistantMessages.put(streamingMessage);
-    chatController.publishGenerationStarted(streamingMessage);
-    await chatService.updateMessage(streamingMessage.id, isStreaming: true);
-    onMessagesChanged?.call();
-    _setConversationLoading(conversation.id, true);
-
-    final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning =
-        supportsReasoning &&
-        _isReasoningEnabled(
-          _selectedReasoning(
-            settings: settings,
-            providerKey: providerKey,
-            modelId: modelId,
-            assistant: assistant,
-          ),
-        );
-
-    _bindFileProcessingCallbacks();
     try {
+      await chatService.updateMessage(streamingMessage.id, isStreaming: true);
+      if (isStopping(conversation.id) ||
+          !_activeAssistantMessages.isActive(streamingMessage)) {
+        return ChatActionResult.success(streamingMessage);
+      }
+      // A window opened during the write may still show the completed snapshot.
+      chatController.publishGenerationStarted(streamingMessage);
+      onMessagesChanged?.call();
+      _setConversationLoading(conversation.id, true);
+
+      final supportsReasoning = _isReasoningModel(providerKey, modelId);
+      final enableReasoning =
+          supportsReasoning &&
+          _isReasoningEnabled(
+            _selectedReasoning(
+              settings: settings,
+              providerKey: providerKey,
+              modelId: modelId,
+              assistant: assistant,
+            ),
+          );
+
+      _bindFileProcessingCallbacks();
       final apiContextMessages = List<ChatMessage>.of(completeMessages);
       apiContextMessages[contextIndex] = streamingMessage;
       final prepared = await messageGenerationService
@@ -2107,7 +2130,6 @@ class ChatActions {
         assistantMessage: streamingMessage,
         prepared: prepared,
         userImagePaths: userImagePaths,
-        allowImagesApiRouting: allowImagesApiRouting,
         providerKey: providerKey,
         modelId: modelId,
         assistant: assistant,
@@ -2124,11 +2146,17 @@ class ChatActions {
       await _executeGeneration(ctx);
       return ChatActionResult.success(streamingMessage);
     } catch (e) {
-      final action = prepareErrorAction(
+      final action = await _finishPrepareError(
+        conversation.id,
+        streamingMessage,
+        prepareErrorAction(
+          e,
+          requestCancelled:
+              isStopping(conversation.id) ||
+              !_activeAssistantMessages.isActive(streamingMessage),
+        ),
         e,
-        requestCancelled: isStopping(conversation.id),
       );
-      await _finishPrepareError(conversation.id, streamingMessage, action);
       if (action != PrepareErrorAction.failed) {
         return ChatActionResult.success(streamingMessage);
       }
@@ -2141,20 +2169,25 @@ class ChatActions {
   // ============================================================================
 
   /// Cancel the active streaming for the current conversation.
-  Future<void> cancelStreaming(Conversation? conversation) async {
+  Future<void> cancelStreaming(
+    Conversation? conversation, {
+    bool userRequested = false,
+  }) async {
     final cid = conversation?.id;
     if (cid == null) return;
-    await cancelStreamingById(cid);
+    await cancelStreamingById(cid, userRequested: userRequested);
   }
 
   /// Cancel the active streaming for the conversation with id [cid].
-  Future<void> cancelStreamingById(String cid) {
+  Future<void> cancelStreamingById(String cid, {bool userRequested = false}) {
     final existing = _cancelStreamingFutures[cid];
     if (existing != null) return existing;
 
     late final Future<void> operation;
-    operation = Future<void>.microtask(() => _cancelStreamingByIdOnce(cid))
-        .whenComplete(() {
+    operation =
+        Future<void>.microtask(
+          () => _cancelStreamingByIdOnce(cid, userRequested: userRequested),
+        ).whenComplete(() {
           if (identical(_cancelStreamingFutures[cid], operation)) {
             _cancelStreamingFutures.remove(cid);
             _setConversationLoading(cid, false);
@@ -2164,7 +2197,10 @@ class ChatActions {
     return operation;
   }
 
-  Future<void> _cancelStreamingByIdOnce(String cid) async {
+  Future<void> _cancelStreamingByIdOnce(
+    String cid, {
+    required bool userRequested,
+  }) async {
     // Cancel pending tool approval requests for this conversation to prevent
     // deadlock. Scoped by conversation id: the static deletion entry points
     // (cancelActiveGenerationFor / cancelActiveGenerationsForAssistant) may
@@ -2185,12 +2221,14 @@ class ChatActions {
 
     // Reset file processing state on cancel, for this conversation's message
     // only: a global reset would hide a bar another conversation still owns.
-    final cancelIndicatorTarget = _activeAssistantMessages.cancellationTarget(
+    final visibleStreaming = _activeAssistantMessages.cancellationTarget(
       cid,
       _messages,
     );
-    if (cancelIndicatorTarget != null) {
-      onFileProcessingFinished?.call(cancelIndicatorTarget.id);
+    final terminal = _terminalOperations[visibleStreaming?.id];
+    if (visibleStreaming != null) {
+      _streamingStates[visibleStreaming.id]?.stopRequested = true;
+      onFileProcessingFinished?.call(visibleStreaming.id);
     }
 
     // Abort the HTTP request before waiting on the subscription: the barrier
@@ -2203,10 +2241,6 @@ class ChatActions {
 
     // End the visible streaming state immediately. The conversation remains
     // internally busy through [_cancelStreamingFutures] until teardown ends.
-    final visibleStreaming = _activeAssistantMessages.cancellationTarget(
-      cid,
-      _messages,
-    );
     if (visibleStreaming != null) {
       streamController.markStreamingEnded(visibleStreaming.id);
       streamController.cleanupTimers(visibleStreaming.id);
@@ -2228,6 +2262,13 @@ class ChatActions {
 
     if (sub != null) {
       await _cancelSubscriptionWithTimeout(sub);
+    }
+    if (terminal != null) {
+      try {
+        await terminal;
+      } catch (_) {
+        // If the terminal write failed, stop can still persist the active run.
+      }
     }
 
     // The active identity is independent from the currently loaded window.
@@ -2265,16 +2306,18 @@ class ChatActions {
               .copyWith(parts: assistantParts, isStreaming: false);
       var cancellationPersisted = false;
       try {
+        final interrupted = _background.wasInterrupted(backgroundTaskId);
         await _finalizeStreamingCheckpoint(
           finalizedMessage,
-          terminalState: _background.wasInterrupted(backgroundTaskId)
+          terminalState: interrupted
               ? GenerationRunState.interrupted
               : GenerationRunState.cancelled,
-          errorCode: _background.wasInterrupted(backgroundTaskId)
-              ? 'background_interrupted'
-              : null,
+          errorCode: interrupted ? 'background_interrupted' : null,
         );
         cancellationPersisted = true;
+        if (userRequested && !interrupted && state?.requestDispatched == true) {
+          state!.ctx.settings.refreshBalanceAfterReply(state.ctx.providerKey);
+        }
       } finally {
         _clearGenerationRuntimeState(finalizedMessage);
         if (chatController.publishTerminalMessage(finalizedMessage)) {
@@ -2308,6 +2351,7 @@ class ChatActions {
     stream_ctrl.StreamingState state,
   ) async {
     final id = state.conversationId;
+    final String? assistantId = ctx.assistant?.id;
     final liveSettings = contextProvider.read<SettingsProvider>();
     final preferences = await chatService.compressionConfig(
       id,
@@ -2330,6 +2374,7 @@ class ChatActions {
           (m) =>
               m['role'] == 'user' &&
               m[imageContextOwnerKey] is String &&
+              !isCarriedMessageId(m[imageContextOwnerKey] as String) &&
               !(m[imageContextOwnerKey] as String).startsWith(
                 ContextOperation.summaryPrefix,
               ),
@@ -2355,22 +2400,27 @@ class ChatActions {
         '${nativeCompactionScope(ctx.config)}:${spec.apiModelId ?? ctx.modelId}';
     var nativeAttempted = false;
     var notified = false;
-    final attempted = <String>{};
+    final attempted = <(String, bool)>{};
+    ContextCompressionTask? automaticReview;
     bool cancelled() =>
         disposed ||
         isStopping(id) ||
         !identical(_streamingStates[state.messageId], state) ||
         !_activeAssistantMessages.isActive(ctx.assistantMessage);
     late RequestHistoryContext history;
-    Future<int> estimate(
+    Future<int?> estimate(
       Map<String, dynamic> body, {
       Set<String> excluded = const {},
     }) async {
-      final projected =
-          await ctx.imageContext?.project(body, excludedOwners: excluded) ??
-          body;
-      return (estimateRequestInput(projected, kind) * history.calibration)
-          .ceil();
+      try {
+        final projected =
+            await ctx.imageContext?.project(body, excludedOwners: excluded) ??
+            body;
+        return (estimateRequestInput(projected, kind) * history.calibration)
+            .ceil();
+      } catch (_) {
+        return null;
+      }
     }
 
     Future<void> checkMode() async {
@@ -2424,7 +2474,8 @@ class ChatActions {
           return null;
         }
         var before = await estimate(body);
-        history.lastEstimatedTokens = (before / history.calibration).ceil();
+        history.lastEstimatedTokens = ((before ?? 0) / history.calibration)
+            .ceil();
         final output = normalizedRequestOutputReserve(body, spec.maxOutput);
         final budget = window == null
             ? null
@@ -2444,11 +2495,13 @@ class ChatActions {
             return null;
           }
           before = overflow
-              ? math.max(before, budget?.input ?? window ?? before)
+              ? math.max(before ?? 0, budget?.input ?? window ?? 0)
               : nativeEstimate ?? measured!.usedTokens;
         }
         if (!overflow &&
-            (budget == null || !budget.shouldTrigger(before, preferences))) {
+            (before == null ||
+                budget == null ||
+                !budget.shouldTrigger(before, preferences))) {
           return null;
         }
         if (current.mode == AutoCompressionMode.notify) {
@@ -2458,27 +2511,51 @@ class ChatActions {
           }
           return null;
         }
-        if (chatService.contextCompression.taskFor(id)?.active == true) {
+        final compression = chatService.contextCompression;
+        final previousTask = compression.taskFor(id);
+        final retryReview =
+            overflow &&
+            previousTask?.phase == CompressionPhase.review &&
+            identical(previousTask, automaticReview);
+        if (previousTask?.active == true && !retryReview) {
           return null;
         }
         await _checkpointWriters[state.messageId]?.barrier();
         if (cancelled() || !allowed) return null;
         final snapshot = await chatService.loadContextSnapshot(id);
         final source = ContextHistory.throughMessage(snapshot.messages, userId);
-        final options = CompressContextOptions(
+        CompressContextOptions optionsFor(int keep) => CompressContextOptions(
           mode: CompressContextLimitMode.keepRecent,
           native: useNative,
-          keepUserMessages: useNative
+          carry: useNative
+              ? preferences.nativeCarryOriginals
+              : preferences.carryOriginals,
+          keepUserMessages: keep,
+          regenerateExisting: overflow && !useNative,
+        );
+        CompressionSelection select(CompressContextOptions options) =>
+            selectCompressionHistory(
+              source,
+              snapshot.operations,
+              options,
+              protectedMessageId: userId,
+              effectiveMessageIds: allowedMessageIds,
+            );
+
+        var options = optionsFor(
+          useNative
               ? preferences.nativeKeepRecentUserTurns
+              : overflow
+              ? 1
               : preferences.keepRecentUserTurns,
         );
-        final selection = selectCompressionHistory(
-          source,
-          snapshot.operations,
-          options,
-          protectedMessageId: userId,
-          effectiveMessageIds: allowedMessageIds,
-        );
+        var selection = select(options);
+        if (!useNative &&
+            options.keepUserMessages! > 1 &&
+            selection.covered.isEmpty) {
+          options = optionsFor(1);
+          selection = select(options);
+        }
         if (selection.missingOriginals) {
           if (!notified) {
             notified = true;
@@ -2493,15 +2570,19 @@ class ChatActions {
           source,
           snapshot.operations,
         );
-        if (!attempted.add(fingerprint)) return null;
+        if (!attempted.add((fingerprint, overflow))) return null;
         nativeAttempted = useNative;
-        final excluded = selection.covered.map((m) => m.id).toSet();
+        var excluded = selection.covered.map((m) => m.id).toSet();
         List<ChatMessage> candidateHistory(ContextOperation candidate) =>
             ContextHistory.resolve(source, [...snapshot.operations, candidate])
                 .where(
                   (message) =>
                       allowedMessageIds.contains(message.id) ||
-                      message.id == candidate.summaryMessageId,
+                      message.id == candidate.summaryMessageId ||
+                      message.id.startsWith('$carriedPrefix${candidate.id}:') ||
+                      message.id.startsWith(
+                        '$carriedReplyPrefix${candidate.id}:',
+                      ),
                 )
                 .toList();
         Future<List<Map<String, dynamic>>> rebuild(
@@ -2512,59 +2593,86 @@ class ChatActions {
             conversationId: id,
             providerKey: ctx.providerKey,
             modelId: ctx.modelId,
-            assistantId: chatService.getConversation(id)?.assistantId,
+            assistantId: assistantId,
             messagesOverride: messages,
           );
           return preview.apiMessages;
         }
 
-        List<Map<String, dynamic>>? replacement;
-        try {
-          var runtimeConfig = preferences;
-          if (budget != null && !useNative) {
-            final empty = ContextOperation(
-              id: 'planning',
-              kind: ContextOperationKind.compress,
-              anchorGroupId: ContextHistory.group(selection.covered.last),
-              appliedAfterGroupId: ContextHistory.group(source.last),
-              sourceGroups: selection.covered
-                  .map(ContextHistory.group)
-                  .toList(),
-              dependencies: selection.dependencies,
-              createdAt: DateTime.now(),
-              compressionDetails: const {'envelope': 'history-v1'},
-            );
-            final fixed = await estimate(
+        Future<int?> estimateFixed() async {
+          final empty = ContextOperation(
+            id: 'planning',
+            kind: ContextOperationKind.compress,
+            anchorGroupId: ContextHistory.group(selection.covered.last),
+            appliedAfterGroupId: ContextHistory.group(source.last),
+            sourceGroups: selection.covered.map(ContextHistory.group).toList(),
+            dependencies: selection.dependencies,
+            createdAt: DateTime.now(),
+            compressionDetails: const {'envelope': 'history-v1'},
+          );
+          try {
+            return await estimate(
               project(await rebuild(empty)),
               excluded: excluded,
             );
-            final space =
-                (budget.input * preferences.targetInputRatio).floor() - fixed;
-            if (space < 128) {
-              if (!notified) {
-                notified = true;
-                viewModel.onError?.call('compression_reference_too_large');
-              }
-              return null;
-            }
-            runtimeConfig = preferences.withOverrides({
-              'summaryTokens': space.clamp(128, preferences.summaryTokens),
-            });
+          } catch (_) {
+            return null;
           }
+        }
+
+        List<Map<String, dynamic>>? replacement;
+        try {
+          var summaryTokens = preferences.summaryTokens;
+          int? carryBudgetTokens;
+          if (budget != null) {
+            var fixed = await estimateFixed();
+            if (!useNative &&
+                options.keepUserMessages! > 1 &&
+                fixed != null &&
+                budget.input - fixed < 128) {
+              final shorter = optionsFor(1);
+              final expanded = select(shorter);
+              if (expanded.covered.isNotEmpty &&
+                  !expanded.missingOriginals &&
+                  !expanded.needsRegeneration) {
+                options = shorter;
+                selection = expanded;
+                excluded = selection.covered.map((m) => m.id).toSet();
+                fixed = await estimateFixed();
+              }
+            }
+            if (fixed != null) {
+              final goal =
+                  (budget.input * preferences.targetInputRatio).floor() - fixed;
+              final space = useNative || goal >= 128
+                  ? goal
+                  : budget.input - fixed;
+              carryBudgetTokens = useNative
+                  ? space.clamp(0, 64000)
+                  : math.max(0, space - 128);
+              if (!useNative && space > 0) {
+                summaryTokens = space.clamp(128, summaryTokens);
+              }
+            }
+          }
+          if (cancelled() || !allowed) return null;
           final request = await viewModel.buildCompressionRequest(
             id,
             options: options,
             automatic: true,
             beforeMessageId: userId,
             effectiveMessageIds: Set.unmodifiable(allowedMessageIds),
-            configOverride: runtimeConfig,
-            nativeModel: useNative
-                ? (
-                    providerKey: ctx.providerKey,
-                    modelId: ctx.modelId,
-                    config: ctx.config,
-                  )
-                : null,
+            // Reference choices apply at the start of each text compression.
+            configOverride: useNative
+                ? preferences
+                : preferences.withOverrides({
+                    'summaryTokens': summaryTokens,
+                    'includeReference': current.includeReference,
+                    'includeInstructionInjections':
+                        current.includeInstructionInjections,
+                  }),
+            carryBudgetTokens: carryBudgetTokens,
+            activeGeneration: ctx,
             isCancelled: () => cancelled() || !allowed,
             acceptCandidate: (candidate) async {
               final next = await rebuild(candidate);
@@ -2576,22 +2684,23 @@ class ChatActions {
                 replacement = next;
                 return true;
               }
+              final prior = before;
               final after = await estimate(project(next), excluded: excluded);
-              final accepted = budget == null
-                  ? after < before
-                  : budget.accepts(
-                      before: before,
-                      after: after,
-                      config: preferences,
-                    );
+              final accepted = prior == null || after == null || after < prior;
               if (accepted) replacement = next;
               return accepted;
             },
           );
-          final task = await chatService.contextCompression.runAtSafePoint(
-            id,
-            request,
-          );
+          if (retryReview) {
+            if (!identical(compression.taskFor(id), previousTask) ||
+                previousTask?.phase != CompressionPhase.review) {
+              return null;
+            }
+            await compression.cancel(id);
+          }
+          if (cancelled() || !allowed) return null;
+          final task = await compression.runAtSafePoint(id, request);
+          automaticReview = task.phase == CompressionPhase.review ? task : null;
           if (cancelled() ||
               !allowed ||
               task.phase != CompressionPhase.completed) {
@@ -2599,6 +2708,12 @@ class ChatActions {
           }
           ctx.imageContext?.compressedOwners.addAll(excluded);
           allowedMessageIds.add(task.candidate!.summaryMessageId);
+          for (final item
+              in task.candidate!.carried?.items ?? <CarriedOriginal>[]) {
+            allowedMessageIds.add(
+              '$carriedPrefix${task.id}:${item.sourceMessageId}',
+            );
+          }
           // Publish activation for the accepted projection at the real request
           // boundary. Candidate/reference previews above remain read-only.
           try {
@@ -2606,7 +2721,7 @@ class ChatActions {
               conversationId: id,
               providerKey: ctx.providerKey,
               modelId: ctx.modelId,
-              assistantId: chatService.getConversation(id)?.assistantId,
+              assistantId: assistantId,
               messagesOverride: candidateHistory(task.candidate!),
             );
           } catch (error) {
@@ -2626,7 +2741,9 @@ class ChatActions {
         ctx.onToolCall != null &&
         spec.abilities.contains(ModelAbility.tool) &&
         ctx.toolDefs.any(
-          (tool) => (tool['function'] as Map?)?['name'] != 'read_chat_image',
+          (tool) =>
+              (tool['function'] as Map?)?['name'] != 'view_image' ||
+              ViewImageTool.supportsFiles(tool),
         );
     if (canRead) {
       final reader = ChatContextReader(() async {
@@ -2669,7 +2786,10 @@ class ChatActions {
 
   /// Execute generation with the given context.
   Future<void> _executeGeneration(stream_ctrl.GenerationContext ctx) async {
-    if (AppExitFlush.isExiting) return;
+    if (AppExitFlush.isExiting ||
+        isStopping(ctx.assistantMessage.conversationId)) {
+      return;
+    }
     final toolEvents = chatService.getToolEventsForMessage(
       ctx.assistantMessage,
     );
@@ -2707,10 +2827,7 @@ class ChatActions {
     // Mark this message as actively streaming to suppress UI rebuilds
     streamController.markStreamingStarted(state.messageId);
     _activeAssistantMessages.put(state.ctx.assistantMessage);
-    _streamingToolEvents[state.messageId] = toolEvents
-        .map((event) => Map<String, dynamic>.from(event))
-        .toList();
-    _toolEventSnapshots.remove(state.messageId);
+    _streamingToolEvents[state.messageId] = StreamingToolEvents(toolEvents);
     _checkpointWriters[state.messageId] =
         LatestWinsCheckpointWriter<_StreamingCheckpoint>(
           write: (checkpoint) => chatService.updateStreamingCheckpointSilent(
@@ -2763,23 +2880,15 @@ class ChatActions {
         );
         return;
       }
+      if (state.stopRequested || isStopping(conversationId)) return;
       final runId = ctx.generationRunId;
       if (runId != null) {
         final cursor = _generationCheckpointCursors[state.messageId];
         if (cursor == null) {
           throw StateError('generation_run_cursor_missing');
         }
-        final run = await chatService.transitionGenerationRun(
-          id: runId,
-          expectedState: cursor.state,
-          expectedStateRevision: cursor.stateRevision,
-          nextState: GenerationRunState.requesting,
-        );
-        state.generationStateRevision = run.stateRevision;
-        cursor
-          ..state = run.state
-          ..stateRevision = run.stateRevision
-          ..nextSeq = run.checkpointSeq + 1;
+        await cursor.advance(chatService, GenerationRunState.requesting);
+        if (state.stopRequested || isStopping(conversationId)) return;
       }
       final previousSub = _conversationStreams.remove(conversationId);
       if (previousSub != null) {
@@ -2822,9 +2931,9 @@ class ChatActions {
         stream: ctx.streamOutput,
         requestId: conversationId,
         conversationId: conversationId,
-        allowImagesApiRouting: ctx.allowImagesApiRouting,
         ocrActive: ctx.ocrActive,
         parseMarkdownImageLinks: ctx.settings.sendMarkdownImageLinksAsImages,
+        onRequestDispatched: () => state.requestDispatched = true,
       );
 
       if (!ctx.streamOutput) {
@@ -2832,6 +2941,7 @@ class ChatActions {
         // arrive so a paused tool has a durable transcript before it resumes.
         await for (final chunk in stream) {
           await _handleStreamChunk(chunk, state);
+          if (state.stopRequested) return;
         }
         await _handleStreamDone(state);
         return;
@@ -2859,13 +2969,22 @@ class ChatActions {
     StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) async {
+    if (state.stopRequested ||
+        state.terminalPersisted ||
+        isStopping(state.conversationId)) {
+      return;
+    }
     if (chunk is RetryPending) {
       _setRetryStatus(state, chunk);
     } else {
       _setRetryStatus(state, null);
     }
     if (chunk is! RetryPending && chunk is! RetryAttemptStart) {
-      await _markGenerationStreaming(state);
+      final cursor = _generationCheckpointCursors[state.messageId];
+      if (cursor != null && cursor.state == GenerationRunState.requesting) {
+        await cursor.advance(chatService, GenerationRunState.streaming);
+        if (state.stopRequested || isStopping(state.conversationId)) return;
+      }
     }
     if (chunk is Usage) {
       _historyContexts[state.messageId]?.recordUsage(chunk.usage);
@@ -2875,7 +2994,7 @@ class ChatActions {
       case RetryPending() || RetryAttemptStart():
         break;
       case TextDelta(:final text):
-        await _handleContentChunk(state, text);
+        _handleContentChunk(state, text);
         _scheduleStreamingCheckpoint(state);
       case ReasoningStart(:final id):
         streamController.handleReasoningStart(id, state);
@@ -2895,7 +3014,7 @@ class ChatActions {
         _scheduleStreamingCheckpoint(state);
       case ToolCallStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
-        await _handleToolCallsChunk(chunk, state);
+        _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case ToolCallDelta(:final id, :final toolNameDelta):
         if (toolNameDelta.isNotEmpty) {
@@ -2903,7 +3022,7 @@ class ChatActions {
               '${state.pendingToolNames[id] ?? ''}$toolNameDelta';
         }
       case ToolCallEnd():
-        await _handleToolCallsChunk(chunk, state);
+        _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case AssistantRoundEnd():
         streamController.finishReasoningIfNeeded(state.messageId);
@@ -2913,7 +3032,7 @@ class ChatActions {
         _scheduleStreamingCheckpoint(state);
       case ServerToolStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
-        await _handleToolCallsChunk(chunk, state);
+        _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case ServerToolEnd() || ToolCallResult() || Annotations():
         await _handleToolResultsChunk(chunk, state);
@@ -2964,33 +3083,6 @@ class ChatActions {
     state.totalTokens = state.totalUsage?.totalTokens ?? 0;
   }
 
-  Future<void> _markGenerationStreaming(
-    stream_ctrl.StreamingState state,
-  ) async {
-    final runId = state.ctx.generationRunId;
-    final expectedRevision = state.generationStateRevision;
-    if (runId == null ||
-        expectedRevision == null ||
-        state.generationStreamingStarted) {
-      return;
-    }
-    final run = await chatService.transitionGenerationRun(
-      id: runId,
-      expectedState: GenerationRunState.requesting,
-      expectedStateRevision: expectedRevision,
-      nextState: GenerationRunState.streaming,
-    );
-    state
-      ..generationStateRevision = run.stateRevision
-      ..generationStreamingStarted = true;
-    final cursor = _generationCheckpointCursors[state.messageId];
-    if (cursor != null) {
-      cursor
-        ..state = run.state
-        ..stateRevision = run.stateRevision;
-    }
-  }
-
   /// Handle reasoning chunk from stream.
   Future<void> _handleReasoningChunk(
     String id,
@@ -3002,24 +3094,14 @@ class ChatActions {
   }
 
   /// Handle tool calls chunk from stream.
-  Future<void> _handleToolCallsChunk(
+  void _handleToolCallsChunk(
     StreamChunk chunk,
     stream_ctrl.StreamingState state,
-  ) async {
-    await streamController.handleToolCallsChunk(
+  ) {
+    streamController.handleToolCallsChunk(
       chunk,
       state,
-      updateReasoningSegmentsInDb: (String messageId, String json) async {
-        // The complete reasoning snapshot is coalesced after this chunk.
-      },
-      setToolEventsInDb:
-          (String messageId, List<Map<String, dynamic>> events) async {
-            _toolEventSnapshots.remove(messageId);
-            _streamingToolEvents[messageId] = events
-                .map((event) => Map<String, dynamic>.from(event))
-                .toList();
-          },
-      getToolEventsFromDb: _copyToolEvents,
+      recordCall: _eventsFor(state.messageId).start,
     );
     _publishAssistantParts(state);
   }
@@ -3041,14 +3123,13 @@ class ChatActions {
             String? content,
             Map<String, dynamic>? metadata,
           }) async {
-            _upsertStreamingToolEvent(
-              messageId,
-              id: id,
-              name: name,
-              arguments: arguments,
-              content: content,
-              metadata: metadata,
-            );
+            _eventsFor(messageId).complete({
+              'id': id,
+              'name': name,
+              'arguments': arguments,
+              'content': content,
+              if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
+            });
           },
     );
     _publishAssistantParts(state);
@@ -3068,10 +3149,10 @@ class ChatActions {
   }
 
   /// Handle content chunk from stream (non-done).
-  Future<void> _handleContentChunk(
+  void _handleContentChunk(
     stream_ctrl.StreamingState state,
     String chunkContent,
-  ) async {
+  ) {
     // Fast bail-out: if _finishStreaming already ran, don't touch state at all.
     if (state.finishHandled) return;
 
@@ -3082,7 +3163,7 @@ class ChatActions {
 
     // End reasoning when content starts
     if (state.ctx.streamOutput && chunkContent.isNotEmpty) {
-      await _finishReasoningOnContent(state);
+      streamController.finishReasoningIfNeeded(messageId);
     }
 
     _scheduleBackgroundGenerationUpdate(state);
@@ -3112,28 +3193,11 @@ class ChatActions {
     }
   }
 
-  /// Finish reasoning segment when content starts arriving.
-  Future<void> _finishReasoningOnContent(
-    stream_ctrl.StreamingState state,
-  ) async {
-    await streamController.finishReasoningAndPersist(
-      state.messageId,
-      updateReasoningInDb:
-          (
-            String messageId, {
-            String? reasoningText,
-            DateTime? reasoningFinishedAt,
-            String? reasoningSegmentsJson,
-          }) async {
-            // The complete reasoning snapshot is coalesced after this chunk.
-          },
-    );
-  }
-
   /// Handle stream finish (isDone == true).
   Future<void> _handleStreamFinish(stream_ctrl.StreamingState state) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
+    final subscription = _conversationStreams[conversationId];
     if (!state.ctx.streamOutput) {
       // A resumed reply also owns the reasoning from its earlier rounds.
       state.bufferedReasoning = state.partsHandler.parts
@@ -3152,6 +3216,7 @@ class ChatActions {
     if (hasLoadingTool) {
       return;
     }
+    onFileProcessingFinished?.call(messageId);
 
     // Materialize buffered reasoning before the final checkpoint.
     if (!state.ctx.streamOutput && state.bufferedReasoning.isNotEmpty) {
@@ -3164,13 +3229,7 @@ class ChatActions {
         ..expanded = !(autoCollapseThinking ?? false);
     }
 
-    // Track the _finishStreaming future so _handleStreamDone can await it
-    // if it fires concurrently (stream.onDone can fire while we're still
-    // awaiting async work inside _finishStreaming).
-    final finishFuture = _finishStreaming(state);
-    _finishStreamingFutures[messageId] = finishFuture;
-    await finishFuture;
-    _finishStreamingFutures.remove(messageId);
+    await _finishStreaming(state);
 
     // Notify for background notification if needed
     if (!state.finishHandled) {
@@ -3179,16 +3238,18 @@ class ChatActions {
 
     // This finish handler runs inside the sequential drain, so awaiting the
     // barrier cancel here would wait on this very drain and never complete.
-    // The source stream is finishing on its own (a done chunk arrived);
-    // onDone performs the remaining cleanup, so only drop the map entry.
-    _conversationStreams.remove(conversationId);
+    // The source stream is finishing on its own. A newer request may already
+    // have installed its own subscription while this finish was awaiting.
+    if (identical(_conversationStreams[conversationId], subscription)) {
+      _conversationStreams.remove(conversationId);
+    }
   }
 
   /// Finish streaming and persist final state.
   Future<void> _finishStreaming(
     stream_ctrl.StreamingState state, {
     bool generateTitle = true,
-  }) async {
+  }) => _runTerminalOperation(state.messageId, () async {
     state.finishRequestTiming();
     final messageId = state.messageId;
     final conversationId = state.conversationId;
@@ -3283,6 +3344,7 @@ class ChatActions {
         terminalState: GenerationRunState.completed,
       );
       state.terminalPersisted = true;
+      state.ctx.settings.refreshBalanceAfterReply(state.ctx.providerKey);
 
       await onAssistantMessageFinished?.call(finalizedMessage);
 
@@ -3299,13 +3361,17 @@ class ChatActions {
       // A failed completion write goes through _handleStreamError next. Keep
       // its resources until that failure result has also been persisted.
       if (state.terminalPersisted) {
-        await _background.finish(
-          _backgroundTaskId(state.ctx),
-          BackgroundTaskOutcome.completed,
-          replyPreview: ThinkingTagParser.parseWithRanges(
-            finalizedMessage.content,
-          ).visibleContent,
-        );
+        try {
+          await _background.finish(
+            _backgroundTaskId(state.ctx),
+            BackgroundTaskOutcome.completed,
+            replyPreview: ThinkingTagParser.parseWithRanges(
+              finalizedMessage.content,
+            ).visibleContent,
+          );
+        } finally {
+          _clearGenerationRuntimeState(finalizedMessage);
+        }
       }
       // UI lifecycle cleanup is independent from terminal persistence success.
       if (chatController.publishTerminalMessage(finalizedMessage)) {
@@ -3318,14 +3384,14 @@ class ChatActions {
       // does not miss that height change.
       onStreamFinished?.call(conversationId);
     }
-  }
+  });
 
   /// Handle stream error.
   Future<void> _handleStreamError(
     dynamic e,
     stream_ctrl.StreamingState state,
   ) async {
-    if (state.terminalPersisted) return;
+    if (state.stopRequested || state.terminalPersisted) return;
     _setRetryStatus(state, null);
     final messageId = state.messageId;
     final conversationId = state.conversationId;
@@ -3335,6 +3401,16 @@ class ChatActions {
     )) {
       return;
     }
+    await _runTerminalOperation(messageId, () => _persistStreamError(e, state));
+  }
+
+  Future<void> _persistStreamError(
+    dynamic e,
+    stream_ctrl.StreamingState state,
+  ) async {
+    final messageId = state.messageId;
+    final conversationId = state.conversationId;
+    final subscription = _conversationStreams[conversationId];
     state.finishRequestTiming();
     state.finishHandled = true;
     final oauthFailure =
@@ -3437,42 +3513,56 @@ class ChatActions {
             : 'generation_failed',
       );
       state.terminalPersisted = true;
+    } catch (_) {
+      if (isStopping(conversationId)) return;
+      rethrow;
     } finally {
-      await _background.finish(
-        _backgroundTaskId(state.ctx),
-        BackgroundTaskOutcome.failed,
-        resultPersisted: state.terminalPersisted,
-      );
-      _clearGenerationRuntimeState(errorMessage);
-      if (chatController.publishTerminalMessage(errorMessage)) {
-        onMessagesChanged?.call();
-      }
-      streamController.removeStreamingNotifier(messageId);
-      _setConversationLoading(conversationId, false);
-      // The sequential stream drain owns source cancellation after this error
-      // handler returns. Re-entering its barrier cancel here would wait on this
-      // handler itself and prevent the UI error callback below from firing.
-      _conversationStreams.remove(conversationId);
-      if (!oauthFailure && truncation == null) {
-        if (isContextLengthError(errorText) && onContextOverflow != null) {
-          onContextOverflow!(
-            errorMessage,
-            errorText,
-            _assistantPartsForState(state),
-          );
-        } else {
-          onStreamError?.call(errorText);
+      if (state.terminalPersisted || !isStopping(conversationId)) {
+        await _background.finish(
+          _backgroundTaskId(state.ctx),
+          BackgroundTaskOutcome.failed,
+          resultPersisted: state.terminalPersisted,
+        );
+        // Stop may have taken ownership of a rolled-back write during native
+        // cleanup. Keep its cursor until cancellation commits.
+        if (state.terminalPersisted || !isStopping(conversationId)) {
+          _clearGenerationRuntimeState(errorMessage);
+          if (chatController.publishTerminalMessage(errorMessage)) {
+            onMessagesChanged?.call();
+          }
+          streamController.removeStreamingNotifier(messageId);
+          _setConversationLoading(conversationId, false);
+          // The sequential stream drain owns source cancellation after this error
+          // handler returns. Re-entering its barrier cancel here would wait on this
+          // handler itself and prevent the UI error callback below from firing.
+          if (identical(_conversationStreams[conversationId], subscription)) {
+            _conversationStreams.remove(conversationId);
+          }
+          if (!oauthFailure && truncation == null) {
+            if (isCompressionCapacityError(errorText) &&
+                onContextOverflow != null) {
+              onContextOverflow!(
+                errorMessage,
+                errorText,
+                _assistantPartsForState(state),
+              );
+            } else {
+              onStreamError?.call(errorText);
+            }
+          }
+          onStreamFinished?.call(conversationId);
         }
       }
-      onStreamFinished?.call(conversationId);
     }
   }
 
   /// Handle stream done callback.
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
+    if (state.stopRequested || state.terminalPersisted) return;
     state.finishRequestTiming();
     final conversationId = state.conversationId;
     final messageId = state.messageId;
+    final subscription = _conversationStreams[conversationId];
 
     // Reset file processing state on done (just in case), scoped to this
     // message so a background conversation's indicator survives.
@@ -3484,6 +3574,7 @@ class ChatActions {
     // Same reason as in _finishStreaming: drain the smoothing buffer through
     // its own tick instead of dumping it into one frame.
     await streamController.drainSmoothStream(messageId);
+    if (state.stopRequested || state.terminalPersisted) return;
 
     streamController.cleanupTimers(messageId);
 
@@ -3491,7 +3582,7 @@ class ChatActions {
     // wait for it to complete before removing notifiers or triggering rebuild.
     // This prevents a race where the notifier is removed and a rebuild is
     // triggered while _finishStreaming hasn't yet updated _messages[index].
-    final inFlight = _finishStreamingFutures[messageId];
+    final inFlight = _terminalOperations[messageId];
     if (inFlight != null) {
       await inFlight;
     } else if (_loadingConversationIds.contains(conversationId)) {
@@ -3506,7 +3597,9 @@ class ChatActions {
     // The source stream is already done and this handler runs inside the
     // sequential drain; awaiting the barrier cancel here would wait on this
     // very drain and never complete, so only drop the map entry.
-    _conversationStreams.remove(conversationId);
+    if (identical(_conversationStreams[conversationId], subscription)) {
+      _conversationStreams.remove(conversationId);
+    }
   }
 
   // ============================================================================
@@ -3516,7 +3609,7 @@ class ChatActions {
   /// Persist latest in-flight assistant message content and reasoning.
   Future<void> flushConversationProgress(Conversation? conversation) async {
     final cid = conversation?.id;
-    if (cid == null || _messages.isEmpty) return;
+    if (cid == null || isStopping(cid) || _messages.isEmpty) return;
 
     // Find the latest streaming assistant message in the current conversation
     ChatMessage? streaming;
@@ -3527,7 +3620,9 @@ class ChatActions {
         break;
       }
     }
-    if (streaming == null) return;
+    if (streaming == null || _terminalOperations.containsKey(streaming.id)) {
+      return;
+    }
 
     // Prefer the full accumulated stream text over the typewriter prefix that
     // may still be sitting on the in-memory message widget.

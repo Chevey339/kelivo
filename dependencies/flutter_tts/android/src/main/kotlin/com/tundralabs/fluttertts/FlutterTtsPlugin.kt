@@ -43,6 +43,7 @@ class FlutterTtsPlugin : MethodCallHandler, FlutterPlugin {
     private var synth = false
     private var context: Context? = null
     private var tts: TextToSpeech? = null
+    private var speechRate: Float? = null
     private val tag = "TTS"
     private val pendingMethodCalls = ArrayList<Runnable>()
     private val utterances = HashMap<String, String>()
@@ -214,17 +215,21 @@ class FlutterTtsPlugin : MethodCallHandler, FlutterPlugin {
         }
     }
 
+    @Synchronized
+    private fun runPendingMethodCalls(status: Int) {
+        ttsStatus = status
+        if (status == TextToSpeech.SUCCESS) {
+            // A queued speak may be retried before Dart sees the new engine.
+            speechRate?.let { tts!!.setSpeechRate(it) }
+        }
+        val pending = pendingMethodCalls.toList()
+        pendingMethodCalls.clear()
+        for (call in pending) call.run()
+    }
+
     private val onInitListenerWithCallback: TextToSpeech.OnInitListener =
         TextToSpeech.OnInitListener { status ->
-            // Handle pending method calls (sent while TTS was initializing)
-            synchronized(this@FlutterTtsPlugin) {
-                ttsStatus = status
-                for (call in pendingMethodCalls) {
-                    call.run()
-                }
-                pendingMethodCalls.clear()
-            }
-
+            runPendingMethodCalls(status)
             if (status == TextToSpeech.SUCCESS) {
                 tts!!.setOnUtteranceProgressListener(utteranceProgressListener)
                 try {
@@ -247,14 +252,7 @@ class FlutterTtsPlugin : MethodCallHandler, FlutterPlugin {
 
     private val onInitListenerWithoutCallback: TextToSpeech.OnInitListener =
         TextToSpeech.OnInitListener { status ->
-            // Handle pending method calls (sent while TTS was initializing)
-            synchronized(this@FlutterTtsPlugin) {
-                ttsStatus = status
-                for (call in pendingMethodCalls) {
-                    call.run()
-                }
-                pendingMethodCalls.clear()
-            }
+            runPendingMethodCalls(status)
 
             if (status == TextToSpeech.SUCCESS) {
                 tts!!.setOnUtteranceProgressListener(utteranceProgressListener)
@@ -391,7 +389,9 @@ class FlutterTtsPlugin : MethodCallHandler, FlutterPlugin {
                 val rate: String = call.arguments.toString()
                 // To make the FlutterTts API consistent across platforms,
                 // Android 1.0 is mapped to flutter 0.5.
-                setSpeechRate(rate.toFloat() * 2.0f)
+                val nativeRate = rate.toFloat() * 2.0f
+                speechRate = nativeRate
+                tts!!.setSpeechRate(nativeRate)
                 result.success(1)
             }
 
@@ -458,10 +458,6 @@ class FlutterTtsPlugin : MethodCallHandler, FlutterPlugin {
 
             else -> result.notImplemented()
         }
-    }
-
-    private fun setSpeechRate(rate: Float) {
-        tts!!.setSpeechRate(rate)
     }
 
     private fun isLanguageAvailable(locale: Locale?): Boolean {

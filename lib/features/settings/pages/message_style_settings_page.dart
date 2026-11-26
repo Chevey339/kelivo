@@ -67,9 +67,12 @@ class MessageStyleSettingsPage extends StatelessWidget {
 Future<void> resetMessageStyleSettings(BuildContext context) async {
   final ok = await _confirmReset(context);
   if (!ok || !context.mounted) return;
-  await context.read<SettingsProvider>().setChatBubbleStyleOverrides(
-    const ChatBubbleStyleOverrides(),
-  );
+  final settings = context.read<SettingsProvider>();
+  await Future.wait([
+    settings.setChatBubbleStyleOverrides(const ChatBubbleStyleOverrides()),
+    settings.resetThinkingToolCardStyle(),
+    settings.setShowAssistantBodyBubble(true),
+  ]);
 }
 
 Future<void> showMessageStyleSettingsDialog(BuildContext context) {
@@ -111,7 +114,7 @@ class MessageStyleSettingsBody extends StatefulWidget {
 
 class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
   bool? _editingDark;
-  bool _editingUser = false;
+  ChatBubbleStyleTarget _editingTarget = ChatBubbleStyleTarget.assistant;
   ThemeData? _cachedLightTheme;
   ThemeData? _cachedDarkTheme;
   String? _previewThemeKey;
@@ -125,9 +128,16 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
     final style = settings.chatMessageBackgroundStyle;
-    final overrides = settings.chatBubbleStyleOverridesFor(
-      isUser: _editingUser,
-    );
+    final customCards =
+        settings.canCustomizeThinkingToolCards &&
+        settings.customizeThinkingToolCards;
+    final editingTarget =
+        !customCards && _editingTarget == ChatBubbleStyleTarget.thinkingToolCard
+        ? ChatBubbleStyleTarget.assistant
+        : _editingTarget;
+    final overrides = settings.chatBubbleStyleOverridesFor(editingTarget);
+    Future<void> updateOverrides(ChatBubbleStyleOverrides value) =>
+        settings.setChatBubbleStyleOverridesFor(editingTarget, value);
     final editingDark = _isEditingDark;
     final isDefault = style == ChatMessageBackgroundStyle.defaultStyle;
     final previewThemes = _previewThemes(context);
@@ -177,30 +187,63 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
 
     final layoutCard = SectionCard(
       children: [
-        _SwitchRow(
-          label: l10n.messageStyleSettingsPageAssistantFitContent,
-          subtitle: l10n.messageStyleSettingsPageAssistantFitContentSubtitle,
-          value: settings.assistantBubbleFitContent,
-          onChanged: settings.setAssistantBubbleFitContent,
-        ),
-        _iosDivider(context),
-        _SwitchRow(
-          label: l10n.messageStyleSettingsPageAssistantSplitParagraphs,
-          subtitle:
-              l10n.messageStyleSettingsPageAssistantSplitParagraphsSubtitle,
-          value: settings.assistantBubbleSplitParagraphs,
-          onChanged: settings.setAssistantBubbleSplitParagraphs,
-        ),
+        if (!isDefault)
+          _SwitchRow(
+            label: l10n.messageStyleSettingsPageShowAssistantBodyBubble,
+            subtitle:
+                l10n.messageStyleSettingsPageShowAssistantBodyBubbleSubtitle,
+            value: settings.assistantBodyBubbleVisible,
+            onChanged: settings.setShowAssistantBodyBubble,
+          ),
+        if (settings.assistantBubbleLayoutEnabled) ...[
+          if (!isDefault) _iosDivider(context),
+          _SwitchRow(
+            label: l10n.messageStyleSettingsPageAssistantFitContent,
+            subtitle: l10n.messageStyleSettingsPageAssistantFitContentSubtitle,
+            value: settings.assistantBubbleFitContent,
+            onChanged: settings.setAssistantBubbleFitContent,
+          ),
+          _iosDivider(context),
+          _SwitchRow(
+            label: l10n.messageStyleSettingsPageAssistantSplitParagraphs,
+            subtitle:
+                l10n.messageStyleSettingsPageAssistantSplitParagraphsSubtitle,
+            value: settings.assistantBubbleSplitParagraphs,
+            onChanged: settings.setAssistantBubbleSplitParagraphs,
+          ),
+        ],
+        if (settings.canCustomizeThinkingToolCards) ...[
+          _iosDivider(context),
+          _SwitchRow(
+            label: l10n.messageStyleSettingsPageCustomizeThinkingToolCards,
+            subtitle:
+                l10n.messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle,
+            value: customCards,
+            onChanged: (enabled) async {
+              if (enabled) {
+                setState(
+                  () => _editingTarget = ChatBubbleStyleTarget.thinkingToolCard,
+                );
+              }
+              await settings.setCustomizeThinkingToolCards(enabled);
+            },
+          ),
+        ],
       ],
     );
 
     final preview = _PreviewPanel(
       theme: previewTheme,
       editingDark: editingDark,
-      editingUser: _editingUser,
+      editingTarget: editingTarget,
       style: style,
       userOverrides: settings.userChatBubbleStyleOverrides,
       assistantOverrides: settings.assistantChatBubbleStyleOverrides,
+      thinkingToolOverrides: customCards
+          ? settings.chatBubbleStyleOverridesFor(
+              ChatBubbleStyleTarget.thinkingToolCard,
+            )
+          : null,
     );
 
     final params = SectionCard(
@@ -214,10 +257,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
               min: 0,
               max: 30,
               stepSize: 1,
-              onChanged: (v) => settings.setChatBubbleStyleOverridesForRole(
-                isUser: _editingUser,
-                value: overrides.copyWith(blurSigma: () => v),
-              ),
+              onChanged: (v) =>
+                  updateOverrides(overrides.copyWith(blurSigma: () => v)),
             ),
           ),
           Padding(
@@ -242,9 +283,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
             initial: resolved.background.withValues(alpha: 1),
             onPicked: (color) {
               final argb = _opaqueArgb(color);
-              settings.setChatBubbleStyleOverridesForRole(
-                isUser: _editingUser,
-                value: editingDark
+              updateOverrides(
+                editingDark
                     ? overrides.copyWith(backgroundArgbDark: () => argb)
                     : overrides.copyWith(backgroundArgbLight: () => argb),
               );
@@ -262,9 +302,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
             stepSize: 1,
             onChanged: (v) {
               final opacity = (v / 100).clamp(0.0, 1.0);
-              settings.setChatBubbleStyleOverridesForRole(
-                isUser: _editingUser,
-                value: style == ChatMessageBackgroundStyle.frosted
+              updateOverrides(
+                style == ChatMessageBackgroundStyle.frosted
                     ? overrides.copyWith(frostedOpacity: () => opacity)
                     : overrides.copyWith(solidOpacity: () => opacity),
               );
@@ -281,9 +320,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
             initial: resolved.border.withValues(alpha: 1),
             onPicked: (color) {
               final argb = _opaqueArgb(color);
-              settings.setChatBubbleStyleOverridesForRole(
-                isUser: _editingUser,
-                value: editingDark
+              updateOverrides(
+                editingDark
                     ? overrides.copyWith(borderArgbDark: () => argb)
                     : overrides.copyWith(borderArgbLight: () => argb),
               );
@@ -299,9 +337,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
             min: 0,
             max: 100,
             stepSize: 1,
-            onChanged: (v) => settings.setChatBubbleStyleOverridesForRole(
-              isUser: _editingUser,
-              value: overrides.copyWith(
+            onChanged: (v) => updateOverrides(
+              overrides.copyWith(
                 borderOpacity: () => (v / 100).clamp(0.0, 1.0),
               ),
             ),
@@ -316,10 +353,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
             min: 0,
             max: 3,
             stepSize: 0.1,
-            onChanged: (v) => settings.setChatBubbleStyleOverridesForRole(
-              isUser: _editingUser,
-              value: overrides.copyWith(borderWidth: () => v),
-            ),
+            onChanged: (v) =>
+                updateOverrides(overrides.copyWith(borderWidth: () => v)),
           ),
         ),
         _iosDivider(context, indent: 14),
@@ -332,9 +367,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
             initial: resolved.text.withValues(alpha: 1),
             onPicked: (color) {
               final argb = _opaqueArgb(color);
-              settings.setChatBubbleStyleOverridesForRole(
-                isUser: _editingUser,
-                value: editingDark
+              updateOverrides(
+                editingDark
                     ? overrides.copyWith(textArgbDark: () => argb)
                     : overrides.copyWith(textArgbLight: () => argb),
               );
@@ -350,10 +384,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
             min: 0,
             max: 28,
             stepSize: 1,
-            onChanged: (v) => settings.setChatBubbleStyleOverridesForRole(
-              isUser: _editingUser,
-              value: overrides.copyWith(cornerRadius: () => v),
-            ),
+            onChanged: (v) =>
+                updateOverrides(overrides.copyWith(cornerRadius: () => v)),
           ),
         ),
       ],
@@ -370,31 +402,35 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
             layoutCard,
             const SizedBox(height: 12),
             _SegmentedToggle(
-              leftLabel: l10n.messageStyleSettingsPageLight,
-              leftIcon: Lucide.Sun,
-              rightLabel: l10n.messageStyleSettingsPageDark,
-              rightIcon: Lucide.Moon,
-              rightSelected: editingDark,
-              onChanged: (value) {
-                if (value == editingDark) return;
-                Haptics.soft();
-                setState(() => _editingDark = value);
-              },
+              segments: [
+                (label: l10n.messageStyleSettingsPageLight, icon: Lucide.Sun),
+                (label: l10n.messageStyleSettingsPageDark, icon: Lucide.Moon),
+              ],
+              index: editingDark ? 1 : 0,
+              onChanged: (index) => setState(() => _editingDark = index == 1),
             ),
             if (!isDefault) ...[
               const SizedBox(height: 12),
               _SegmentedToggle(
-                leftLabel: l10n.messageStyleSettingsPageRoleUser,
-                leftIcon: Lucide.User,
-                rightLabel: l10n.messageStyleSettingsPageRoleAssistant,
-                rightIcon: Lucide.Bot,
-                rightSelected: !_editingUser,
-                onChanged: (rightSelected) {
-                  final editingUser = !rightSelected;
-                  if (editingUser == _editingUser) return;
-                  Haptics.soft();
-                  setState(() => _editingUser = editingUser);
-                },
+                segments: [
+                  (
+                    label: l10n.messageStyleSettingsPageRoleUser,
+                    icon: customCards ? null : Lucide.User,
+                  ),
+                  (
+                    label: l10n.messageStyleSettingsPageRoleAssistant,
+                    icon: customCards ? null : Lucide.Bot,
+                  ),
+                  if (customCards)
+                    (
+                      label: l10n.messageStyleSettingsPageRoleThinkingTool,
+                      icon: null,
+                    ),
+                ],
+                index: editingTarget.index,
+                onChanged: (index) => setState(
+                  () => _editingTarget = ChatBubbleStyleTarget.values[index],
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -688,7 +724,7 @@ class _SwitchRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          IosSwitch(value: value, onChanged: onChanged),
+          IosSwitch(value: value, onChanged: onChanged, semanticLabel: label),
         ],
       ),
     );
@@ -731,20 +767,14 @@ class _StyleSwatch extends StatelessWidget {
 
 class _SegmentedToggle extends StatelessWidget {
   const _SegmentedToggle({
-    required this.leftLabel,
-    required this.leftIcon,
-    required this.rightLabel,
-    required this.rightIcon,
-    required this.rightSelected,
+    required this.segments,
+    required this.index,
     required this.onChanged,
   });
 
-  final String leftLabel;
-  final IconData leftIcon;
-  final String rightLabel;
-  final IconData rightIcon;
-  final bool rightSelected;
-  final ValueChanged<bool> onChanged;
+  final List<({String label, IconData? icon})> segments;
+  final int index;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -765,11 +795,12 @@ class _SegmentedToggle extends StatelessWidget {
               AnimatedAlign(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
-                alignment: rightSelected
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
+                alignment: AlignmentDirectional(
+                  2 * index / (segments.length - 1) - 1,
+                  0,
+                ),
                 child: FractionallySizedBox(
-                  widthFactor: 0.5,
+                  widthFactor: 1 / segments.length,
                   heightFactor: 1,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -792,22 +823,19 @@ class _SegmentedToggle extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: _SegmentedToggleHit(
-                      label: leftLabel,
-                      icon: leftIcon,
-                      selected: !rightSelected,
-                      onTap: () => onChanged(false),
+                  for (var i = 0; i < segments.length; i++)
+                    Expanded(
+                      child: _SegmentedToggleHit(
+                        label: segments[i].label,
+                        icon: segments[i].icon,
+                        selected: i == index,
+                        onTap: () {
+                          if (i == index) return;
+                          Haptics.soft();
+                          onChanged(i);
+                        },
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _SegmentedToggleHit(
-                      label: rightLabel,
-                      icon: rightIcon,
-                      selected: rightSelected,
-                      onTap: () => onChanged(true),
-                    ),
-                  ),
                 ],
               ),
             ],
@@ -827,7 +855,7 @@ class _SegmentedToggleHit extends StatelessWidget {
   });
 
   final String label;
-  final IconData icon;
+  final IconData? icon;
   final bool selected;
   final VoidCallback onTap;
 
@@ -844,28 +872,34 @@ class _SegmentedToggleHit extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 1),
-              child: Icon(
-                icon,
-                size: 16,
-                color: selected
-                    ? cs.primary
-                    : cs.onSurface.withValues(alpha: 0.52),
+            if (icon case final icon?) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(
+                  icon,
+                  size: 16,
+                  color: selected
+                      ? cs.primary
+                      : cs.onSurface.withValues(alpha: 0.52),
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.1,
-                fontWeight: selected
-                    ? AppFontWeights.semibold
-                    : AppFontWeights.regular,
-                color: selected
-                    ? cs.onSurface
-                    : cs.onSurface.withValues(alpha: 0.55),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.1,
+                  fontWeight: selected
+                      ? AppFontWeights.semibold
+                      : AppFontWeights.regular,
+                  color: selected
+                      ? cs.onSurface
+                      : cs.onSurface.withValues(alpha: 0.55),
+                ),
               ),
             ),
           ],
@@ -1050,18 +1084,20 @@ class _PreviewPanel extends StatelessWidget {
   const _PreviewPanel({
     required this.theme,
     required this.editingDark,
-    required this.editingUser,
+    required this.editingTarget,
     required this.style,
     required this.userOverrides,
     required this.assistantOverrides,
+    required this.thinkingToolOverrides,
   });
 
   final ThemeData theme;
   final bool editingDark;
-  final bool editingUser;
+  final ChatBubbleStyleTarget editingTarget;
   final ChatMessageBackgroundStyle style;
   final ChatBubbleStyleOverrides userOverrides;
   final ChatBubbleStyleOverrides assistantOverrides;
+  final ChatBubbleStyleOverrides? thinkingToolOverrides;
 
   @override
   Widget build(BuildContext context) {
@@ -1086,7 +1122,8 @@ class _PreviewPanel extends StatelessWidget {
             style: style,
             userOverrides: userOverrides,
             assistantOverrides: assistantOverrides,
-            editingUser: editingUser,
+            thinkingToolOverrides: thinkingToolOverrides,
+            editingTarget: editingTarget,
           ),
         ),
       ),
@@ -1099,13 +1136,15 @@ class _PreviewScene extends StatelessWidget {
     required this.style,
     required this.userOverrides,
     required this.assistantOverrides,
-    required this.editingUser,
+    required this.thinkingToolOverrides,
+    required this.editingTarget,
   });
 
   final ChatMessageBackgroundStyle style;
   final ChatBubbleStyleOverrides userOverrides;
   final ChatBubbleStyleOverrides assistantOverrides;
-  final bool editingUser;
+  final ChatBubbleStyleOverrides? thinkingToolOverrides;
+  final ChatBubbleStyleTarget editingTarget;
 
   @override
   Widget build(BuildContext context) {
@@ -1124,6 +1163,11 @@ class _PreviewScene extends StatelessWidget {
       style,
       assistantOverrides,
     );
+    final cardOverrides = thinkingToolOverrides;
+    final cardResolved = cardOverrides == null
+        ? assistantResolved
+        : resolveBubbleStyle(cs, brightness, style, cardOverrides);
+    final cardStrong = _previewStrong(context, cardResolved);
     final dimInactive = style != ChatMessageBackgroundStyle.defaultStyle;
     Widget maybeDim({required bool active, required Widget child}) {
       if (!dimInactive || active) return child;
@@ -1152,7 +1196,7 @@ class _PreviewScene extends StatelessWidget {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 240),
                     child: maybeDim(
-                      active: editingUser,
+                      active: editingTarget == ChatBubbleStyleTarget.user,
                       child: _PreviewSurface(
                         style: style,
                         resolved: userResolved,
@@ -1176,10 +1220,14 @@ class _PreviewScene extends StatelessWidget {
                   ),
                 ),
                 maybeDim(
-                  active: !editingUser,
+                  active:
+                      editingTarget ==
+                      (cardOverrides == null
+                          ? ChatBubbleStyleTarget.assistant
+                          : ChatBubbleStyleTarget.thinkingToolCard),
                   child: _PreviewSurface(
                     style: style,
-                    resolved: assistantResolved,
+                    resolved: cardResolved,
                     defaultColor: cs.primaryContainer.withValues(
                       alpha: brightness == Brightness.dark ? 0.25 : 0.30,
                     ),
@@ -1188,7 +1236,7 @@ class _PreviewScene extends StatelessWidget {
                       children: [
                         ReasoningIcons.thinkingCardIcon(
                           size: 16,
-                          color: _previewStrong(context, assistantResolved),
+                          color: cardStrong,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1197,15 +1245,11 @@ class _PreviewScene extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: AppFontWeights.emphasis,
-                              color: _previewStrong(context, assistantResolved),
+                              color: cardStrong,
                             ),
                           ),
                         ),
-                        Icon(
-                          Lucide.ChevronRight,
-                          size: 16,
-                          color: _previewStrong(context, assistantResolved),
-                        ),
+                        Icon(Lucide.ChevronRight, size: 16, color: cardStrong),
                       ],
                     ),
                   ),
@@ -1215,11 +1259,13 @@ class _PreviewScene extends StatelessWidget {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 260),
                     child: maybeDim(
-                      active: !editingUser,
+                      active: editingTarget == ChatBubbleStyleTarget.assistant,
                       child: _PreviewSurface(
                         style: style,
                         resolved: assistantResolved,
-                        bareOnDefault: true,
+                        bare: !context.select<SettingsProvider, bool>(
+                          (s) => s.assistantBodyBubbleVisible,
+                        ),
                         padding: const EdgeInsets.all(11),
                         child: Text(
                           l10n.messageStyleSettingsPagePreviewAssistant,
@@ -1263,7 +1309,7 @@ class _PreviewSurface extends StatelessWidget {
     required this.padding,
     required this.child,
     this.defaultColor,
-    this.bareOnDefault = false,
+    this.bare = false,
   });
 
   final ChatMessageBackgroundStyle style;
@@ -1271,10 +1317,11 @@ class _PreviewSurface extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final Widget child;
   final Color? defaultColor;
-  final bool bareOnDefault;
+  final bool bare;
 
   @override
   Widget build(BuildContext context) {
+    if (bare) return child;
     final padded = Padding(padding: padding, child: child);
     switch (style) {
       case ChatMessageBackgroundStyle.frosted:
@@ -1297,7 +1344,6 @@ class _PreviewSurface extends StatelessWidget {
           child: padded,
         );
       case ChatMessageBackgroundStyle.defaultStyle:
-        if (bareOnDefault) return child;
         if (defaultColor == null) return padded;
         return DecoratedBox(
           decoration: BoxDecoration(

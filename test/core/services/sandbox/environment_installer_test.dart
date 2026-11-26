@@ -561,7 +561,7 @@ void main() {
 
   for (final hasCurrent in [true, false]) {
     test(
-      'reset removes recovery rootfs before restart, current=$hasCurrent',
+      'reset removes temporary files and recovery rootfs before restart, current=$hasCurrent',
       () async {
         final installer = buildInstaller(servingTarball());
         final previous = await Directory(
@@ -576,6 +576,10 @@ void main() {
             p.join(installer.rootfsDir.path, kKelivoVersionFile),
           ).writeAsString('ubuntu 24.04.3 arm64 noble\n');
         }
+        await installer.tmpDir.create();
+        await File(
+          p.join(installer.tmpDir.path, 'libtalloc.so.2'),
+        ).writeAsString('staged runtime library');
         await env.setState(
           EnvironmentState(
             phase: hasCurrent
@@ -585,6 +589,7 @@ void main() {
         );
         await installer.reset();
         expect(await installer.rootfsDir.exists(), isFalse);
+        expect(await installer.tmpDir.exists(), isFalse);
         final restarted = buildInstaller(servingTarball());
         await restarted.recoverInterruptedInstall();
         expect(await restarted.rootfsDir.exists(), isFalse);
@@ -624,6 +629,7 @@ void main() {
         installer.rootfsDir,
         Directory(p.join(envDir.path, 'staging')),
         installer.downloadsDir,
+        installer.tmpDir,
       ];
       final locked = <Directory>[];
       try {
@@ -637,6 +643,7 @@ void main() {
           installer.deletingRootfsDir.path,
           directories[2].path,
           directories[3].path,
+          directories[4].path,
         ]);
         expect(env.state.phase, EnvironmentPhase.notInstalled);
         expect(workspace.busyCalls.last, isFalse);
@@ -853,6 +860,9 @@ void main() {
         final staged = await File(
           p.join(installer.stagingRootfsDir.path, 'keep'),
         ).writeAsString('staged data');
+        final temporary = await File(
+          p.join(installer.tmpDir.path, 'keep'),
+        ).writeAsString('runtime data');
         workspace.rejectStop = true;
         if (reset) {
           await expectLater(installer.reset(), throwsException);
@@ -861,10 +871,12 @@ void main() {
         }
         expect(await active.readAsString(), 'active data');
         expect(await staged.readAsString(), 'staged data');
+        expect(await temporary.readAsString(), 'runtime data');
         expect(workspace.deletePaths, isEmpty);
         expect(workspace.busyCalls.last, isFalse);
         workspace.rejectStop = false;
         await installer.reset();
+        expect(await installer.tmpDir.exists(), isFalse);
         expect(env.state.phase, EnvironmentPhase.notInstalled);
       },
     );

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/providers/settings_provider.dart';
 
+enum ChatBubbleStyleTarget { user, assistant, thinkingToolCard }
+
 /// Optional overrides for frosted/solid chat bubbles.
 ///
 /// Every field is nullable. `null` means keep today's hardcoded default

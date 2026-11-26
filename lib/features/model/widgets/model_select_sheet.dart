@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import '../../../core/models/media_creation.dart';
+import '../../../core/models/model_spec.dart';
+import '../../../core/services/media/media_models.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -19,6 +22,7 @@ import '../../../utils/provider_grouping_logic.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../desktop/desktop_home_page.dart' show DesktopHomePage;
+import '../../../desktop/desktop_tab.dart' show DesktopTab;
 import '../../home/controllers/home_page_controller.dart';
 import '../../home/utils/model_display_helper.dart';
 import '../../provider/widgets/provider_avatar.dart';
@@ -54,6 +58,7 @@ class _ModelProcessingData {
   final String currentModelKey;
   final List<String> providersOrder;
   final String? limitProviderKey;
+  final CreationModelSlot? creationSlot;
 
   _ModelProcessingData({
     required this.providerConfigs,
@@ -61,19 +66,35 @@ class _ModelProcessingData {
     required this.currentModelKey,
     required this.providersOrder,
     this.limitProviderKey,
+    this.creationSlot,
   });
+}
+
+_ModelItem? _favoriteModel(
+  _ProviderGroup group,
+  String modelId,
+  ProviderConfig provider,
+  CreationModelSlot? creationSlot,
+) {
+  final inGroup = group.items.where((item) => item.id == modelId).firstOrNull;
+  if (inGroup != null || creationSlot != null) return inGroup;
+  final spec = ModelSpecResolver.instance.spec(provider, modelId);
+  if (spec.type.isMedia || spec.type == ModelType.other) return null;
+  return _ModelItem(
+    providerKey: provider.id,
+    providerName: group.name,
+    id: modelId,
+    info: spec,
+    pinned: true,
+    selected: false,
+  );
 }
 
 class _ModelProcessingResult {
   final Map<String, _ProviderGroup> groups;
-  final List<_ModelItem> favItems;
   final List<String> orderedKeys;
 
-  _ModelProcessingResult({
-    required this.groups,
-    required this.favItems,
-    required this.orderedKeys,
-  });
+  _ModelProcessingResult({required this.groups, required this.orderedKeys});
 }
 
 List<String> _buildDisplayProvidersOrder(
@@ -111,56 +132,37 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
     if (cfg.enabledModels.isEmpty) return;
 
     final name = cfg.name;
-    final list = <_ModelItem>[
-      for (final mid in cfg.enabledModels)
-        () {
-          final spec = ModelSpecResolver.instance.spec(cfg, mid);
-          return _ModelItem(
-            providerKey: key,
-            providerName: name.isNotEmpty ? name : key,
-            id: mid,
-            info: spec,
-            pinned: data.pinnedModels.contains('$key::$mid'),
-            selected: data.currentModelKey == '$key::$mid',
-          );
-        }(),
-    ];
+    final list = <_ModelItem>[];
+    for (final mid in cfg.enabledModels) {
+      final spec = ModelSpecResolver.instance.spec(cfg, mid);
+      final slot = data.creationSlot;
+      if (slot == null) {
+        if (spec.type.isMedia || spec.type == ModelType.other) continue;
+      } else if (slot.mode case final mode?) {
+        if (resolveMediaModel(cfg, mid, mode, resolvedSpec: spec) == null) {
+          continue;
+        }
+      } else if (spec.type != ModelType.chat ||
+          cfg.isOAuth && cfg.oauthCredentials?.requiresLogin != false) {
+        continue;
+      }
+      list.add(
+        _ModelItem(
+          providerKey: key,
+          providerName: name.isNotEmpty ? name : key,
+          id: mid,
+          info: spec,
+          pinned: data.pinnedModels.contains('$key::$mid'),
+          selected: data.currentModelKey == '$key::$mid',
+        ),
+      );
+    }
+    if (list.isEmpty) return;
     groups[key] = _ProviderGroup(
       name: name.isNotEmpty ? name : key,
       items: list,
     );
   });
-
-  // Build favorites group (duplicate items)
-  final favItems = <_ModelItem>[];
-  for (final k in data.pinnedModels) {
-    final parts = k.split('::');
-    if (parts.length < 2) continue;
-    final pk = parts[0];
-    final mid = parts.sublist(1).join('::');
-    if (data.providerConfigs[pk]?.disabledModels.contains(mid) == true) {
-      continue;
-    }
-    final g = groups[pk];
-    if (g == null) continue;
-    final found = g.items.firstWhere(
-      (e) => e.id == mid,
-      orElse: () {
-        final cfg = data.providerConfigs[pk];
-        return _ModelItem(
-          providerKey: pk,
-          providerName: g.name,
-          id: mid,
-          info: cfg == null
-              ? ModelSpec(id: mid, displayName: mid)
-              : ModelSpecResolver.instance.spec(cfg, mid),
-          pinned: true,
-          selected: data.currentModelKey == '$pk::$mid',
-        );
-      },
-    );
-    favItems.add(found.copyWith(pinned: true));
-  }
 
   // Provider sections ordered by ProvidersPage order
   final orderedKeys = <String>[];
@@ -171,11 +173,7 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
     if (!orderedKeys.contains(k)) orderedKeys.add(k);
   }
 
-  return _ModelProcessingResult(
-    groups: groups,
-    favItems: favItems,
-    orderedKeys: orderedKeys,
-  );
+  return _ModelProcessingResult(groups: groups, orderedKeys: orderedKeys);
 }
 
 /// Opens the model picker and returns the chosen model.
@@ -188,6 +186,7 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
 Future<ModelSelection?> showModelSelector(
   BuildContext context, {
   String? limitProviderKey,
+  CreationModelSlot? creationSlot,
   String? initialProviderKey,
   String? initialModelId,
   bool allowInherit = false,
@@ -204,6 +203,7 @@ Future<ModelSelection?> showModelSelector(
       return await _showDesktopModelSelector(
         context,
         limitProviderKey: limitProviderKey,
+        creationSlot: creationSlot,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
         allowInherit: allowInherit,
@@ -219,6 +219,7 @@ Future<ModelSelection?> showModelSelector(
       ),
       builder: (ctx) => _ModelSelectSheet(
         limitProviderKey: limitProviderKey,
+        creationSlot: creationSlot,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
         allowInherit: allowInherit,
@@ -335,12 +336,14 @@ Future<void> showModelSelectSheet(
 class _ModelSelectSheet extends StatefulWidget {
   const _ModelSelectSheet({
     this.limitProviderKey,
+    this.creationSlot,
     this.initialProviderKey,
     this.initialModelId,
     this.allowInherit = false,
     this.inheritLabel,
   });
   final String? limitProviderKey;
+  final CreationModelSlot? creationSlot;
   final String? initialProviderKey;
   final String? initialModelId;
   final bool allowInherit;
@@ -413,6 +416,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   ) {
     final hasInitial =
         widget.initialProviderKey != null && widget.initialModelId != null;
+    if (!hasInitial && widget.creationSlot != null) return '';
     final provider = hasInitial
         ? widget.initialProviderKey
         : assistantProvider.currentAssistant?.chatModelProvider ??
@@ -455,6 +459,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           providerConfigs.keys,
         ),
         limitProviderKey: widget.limitProviderKey,
+        creationSlot: widget.creationSlot,
       );
 
       final result = _processModelsInBackground(processingData);
@@ -511,6 +516,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         providerConfigs.keys,
       ),
       limitProviderKey: widget.limitProviderKey,
+      creationSlot: widget.creationSlot,
     );
 
     final result = _processModelsInBackground(processingData);
@@ -1055,21 +1061,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           }
           final g = _groups[pk];
           if (g == null) continue;
-          final found = g.items.firstWhere(
-            (e) => e.id == mid,
-            orElse: () => _ModelItem(
-              providerKey: pk,
-              providerName: g.name,
-              id: mid,
-              info: ModelSpecResolver.instance.spec(
-                settings.getProviderConfig(pk),
-                mid,
-              ),
-              pinned: true,
-              selected: false,
-            ),
+          final found = _favoriteModel(
+            g,
+            mid,
+            settings.getProviderConfig(pk),
+            widget.creationSlot,
           );
-          if (_matchesSearch(query, found, found.providerName)) {
+          if (found != null &&
+              _matchesSearch(query, found, found.providerName)) {
             favs.add(found.copyWith(pinned: true));
             favMatchedKeys.add('$pk::$mid');
           }
@@ -1735,6 +1734,7 @@ class _InheritRow extends _ListRow {
 Future<ModelSelection?> _showDesktopModelSelector(
   BuildContext context, {
   String? limitProviderKey,
+  CreationModelSlot? creationSlot,
   String? initialProviderKey,
   String? initialModelId,
   bool allowInherit = false,
@@ -1747,6 +1747,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
     barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) => _DesktopModelSelectDialogBody(
       limitProviderKey: limitProviderKey,
+      creationSlot: creationSlot,
       initialProviderKey: initialProviderKey,
       initialModelId: initialModelId,
       allowInherit: allowInherit,
@@ -1768,12 +1769,14 @@ Future<ModelSelection?> _showDesktopModelSelector(
 class _DesktopModelSelectDialogBody extends StatefulWidget {
   const _DesktopModelSelectDialogBody({
     this.limitProviderKey,
+    this.creationSlot,
     this.initialProviderKey,
     this.initialModelId,
     this.allowInherit = false,
     this.inheritLabel,
   });
   final String? limitProviderKey;
+  final CreationModelSlot? creationSlot;
   final String? initialProviderKey;
   final String? initialModelId;
   final bool allowInherit;
@@ -1840,6 +1843,7 @@ class _DesktopModelSelectDialogBodyState
   ) {
     final hasInitial =
         widget.initialProviderKey != null && widget.initialModelId != null;
+    if (!hasInitial && widget.creationSlot != null) return '';
     final provider = hasInitial
         ? widget.initialProviderKey
         : assistantProvider.currentAssistant?.chatModelProvider ??
@@ -1866,6 +1870,7 @@ class _DesktopModelSelectDialogBodyState
         providerConfigs.keys,
       ),
       limitProviderKey: widget.limitProviderKey,
+      creationSlot: widget.creationSlot,
     );
     // Synchronous processing is fast enough here
     final result = _processModelsInBackground(data);
@@ -1947,21 +1952,14 @@ class _DesktopModelSelectDialogBodyState
           }
           final g = _groups[pk];
           if (g == null) continue;
-          final found = g.items.firstWhere(
-            (e) => e.id == mid,
-            orElse: () => _ModelItem(
-              providerKey: pk,
-              providerName: g.name,
-              id: mid,
-              info: ModelSpecResolver.instance.spec(
-                settings.getProviderConfig(pk),
-                mid,
-              ),
-              pinned: true,
-              selected: false,
-            ),
+          final found = _favoriteModel(
+            g,
+            mid,
+            settings.getProviderConfig(pk),
+            widget.creationSlot,
           );
-          if (_matchesSearch(query, found, found.providerName)) {
+          if (found != null &&
+              _matchesSearch(query, found, found.providerName)) {
             favs.add(found.copyWith(pinned: true));
             favMatchedKeys.add('$pk::$mid');
           }
@@ -2461,7 +2459,7 @@ class _DesktopModelSelectDialogBodyState
                     nav.push(
                       PageRouteBuilder(
                         pageBuilder: (_, __, ___) => DesktopHomePage(
-                          initialTabIndex: 3,
+                          initialTab: DesktopTab.settings,
                           initialProviderKey: providerKey,
                         ),
                         transitionDuration: const Duration(milliseconds: 220),

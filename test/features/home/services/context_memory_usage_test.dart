@@ -7,6 +7,8 @@ import 'dart:io';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:Kelivo/core/models/context_operation.dart';
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/models/instruction_injection.dart';
 import 'package:Kelivo/core/models/world_book.dart';
 import 'package:Kelivo/core/services/memory/memory_prompts.dart';
 import 'package:Kelivo/core/models/memory_entry.dart';
@@ -40,7 +42,9 @@ import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
+import 'package:Kelivo/features/home/services/ocr_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -546,7 +550,7 @@ void main() {
     },
   );
 
-  testWidgets('compression preview excludes retained text and dynamic references', (
+  testWidgets('compression respects history and reference settings', (
     tester,
   ) async {
     await mount(tester);
@@ -610,8 +614,19 @@ void main() {
         await assistants.updateAssistant(
           assistants
               .getById('assistant')!
-              .copyWith(limitContextMessages: true, contextMessageSize: 1),
+              .copyWith(
+                systemPrompt: 'ASSISTANT_BACKGROUND',
+                limitContextMessages: true,
+                contextMessageSize: 1,
+              ),
         );
+        const card = InstructionInjection(
+          id: 'style',
+          title: 'Chat style',
+          prompt: 'CHAT_STYLE_INSTRUCTION',
+        );
+        await injections.add(card);
+        await injections.setActiveId(card.id, assistantId: 'assistant');
         await books.addBook(
           const WorldBook(
             id: 'range',
@@ -648,11 +663,16 @@ void main() {
           options,
         );
         expect(selection.retained.single.id, 'retained');
-        for (final includeReference in [false, true]) {
+        for (final (includeReference, includeInstructionInjections) in [
+          (false, true),
+          (true, true),
+          (true, false),
+        ]) {
           final config = CompressionConfig(
             summaryTokens: 512,
             maxOutputTokens: 4096,
             includeReference: includeReference,
+            includeInstructionInjections: includeInstructionInjections,
           );
           final preview = await vm.previewCompressionRequest(
             'one',
@@ -664,33 +684,63 @@ void main() {
           expect(preview.prompt, contains('Decision A'));
           expect(preview.prompt, isNot(contains('FUTURE_')));
           expect(preview.prompt, isNot(contains('<continuation')));
-          if (includeReference) {
-            expect(preview.prompt, contains('PAST_REFERENCE'));
-            expect(preview.prompt, contains('PAST_MEMORY'));
-            final request = await vm.buildCompressionRequest(
-              'one',
-              options: options,
-              configOverride: config,
-            );
-            final reference = await request.loadReference!(selection);
-            expect(reference, contains('PAST_REFERENCE'));
-            expect(reference, contains('PAST_MEMORY'));
-            expect(reference, isNot(contains('SUPERSEDED_MEMORY')));
-            expect(reference, isNot(contains('FUTURE_')));
-            // A summary-only range must not read the latest real turn for timers.
-            final summaries = selection.input
-                .where(ContextOperation.isSummary)
-                .toList();
-            final summaryReference = await g.compressionReferenceText(
-              conversationId: 'one',
-              modelId: 'opaque',
-              assistantId: 'assistant',
-              messages: summaries,
-              promptTime: DateTime(2026),
-            );
-            expect(summaryReference, isNot(contains('FUTURE_')));
+          expect(
+            preview.prompt.contains('ASSISTANT_BACKGROUND'),
+            includeReference,
+          );
+          expect(preview.prompt.contains('PAST_REFERENCE'), includeReference);
+          expect(preview.prompt.contains('PAST_MEMORY'), includeReference);
+          expect(
+            preview.prompt.contains(card.prompt),
+            includeReference && includeInstructionInjections,
+          );
+          await chat.setCompressionOverrides('one', {
+            'includeReference': includeReference,
+            'includeInstructionInjections': includeInstructionInjections,
+          });
+          final request = await vm.buildCompressionRequest(
+            'one',
+            options: options,
+            automatic: true,
+          );
+          if (!includeReference) {
+            expect(request.loadReference, isNull);
+            continue;
           }
+          final reference = await request.loadReference!(selection);
+          expect(reference.contains(card.prompt), includeInstructionInjections);
+          expect(reference, contains('ASSISTANT_BACKGROUND'));
+          expect(reference, contains('PAST_REFERENCE'));
+          expect(reference, contains('PAST_MEMORY'));
+          expect(reference, isNot(contains('SUPERSEDED_MEMORY')));
+          expect(reference, isNot(contains('FUTURE_')));
         }
+        expect((await preview(g)).injectionsText, contains(card.prompt));
+        final orphaned = chat
+            .getConversation('one')!
+            .copyWith(assistantId: 'removed-assistant');
+        await repository.putConversation(orphaned);
+        chat.conversations['one'] = orphaned;
+        final orphanPreview = await vm.previewCompressionRequest(
+          'one',
+          options,
+          const CompressionConfig(),
+          history: Future.value(history),
+        );
+        expect(orphanPreview.prompt, contains(card.prompt));
+        // A summary-only range must not read the latest real turn for timers.
+        final summaries = selection.input
+            .where(ContextOperation.isSummary)
+            .toList();
+        final summaryReference = await g.compressionReferenceText(
+          conversationId: 'one',
+          modelId: 'opaque',
+          assistantId: 'assistant',
+          messages: summaries,
+          promptTime: DateTime(2026),
+          includeInstructionInjections: false,
+        );
+        expect(summaryReference, isNot(contains('FUTURE_')));
       } finally {
         vm.dispose();
         controller.dispose();
@@ -880,6 +930,96 @@ void main() {
         providerKey: 'Test',
         modelId: 'opaque',
       );
+
+  testWidgets('image exclusion replaces OCR without freezing the result', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.runAsync(() async {
+      const first = 'data:image/png;base64,YWJj';
+      const second = 'data:image/png;base64,ZGVm';
+      final message = ChatMessage(
+        id: 'with-ocr',
+        conversationId: 'one',
+        role: 'user',
+        parts: [
+          const TextPart('Describe both pictures'),
+          ImagePart(uri: first),
+          ImagePart(uri: second),
+        ],
+      );
+      await repository.putMessage(message);
+      await settings.setOcrModel('Test', 'opaque');
+      await settings.setOcrEnabled(true);
+      var ocrCalls = 0;
+      builder = MessageBuilderService(
+        chatService: chat,
+        contextProvider: context,
+        ocrHandler: (paths, {revisionId, session, requestId}) async {
+          expect(paths, [second]);
+          ocrCalls++;
+          return 'Text from second image';
+        },
+        ocrPrefetch: ({required revisionIds, required imagePaths}) async {
+          expect(imagePaths, [second]);
+          return OcrPrepareSession()
+            ..hashesByPath.addAll({first: 'first-hash', second: 'second-hash'})
+            ..artifactsByRevision[message.id] = {
+              'first-hash': 'Text from excluded image',
+              'second-hash': 'Text from second image',
+            };
+        },
+      );
+      final filtered = RequestImageContext.withoutExcludedAttachments(
+        [message],
+        {const ContextImageIdentity('with-ocr', 'part:1').key},
+      );
+      final conversation = chat.getConversation('one');
+      Future<String> sendFiltered({bool previewOnly = false}) async {
+        final api = builder.buildApiMessages(
+          messages: filtered.messages,
+          versionSelections: {},
+          currentConversation: conversation,
+          imageFilteredRevisions: filtered.affectedRevisions,
+        );
+        final paths = await builder.processUserMessagesForApi(
+          api,
+          settings,
+          null,
+          conversation: conversation,
+          sourceMessages: filtered.messages,
+          imageFilteredRevisions: filtered.affectedRevisions,
+          previewOnly: previewOnly,
+        );
+        expect(paths, [second]);
+        return api.single['content'] as String;
+      }
+
+      final remainingOcr = OcrService.formatOcrBlock('Text from second image');
+      expect(await sendFiltered(), '${remainingOcr}Describe both pictures');
+      expect(await repository.getMessagePrompt(message.id), isNull);
+
+      final originalOcr = OcrService.formatOcrBlock(
+        'Text from excluded image\nText from second image',
+      );
+      final frozen =
+          'Frozen prefix\n${originalOcr}Frozen user template\n$originalOcr';
+      await repository.putMessagePrompt(
+        revisionId: message.id,
+        conversationId: message.conversationId,
+        payload: frozen,
+        carriesMemorySnapshot: false,
+      );
+      final expected =
+          'Frozen prefix\n${remainingOcr}Frozen user template\n$remainingOcr';
+      expect(await sendFiltered(), expected);
+      expect(await sendFiltered(previewOnly: true), expected);
+      await settings.setOcrEnabled(false);
+      expect(await sendFiltered(), expected);
+      expect(ocrCalls, 2);
+      expect((await repository.getMessagePrompt(message.id))?.payload, frozen);
+    });
+  });
 
   testWidgets('image context respects models that disable remote image URLs', (
     tester,

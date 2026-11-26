@@ -13,7 +13,6 @@ class AppDelegate: FlutterAppDelegate {
     loginLaunch = launchedAtLogin
     for callback in launchCallbacks { callback(launchedAtLogin) }
     launchCallbacks.removeAll()
-    super.applicationDidFinishLaunching(notification)
   }
 
   func readLoginLaunch(_ completion: @escaping (Bool) -> Void) {

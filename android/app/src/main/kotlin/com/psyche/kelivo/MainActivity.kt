@@ -5,8 +5,10 @@ import android.content.ActivityNotFoundException
 import android.net.Uri
 import android.content.Intent
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
 import android.os.StatFs
+import android.provider.OpenableColumns
 import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
 import io.flutter.embedding.android.FlutterActivity
@@ -15,10 +17,13 @@ import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
 import com.psyche.kelivo.workspace.WorkspacePlugin
 import io.flutter.plugin.common.MethodChannel
+import com.crazecoder.openfile.OpenFilePlugin
 import com.dexterous.flutterlocalnotifications.FlutterLocalNotificationsPlugin
 import java.io.File
 import java.io.FileInputStream
+import java.io.InputStream
 import java.io.OutputStream
+import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
 import java.util.Locale
 
@@ -76,10 +81,34 @@ class MainActivity : FlutterActivity() {
         DISCARDED,
     }
 
+    private class BackupCopy(val id: Int) {
+        val probe = CancellationSignal()
+        @Volatile var cancelled = false
+            private set
+        var started = false
+        private var writing = false
+
+        @Synchronized fun claimWrite(): Boolean {
+            if (cancelled) return false
+            writing = true
+            return true
+        }
+
+        // Once writing is claimed, the worker owns completion through rollback.
+        // During a read-only probe the caller can release the request immediately.
+        @Synchronized fun cancel(): Boolean {
+            if (!cancelled && started && !writing) Thread { probe.cancel() }.start()
+            cancelled = true
+            return !writing
+        }
+    }
+    private var backupCopy: BackupCopy? = null
+
     private val processTextChannelName = "app.process_text"
     private val fileSaveChannelName = "app.file_save"
     private val deviceStorageChannelName = "app.device_storage"
     private var processTextChannel: MethodChannel? = null
+    private lateinit var openFileChannel: MethodChannel
     private var fileSaveChannel: MethodChannel? = null
     private var deviceStorageChannel: MethodChannel? = null
     private var pendingProcessText: String? = null
@@ -117,7 +146,12 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-         super.configureFlutterEngine(flutterEngine)
+        super.configureFlutterEngine(flutterEngine)
+        // open_filex clears its handler on Activity detach but only registers
+        // it on engine creation. Rebind the retained plugin for each new host.
+        openFileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "open_file")
+        val openFilePlugin = flutterEngine.plugins.get(OpenFilePlugin::class.java) as? OpenFilePlugin
+        openFileChannel.setMethodCallHandler(openFilePlugin)
         kelivo.messageInput.attachActivity(this)
         selectionMenu = AndroidSelectionMenu(flutterEngine.dartExecutor.binaryMessenger) {
             findViewById<FlutterView>(FlutterActivity.FLUTTER_VIEW_ID)
@@ -147,6 +181,15 @@ class MainActivity : FlutterActivity() {
             }
             when (call.method) {
                 "saveFileFromPath" -> handleSaveFileFromPath(call.arguments, result)
+                "cancelSave" -> {
+                    val job = backupCopy
+                    if (job != null && job.id == call.arguments) {
+                        val untouched = job.cancel()
+                        if (!job.started) finishActivity(CREATE_DOCUMENT_REQUEST_CODE)
+                        else if (untouched) finishPendingSave(pendingSaveResult) { it.success(false) }
+                    }
+                    result.success(null)
+                }
                 "createWritableFile" -> handleCreateWritableFile(call.arguments, result)
                 "writeWritableFileChunk" -> handleWriteWritableFileChunk(call.arguments, result)
                 "completeWritableFile" -> handleCompleteWritableFile(result)
@@ -200,12 +243,15 @@ class MainActivity : FlutterActivity() {
         OAuthHandler.detachActivity(this)
         processTextChannel?.setMethodCallHandler(null)
         processTextChannel = null
+        openFileChannel.setMethodCallHandler(null)
         fileSaveChannel?.setMethodCallHandler(null)
         fileSaveChannel = null
         deviceStorageChannel?.setMethodCallHandler(null)
         deviceStorageChannel = null
-        finishPendingSave(pendingSaveResult) {
-            it.error("cancelled", "The file picker was closed.", null)
+        if (backupCopy?.cancel() != false) {
+            finishPendingSave(pendingSaveResult) {
+                it.error("cancelled", "The file picker was closed.", null)
+            }
         }
         val stream = pendingWritableStream
         val uri = pendingWritableUri
@@ -280,6 +326,7 @@ class MainActivity : FlutterActivity() {
 
         pendingSaveResult = result
         pendingSaveSourcePath = sourceFile.absolutePath
+        backupCopy = (args?.get("progressId") as? Number)?.let { BackupCopy(it.toInt()) }
 
         try {
             val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
@@ -432,6 +479,7 @@ class MainActivity : FlutterActivity() {
     ) {
         if (expected == null || pendingSaveResult !== expected) return
         pendingSaveResult = null
+        backupCopy = null
         pendingSaveSourcePath = null
         pendingDirectWrite = false
         reply(expected)
@@ -469,24 +517,123 @@ class MainActivity : FlutterActivity() {
             return
         }
 
+        val job = backupCopy
+        if (job?.cancelled == true) {
+            finishPendingSave(result) { it.success(false) }
+            return
+        }
+        job?.started = true
         Thread {
-            try {
-                contentResolver.openOutputStream(destUri)?.use { outputStream ->
-                    FileInputStream(File(sourcePath)).use { inputStream ->
-                        inputStream.copyTo(outputStream, DEFAULT_BUFFER_SIZE)
+            // SAF grants access to a single document. It cannot atomically
+            // replace an existing backup if the copy is cancelled or fails.
+            if (job != null && !isEmptyBackupDestination(destUri, job.probe)) {
+                runOnUiThread {
+                    finishPendingSave(result) {
+                        if (job.cancelled) it.success(false)
+                        else it.error("backup_destination_needs_new_file", "Choose a new backup file.", null)
                     }
-                } ?: throw IllegalStateException("Unable to open destination stream.")
-
-                runOnUiThread {
-                    finishPendingSave(result) { it.success(true) }
                 }
+                return@Thread
+            }
+            if (job != null && !job.claimWrite()) return@Thread
+            var opened = false
+            try {
+                val source = File(sourcePath)
+                FileInputStream(source).use { input ->
+                    if (job?.cancelled == true) throw CancellationException()
+                    contentResolver.openOutputStream(destUri, if (job == null) "w" else "wt")?.use { output ->
+                        opened = true
+                        if (job == null) {
+                            input.copyTo(output)
+                        } else {
+                            copyBackupWithProgress(input, output, source.length(), { job.cancelled }) { written, total ->
+                                runOnUiThread {
+                                    if (backupCopy === job) {
+                                        fileSaveChannel?.invokeMethod("saveProgress", listOf(job.id, written, total))
+                                    }
+                                }
+                            }
+                        }
+                    } ?: throw IllegalStateException("Unable to open destination stream.")
+                }
+                runOnUiThread { finishPendingSave(result) { it.success(true) } }
             } catch (e: Exception) {
+                var failure = e
+                if (job != null && opened) {
+                    try {
+                        // The picker may have returned an existing empty document.
+                        // Restore its contents while preserving its URI and grants.
+                        contentResolver.openOutputStream(destUri, "wt")?.close()
+                            ?: throw IllegalStateException("Unable to clear the incomplete backup.")
+                    } catch (cleanup: Exception) {
+                        cleanup.addSuppressed(e)
+                        failure = cleanup
+                    }
+                }
                 runOnUiThread {
-                    finishPendingSave(result) { it.error("save_failed", e.message, null) }
+                    finishPendingSave(result) {
+                        if (failure is CancellationException) it.success(false)
+                        else it.error("save_failed", failure.message, null)
+                    }
                 }
             }
         }.start()
     }
+
+    private fun isEmptyBackupDestination(uri: Uri, signal: CancellationSignal): Boolean {
+        val size = try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null, signal)?.use { cursor ->
+                val column = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (column >= 0 && cursor.moveToFirst() && !cursor.isNull(column)) cursor.getLong(column) else null
+            }
+        } catch (_: Exception) { null }
+        if (size != null && size > 0) return false
+        // Cloud providers may omit the size or report zero for existing data.
+        // Only observed EOF is sufficient to open the truncating stream.
+        return try {
+            signal.throwIfCanceled()
+            contentResolver.openAssetFileDescriptor(uri, "r", signal)?.use { asset ->
+                asset.createInputStream().use { input ->
+                    signal.setOnCancelListener { runCatching { input.close() } }
+                    try {
+                        signal.throwIfCanceled()
+                        input.read() == -1
+                    } finally {
+                        signal.setOnCancelListener(null)
+                    }
+                }
+            } == true
+        } catch (_: Exception) { false }
+    }
+}
+
+internal fun copyBackupWithProgress(
+    input: InputStream,
+    output: OutputStream,
+    total: Long,
+    cancelled: () -> Boolean,
+    report: (Long, Long) -> Unit,
+) {
+    val buffer = ByteArray(1024 * 1024)
+    var written = 0L
+    var last = System.nanoTime()
+    report(0, total)
+    while (true) {
+        if (cancelled()) throw CancellationException()
+        val n = input.read(buffer)
+        if (n < 0) break
+        output.write(buffer, 0, n)
+        written += n
+        val now = System.nanoTime()
+        if (written < total && (written == n.toLong() || now - last >= 100_000_000)) {
+            report(written, total)
+            last = now
+        }
+    }
+    check(written == total) { "Incomplete backup copy." }
+    if (cancelled()) throw CancellationException()
+    report(written, total)
+    output.flush()
 }
 
 internal fun fileSaveMimeType(fileName: String): String =

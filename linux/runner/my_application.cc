@@ -109,6 +109,42 @@ static void my_application_activate(GApplication* application) {
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
   g_autoptr(FlStandardMethodCodec) startup_codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) backup_keychain = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "kelivo/backup_keychain", FL_METHOD_CODEC(startup_codec));
+  fl_method_channel_set_method_call_handler(backup_keychain,
+      [](FlMethodChannel*, FlMethodCall* call, gpointer) {
+        if (g_strcmp0(fl_method_call_get_name(call), "unlocked") != 0) {
+          fl_method_call_respond_not_implemented(call, nullptr);
+          return;
+        }
+        // Inspect the default collection's Locked property without activating
+        // a secret service or sending an Unlock request.
+        g_autoptr(GDBusConnection) bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, nullptr);
+        if (bus == nullptr) {
+          g_autoptr(FlValue) value = fl_value_new_bool(FALSE);
+          fl_method_call_respond_success(call, value, nullptr);
+          return;
+        }
+        g_dbus_connection_call(bus, "org.freedesktop.secrets",
+            "/org/freedesktop/secrets/aliases/default", "org.freedesktop.DBus.Properties",
+            "Get", g_variant_new("(ss)", "org.freedesktop.Secret.Collection", "Locked"),
+            G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, 1500, nullptr,
+            [](GObject* connection, GAsyncResult* result, gpointer data) {
+              g_autoptr(FlMethodCall) pending = FL_METHOD_CALL(data);
+              g_autoptr(GVariant) reply = g_dbus_connection_call_finish(
+                  G_DBUS_CONNECTION(connection), result, nullptr);
+              gboolean unlocked = FALSE;
+              if (reply != nullptr) {
+                g_autoptr(GVariant) locked = nullptr;
+                g_variant_get(reply, "(v)", &locked);
+                unlocked = g_variant_is_of_type(locked, G_VARIANT_TYPE_BOOLEAN) &&
+                           !g_variant_get_boolean(locked);
+              }
+              g_autoptr(FlValue) value = fl_value_new_bool(unlocked);
+              fl_method_call_respond_success(pending, value, nullptr);
+            }, g_object_ref(call));
+      }, nullptr, nullptr);
   g_autoptr(FlMethodChannel) startup_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)),
       "app.desktop_startup", FL_METHOD_CODEC(startup_codec));

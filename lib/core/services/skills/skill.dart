@@ -1,5 +1,8 @@
 import '../../models/skill_record.dart';
 
+/// Reserved for bundle receipts and staging files in the skill library.
+const bundledSkillStoragePrefix = '.bundled-';
+
 class Skill {
   const Skill({
     required this.record,

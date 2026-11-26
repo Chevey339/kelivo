@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/services/chat/document_text_extractor.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -129,6 +130,25 @@ void main() {
     expect(streamErrors, ['Bad state: generation failed']);
     // The indicator is released for this message only, never globally.
     expect(clearedIndicatorIds, ['assistant-1']);
+
+    // Scheduled runs read errorCode; detached sends use the string callback.
+    // Both must retain the cause and the original display name.
+    final name = 'draft:${'稿😀' * 80}.txt';
+    final fileError = AttachmentReadError(AttachmentProblem.encoding, name);
+    await viewModel.debugChatActions.handleSendGenerationFailure(
+      error: fileError,
+      conversationId: 'conversation-1',
+      assistantMessage: assistantMessage,
+    );
+    expect(AttachmentReadError.fromMessage(streamErrors.last)?.name, name);
+    final saved = service.errorCodes.last!;
+    expect(saved.runes.length, lessThanOrEqualTo(128));
+    expect(saved, contains('…'));
+    expect(saved, endsWith('.txt'));
+    expect(
+      AttachmentReadError.fromMessage(service.errorCodes.last!)?.problem,
+      AttachmentProblem.encoding,
+    );
   });
 
   testWidgets('cancelled prepare does not notify onStreamError', (

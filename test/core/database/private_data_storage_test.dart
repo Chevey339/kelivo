@@ -18,6 +18,7 @@ import 'package:Kelivo/core/services/storage/device_storage_probe.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpRecoverySnapshotPaths();
   late Directory root, source, target;
   setUp(() async {
     root = await Directory.systemTemp.createTemp('kelivo-private-storage-');

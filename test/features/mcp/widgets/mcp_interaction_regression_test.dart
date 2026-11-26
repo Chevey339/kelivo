@@ -7,7 +7,7 @@ import 'package:Kelivo/desktop/widgets/desktop_form_dialog.dart';
 import 'package:Kelivo/desktop/setting/mcp_pane.dart';
 import 'package:Kelivo/features/mcp/pages/mcp_page.dart';
 import 'package:Kelivo/features/mcp/widgets/mcp_icon_picker.dart';
-import 'package:Kelivo/features/mcp/widgets/mcp_text_dialog.dart';
+import 'package:Kelivo/shared/widgets/text_input_dialog.dart';
 import 'package:Kelivo/features/provider/widgets/provider_icon_picker.dart';
 import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
@@ -269,7 +269,7 @@ void main() {
               onPressed: () async {
                 result = await showDialog<String>(
                   context: ctx,
-                  builder: (_) => McpTextDialog(
+                  builder: (_) => TextInputDialog(
                     title: 'Rename group',
                     hint: 'Name',
                     submitLabel: 'Save',

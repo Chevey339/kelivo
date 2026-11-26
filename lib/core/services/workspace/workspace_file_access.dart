@@ -3,6 +3,7 @@ import 'network_path_check.dart';
 import 'package:path/path.dart' as p;
 import '../conversation_tool_permissions.dart';
 import '../api/tool_call_cancellation.dart';
+import '../skills/skill.dart';
 import 'workspace_paths.dart';
 import 'workspace_runtime.dart';
 
@@ -111,13 +112,22 @@ class WorkspaceFileAccess {
       );
     }
     if (write &&
-        (lexical.zone == WorkspaceZone.skills ||
-            real.zone == WorkspaceZone.skills)) {
+        (_isReservedSkillPath(lexical) || _isReservedSkillPath(real))) {
       throw const ToolPermissionException(
-        'skills_readonly',
-        'The skills zone is read-only',
+        'path_outside',
+        'This path is reserved for skill library metadata',
       );
     }
+  }
+
+  bool _isReservedSkillPath(ResolvedPath target) {
+    if (target.zone != WorkspaceZone.skills) return false;
+    final relative = WorkspacePaths.relativeToHostRoot(
+      paths.skillsHostDir,
+      target.hostPath,
+    );
+    return relative?.toLowerCase().startsWith(bundledSkillStoragePrefix) ??
+        false;
   }
 
   /// Scans never follow descendant links, even after approving an external root.

@@ -1,3 +1,5 @@
+import '../../core/models/media_creation.dart';
+import '../../features/model/widgets/creation_default_models.dart';
 import '../../features/chat/widgets/compression_template_library.dart';
 import '../../features/home/widgets/model_icon.dart';
 import 'package:flutter/material.dart';
@@ -315,12 +317,40 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     configAction: () => _showOcrPromptDialog(context),
                   ),
+                  for (final slot in CreationModelSlot.values) ...[
+                    const SizedBox(height: 16),
+                    _buildCreationCard(context, settings, slot),
+                  ],
                 ],
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCreationCard(
+    BuildContext context,
+    SettingsProvider settings,
+    CreationModelSlot slot,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final labels = creationDefaultModelLabels(l10n, slot);
+    final selected = settings.creationModel(slot);
+    return _ModelCard(
+      icon: labels.icon,
+      title: labels.title,
+      subtitle: labels.subtitle,
+      modelProvider: selected?.providerKey,
+      modelId: selected?.modelId,
+      disabledWhenUnset: true,
+      onPick: () => pickCreationDefaultModel(context, slot),
+      resetTooltip: l10n.defaultModelPageResetDefault,
+      onReset: () => settings.setCreationModel(slot, null),
+      configAction: slot == CreationModelSlot.promptEnhance
+          ? () => editCreationEnhancePrompt(context, desktop: true)
+          : null,
     );
   }
 

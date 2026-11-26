@@ -1,16 +1,16 @@
 import 'dart:async';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/models/avatar_config.dart';
 import '../../../core/models/mcp_presentation.dart';
-import '../../../core/services/mcp/mcp_icon_cache.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
 import '../../../shared/widgets/emoji_picker_dialog.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../utils/icon_cache.dart';
 import '../../provider/widgets/avatar_input_dialog.dart';
+import '../../provider/widgets/avatar_picker.dart';
 import '../../provider/widgets/provider_icon_picker.dart';
-import 'mcp_text_dialog.dart';
+import '../../../shared/widgets/text_input_dialog.dart';
 
 Future<void> showMcpIconPicker(
   BuildContext context, {
@@ -35,24 +35,11 @@ Future<void> showMcpIconPicker(
         if (value == null) return;
         icon = McpServerIcon(type: McpIconType.emoji, value: value);
       case AvatarSource.image:
-        final files = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: [
-            'png',
-            'jpg',
-            'jpeg',
-            'webp',
-            'gif',
-            'svg',
-            'ico',
-            'bmp',
-          ],
-        );
-        final path = files?.files.single.path;
+        final path = await pickAvatarImageFile();
         if (path == null) return;
         icon = McpServerIcon(
           type: McpIconType.file,
-          value: await McpIconCache.importFile(path),
+          value: await IconCache.importFile(path),
         );
       case AvatarSource.builtin:
         final asset = await showProviderIconPicker(
@@ -70,7 +57,7 @@ Future<void> showMcpIconPicker(
           desktop: desktop,
           title: l10n.sideDrawerImageUrlDialogTitle,
           hint: l10n.sideDrawerImageUrlDialogHint,
-          valid: (value) => McpIconCache.isWebUri(Uri.tryParse(value)),
+          valid: (value) => IconCache.isWebUri(Uri.tryParse(value)),
         );
         if (value == null) return;
         icon = McpServerIcon(type: McpIconType.url, value: value);
@@ -116,7 +103,8 @@ Future<String?> _input(
 }) async {
   return showDialog<String>(
     context: context,
-    builder: (_) => McpTextDialog(
+    builder: (_) => TextInputDialog(
+      cancelLabel: AppLocalizations.of(context)!.mcpPageCancel,
       title: title,
       hint: hint,
       valid: valid,

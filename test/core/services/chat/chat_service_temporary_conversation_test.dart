@@ -103,9 +103,13 @@ void main() {
       final conversation = await chat.createDraftConversation(
         temporary: temporary,
       );
+      expect(
+        (await chat.imageContextSettings(conversation.id)).allowRecall,
+        isFalse,
+      );
       await chat.setImageContextSettings(
         conversation.id,
-        const ImageContextSettings(allowRecall: false),
+        const ImageContextSettings(allowRecall: true),
       );
       final message = await chat.addMessage(
         conversationId: conversation.id,
@@ -119,7 +123,7 @@ void main() {
       final image = RequestImageContext.collect(before).single;
       expect(image.key, ContextImageIdentity(message.id, 'part:1').key);
       final settings = await chat.imageContextSettings(conversation.id);
-      expect(settings.allowRecall, isFalse);
+      expect(settings.allowRecall, isTrue);
       final revision = chat.contextRevision(conversation.id);
       await chat.setImageContextSettings(
         conversation.id,
@@ -131,7 +135,7 @@ void main() {
       });
       expect(
         (await chat.imageContextSettings(conversation.id)).allowRecall,
-        isFalse,
+        isTrue,
       );
       expect(
         (await chat.chatRepositoryOrNull!.readImageContextSettings(
@@ -143,12 +147,29 @@ void main() {
         (await chat.chatRepositoryOrNull!.readImageContextSettings(
           conversation.id,
         )).allowRecall,
-        temporary,
+        !temporary,
       );
+      await chat.updateImageContextSettings(
+        conversation.id,
+        (value) => value.exclude({image.key}, true),
+      );
+      final fork = await chat.forkConversationFromMessages(
+        title: 'Selected messages',
+        assistantId: null,
+        sourceMessages: before,
+        activate: false,
+      );
+      final forkImage = RequestImageContext.collect(
+        await chat.imageContextHistory(fork.id),
+      ).single;
+      expect(forkImage.key, isNot(image.key));
+      expect((await chat.imageContextSettings(fork.id)).excluded, {
+        forkImage.key,
+      });
       await chat.clearConversationContext(conversation.id);
       expect(
         (await chat.imageContextSettings(conversation.id)).allowRecall,
-        isFalse,
+        isTrue,
       );
       expect(await chat.imageContextHistory(conversation.id), isEmpty);
       expect(
@@ -181,7 +202,7 @@ void main() {
       );
       expect(
         (await chat.imageContextSettings(conversation.id)).allowRecall,
-        isTrue,
+        isFalse,
       );
     });
   }
@@ -1501,6 +1522,32 @@ void main() {
           'temporary message 3',
           'temporary message 4',
         ]);
+      },
+    );
+
+    test(
+      'temporary conversation find yields bounded batches in message order',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = await service.createDraftConversation(
+          temporary: true,
+        );
+        final ids = <String>[];
+        for (var i = 0; i < 53; i++) {
+          final message = await service.addMessage(
+            conversationId: conversation.id,
+            role: i.isEven ? 'user' : 'assistant',
+            content: 'message $i',
+          );
+          ids.add(message.id);
+        }
+
+        final pages = await service
+            .conversationFindCandidates(conversation.id)
+            .toList();
+        expect(pages.map((page) => page.length), [48, 5]);
+        expect(pages.expand((page) => page.map((row) => row.id)), ids);
       },
     );
 

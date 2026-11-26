@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
+import 'backup_task_progress.dart';
 import 'restore_durability.dart';
 import 'restore_previous_builder.dart';
 import 'restore_previous_plan.dart';
@@ -29,6 +30,7 @@ final class PersistedRestorePrevious {
 final class RestorePreviousStore {
   RestorePreviousStore({
     required this.runDirectory,
+    this.onProgress,
     RestoreDurability? durability,
   }) : durability = durability ?? RestorePlatformDurability() {
     if (!RegExp(
@@ -44,6 +46,7 @@ final class RestorePreviousStore {
   static const _maximumControlBytes = 16 * 1024 * 1024;
 
   final Directory runDirectory;
+  final BackupProgressSink? onProgress;
   final RestoreDurability durability;
 
   Directory get pendingDirectory =>
@@ -168,6 +171,7 @@ final class RestorePreviousStore {
     await RestorePreviousBuilder.validateStoredPayload(
       directory: previous.directory,
       expected: previous.plan,
+      onProgress: onProgress,
     );
   }
 

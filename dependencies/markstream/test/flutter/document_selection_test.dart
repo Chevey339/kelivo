@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
@@ -14,13 +15,38 @@ Future<void> drag(
   int start,
   String to,
   int end,
-) async {
-  final gesture = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
-  await gesture.addPointer();
-  await gesture.down(edge(paragraph(from), start));
-  await gesture.moveTo(edge(paragraph(to), end - 1, end: true));
+) => _dragBetween(
+  tester,
+  edge(paragraph(from), start),
+  edge(paragraph(to), end - 1, end: true),
+);
+
+Future<void> _dragBetween(WidgetTester tester, Offset start, Offset end) async {
+  final gesture = await tester.startGesture(
+    start,
+    kind: ui.PointerDeviceKind.mouse,
+  );
+  await gesture.moveTo(end);
   await gesture.up();
+  await gesture.removePointer();
   await tester.pumpAndSettle();
+}
+
+Offset _logicalEdge(
+  RenderParagraph paragraph,
+  int character, {
+  bool end = false,
+}) {
+  final box = paragraph
+      .getBoxesForSelection(
+        TextSelection(baseOffset: character, extentOffset: character + 1),
+      )
+      .single;
+  return edge(
+    paragraph,
+    character,
+    end: end == (box.direction == TextDirection.ltr),
+  );
 }
 
 void main() {
@@ -156,6 +182,334 @@ void main() {
     );
     expect(controller.selections.single.sourceRanges.first.start, 10);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+  testWidgets(
+    'partial inline code selection preserves text and source offsets',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(controller.dispose);
+      String? native;
+      await tester.pumpWidget(
+        host(
+          MarkstreamView(
+            source: 'Before `archived: true` after',
+            selectionController: controller,
+          ),
+          selectable: true,
+          onSelection: (value) => native = value?.plainText,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await drag(tester, 'archived', 1, 'archived', 8);
+      expect(native, 'rchived');
+      expect(controller.selectedPlainText, native);
+      expect(controller.selectedMarkdown, '`rchived`');
+      final sourceRange = controller.selections.single.sourceRanges.single;
+      expect((sourceRange.start, sourceRange.end), (9, 16));
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+      expect(native, 'rchived:');
+      expect(controller.selectedPlainText, native);
+
+      tester
+          .state<SelectableRegionState>(find.byType(SelectableRegion))
+          .clearSelection();
+      await tester.pump(const Duration(milliseconds: 600));
+      await drag(tester, 'Before', 0, 'archived', 8);
+      expect(native, 'Before archived');
+      expect(controller.selectedPlainText, native);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'inline code drag follows source order across mixed text directions',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(controller.dispose);
+      String? native;
+      for (final (before, code, after, direction) in [
+        ('אבגדה ', 'archived: true', ' וזחטי', TextDirection.rtl),
+        ('Before ', 'אבגדה וזהחטי', ' after', TextDirection.ltr),
+      ]) {
+        await tester.pumpWidget(
+          host(
+            Directionality(
+              textDirection: direction,
+              child: MarkstreamView(
+                source: '$before`$code`$after',
+                selectionController: controller,
+              ),
+            ),
+            selectable: true,
+            onSelection: (value) => native = value?.plainText,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final prose = paragraph(before);
+        final start = _logicalEdge(prose, 0);
+        final end = _logicalEdge(
+          prose,
+          before.length + after.length,
+          end: true,
+        );
+        final inside = _logicalEdge(paragraph(code), 4, end: true);
+        for (final (a, b, expected) in [
+          (start, end, '$before$code$after'),
+          (end, start, '$before$code$after'),
+          (start, inside, '$before${code.substring(0, 5)}'),
+          (inside, start, '$before${code.substring(0, 5)}'),
+        ]) {
+          tester
+              .state<SelectableRegionState>(find.byType(SelectableRegion))
+              .clearSelection();
+          await tester.pump(const Duration(milliseconds: 600));
+          await _dragBetween(tester, a, b);
+          expect(native, expected);
+          expect(controller.selectedPlainText, expected);
+        }
+      }
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'partial HTML code and keyboard labels copy only the selected text',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(controller.dispose);
+      String? native;
+      await tester.pumpWidget(
+        host(
+          MarkstreamView(
+            source:
+                'Before <code>archived: true</code> then <kbd>spacebar</kbd> after',
+            selectionController: controller,
+          ),
+          selectable: true,
+          onSelection: (value) => native = value?.plainText,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final (code, selected, markdown, source) in [
+        ('archived', 'rchi', '<code>rchi</code>', (14, 18)),
+        ('spacebar', 'pace', '<kbd>pace</kbd>', (46, 50)),
+      ]) {
+        tester
+            .state<SelectableRegionState>(find.byType(SelectableRegion))
+            .clearSelection();
+        await tester.pump(const Duration(milliseconds: 600));
+        await drag(tester, code, 1, code, 5);
+        expect(native, selected);
+        expect(controller.selectedPlainText, selected);
+        expect(controller.selectedMarkdown, markdown);
+        final range = controller.selections.single.sourceRanges.single;
+        expect((range.start, range.end), source);
+      }
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'partial HTML code omits unselected content from flattened children',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(controller.dispose);
+      const source =
+          'Before <code><img src="x.png" alt="archived: true">'
+          'end<img src="y.png" alt=""></code> after';
+      await tester.pumpWidget(
+        host(
+          MarkstreamView(source: source, selectionController: controller),
+          selectable: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await drag(tester, 'archived', 1, 'archived', 4);
+      expect(controller.selectedPlainText, 'rch');
+      expect(controller.selectedMarkdown, '<code>rch</code>');
+
+      selectAll(tester);
+      await tester.pumpAndSettle();
+      expect(controller.selectedPlainText, 'Before archived: trueend after');
+      expect(controller.selectedMarkdown, source);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'HTML code with generated separators preserves fully selected markup',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(controller.dispose);
+      const source =
+          'Before <code><table><tr><td>alpha</td><td>beta</td></tr></table>'
+          ' twice</code> after';
+      await tester.pumpWidget(
+        host(
+          MarkstreamView(source: source, selectionController: controller),
+          width: 750,
+          selectable: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      selectAll(tester);
+      await tester.pumpAndSettle();
+      expect(controller.selectedPlainText, 'Before alpha\tbeta twice after');
+      expect(controller.selectedMarkdown, source);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'literal replacement characters count toward inline code selection offsets',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(controller.dispose);
+      const source = 'Before `a\uFFFCb` after';
+      String? native;
+      await tester.pumpWidget(
+        host(
+          MarkstreamView(source: source, selectionController: controller),
+          selectable: true,
+          onSelection: (value) => native = value?.plainText,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      selectAll(tester);
+      await tester.pumpAndSettle();
+      expect(native, 'Before a\uFFFCb after');
+      expect(controller.selectedMarkdown, source);
+
+      tester
+          .state<SelectableRegionState>(find.byType(SelectableRegion))
+          .clearSelection();
+      await tester.pump(const Duration(milliseconds: 600));
+      await drag(tester, 'a\uFFFCb', 2, 'Before', 'Before \uFFFC after'.length);
+      expect(native, 'b after');
+      expect(controller.selectedMarkdown, '`b` after');
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'inline code selection crosses reference chips in source order',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(controller.dispose);
+      const reference = '\uFFFC';
+      final extensions = MarkstreamExtensions(
+        literalSpanBuilder: (_, span, _) {
+          final parts = span.toPlainText().split(reference);
+          return TextSpan(
+            style: span.style,
+            children: [
+              for (var i = 0; i < parts.length; i++) ...[
+                if (i > 0)
+                  const WidgetSpan(
+                    alignment: PlaceholderAlignment.baseline,
+                    baseline: TextBaseline.alphabetic,
+                    child: SelectableSpanAdapter(
+                      selectedText: reference,
+                      child: Text('Reference'),
+                    ),
+                  ),
+                TextSpan(text: parts[i]),
+              ],
+            ],
+          );
+        },
+      );
+      String? native;
+      Future<void> mount(String code, {double width = 390}) async {
+        await tester.pumpWidget(
+          host(
+            MarkstreamView(
+              source: 'Before `$code` after',
+              extensions: extensions,
+              selectionController: controller,
+            ),
+            width: width,
+            selectable: true,
+            onSelection: (value) => native = value?.plainText,
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await mount(
+        'ab$reference'
+        'cd',
+      );
+      await drag(tester, 'ab', 1, 'ab', 2);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+      expect(
+        native,
+        'b$reference'
+        'c',
+      );
+      expect(
+        controller.selectedMarkdown,
+        '`b$reference'
+        'c`',
+      );
+
+      const bidiCode =
+          'אבג$reference'
+          'דהו$reference'
+          'זחט';
+      await mount(bidiCode, width: 180);
+      selectAll(tester);
+      await tester.pumpAndSettle();
+      expect(native, 'Before $bidiCode after');
+      expect(controller.selectedMarkdown, 'Before `$bidiCode` after');
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'selection stays valid when a streaming inline code capsule is reparsed',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(controller.dispose);
+      final source = ValueNotifier('Before `archived: tr`');
+      addTearDown(source.dispose);
+      await tester.pumpWidget(
+        host(
+          ValueListenableBuilder(
+            valueListenable: source,
+            builder: (_, value, _) => MarkstreamView(
+              source: value,
+              streaming: true,
+              selectionController: controller,
+            ),
+          ),
+          width: 520,
+          selectable: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await drag(tester, 'Before', 0, 'archived', 8);
+      expect(controller.selectedMarkdown, 'Before `archived`');
+
+      source.value += '` then more`';
+      await tester.pumpAndSettle();
+      expect(controller.selectedMarkdown, 'Before `archived`');
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
   testWidgets('folded content and paginated rows never leak into Markdown', (
     tester,
   ) async {

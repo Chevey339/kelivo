@@ -4,6 +4,7 @@ import '../services/backup/data_sync.dart';
 import '../services/backup/restore_startup_gate.dart';
 import 'startup_recovery_service.dart';
 import 'database_installation_gate.dart';
+import 'chat_database_repository.dart';
 import 'database_family_preserver.dart';
 import '../services/backup/restore_workspace_lock.dart';
 import '../services/legacy_data_retirement_service.dart';
@@ -139,6 +140,7 @@ abstract final class PrivateDataStorage {
     required Directory source,
     required Directory target,
     void Function()? onCopying,
+    DatabaseUpgradeStageSink? onUpgradeStage,
     RestoreDurability? durability,
   }) async {
     if (p.equals(source.absolute.path, target.absolute.path) ||
@@ -172,7 +174,7 @@ abstract final class PrivateDataStorage {
           durability: io,
         );
         try {
-          await _finishRecovery(target, io);
+          await _finishRecovery(target, io, onUpgradeStage: onUpgradeStage);
         } finally {
           await targetLease.close();
         }
@@ -261,9 +263,18 @@ abstract final class PrivateDataStorage {
       // Startup still has to upgrade the copied database. Budget its retained
       // backup and journal before activating the new directory, not just the
       // first copy. The source remains untouched on an insufficient-space exit.
-      requiredBytes += await SchemaMigrations.additionalUpgradeBytes(
+      var upgradeBytes = await SchemaMigrations.additionalUpgradeBytes(
         File(p.join(source.path, 'kelivo.db')),
       );
+      for (final name in before.keys.where(
+        ChatDatabaseRepository.isPremigrationBackup,
+      )) {
+        final bytes = await SchemaMigrations.additionalUpgradeBytes(
+          File(p.join(source.path, name)),
+        );
+        if (bytes > upgradeBytes) upgradeBytes = bytes;
+      }
+      requiredBytes += upgradeBytes;
       await InsufficientStorageSpace.require(requiredBytes);
       await staged.create(recursive: true);
       await io.restrictDirectory(staged);
@@ -445,8 +456,9 @@ abstract final class PrivateDataStorage {
 
   static Future<void> _finishRecovery(
     Directory target,
-    RestoreDurability io,
-  ) async {
+    RestoreDurability io, {
+    DatabaseUpgradeStageSink? onUpgradeStage,
+  }) async {
     final intentFile = File(p.join(target.parent.path, recoveryName));
     final intent = await _readRecord(intentFile);
     if (intent['runId'] is String) {
@@ -460,6 +472,7 @@ abstract final class PrivateDataStorage {
       final receipt = await DatabaseInstallationGate.ensureReady(
         appDataDirectory: target,
         durability: io,
+        onUpgradeStage: onUpgradeStage,
       );
       if (receipt.databaseId != intent['databaseId']) {
         throw StateError('private_storage_recovery_identity');
@@ -530,6 +543,7 @@ abstract final class PrivateDataStorage {
   // neither copied nor hashed during activation.
   static bool _isDatabaseState(String name) =>
       DatabaseFamilyPreserver.suffixes.any((s) => name == 'kelivo.db$s') ||
+      ChatDatabaseRepository.isPremigrationBackup(name) ||
       name.startsWith('database_installation_receipt_') ||
       name == DatabaseInstallationGate.historyFileName ||
       name == RestoreWorkspaceLock.workspaceRootName ||

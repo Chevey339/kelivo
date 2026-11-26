@@ -1,9 +1,56 @@
+import 'dart:collection';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/services/api/json_schema_utils.dart';
 
+class _TrackedDefinitions extends MapView<String, dynamic> {
+  _TrackedDefinitions(super.map);
+  final reads = <Object?>[];
+  @override
+  dynamic operator [](Object? key) {
+    reads.add(key);
+    return super[key];
+  }
+}
+
 void main() {
   group('resolveJsonSchemaRefs', () {
+    test(
+      'native nullable probe checks only the type of an unretained reference',
+      () {
+        const child = {
+          'anyOf': [
+            {'type': 'null'},
+            {r'$ref': r'#/$defs/Street'},
+          ],
+        };
+        final definitions = _TrackedDefinitions({
+          'Alias': {r'$ref': r'#/$defs/Address'},
+          'Address': {
+            'properties': {'home': child, 'work': child},
+          },
+          'Street': {'type': 'string'},
+          'Count': {'type': 'integer'},
+        });
+        final resolved = resolveJsonSchemaRefs({
+          r'$defs': definitions,
+          'type': 'object',
+          'properties': {
+            'address': {
+              'anyOf': [
+                {'type': 'null'},
+                {r'$ref': r'#/$defs/Alias'},
+              ],
+            },
+            'count': {r'$ref': r'#/$defs/Count'},
+          },
+        }, preserveJsonSchema: false);
+        expect(definitions.reads, ['Alias', 'Address', 'Count']);
+        expect(resolved['properties']['count'], {'type': 'integer'});
+      },
+    );
+
     test('inlines a \$defs reference and drops the definition block', () {
       final resolved = resolveJsonSchemaRefs({
         'type': 'object',

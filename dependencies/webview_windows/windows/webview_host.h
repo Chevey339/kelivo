@@ -26,6 +26,9 @@ struct WebviewCreationError {
 
 class WebviewHost : public std::enable_shared_from_this<WebviewHost> {
  public:
+  using EnvironmentCreationCallback =
+      std::function<void(wil::com_ptr<ICoreWebView2Environment3>)>;
+
   typedef std::function<void(std::unique_ptr<Webview>,
                              std::unique_ptr<WebviewCreationError>)>
       WebviewCreationCallback;
@@ -36,11 +39,15 @@ class WebviewHost : public std::enable_shared_from_this<WebviewHost> {
                              std::unique_ptr<WebviewCreationError>)>
       PointerInfoCreationCallback;
 
-  static std::unique_ptr<WebviewHost> Create(
-      WebviewPlatform* platform,
-      std::optional<std::wstring> user_data_directory = std::nullopt,
-      std::optional<std::wstring> browser_exe_path = std::nullopt,
-      std::optional<std::string> arguments = std::nullopt);
+  static void CreateEnvironment(
+      const std::optional<std::wstring>& user_data_directory,
+      const std::optional<std::wstring>& browser_exe_path,
+      const std::optional<std::string>& arguments,
+      EnvironmentCreationCallback callback);
+
+  WebviewHost(WebviewPlatform* platform,
+              wil::com_ptr<ICoreWebView2Environment3> webview_env);
+  ~WebviewHost();
 
   void CreateWebview(HWND hwnd, bool offscreen_only, bool owns_window, bool restricted,
                      WebviewCreationCallback callback);
@@ -56,8 +63,6 @@ class WebviewHost : public std::enable_shared_from_this<WebviewHost> {
   winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor> compositor_;
   wil::com_ptr<ICoreWebView2Environment3> webview_env_;
 
-  WebviewHost(WebviewPlatform* platform,
-              wil::com_ptr<ICoreWebView2Environment3> webview_env);
   void CreateWebViewCompositionController(
       HWND hwnd, CompositionControllerCreationCallback cb);
 };

@@ -115,6 +115,16 @@ void main() {
       ('MiniMax', 'minimax-color.svg'): ['MiniMaxAI/MiniMax-M3'],
       ('Grok', 'grok.svg'): ['x-ai/grok-4'],
       ('Sora', 'sora-color.svg'): ['sora-2'],
+      ('Devin', 'devin-color.svg'): [
+        'swe-2-flash-medium',
+        'devin2api/swe-2-flash-medium',
+        'devin2api/swe-1-6-slow',
+      ],
+      ('Pangu', 'huawei-color.svg'): [
+        'openpangu-2.0-flash',
+        'huawei/openPangu-2.0-Flash',
+        'pangu-mm-m2-img2txt-12k',
+      ],
     };
 
     for (final entry in families.entries) {
@@ -144,12 +154,33 @@ void main() {
         'skating',
         'sterling',
         'ringbuffer',
+        'swe-20',
+        'openpangux',
         'custom-model',
       ]) {
         expect(groupFor(id), '其他模型', reason: id);
         expect(BrandAssets.assetForName(id), isNull, reason: id);
       }
     });
+
+    test(
+      'the devin2api namespace leaves unrelated models in their own groups',
+      () {
+        for (final id in [
+          'devin2api/custom-model',
+          'devin2api/swe-grep',
+          'devin2api/swe-check',
+        ]) {
+          expect(groupFor(id), '其他模型', reason: id);
+          expect(BrandAssets.assetForName(id), isNull, reason: id);
+        }
+        expect(groupFor('devin2api/kimi-k3'), 'Kimi');
+        expect(
+          BrandAssets.assetForName('devin2api/kimi-k3'),
+          'assets/icons/kimi-color.svg',
+        );
+      },
+    );
 
     test('model names take precedence over hosting providers', () {
       expect(

@@ -101,6 +101,7 @@ class _ToolSchemaSettingsPageState extends State<ToolSchemaSettingsPage> {
     final cs = Theme.of(context).colorScheme;
     final title = switch (group) {
       BuiltInToolGroup.search => l10n.toolSchemaSettingsGroupSearch,
+      BuiltInToolGroup.images => l10n.toolSchemaSettingsGroupImages,
       BuiltInToolGroup.memory => l10n.toolSchemaSettingsGroupMemory,
       BuiltInToolGroup.local => l10n.toolSchemaSettingsGroupLocal,
       BuiltInToolGroup.workspace => l10n.workspacesTitle,

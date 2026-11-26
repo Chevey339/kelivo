@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'dart:io';
-import '../../database/database_family_preserver.dart';
 import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../database/app_database.dart';
+import '../../database/database_family_preserver.dart';
 import '../../database/database_installation_gate.dart';
 import '../hive_migration_marker.dart';
 import '../legacy_data_retirement_service.dart';
@@ -15,15 +16,17 @@ import '../backup/restore_trace_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
 import '../logging/flutter_logger.dart';
+import '../media/media_generation_runner.dart';
 import '../network/request_logger.dart';
 import '../sandbox/rootfs_disk_usage.dart';
 import '../workspace/workspace_session_sync.dart';
-import 'storage_image_usage.dart';
+import 'storage_attachment_usage.dart';
 import 'attachment_file_lock.dart';
 
 enum StorageUsageCategoryKey {
   images,
   files,
+  creations,
   chatData,
   legacyChatData,
   restoreTraces,
@@ -80,11 +83,13 @@ class StorageUsageReport {
   final int totalFiles;
   final StorageUsageStats clearable;
   final List<StorageUsageCategory> categories;
+  final StorageUploadFiles uploads;
   const StorageUsageReport({
     required this.totalBytes,
     required this.totalFiles,
     required this.clearable,
     required this.categories,
+    this.uploads = const StorageUploadFiles(),
   });
 }
 
@@ -94,15 +99,125 @@ class StorageFileEntry {
   final int bytes;
   final DateTime modifiedAt;
   final StorageImageKind? imageKind;
-  final bool isInUse;
+
+  /// Null until the reference scan has confirmed the file's status.
+  final bool? isInUse;
+  bool get canDelete => isInUse == false;
+  final Map<String, String> conversations;
+  final DateTime? pendingDeletionAt;
   const StorageFileEntry({
     required this.path,
     required this.name,
     required this.bytes,
     required this.modifiedAt,
     this.imageKind,
-    this.isInUse = false,
+    this.isInUse,
+    this.conversations = const {},
+    this.pendingDeletionAt,
   });
+}
+
+class StorageUploadFiles {
+  const StorageUploadFiles({this.images = const [], this.files = const []});
+
+  final List<StorageFileEntry> images;
+  final List<StorageFileEntry> files;
+  bool get isEmpty => images.isEmpty && files.isEmpty;
+
+  bool hasSameFiles(StorageUploadFiles other) {
+    bool same(List<StorageFileEntry> a, List<StorageFileEntry> b) {
+      if (a.length != b.length) return false;
+      for (var i = 0; i < a.length; i++) {
+        if (a[i].path != b[i].path ||
+            a[i].bytes != b[i].bytes ||
+            a[i].modifiedAt != b[i].modifiedAt) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    return same(images, other.images) && same(files, other.files);
+  }
+}
+
+/// The storage page owns this cache. Only the listed files and their labels
+/// survive a scan; the database, message payloads and full index stay in the worker.
+class StorageUploadSession {
+  StorageUploadSession({this.readVersion});
+  final Future<(int, int)> Function()? readVersion;
+  StorageUploadFiles _directory = const StorageUploadFiles();
+  StorageUploadFiles get directory => _directory;
+  StorageUploadFiles? _checked;
+  Future<StorageUploadFiles?>? _listing;
+  int _directoryRevision = 0;
+  Future<StorageUploadFiles>? _inFlight;
+  ({(int, int)? database, int transient})? _version;
+
+  void reset(StorageUploadFiles files) {
+    invalidateDirectory();
+    _directory = files;
+    _checked = null;
+  }
+
+  void invalidateDirectory() => _directoryRevision++;
+
+  /// Share the directory walk across categories. A change during the walk
+  /// returns null so the latest visible request can enumerate again.
+  Future<StorageUploadFiles?> refreshDirectory() =>
+      _listing ??= _refreshDirectory().whenComplete(() => _listing = null);
+
+  Future<StorageUploadFiles?> _refreshDirectory() async {
+    final revision = _directoryRevision;
+    final StorageUploadFiles files;
+    try {
+      files = await StorageUsageService.readUploadFiles();
+    } catch (_) {
+      if (revision == _directoryRevision) rethrow;
+      return null;
+    }
+    if (revision != _directoryRevision) return null;
+    if (!_directory.hasSameFiles(files)) reset(files);
+    return _directory;
+  }
+
+  Future<StorageUploadFiles> inspect() =>
+      _inFlight ??= _inspect().whenComplete(() => _inFlight = null);
+
+  Future<StorageUploadFiles> _inspect() async {
+    if (_directory.isEmpty) return _directory;
+    final version = (
+      database: await readVersion?.call(),
+      transient: AttachmentFileLock.transientRevision,
+    );
+    final files = _directory;
+    if (files.isEmpty) return files;
+    if (version.database != null && _version == version && _checked != null) {
+      return _checked!;
+    }
+
+    // A write or refresh supersedes both labels and errors from that snapshot.
+    // Only a visible detail will retry a result that is still unknown.
+    Future<bool> isCurrent() async =>
+        version.database == await readVersion?.call() &&
+        version.transient == AttachmentFileLock.transientRevision &&
+        identical(files, _directory);
+
+    final StorageUploadFiles checked;
+    try {
+      checked = await StorageUsageService._inspectUploads(
+        files,
+        AttachmentFileLock.captureTransient(),
+      );
+    } catch (_) {
+      if (await isCurrent()) rethrow;
+      return _directory;
+    }
+    if (!await isCurrent()) return _directory;
+    _version = version;
+    _checked = checked;
+    return checked;
+  }
 }
 
 /// Name of the append-only record written before an unattended database
@@ -156,6 +271,7 @@ abstract final class StorageUsageService {
   }
 
   static Future<StorageUsageReport> computeReport({
+    bool includeUploadFiles = false,
     Future<Directory> Function()? workspacesDirectory,
     Future<Directory> Function()? environmentDirectory,
     Future<Directory> Function()? skillsDirectory,
@@ -164,6 +280,7 @@ abstract final class StorageUsageService {
   }) async {
     final root = await AppDirectories.getAppDataDirectory();
     final contentRoot = await AppDirectories.contentDirectoryFor(root);
+    final creationsDir = Directory(p.join(contentRoot.path, 'generations'));
     final splitStorage = !p.equals(root.path, contentRoot.path);
     var migrationCompleted = false;
     try {
@@ -217,6 +334,7 @@ abstract final class StorageUsageService {
 
     int totalBytes = 0;
     int totalFiles = 0;
+    final uploadDirectories = <String>[];
 
     if (!await root.exists() && !await contentRoot.exists()) {
       return StorageUsageReport(
@@ -241,14 +359,24 @@ abstract final class StorageUsageService {
       try {
         await for (final ent in _listFiles(
           scanRoot,
-          excludedTopDirectories: _isolateMeasuredTopDirs,
+          skipTopDirectory: (dir) {
+            if (p.equals(dir.path, creationsDir.path)) return true;
+            final name = p.basename(dir.path);
+            if (includeUploadFiles &&
+                (!splitStorage || publicFiles) &&
+                _uploadDirectories.any((known) => p.equals(name, known))) {
+              uploadDirectories.add(dir.path);
+              return true;
+            }
+            return _isolateMeasuredTopDirs.contains(name.toLowerCase());
+          },
         )) {
           final rel = p.relative(ent.path, from: scanRoot.path);
           final parts = p.split(rel);
           int bytes = 0;
           try {
             bytes = await ent.length();
-          } catch (_) {
+          } on FileSystemException {
             bytes = 0;
           }
           totalFiles += 1;
@@ -375,12 +503,24 @@ abstract final class StorageUsageService {
       }
     }
 
-    final [
+    var uploads = const StorageUploadFiles();
+    if (uploadDirectories.isNotEmpty) {
+      final inventory = await _readUploadDirectories(uploadDirectories);
+      uploads = inventory.files;
+      byCat[StorageUsageCategoryKey.images]!.addStats(inventory.imagesStats);
+      byCat[StorageUsageCategoryKey.files]!.addStats(inventory.filesStats);
+      totalFiles +=
+          inventory.imagesStats.fileCount + inventory.filesStats.fileCount;
+      totalBytes += inventory.imagesStats.bytes + inventory.filesStats.bytes;
+    }
+
+    final (
       workspaceUsage,
       skillsUsage,
       sessionsUsage,
       sandboxUsage,
-    ] = await Future.wait([
+      creationUsage,
+    ) = await (
       _measureContentsOf(
         workspacesDirectory ?? AppDirectories.getWorkspacesDirectory,
       ),
@@ -393,7 +533,8 @@ abstract final class StorageUsageService {
             environmentDirectory ?? AppDirectories.getEnvironmentDirectory,
         rootfsUsageDirectory: rootfsUsageDirectory,
       ),
-    ]);
+      _measureContentsOf(() async => creationsDir),
+    ).wait;
     byCat[StorageUsageCategoryKey.workspaceFiles]!.addStats(
       workspaceUsage.stats,
     );
@@ -402,16 +543,19 @@ abstract final class StorageUsageService {
     byCat[StorageUsageCategoryKey.sandboxEnvironment]!.addStats(
       sandboxUsage.stats,
     );
+    byCat[StorageUsageCategoryKey.creations]!.addStats(creationUsage.stats);
     totalFiles +=
         workspaceUsage.stats.fileCount +
         skillsUsage.stats.fileCount +
         sessionsUsage.stats.fileCount +
-        sandboxUsage.stats.fileCount;
+        sandboxUsage.stats.fileCount +
+        creationUsage.stats.fileCount;
     totalBytes +=
         workspaceUsage.stats.bytes +
         skillsUsage.stats.bytes +
         sessionsUsage.stats.bytes +
-        sandboxUsage.stats.bytes;
+        sandboxUsage.stats.bytes +
+        creationUsage.stats.bytes;
 
     final fontsDir = await AppDirectories.getFontsDirectory();
     final localModelsDir = Directory(p.join(contentRoot.path, 'asr_models'));
@@ -468,6 +612,11 @@ abstract final class StorageUsageService {
       StorageUsageCategory(
         key: StorageUsageCategoryKey.files,
         stats: byCat[StorageUsageCategoryKey.files]!.toStats(),
+      ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.creations,
+        stats: creationUsage.stats,
+        subcategories: creationUsage.subcategories,
       ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.chatData,
@@ -655,7 +804,38 @@ abstract final class StorageUsageService {
       totalFiles: totalFiles,
       clearable: clearable,
       categories: categories,
+      uploads: uploads,
     );
+  }
+
+  static Future<int> clearCreationBatches(
+    MediaGenerationRunner runner, {
+    required DateTime cutoff,
+  }) async {
+    await runner.initialized;
+    await runner.recoverBatchDeletions();
+    final repository = runner.repository;
+    final version = repository.replacementVersion;
+    final candidates = await repository.completedBatchIdsBefore(cutoff);
+    var removed = 0;
+    for (final id in candidates) {
+      await AttachmentFileLock.synchronized(() async {
+        if (!repository.canWrite || version != repository.replacementVersion) {
+          throw StateError('Creation history changed during cleanup');
+        }
+        final batch = await repository.batch(id);
+        if (batch == null ||
+            batch.status.isActive ||
+            !batch.createdAt.isBefore(cutoff)) {
+          return;
+        }
+        await runner.files.deleteBatchesAndRecords([
+          id,
+        ], () => repository.deleteBatch(id));
+        removed++;
+      });
+    }
+    return removed;
   }
 
   static Future<void> clearCache({required bool avatarsOnly}) async {
@@ -765,127 +945,177 @@ abstract final class StorageUsageService {
     await _deleteDirectoryContents(Directory(p.join(root.path, 'asr_models')));
   }
 
-  static Future<List<StorageFileEntry>> listUploadEntries({
-    required bool images,
-  }) async {
-    final dir = await AppDirectories.getUploadDirectory();
-    final imagesDir = await AppDirectories.getImagesDirectory();
-    final avatarsDir = await AppDirectories.getAvatarsDirectory();
-    final usage = await StorageImageUsage.load(includeMessages: images);
-    final out = <StorageFileEntry>[];
-    Future<void> addFromDir(Directory d) async {
-      if (!await d.exists()) return;
+  static const _uploadDirectories = ['upload', 'images', 'avatars'];
+
+  static Future<StorageFileEntry> _fileInfo(File file) async {
+    var bytes = 0;
+    var modified = DateTime.fromMillisecondsSinceEpoch(0);
+    try {
+      final stat = await file.stat();
+      if (stat.type == FileSystemEntityType.file) {
+        bytes = stat.size;
+        modified = stat.modified;
+      }
+    } on FileSystemException {
       try {
-        await for (final ent in _listFiles(d)) {
-          final name = p.basename(ent.path);
-          final isImg = _isImageExt(name);
-          if (isImg != images) continue;
-          int bytes = 0;
-          DateTime modifiedAt = DateTime.fromMillisecondsSinceEpoch(0);
-          try {
-            final stat = await ent.stat();
-            bytes = stat.size;
-            modifiedAt = stat.modified;
-          } catch (_) {
-            try {
-              bytes = await ent.length();
-            } catch (_) {}
-          }
-          String? realPath;
-          try {
-            realPath = await ent.resolveSymbolicLinks();
-          } on FileSystemException {
-            // A concurrent removal must not stop listing the remaining files.
-          }
-          out.add(
-            StorageFileEntry(
-              path: ent.path,
-              name: name,
-              bytes: bytes,
-              modifiedAt: modifiedAt,
-              imageKind: images
-                  ? usage.kindFor(ent.path, realPath: realPath)
-                  : null,
-              isInUse:
-                  usage.isInUse(ent.path) ||
-                  (realPath != null && usage.isInUse(realPath)),
-            ),
-          );
-        }
-      } catch (_) {
-        // Ignore listing errors and return partial results.
+        bytes = await file.length();
+      } on FileSystemException {
+        // The file may have disappeared during enumeration.
       }
     }
+    return StorageFileEntry(
+      path: file.path,
+      name: p.basename(file.path),
+      bytes: bytes,
+      modifiedAt: modified,
+    );
+  }
 
-    await addFromDir(dir);
-    await addFromDir(imagesDir);
-    await addFromDir(avatarsDir);
-    out.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
-    return out;
+  static void _sortUploads(StorageUploadFiles uploads) {
+    int newest(StorageFileEntry a, StorageFileEntry b) {
+      final order = b.modifiedAt.compareTo(a.modifiedAt);
+      return order == 0 ? a.path.compareTo(b.path) : order;
+    }
+
+    uploads.images.sort(newest);
+    uploads.files.sort(newest);
+  }
+
+  static Future<StorageUploadFiles> readUploadFiles() async {
+    final root = (await AppDirectories.getContentDirectory()).path;
+    final inventory = await _readUploadDirectories([
+      for (final name in _uploadDirectories) p.join(root, name),
+    ]);
+    return inventory.files;
+  }
+
+  static Future<
+    ({
+      StorageUploadFiles files,
+      StorageUsageStats imagesStats,
+      StorageUsageStats filesStats,
+    })
+  >
+  _readUploadDirectories(List<String> directories) => Isolate.run(() async {
+    final uploads = StorageUploadFiles(images: [], files: []);
+    final imagesStats = _MutableStats(), filesStats = _MutableStats();
+    for (final path in directories) {
+      await for (final file in _listFiles(Directory(path))) {
+        final entry = await _fileInfo(file);
+        if (_isImageExt(entry.name)) {
+          uploads.images.add(entry);
+          imagesStats.add(entry.bytes);
+        } else {
+          uploads.files.add(entry);
+          filesStats.add(entry.bytes);
+        }
+      }
+    }
+    _sortUploads(uploads);
+    return (
+      files: uploads,
+      imagesStats: imagesStats.toStats(),
+      filesStats: filesStats.toStats(),
+    );
+  });
+
+  static Future<StorageUploadFiles> _inspectUploads(
+    StorageUploadFiles files,
+    TransientAttachmentSnapshot transient, {
+    Map<String, Map<String, String>> additionalReferences = const {},
+    bool generationActive = false,
+  }) async {
+    final root = (await AppDirectories.getContentDirectory()).path;
+    final databasePath = p.join(
+      (await AppDirectories.getAppDataDirectory()).path,
+      AppDatabase.databaseFileName,
+    );
+    return Isolate.run(() {
+      final usage = StorageAttachmentUsage.readInWorker(databasePath, root)
+        ..includeConversations(
+          transient.resolve(),
+          generationActive: generationActive || transient.generationActive,
+        )
+        ..includeConversations(additionalReferences);
+      StorageFileEntry inspect(StorageFileEntry file, {required bool image}) {
+        String? realPath;
+        try {
+          realPath = File(file.path).resolveSymbolicLinksSync();
+        } on FileSystemException {
+          // Retain lexical references if the file disappeared during the scan.
+        }
+        return StorageFileEntry(
+          path: file.path,
+          name: file.name,
+          bytes: file.bytes,
+          modifiedAt: file.modifiedAt,
+          conversations: usage.conversationsFor(file.path),
+          pendingDeletionAt: usage.pendingDeletionFor(file.path),
+          imageKind: image
+              ? usage.kindFor(file.path, realPath: realPath)
+              : null,
+          isInUse:
+              usage.isInUse(file.path) ||
+              (realPath != null && usage.isInUse(realPath)),
+        );
+      }
+
+      return StorageUploadFiles(
+        images: [for (final file in files.images) inspect(file, image: true)],
+        files: [for (final file in files.files) inspect(file, image: false)],
+      );
+    });
+  }
+
+  static Future<List<StorageFileEntry>> listUploadEntries({
+    required bool images,
+    Map<String, Map<String, String>> additionalReferences = const {},
+    bool generationActive = false,
+  }) async {
+    final files = await readUploadFiles();
+    if ((images ? files.images : files.files).isEmpty) return [];
+    final inspected = await _inspectUploads(
+      images
+          ? StorageUploadFiles(images: files.images)
+          : StorageUploadFiles(files: files.files),
+      AttachmentFileLock.captureTransient(),
+      additionalReferences: additionalReferences,
+      generationActive: generationActive,
+    );
+    return images ? inspected.images : inspected.files;
   }
 
   static Future<int> deleteUploadFiles(
     Iterable<String> paths, {
     required bool images,
+    Set<String> protectedPaths = const {},
+    bool generationActive = false,
   }) => AttachmentFileLock.synchronized(
-    () => _deleteUploadFiles(paths, images: images),
+    () => _deleteUploadFiles(
+      paths,
+      images: images,
+      protectedPaths: protectedPaths,
+      generationActive: generationActive,
+    ),
   );
 
   static Future<int> _deleteUploadFiles(
     Iterable<String> paths, {
     required bool images,
+    required Set<String> protectedPaths,
+    required bool generationActive,
   }) async {
-    final dir = await AppDirectories.getUploadDirectory();
-    final imagesDir = await AppDirectories.getImagesDirectory();
-    final avatarsDir = await AppDirectories.getAvatarsDirectory();
-    final roots = <String>[
-      p.normalize(dir.absolute.path),
-      p.normalize(imagesDir.absolute.path),
-      p.normalize(avatarsDir.absolute.path),
-    ];
-    final realRoots = await Future.wait(
-      roots.map((root) async {
-        try {
-          return await Directory(root).resolveSymbolicLinks();
-        } catch (_) {
-          return root;
-        }
-      }),
+    final removedPaths = await StorageAttachmentUsage.deleteUnusedFiles(
+      paths.where((path) => _isImageExt(path) == images),
+      protectedPaths: protectedPaths,
+      generationActive: generationActive,
     );
-    // Re-read references after confirmation; the list shown by the UI may be
-    // stale after an assistant/user/provider changed its appearance.
-    final usage = await StorageImageUsage.load(includeMessages: false);
-    final removedPaths = <String>{};
-    for (final raw in paths) {
-      try {
-        final abs = p.normalize(File(raw).absolute.path);
-        if (_isImageExt(abs) != images) continue;
-        final allowed = roots.any((root) => p.isWithin(root, abs));
-        if (!allowed) continue;
-        // A symlinked child directory must not let storage cleanup escape the
-        // app's upload roots. Only regular files are eligible for deletion.
-        final parent = await File(abs).parent.resolveSymbolicLinks();
-        if (!realRoots.any(
-          (root) => p.equals(root, parent) || p.isWithin(root, parent),
-        )) {
-          continue;
-        }
-        if (await FileSystemEntity.type(abs, followLinks: false) !=
-            FileSystemEntityType.file) {
-          continue;
-        }
-        if (usage.isInUse(abs) ||
-            usage.isInUse(await File(abs).resolveSymbolicLinks())) {
-          continue;
-        }
-        await File(abs).delete();
-        removedPaths.add(abs);
-      } catch (_) {}
-    }
     if (removedPaths.isNotEmpty) {
       await deleteSessionAttachmentCopies(
         removedPaths,
         sessionsDirectory: await AppDirectories.getSessionsDirectory(),
+        protectedPaths: protectedPaths,
+        generationActive: generationActive,
       );
     }
     return removedPaths.length;
@@ -903,29 +1133,20 @@ abstract final class StorageUsageService {
 
   static Future<StorageUsageStats> clearOrphanSessionFiles({
     Set<String>? conversationIds,
+    Set<String> protectedPaths = const {},
     Future<Directory> Function()? sessionsDirectory,
   }) async {
-    final ids = conversationIds ?? await _readConversationIdsFromDatabase();
-    final sessions =
-        await (sessionsDirectory ?? AppDirectories.getSessionsDirectory)();
-    final stats = await _orphanSessionStats(
-      sessions: sessions,
-      conversationIds: ids,
+    final cleared = await AttachmentFileLock.synchronized(
+      () async => StorageAttachmentUsage.cleanSessions(
+        includeOrphans: true,
+        sessionsDirectory: sessionsDirectory == null
+            ? null
+            : await sessionsDirectory(),
+        conversationIds: conversationIds,
+        protectedPaths: protectedPaths,
+      ),
     );
-    if (!await sessions.exists()) return stats;
-    try {
-      await for (final ent in sessions.list(
-        recursive: false,
-        followLinks: false,
-      )) {
-        if (ent is! Directory) continue;
-        if (ids.contains(p.basename(ent.path))) continue;
-        try {
-          await ent.delete(recursive: true);
-        } catch (_) {}
-      }
-    } catch (_) {}
-    return stats;
+    return StorageUsageStats(fileCount: cleared.files, bytes: cleared.bytes);
   }
 
   static Future<StorageUsageStats> _orphanSessionStats({
@@ -1041,7 +1262,7 @@ abstract final class StorageUsageService {
   /// to the unreadable directory rather than aborting all remaining siblings.
   static Stream<File> _listFiles(
     Directory root, {
-    Set<String> excludedTopDirectories = const {},
+    bool Function(Directory)? skipTopDirectory,
   }) async* {
     final pending = <Directory>[root];
     while (pending.isNotEmpty) {
@@ -1050,9 +1271,7 @@ abstract final class StorageUsageService {
         await for (final entity in dir.list(followLinks: false)) {
           if (entity is Directory) {
             if (dir.path == root.path &&
-                excludedTopDirectories.contains(
-                  p.basename(entity.path).toLowerCase(),
-                )) {
+                (skipTopDirectory?.call(entity) ?? false)) {
               continue;
             }
             pending.add(entity);
@@ -1150,6 +1369,7 @@ class _MutableStats {
 const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.images,
   StorageUsageCategoryKey.files,
+  StorageUsageCategoryKey.creations,
   StorageUsageCategoryKey.chatData,
   StorageUsageCategoryKey.legacyChatData,
   StorageUsageCategoryKey.restoreTraces,
@@ -1180,6 +1400,7 @@ bool _isAlwaysVisibleCategory(StorageUsageCategoryKey key) {
       return false;
     case StorageUsageCategoryKey.images:
     case StorageUsageCategoryKey.files:
+    case StorageUsageCategoryKey.creations:
     case StorageUsageCategoryKey.chatData:
     case StorageUsageCategoryKey.cache:
     case StorageUsageCategoryKey.logs:

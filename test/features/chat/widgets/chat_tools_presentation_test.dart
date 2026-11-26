@@ -74,6 +74,9 @@ void main() {
           // Settings collapse does not hide available tools in the chat picker.
           await harness.mcp.setGroupCollapsed(development, true);
         });
+        harness.mcp.items[3] = harness.mcp.items[3].copyWith(
+          name: 'Offline server',
+        );
         harness.mcp.statuses['server-3'] = McpStatus.error;
         final anchor = GlobalKey();
         await tester.pumpWidget(
@@ -113,12 +116,14 @@ void main() {
           );
           await tester.pumpAndSettle();
         }
-        expect(find.text('Offline group'), findsNothing);
+        expect(find.text('Offline group'), findsOneWidget);
         final order = [
           'Search group',
           'Brave Search',
           'Development group',
           'GitHub',
+          'Offline group',
+          'Offline server',
           'Other',
           'Filesystem',
         ];
@@ -143,7 +148,18 @@ void main() {
         );
         expect(tester.getSize(mark), Size.square(desktop ? 16 : 20));
         expect(tester.widget<McpServerAvatar>(avatar).showBackground, isFalse);
-        expect(find.text('18/26'), findsNWidgets(3));
+        expect(find.text('18/26'), findsNWidgets(4));
+        final reconnect = find.byKey(const ValueKey('mcp-reconnect-server-3'));
+        await tester.ensureVisible(reconnect);
+        await tester.tap(reconnect);
+        await tester.pumpAndSettle();
+        expect(harness.mcp.statusFor('server-3'), McpStatus.connected);
+        expect(
+          harness.assistants.getById(harness.assistantId)!.mcpServerIds,
+          contains('server-3'),
+        );
+        expect(reconnect, findsNothing);
+        await tester.ensureVisible(row);
         await tester.tap(row);
         await tester.pump();
         for (var turn = 0; turn < 6; turn++) {

@@ -9,6 +9,7 @@ import 'schema_versions.dart';
 abstract final class GenUiDerivedSchema {
   static const stateTable = 'gen_ui_surface_state_rows';
   static const searchTable = 'gen_ui_surface_search';
+  static const searchBackfillKey = 'gen_ui_search_backfill_v1';
   static final _schema = Schema5(database: const _SchemaMetadataOnly());
   static final VirtualTableInfo _fts = _schema.genUiSurfaceSearch;
   static final String _searchDefinition =
@@ -21,6 +22,28 @@ abstract final class GenUiDerivedSchema {
   ]);
 
   static String _identifier(String value) => SqlDialect.sqlite.escape(value);
+
+  static Future<bool> hasSearchIndex(AppDatabase db) async {
+    final definitions = {
+      searchTable: _searchDefinition,
+      for (final trigger in _triggers)
+        trigger.entityName:
+            trigger.createStatementsByDialect[SqlDialect.sqlite]!,
+    };
+    final rows = await db
+        .customSelect(
+          'SELECT name, sql FROM sqlite_schema WHERE name IN '
+          '(${List.filled(definitions.length, '?').join(',')})',
+          variables: definitions.keys.map(Variable<String>.new).toList(),
+        )
+        .get();
+    return rows.length == definitions.length &&
+        rows.every(
+          (row) =>
+              _canonicalCreate(row.read<String>('sql')) ==
+              _canonicalCreate(definitions[row.read<String>('name')]!),
+        );
+  }
 
   static final _stateDefinition = _stateCreateSql();
   static String _stateCreateSql() {

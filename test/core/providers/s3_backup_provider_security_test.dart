@@ -11,6 +11,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/providers/s3_backup_provider.dart';
+import 'package:Kelivo/core/services/backup/backup_staging.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -89,7 +90,9 @@ void main() {
           chatService: chatService,
           businessRepository: businessRepository,
           businessPreferences: BusinessPreferences(businessRepository),
-          initialConfig: S3Config(
+        );
+        await provider.restoreFromItem(
+          S3Config(
             endpoint: 'http://${server.address.address}:${server.port}',
             bucket: 'backup-bucket',
             accessKeyId: 'test-access-key',
@@ -103,8 +106,6 @@ void main() {
               },
             ),
           ),
-        );
-        await provider.restoreFromItem(
           BackupFileItem(
             href: Uri.parse('s3://backup-bucket/kelivo_backups/remote_$i.zip'),
             displayName: remoteNames[i],
@@ -117,7 +118,8 @@ void main() {
 
       expect(await relativeSentinel.readAsString(), 'keep relative');
       expect(await absoluteSentinel.readAsString(), 'keep absolute');
-      expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+      final staging = await BackupStaging.resolveRoot();
+      expect(await staging.list().toList(), isEmpty);
     });
   });
 }

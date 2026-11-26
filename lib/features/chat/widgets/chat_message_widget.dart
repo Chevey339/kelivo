@@ -1,3 +1,5 @@
+import '../services/conversation_find_service.dart';
+import 'conversation_find_highlights.dart';
 import 'package:Kelivo/desktop/desktop_overlay_backdrop.dart';
 import '../utils/message_reasoning_source.dart';
 import '../../intelligent_ui/host/ui_copy_actions.dart';
@@ -29,8 +31,8 @@ import '../../../shared/widgets/optional_shader_mask.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
-// import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
+import 'package:crypto/crypto.dart' show sha256;
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../browser/browser_navigation.dart';
@@ -40,6 +42,12 @@ import '../../../core/services/browser/browser_service.dart';
 import '../../browser/models/browser_tool_presentation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/image_context.dart' show ContextImageIdentity;
+import '../../../shared/markdown/link_image_handlers.dart'
+    show GeneratedImageMarkdownScope;
+import '../../../core/models/media_creation.dart';
+import '../../../core/utils/chat_image_result.dart';
+import '../../media/providers/media_creation_controller.dart';
 import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
@@ -49,6 +57,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/providers/assistant_provider.dart';
 import 'package:intl/intl.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/kelivo_file_uri.dart';
 import '../../../utils/safe_resize_image.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../../shared/widgets/avatar_image.dart';
@@ -63,15 +72,18 @@ import '../../../shared/markdown/quote_syntax.dart';
 import '../controllers/quote_editing_controller.dart' show buildQuoteTextSpan;
 import 'quote_chip.dart';
 import 'quote_source_highlight.dart';
+import 'plain_message_text.dart';
 import 'quote_source_anchor.dart';
 import 'quote_interaction_scope.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/scroll_layout_anchor.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../theme/chat_bubble_style.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -96,7 +108,9 @@ import '../../../core/models/message_part_snapshot.dart';
 import 'select_copy_sheet.dart';
 import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
+import '../../../shared/markdown/citation_syntax.dart';
 import 'chat_surface.dart';
+import 'chat_creation_images.dart';
 import 'collapsible_user_text.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
@@ -149,7 +163,7 @@ Uri? _tryNormalizeExternalUri(String raw) {
 @visibleForTesting
 const double kToolImageTimelineHeight = timelineToolImageHeight;
 @visibleForTesting
-const double kToolImageTimelineMaxWidth = 240;
+const double kToolImageTimelineMaxWidth = timelineToolImageMaxWidth;
 const double kBrowserStepImageHeight = 64;
 const double kBrowserStepImageMaxWidth = 120;
 const int _browserStepsFoldThreshold = 6;
@@ -239,10 +253,7 @@ Uint8List? _decodeDataUriBytes(String path) {
   return bytes;
 }
 
-/// Shared image widget for tool thumbnails and message attachment previews.
-///
-/// Decodes through [SafeResizeImage] at the display area × device pixel ratio so
-/// 17K tool outputs are not materialized at full resolution.
+/// Builds a tool thumbnail without decoding large tool outputs at full resolution.
 Widget _buildResolvedImage(
   BuildContext context,
   String rawPath, {
@@ -250,62 +261,103 @@ Widget _buildResolvedImage(
   double? height,
   double? maxLogicalWidth,
   BoxFit fit = BoxFit.contain,
-  Widget Function()? placeholder,
 }) {
-  final cs = Theme.of(context).colorScheme;
-  Widget errorWidget() =>
-      placeholder?.call() ??
-      Container(
-        width: width ?? (height != null ? height * 0.67 : 120),
-        height: height ?? 180,
-        color: cs.surfaceContainerHighest,
-        alignment: Alignment.center,
-        child: Icon(
-          Lucide.ImageOff,
-          size: 24,
-          color: cs.onSurface.withValues(alpha: 0.5),
-        ),
-      );
-
-  final path = rawPath.trim();
-  if (path.isEmpty) return errorWidget();
-
-  final provider = _toolImageProvider(path);
-  if (provider == null) return errorWidget();
-
   final logicalHeight = height ?? width ?? kToolImageCardHeight;
   final logicalWidth =
       maxLogicalWidth ??
       width ??
       (height != null ? height * 2 : kToolImageTimelineMaxWidth);
-  final decode = toolImageDecodePixels(
+  final provider = _previewImageProvider(
+    rawPath,
     logicalWidth: logicalWidth,
     logicalHeight: logicalHeight,
     devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    fit: fit,
   );
-  Widget image = Image(
-    image: SafeResizeImage.display(
-      provider,
-      width: decode.width,
-      height: decode.height,
-      fit: fit == BoxFit.cover ? SafeResizeFit.cover : SafeResizeFit.contain,
-      allowUpscaling: false,
-      maxEdge: kToolImageMaxDecodeEdge,
-      maxPixels: kToolImageMaxDecodePixels,
+  final image = _buildPreviewImage(
+    context,
+    provider,
+    width: width,
+    height: height,
+    fit: fit,
+  );
+  if (maxLogicalWidth == null || provider == null) return image;
+  return ConstrainedBox(
+    constraints: BoxConstraints(maxWidth: maxLogicalWidth),
+    child: image,
+  );
+}
+
+Widget _buildPreviewImage(
+  BuildContext context,
+  ImageProvider? provider, {
+  required double? width,
+  required double? height,
+  BoxFit fit = BoxFit.contain,
+}) {
+  final cs = Theme.of(context).colorScheme;
+  Widget errorWidget() => Container(
+    width: width ?? (height != null ? height * 0.67 : 120),
+    height: height ?? 180,
+    color: cs.surfaceContainerHighest,
+    alignment: Alignment.center,
+    child: Icon(
+      Lucide.ImageOff,
+      size: 24,
+      color: cs.onSurface.withValues(alpha: 0.5),
     ),
+  );
+
+  if (provider == null) return errorWidget();
+  return Image(
+    image: provider,
     width: width,
     height: height,
     fit: fit,
     gaplessPlayback: true,
     errorBuilder: (_, __, ___) => errorWidget(),
   );
-  if (maxLogicalWidth != null) {
-    image = ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxLogicalWidth),
-      child: image,
-    );
-  }
-  return image;
+}
+
+ImageProvider? _previewImageProvider(
+  String path, {
+  required double logicalWidth,
+  required double logicalHeight,
+  required double devicePixelRatio,
+  required BoxFit fit,
+}) {
+  final source = path.trim();
+  if (source.isEmpty) return null;
+  final base = _toolImageProvider(source);
+  if (base == null) return null;
+  final decode = toolImageDecodePixels(
+    logicalWidth: logicalWidth,
+    logicalHeight: logicalHeight,
+    devicePixelRatio: devicePixelRatio,
+  );
+  return SafeResizeImage.display(
+    base,
+    width: decode.width,
+    height: decode.height,
+    fit: fit == BoxFit.cover ? SafeResizeFit.cover : SafeResizeFit.contain,
+    allowUpscaling: false,
+    maxEdge: kToolImageMaxDecodeEdge,
+    maxPixels: kToolImageMaxDecodePixels,
+  );
+}
+
+Size? _cachedPreviewSize(BuildContext context, ImageProvider provider) {
+  // Only read the thumbnail's already-decoded frame. A pending or broken
+  // thumbnail can still open immediately with the ordinary viewer fade.
+  final stream = provider.resolve(createLocalImageConfiguration(context));
+  Size? size;
+  final listener = ImageStreamListener((info, _) {
+    size = Size(info.image.width.toDouble(), info.image.height.toDouble());
+    info.dispose();
+  }, onError: (_, _) {});
+  stream.addListener(listener);
+  stream.removeListener(listener);
+  return size;
 }
 
 ImageProvider<Object>? _toolImageProvider(String path) {
@@ -354,9 +406,41 @@ class _AssistantInlineImage extends StatefulWidget {
 }
 
 class _AssistantInlineImageState extends State<_AssistantInlineImage> {
+  late ImageProvider? _provider = _assistantInlineImageProvider(widget.uri);
+  late String _sourceId = sha256.convert(utf8.encode(widget.uri)).toString();
+  PageStorageBucket? _storage;
+  double? _aspect;
   ImageStream? _stream;
   ImageStreamListener? _listener;
-  String? _listenedIdentity;
+  ImageProvider? _listenedProvider;
+
+  Object get _aspectId => ('assistant-inline-image-aspect', _sourceId);
+
+  void _syncAspect({bool sourceChanged = false}) {
+    final storage = PageStorage.maybeOf(context);
+    if (!sourceChanged && identical(storage, _storage)) return;
+    _stopListening();
+    _listenedProvider = null;
+    _storage = storage;
+    _aspect = storage?.readState(context, identifier: _aspectId) as double?;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAspect();
+  }
+
+  @override
+  void didUpdateWidget(_AssistantInlineImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final changed = oldWidget.uri != widget.uri;
+    if (changed) {
+      _provider = _assistantInlineImageProvider(widget.uri);
+      _sourceId = sha256.convert(utf8.encode(widget.uri)).toString();
+    }
+    _syncAspect(sourceChanged: changed);
+  }
 
   @override
   void dispose() {
@@ -370,43 +454,46 @@ class _AssistantInlineImageState extends State<_AssistantInlineImage> {
     }
     _stream = null;
     _listener = null;
-    _listenedIdentity = null;
   }
 
   void _listenForAspect(ImageProvider provider) {
-    final identity = '${widget.imageKey}:${widget.uri.length}';
-    if (_listenedIdentity == identity) return;
+    if (_listenedProvider == provider) return;
     _stopListening();
-    _listenedIdentity = identity;
-    final stream = provider.resolve(ImageConfiguration.empty);
-    late final ImageStreamListener listener;
-    listener = ImageStreamListener((info, _) {
-      final width = info.image.width;
-      final height = info.image.height;
-      if (width > 0 && height > 0) {
-        widget.onAspectResolved?.call(widget.imageKey, width / height);
+    _listenedProvider = provider;
+    _stream = provider.resolve(createLocalImageConfiguration(context));
+    _listener = ImageStreamListener((info, synchronous) {
+      final aspect = info.image.width / info.image.height;
+      info.dispose();
+      _stopListening();
+      if (!mounted || !aspect.isFinite || aspect <= 0) return;
+      _storage?.writeState(context, aspect, identifier: _aspectId);
+      if (_aspect != aspect) {
+        if (synchronous) {
+          _aspect = aspect;
+        } else {
+          preserveScrollLayoutAnchor(context);
+          setState(() => _aspect = aspect);
+        }
       }
-    });
-    _stream = stream;
-    _listener = listener;
-    stream.addListener(listener);
+      widget.onAspectResolved?.call(widget.imageKey, aspect);
+    }, onError: (Object error, StackTrace? stack) => _stopListening());
+    _stream!.addListener(_listener!);
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = _assistantInlineImageProvider(widget.uri);
+    final provider = _provider ??= _assistantInlineImageProvider(widget.uri);
     return GestureDetector(
       key: ValueKey('assistant-inline-image:${widget.imageKey}'),
       onTap: widget.group.isEmpty
           ? null
-          : () => _openAssistantImageViewer(
-              context,
+          : () => ImageViewerPage(
               images: widget.group,
               initialIndex: widget.initialIndex.clamp(
                 0,
                 widget.group.length - 1,
               ),
-            ),
+            ).open(context),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final displayWidth = constraints.maxWidth;
@@ -414,61 +501,32 @@ class _AssistantInlineImageState extends State<_AssistantInlineImage> {
           final cacheWidth = displayWidth.isFinite
               ? math.max(1, (displayWidth * dpr).ceil())
               : null;
+          final resized = provider == null
+              ? null
+              : ResizeImage.resizeIfNeeded(cacheWidth, null, provider);
+          // Share Image's decoded stream; measuring must neither decode a
+          // second full-size copy nor keep animated images playing offscreen.
+          if (resized != null) _listenForAspect(resized);
+          final height = displayWidth.isFinite && _aspect != null
+              ? displayWidth / _aspect!
+              : 36.0;
           final image = provider == null
-              ? const Icon(Icons.broken_image)
+              ? const Icon(Lucide.ImageOff)
               : Image(
-                  image: ResizeImage.resizeIfNeeded(cacheWidth, null, provider),
+                  image: resized!,
                   width: displayWidth.isFinite ? displayWidth : null,
+                  height: height,
                   fit: BoxFit.contain,
-                  frameBuilder: (context, child, frame, _) {
-                    if (frame != null) {
-                      _listenForAspect(provider);
-                    }
-                    return child;
-                  },
-                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                  errorBuilder: (_, __, ___) => const Icon(Lucide.ImageOff),
                 );
           return ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: image,
+            child: SizedBox(height: height, child: image),
           );
         },
       ),
     );
   }
-}
-
-void _openAssistantImageViewer(
-  BuildContext context, {
-  required List<String> images,
-  required int initialIndex,
-}) {
-  Navigator.of(context).push(
-    PageRouteBuilder<void>(
-      opaque: false,
-      pageBuilder: (_, __, ___) =>
-          ImageViewerPage(images: images, initialIndex: initialIndex),
-      transitionDuration: const Duration(milliseconds: 360),
-      reverseTransitionDuration: const Duration(milliseconds: 280),
-      transitionsBuilder: (context, anim, sec, child) {
-        final curved = CurvedAnimation(
-          parent: anim,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.02),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
-        );
-      },
-    ),
-  );
 }
 
 IconData _toolIconFor(String name, [Map<String, dynamic> args = const {}]) {
@@ -736,33 +794,8 @@ Widget _buildToolImageFromPath(
   );
 }
 
-void _showToolFullImage(BuildContext context, String path) {
-  Navigator.of(context).push(
-    PageRouteBuilder<void>(
-      opaque: false,
-      pageBuilder: (_, __, ___) => ImageViewerPage(images: [path]),
-      transitionDuration: const Duration(milliseconds: 360),
-      reverseTransitionDuration: const Duration(milliseconds: 280),
-      transitionsBuilder: (context, anim, sec, child) {
-        final curved = CurvedAnimation(
-          parent: anim,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.02),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
-        );
-      },
-    ),
-  );
-}
+void _showToolFullImage(BuildContext context, String path) =>
+    unawaited(ImageViewerPage(images: [path]).open(context));
 
 void _showBrowserStepDetail(
   BuildContext context,
@@ -941,13 +974,46 @@ class _BrowserStepDetailHeader extends StatelessWidget {
   }
 }
 
+/// A mounted tool observation can outlive its cached message. Resolve the
+/// current artwork before offering either its thumbnail or the details action.
+List<String> _liveToolImages(
+  BuildContext context,
+  ToolUIPart part,
+  List<String> paths, {
+  bool listen = true,
+}) {
+  final source = readChatImageMetadata(part.toolName, part.metadata);
+  final id = creationItemFromSourceKey(source?.sourceKey);
+  if (id == null) return paths;
+  return [?_liveCreationImagePath(context, id, listen: listen)];
+}
+
+String? _liveCreationImagePath(
+  BuildContext context,
+  String id, {
+  bool listen = true,
+}) {
+  String? original(MediaCreationController? media) {
+    final item = media?.item(id);
+    return item?.status == GenerationItemStatus.ready &&
+            item?.mode == MediaMode.image
+        ? item!.path
+        : null;
+  }
+
+  return listen
+      ? context.select<MediaCreationController?, String?>(original)
+      : original(context.read<MediaCreationController?>());
+}
+
 void _showToolDetail(BuildContext context, ToolUIPart part, {Widget? header}) {
   final l10n = AppLocalizations.of(context)!;
   final argsPretty = const JsonEncoder.withIndent('  ').convert(part.arguments);
-  final (cleanText, images) = parseToolResultImages(
+  final (cleanText, paths) = parseToolResultImages(
     part.content,
     metadata: part.metadata,
   );
+  final images = _liveToolImages(context, part, paths, listen: false);
   final resultText = cleanText.isNotEmpty
       ? _prettyToolJson(cleanText)
       : l10n.chatMessageWidgetNoResultYet;
@@ -1320,6 +1386,10 @@ class ChatMessageWidget extends StatefulWidget {
 
   /// When null, follows [SettingsProvider.showToolCards].
   final bool? showToolCards;
+
+  /// When null, follows [SettingsProvider.collapseThinkingSteps].
+  /// A false override also expands browser tool groups in the export.
+  final bool? collapseThinkingSteps;
   final void Function(String imageKey, double aspectRatio)? onInlineImageAspect;
 
   /// Off for exports, which must render the whole user message.
@@ -1373,6 +1443,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.onRecoveredAskUserAnswer,
     this.showThinkingCards,
     this.showToolCards,
+    this.collapseThinkingSteps,
     this.onInlineImageAspect,
     this.collapseLongUserText = true,
   });
@@ -2337,15 +2408,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
     final double baseUser = isDesktop ? 14.0 : 15.5;
-    final highlights = quoteSourceHighlights(
+    final quoteRanges = quoteSourceHighlights(
       context,
       widget.message,
       visualText,
       sourceMap: sourceMap,
     );
-    final highlightColor = Theme.of(
-      context,
-    ).colorScheme.primary.withValues(alpha: .22);
+    final find = ConversationFindHighlights.of(context);
+    final highlights = [...quoteRanges, ...?find?.ranges(FindPart.body, 0)];
+    final highlightColor = quoteRanges.isEmpty && highlights.isNotEmpty
+        ? context.appColors.searchHighlight
+        : Theme.of(context).colorScheme.primary.withValues(alpha: .22);
 
     Widget content;
     if (enableUserMarkdown) {
@@ -2356,22 +2429,33 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           baseStyle: TextStyle(fontSize: baseUser, height: 1.45),
           conversationId: widget.message.conversationId,
           highlightRanges: highlights,
+          highlightColor: highlightColor,
         ),
       );
     } else {
-      content = Text.rich(
-        widget.message.quotes.isNotEmpty
+      final text = widget.message.quotes.isEmpty
+          ? UnicodeSanitizer.sanitize(visualText)
+          : visualText;
+      content = plainMessageText(
+        text: text,
+        buildSpan: (start, end) => widget.message.quotes.isNotEmpty
             ? buildQuoteTextSpan(
-                text: visualText,
+                text: text.substring(start, end),
                 quotes: widget.message.quotes,
                 quoteAtOffset: (offset) => quoteAtSourceOffset(
                   widget.message.content,
                   widget.message.quotes,
-                  sourceMap.sourceRange(offset, offset + 1).start,
+                  sourceMap
+                      .sourceRange(start + offset, start + offset + 1)
+                      .start,
                 ),
                 highlights: [
                   for (final range in highlights)
-                    TextRange(start: range.start, end: range.end),
+                    if (range.start < end && range.end > start)
+                      TextRange(
+                        start: range.start.clamp(start, end) - start,
+                        end: range.end.clamp(start, end) - start,
+                      ),
                 ],
                 highlightColor: highlightColor,
                 token: (quote, offset) => SelectableSpanAdapter(
@@ -2379,16 +2463,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   child: QuoteChip(
                     quote: quote,
                     selected: highlights.any(
-                      (range) => range.start <= offset && range.end > offset,
+                      (range) =>
+                          range.start <= start + offset &&
+                          range.end > start + offset,
                     ),
                     style: TextStyle(fontSize: baseUser, height: 1.4),
                   ),
                 ),
               )
             : highlightedQuoteSource(
-                UnicodeSanitizer.sanitize(visualText),
+                text,
                 highlights,
                 highlightColor,
+                start: start,
+                end: end,
               ),
         style: TextStyle(
           fontSize: baseUser,
@@ -2402,7 +2490,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       source: widget.message.content,
       sourceMap: sourceMap,
       quotes: widget.message.quotes,
-      child: content,
+      child: DefaultTextStyle.merge(
+        textWidthBasis: TextWidthBasis.longestLine,
+        child: content,
+      ),
     );
     if (isDesktop) {
       content = AppSelectionArea(
@@ -2421,7 +2512,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         key: ValueKey('user-collapse:${widget.message.id}'),
         collapsedHeight: lineHeight * _collapsedUserTextLines,
         reveal:
-            highlights.isNotEmpty ||
+            quoteRanges.isNotEmpty ||
+            find?.current?.part == FindPart.body ||
             QuoteInteractionScope.maybeOf(
                   context,
                 )?.navigationFor(widget.message.id) !=
@@ -2470,14 +2562,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       child: Icon(Lucide.ImageOff, color: cs.onSurface.withValues(alpha: 0.45)),
     );
 
-    final viewablePaths = <String>[
-      for (final entry in attachmentEntries)
-        if (entry.part is ImagePart)
-          if (!(entry.part as ImagePart).unavailable &&
-              (entry.part as ImagePart).uri.trim().isNotEmpty)
-            _resolveAttachmentImageUri((entry.part as ImagePart).uri),
-    ];
-
+    final viewablePaths = <String>[];
+    final heroTags = <Object>[];
     final items = <Widget>[];
     for (final entry in attachmentEntries) {
       final part = entry.part;
@@ -2540,9 +2626,30 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         continue;
       }
       if (part is ImagePart) {
-        final path = part.uri.trim();
+        final id = alignEnd
+            ? part.generationItemId ??
+                  KelivoFileUri.generationImageItemId(part.uri)
+            : null;
+        final path = id == null
+            ? (part.unavailable ? '' : part.uri.trim())
+            : _liveCreationImagePath(context, id) ?? '';
         final fixed = path.isEmpty ? '' : _resolveAttachmentImageUri(path);
-        final viewIndex = viewablePaths.indexOf(fixed);
+        final viewIndex = viewablePaths.length;
+        final heroTag = (this, partIndex);
+        final available = fixed.isNotEmpty;
+        if (available) {
+          viewablePaths.add(fixed);
+          heroTags.add(heroTag);
+        }
+        final provider = available
+            ? _previewImageProvider(
+                fixed,
+                logicalWidth: 112,
+                logicalHeight: 112,
+                devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+                fit: BoxFit.cover,
+              )
+            : null;
         items.add(
           IosCardPress(
             key: ValueKey(
@@ -2552,55 +2659,39 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             pressedScale: 0.985,
             borderRadius: BorderRadius.circular(10),
             padding: EdgeInsets.zero,
-            onTap: part.unavailable || viewIndex < 0
+            onTap: !available
                 ? null
                 : () {
-                    Navigator.of(context).push(
-                      PageRouteBuilder(
-                        pageBuilder: (_, __, ___) => ImageViewerPage(
-                          images: viewablePaths,
-                          initialIndex: viewIndex,
-                        ),
-                        transitionDuration: const Duration(milliseconds: 360),
-                        reverseTransitionDuration: const Duration(
-                          milliseconds: 280,
-                        ),
-                        transitionsBuilder: (context, anim, sec, child) {
-                          final curved = CurvedAnimation(
-                            parent: anim,
-                            curve: Curves.easeOutCubic,
-                            reverseCurve: Curves.easeInCubic,
-                          );
-                          return FadeTransition(
-                            opacity: curved,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0, 0.02),
-                                end: Offset.zero,
-                              ).animate(curved),
-                              child: child,
-                            ),
-                          );
-                        },
-                      ),
-                    );
+                    final size = provider == null
+                        ? null
+                        : _cachedPreviewSize(context, provider);
+                    ImageViewerPage(
+                      images: viewablePaths,
+                      initialIndex: viewIndex,
+                      heroTags: size == null ? null : heroTags,
+                      initialPreview: size == null
+                          ? null
+                          : (provider: provider!, size: size),
+                    ).open(context);
                   },
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Hero(
-                tag:
-                    'img:${fixed.isNotEmpty ? fixed : 'unavailable-$partIndex'}',
-                child: part.unavailable || fixed.isEmpty
-                    ? unavailableImagePlaceholder()
-                    : _buildResolvedImage(
-                        context,
-                        fixed,
+              child: provider == null
+                  ? unavailableImagePlaceholder()
+                  : Hero(
+                      tag: heroTag,
+                      createRectTween: ImageViewerPage.flightRect,
+                      flightShuttleBuilder: ImageViewerPage.thumbnailFlight,
+                      child: Image(
+                        image: provider,
                         width: 112,
                         height: 112,
                         fit: BoxFit.cover,
-                        placeholder: unavailableImagePlaceholder,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, _, _) =>
+                            unavailableImagePlaceholder(),
                       ),
-              ),
+                    ),
             ),
           ),
         );
@@ -2818,6 +2909,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     BorderRadius radius = BorderRadius.circular(16);
+    final showBubble =
+        isUser ||
+        context.select<SettingsProvider, bool>(
+          (s) => s.assistantBodyBubbleVisible,
+        );
     return buildSharedChatSurface(
       context,
       borderRadius: radius,
@@ -2827,8 +2923,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ? cs.primary.withValues(alpha: 0.15)
                 : cs.primary.withValues(alpha: 0.08))
           : null,
-      bareOnDefault: !isUser,
-      isUser: isUser,
+      bare: !showBubble,
+      target: isUser
+          ? ChatBubbleStyleTarget.user
+          : ChatBubbleStyleTarget.assistant,
       child: child,
     );
   }
@@ -2837,7 +2935,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     required BuildContext context,
     required Widget child,
   }) {
-    // Reuse same styles, but flag as non-user for default fallthrough
     return _buildBubbleContainer(context: context, isUser: false, child: child);
   }
 
@@ -2847,6 +2944,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     bool enableAssistantMarkdown,
     String? Function(String) citationIndexResolver, {
     String contentKey = '',
+    required int findBlock,
+    SourceTextMap? findParagraph,
     Object? detailsStateKey,
     UiTextSlice? uiSource,
     SourceTextMap? sourceMap,
@@ -2856,12 +2955,21 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
     final double baseAssistant = isDesktop ? 14.0 : 15.7;
-    final highlights = quoteSourceHighlights(
+    final quoteRanges = quoteSourceHighlights(
       context,
       widget.message,
       visualContent,
       sourceMap: sourceMap,
     );
+    final highlights = [
+      ...quoteRanges,
+      ...?ConversationFindHighlights.of(
+        context,
+      )?.ranges(FindPart.body, findBlock, paragraph: findParagraph),
+    ];
+    final highlightColor = quoteRanges.isEmpty && highlights.isNotEmpty
+        ? context.appColors.searchHighlight
+        : Theme.of(context).colorScheme.primary.withValues(alpha: .22);
 
     Widget assistantContent;
     if (enableAssistantMarkdown) {
@@ -2869,6 +2977,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         text: visualContent,
         detailsStateKey: detailsStateKey,
         highlightRanges: highlights,
+        highlightColor: highlightColor,
         uiHost: widget.message.role != 'assistant' || uiSource == null
             ? null
             : UiHostBinding(
@@ -2884,11 +2993,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         conversationId: widget.message.conversationId,
       );
     } else {
-      assistantContent = Text.rich(
-        highlightedQuoteSource(
-          UnicodeSanitizer.sanitize(visualContent),
+      final text = UnicodeSanitizer.sanitize(visualContent);
+      assistantContent = plainMessageText(
+        text: text,
+        buildSpan: (start, end) => highlightedQuoteSource(
+          text,
           highlights,
-          Theme.of(context).colorScheme.primary.withValues(alpha: .22),
+          highlightColor,
+          start: start,
+          end: end,
         ),
         style: TextStyle(
           fontSize: baseAssistant,
@@ -2915,6 +3028,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       message: widget.message,
       source: visualContent,
       sourceMap: sourceMap,
+      findBlock: findBlock,
+      findParagraph: findParagraph,
       markdown: enableAssistantMarkdown,
       child: RepaintBoundary(
         child: AppSelectionArea(
@@ -2982,20 +3097,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     bool enableAssistantMarkdown,
     String? Function(String) citationIndexResolver, {
     required String blockKey,
+    int findBlock = 0,
     UiTextSlice? uiSource,
     SourceTextMap? sourceMap,
   }) {
     final split = context.select<SettingsProvider, bool>(
       (s) => s.assistantBubbleSplitParagraphs,
     );
-    final parts = split
-        ? splitAssistantParagraphsWithSource(visualContent)
-        : <AssistantParagraph>[
-            AssistantParagraph(
-              visualContent,
-              SourceSpan(0, visualContent.length),
-            ),
-          ];
+    final parts = assistantDisplayParagraphs(
+      visualContent,
+      split: split,
+      uiSource: uiSource,
+    );
     final detailsBlockKey = sourceMap == null
         ? blockKey
         : ('source', sourceMap.sourceRange(0, 0).start);
@@ -3003,17 +3116,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       for (var i = 0; i < parts.length; i++)
         _buildAssistantTextBlock(
           context,
-          uiSource == null ? parts[i].text : parts[i].span.slice(visualContent),
-          uiSource: uiSource?.slice(parts[i].span.start, parts[i].span.end),
+          parts[i].text,
+          uiSource: parts[i].uiSource,
           enableAssistantMarkdown,
           citationIndexResolver,
+          findBlock: findBlock,
+          findParagraph: parts[i].blockMap,
           contentKey: parts.length == 1 ? '' : '$blockKey.$i',
           detailsStateKey: (widget.message.id, detailsBlockKey, i),
           sourceMap: sourceMap == null
               ? null
-              : uiSource == null
-              ? parts[i].sourceMap.through(sourceMap)
-              : sourceMap.slice(parts[i].span.start, parts[i].span.end),
+              : parts[i].blockMap?.through(sourceMap) ?? sourceMap,
         ),
     ];
   }
@@ -3024,6 +3137,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     bool enableAssistantMarkdown,
     String? Function(String) citationIndexResolver, {
     String contentKey = '',
+    required int findBlock,
+    SourceTextMap? findParagraph,
     Object? detailsStateKey,
     UiTextSlice? uiSource,
     SourceTextMap? sourceMap,
@@ -3038,6 +3153,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           enableAssistantMarkdown,
           citationIndexResolver,
           contentKey: contentKey,
+          findBlock: findBlock,
+          findParagraph: findParagraph,
           detailsStateKey: detailsStateKey,
           uiSource: uiSource,
           sourceMap: sourceMap,
@@ -3314,6 +3431,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       reasoningSegments: effectiveReasoningSegments,
       sourceMap: mappedVisual.sourceMap,
     );
+    final inlineChatImages = context.select<SettingsProvider, bool>(
+      (s) => s.inlineChatImages,
+    );
+    final creationAttachments = widget.message.parts
+        .whereType<ImagePart>()
+        .where((part) => part.generationItemId != null)
+        .toList();
+    final imagePlacement = inlineChatImages
+        ? ChatImagePlacement.resolve(
+            context,
+            widget.message.id,
+            creationAttachments,
+            timelineProjection,
+          )
+        : null;
+    final imageOrdinals = imagePlacement?.atCall.keys.toSet() ?? const <int>{};
     final mediaPreview = _buildAttachmentPreview(
       context,
       parts: timelineProjection.fromParts
@@ -3321,15 +3454,21 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               for (final part in widget.message.parts)
                 if (part is FilePart) part,
             ]
-          : widget.message.parts,
+          : [
+              for (final part in widget.message.parts)
+                if (part is! ImagePart || part.generationItemId == null) part,
+            ],
       isDark: isDark,
       alignEnd: false,
     );
 
-    return ChatSurfaceTheme(
+    final body = ChatSurfaceTheme(
       palette: fg,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+          horizontal: assistantMessageHorizontalPadding,
+          vertical: 12,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -3396,8 +3535,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               const SizedBox(height: 8),
             ],
             ...() {
+              final find = ConversationFindHighlights.of(context);
+              final target = find?.current;
               final showThinkingCards =
-                  widget.showThinkingCards ?? showThinkingCardsSetting;
+                  target?.part == FindPart.reasoning ||
+                  (widget.showThinkingCards ?? showThinkingCardsSetting);
               final showToolCards =
                   widget.showToolCards ?? showToolCardsSetting;
               ToolApprovalService? approval;
@@ -3418,6 +3560,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   null;
               final visibleBlocks = _timelineVisibility.project(
                 timelineProjection,
+                imageCallOrdinals: imageOrdinals,
                 showThinkingCards: showThinkingCards,
                 showToolCards: showToolCards,
                 isPendingApproval: isPending,
@@ -3478,6 +3621,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   if (block.isImage)
                     _resolveAttachmentImageUri(block.imageUri!),
               ];
+              final findBodyIndices = <int, int>{};
+              if (target != null || find?.hits.isNotEmpty == true) {
+                for (var i = 0; i < visibleBlocks.length; i++) {
+                  if (visibleBlocks[i].isText) {
+                    findBodyIndices[i] = findBodyIndices.length;
+                  }
+                }
+              }
               Object blockKey(int index) {
                 final block = visibleBlocks[index];
                 return (
@@ -3487,7 +3638,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       ? 'text'
                       : block.isImage
                       ? block.imageKey
-                      : block.thinkingSteps.first.sourceOrdinal,
+                      : block.imageCallOrdinal == null
+                      ? block.thinkingSteps.first.sourceOrdinal
+                      : ('creation', block.imageCallOrdinal),
                 );
               }
 
@@ -3499,7 +3652,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     final quote = QuoteInteractionScope.maybeOf(
                       context,
                     )?.navigationFor(widget.message.id);
-                    if (quote == null) return null;
+                    if (quote == null) {
+                      if (target == null) return null;
+                      if (target.part == FindPart.reasoning) {
+                        return visibleBlocks.indexWhere(
+                          (b) => b.thinkingSteps.any(
+                            (s) =>
+                                s.isReasoning &&
+                                s.sourceOrdinal == target.block,
+                          ),
+                        );
+                      }
+                      return findBodyIndices.entries
+                          .where((e) => e.value == target.block)
+                          .firstOrNull
+                          ?.key;
+                    }
                     return visibleBlocks.indexWhere(
                       (block) =>
                           block.isText &&
@@ -3515,6 +3683,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   structureToken: (
                     widget.message.id,
                     visibleBlocks.length,
+                    inlineChatImages,
                     showThinkingCards,
                     showToolCards,
                   ),
@@ -3527,7 +3696,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   ),
                   estimateExtent: (index, width) {
                     final block = visibleBlocks[index];
-                    if (block.isImage) {
+                    if (block.isImage || block.imageCallOrdinal != null) {
                       return estimateTimelineImageHeight(
                         maxWidth: width,
                         aspectRatio: block.aspectRatio,
@@ -3543,6 +3712,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   },
                   itemBuilder: (context, index) {
                     final block = visibleBlocks[index];
+                    if (block.imageCallOrdinal case final ordinal?) {
+                      return ChatCreationImages.forSlots(
+                        messageId: widget.message.id,
+                        key: ValueKey(blockKey(index)),
+                        slots: imagePlacement!.atCall[ordinal]!,
+                        streaming: widget.message.isStreaming,
+                      );
+                    }
                     if (block.isImage) {
                       return _buildAssistantImageBlock(
                         context,
@@ -3564,6 +3741,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             enableAssistantMarkdown,
                             citationIndexResolver,
                             blockKey: 'text$index',
+                            findBlock: findBodyIndices[index] ?? 0,
                             uiSource: block.uiSource,
                             sourceMap: block.sourceMap,
                           ),
@@ -3577,6 +3755,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       streaming,
                       showThinkingCards,
                       showToolCards,
+                      widget.collapseThinkingSteps,
                       blockKey(index),
                       widget.message.modelId,
                       widget.message.timestamp,
@@ -3595,6 +3774,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       ),
                       showThinkingCards: showThinkingCards,
                       showToolCards: showToolCards,
+                      collapseThinkingSteps: widget.collapseThinkingSteps,
                       streaming: streaming,
                       onRecoveredAnswer: widget.onRecoveredAskUserAnswer == null
                           ? null
@@ -3619,6 +3799,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               }
               return widgets;
             }(),
+            if (imagePlacement != null)
+              ChatCreationImages.forSlots(
+                messageId: widget.message.id,
+                key: ValueKey(('creation-images', widget.message.id)),
+                slots: imagePlacement.footer,
+                streaming: widget.message.isStreaming,
+              )
+            else
+              ChatCreationImages(
+                key: ValueKey(('creation-images', widget.message.id)),
+                messageId: widget.message.id,
+                attachments: creationAttachments,
+                streaming: widget.message.isStreaming,
+              ),
             if (showProducedFiles &&
                 _producedWorkspaceParts(widget.toolParts).isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -3721,10 +3915,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             Padding(
                               padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
                               child: RepaintBoundary(
-                                child: AppSelectionArea(
-                                  key: ValueKey(
-                                    'translation_${widget.message.id}',
-                                  ),
+                                child: QuoteSourceAnchor(
+                                  message: widget.message,
+                                  source: translationText,
+                                  markdown: enableAssistantMarkdown,
+                                  findPart: FindPart.translation,
                                   child: Builder(
                                     builder: (context) {
                                       final bool isDesktop =
@@ -3737,11 +3932,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                       final double baseTranslation = isDesktop
                                           ? 14.0
                                           : 15.5;
+                                      final ranges =
+                                          ConversationFindHighlights.of(
+                                            context,
+                                          )?.ranges(FindPart.translation, 0) ??
+                                          const <SourceSpan>[];
                                       Widget translationContent;
                                       if (enableAssistantMarkdown) {
                                         translationContent =
                                             MarkdownWithCodeHighlight(
                                               text: translationText,
+                                              highlightRanges: ranges,
+                                              highlightColor: context
+                                                  .appColors
+                                                  .searchHighlight,
                                               onCitationTap: _handleCitationTap,
                                               citationIndexResolver:
                                                   citationIndexResolver,
@@ -3753,10 +3957,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                                   widget.message.conversationId,
                                             );
                                       } else {
-                                        translationContent = Text(
-                                          UnicodeSanitizer.sanitize(
+                                        translationContent = plainMessageText(
+                                          text: UnicodeSanitizer.sanitize(
                                             translationText,
                                           ),
+                                          buildSpan: ranges.isEmpty
+                                              ? null
+                                              : (start, end) =>
+                                                    highlightedQuoteSource(
+                                                      UnicodeSanitizer.sanitize(
+                                                        translationText,
+                                                      ),
+                                                      ranges,
+                                                      context
+                                                          .appColors
+                                                          .searchHighlight,
+                                                      start: start,
+                                                      end: end,
+                                                    ),
                                           style: TextStyle(
                                             fontSize: baseTranslation,
                                             height: 1.4,
@@ -3771,7 +3989,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                           fontSize: baseTranslation,
                                           height: 1.4,
                                         ),
-                                        child: translationContent,
+                                        child: AppSelectionArea(
+                                          key: ValueKey(
+                                            'translation_${widget.message.id}',
+                                          ),
+                                          child: translationContent,
+                                        ),
                                       );
                                     },
                                   ),
@@ -4063,6 +4286,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ),
       ),
     );
+    return GeneratedImageMarkdownScope(
+      handles: creationAttachments.isNotEmpty
+          ? {
+              for (final part in creationAttachments)
+                ContextImageIdentity(
+                  widget.message.id,
+                  'creation:${part.generationItemId}',
+                ).handle,
+            }
+          : const {},
+      child: body,
+    );
   }
 
   // Keep callbacks stable while only the streamed text changes. A new lookup
@@ -4070,27 +4305,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   String? Function(String) _buildCitationIndexResolver(
     List<Map<String, dynamic>> items,
   ) {
-    final lookup = <String, String>{};
-    // An exact ID match wins over a legacy numeric index.
-    for (final item in items) {
-      final id = item['id']?.toString() ?? '';
-      final index = item['index']?.toString() ?? '';
-      if (id.isNotEmpty && index.isNotEmpty) lookup[id] ??= index;
-    }
-    for (final item in items) {
-      final index = item['index']?.toString() ?? '';
-      if (index.isNotEmpty) lookup[index] ??= index;
-    }
+    final lookup = citationIndexLookup(items);
     if (!mapEquals(lookup, _citationIndexLookup)) {
       _citationIndexLookup = lookup;
-      _citationIndexResolver = (id) {
-        final key = id.trim();
-        if (key.isEmpty) return null;
-        final direct = lookup[key];
-        if (direct != null) return direct;
-        final asIndex = int.tryParse(key);
-        return asIndex == null ? null : lookup[asIndex.toString()];
-      };
+      _citationIndexResolver = (id) => resolveCitationIndex(lookup, id);
     }
     return _citationIndexResolver;
   }
@@ -4172,41 +4390,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     if (identical(parts, _searchItemsParts) && _searchItemsCache != null) {
       return _searchItemsCache!;
     }
-    if (parts.isEmpty) {
-      _searchItemsParts = parts;
-      _searchItemsCache = const <Map<String, dynamic>>[];
-      return _searchItemsCache!;
-    }
-
-    final out = <Map<String, dynamic>>[];
-    final seen = <String>{};
-
-    for (int i = parts.length - 1; i >= 0; i--) {
-      final p = parts[i];
-      if ((p.toolName != 'search_web' && p.toolName != 'builtin_search') ||
-          (p.content?.isNotEmpty ?? false) == false) {
-        continue;
-      }
-      try {
-        final obj = jsonDecode(p.content!) as Map<String, dynamic>;
-        final arr = obj['items'] as List? ?? const <dynamic>[];
-        for (final it in arr) {
-          if (it is! Map) continue;
-          final m = it.cast<String, dynamic>();
-          final key = (m['id'] ?? m['url'] ?? '')
-              .toString(); // builtin_search no id
-          if (key.isNotEmpty) {
-            if (!seen.add(key)) continue;
-          }
-          out.add(m);
-        }
-      } catch (_) {
-        // ignore broken tool payload
-      }
-    }
     _searchItemsParts = parts;
-    _searchItemsCache = out;
-    return out;
+    return _searchItemsCache = citationSearchItems(
+      parts.reversed.map((p) => (name: p.toolName, content: p.content)),
+    );
   }
 
   void _showCitationsSheet(List<Map<String, dynamic>> items) {
@@ -4313,19 +4500,23 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isUser = widget.message.role == 'user';
+    final target = switch (widget.message.role) {
+      'user' => ChatBubbleStyleTarget.user,
+      'tool' => ChatBubbleStyleTarget.thinkingToolCard,
+      _ => ChatBubbleStyleTarget.assistant,
+    };
     final palette = computeChatSurfaceForegroundPalette(
       context,
-      isUser: isUser,
+      target: target,
     );
-    final child = isUser
-        ? _buildUserMessage()
-        : widget.message.role == 'tool'
-        ? _buildToolMessage()
-        : PageStorage(
-            bucket: widget.timelineStorage ?? _localTimelineStorage,
-            child: _buildAssistantMessage(),
-          );
+    final child = switch (target) {
+      ChatBubbleStyleTarget.user => _buildUserMessage(),
+      ChatBubbleStyleTarget.thinkingToolCard => _buildToolMessage(),
+      ChatBubbleStyleTarget.assistant => PageStorage(
+        bucket: widget.timelineStorage ?? _localTimelineStorage,
+        child: _buildAssistantMessage(),
+      ),
+    };
     return ChatSurfaceTheme(palette: palette, child: child);
   }
 }
@@ -4729,6 +4920,22 @@ List<WorkspaceToolPart> _producedWorkspaceParts(List<ToolUIPart>? parts) {
 class ToolPartSnapshot extends UnmodifiableListView<ToolUIPart> {
   ToolPartSnapshot(Iterable<ToolUIPart> parts)
     : super(List<ToolUIPart>.of(parts, growable: false));
+
+  ToolPartSnapshot.withPart(
+    List<ToolUIPart> previous,
+    int index,
+    ToolUIPart part,
+  ) : super(
+        List<ToolUIPart>.generate(
+          index == previous.length ? previous.length + 1 : previous.length,
+          (i) => i == index ? part : previous[i],
+          growable: false,
+        ),
+      );
+
+  late final ToolUIPart? lastLoading = reversed
+      .where((part) => part.loading)
+      .firstOrNull;
 }
 
 // Data for a reasoning segment (for mixed display)
@@ -4934,7 +5141,7 @@ enum _ReasoningStepState { collapsed, preview, expanded }
 const double _timelineStepPaddingV = 8;
 const double _timelineIconSize = 18;
 const double _timelineIconColumnWidth = 24;
-const double _timelineGap = 8;
+const double _timelineGap = timelineStepContentInset - _timelineIconColumnWidth;
 const double _timelineLineGap = 3;
 const double _timelineLineX = (_timelineIconColumnWidth - 1) / 2;
 
@@ -5016,6 +5223,7 @@ class _ChainOfThoughtCard extends StatefulWidget {
     required this.message,
     required this.showThinkingCards,
     required this.showToolCards,
+    required this.collapseThinkingSteps,
     required this.streaming,
     this.onRecoveredAnswer,
   });
@@ -5025,6 +5233,7 @@ class _ChainOfThoughtCard extends StatefulWidget {
   String get conversationId => message.conversationId;
   final bool showThinkingCards;
   final bool showToolCards;
+  final bool? collapseThinkingSteps;
   final bool streaming;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
@@ -5109,10 +5318,13 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final fg = chatSurfaceForegroundPalette(context);
-    final collapseThinkingSteps = context.select<SettingsProvider, bool>(
-      (s) => s.collapseThinkingSteps,
+    final fg = computeChatSurfaceForegroundPalette(
+      context,
+      target: ChatBubbleStyleTarget.thinkingToolCard,
     );
+    final collapseThinkingSteps =
+        widget.collapseThinkingSteps ??
+        context.select<SettingsProvider, bool>((s) => s.collapseThinkingSteps);
     final showToolResultSummary = context.select<SettingsProvider, bool>(
       (s) => s.showToolResultSummary,
     );
@@ -5161,6 +5373,15 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
         filteredSteps.every((step) => step.isReasoning) &&
         !filteredSteps.any((step) => step.isReasoning && step.loading);
     final canCollapse = collapseThinkingSteps && filteredSteps.length > 2;
+    final target = ConversationFindHighlights.of(context)?.current;
+    final findStep = target?.part == FindPart.reasoning
+        ? filteredSteps.indexWhere(
+            (s) => s.isReasoning && s.sourceOrdinal == target!.block,
+          )
+        : -1;
+    if (findStep >= 0 && findStep < filteredSteps.length - 2) {
+      _showAllSteps = true;
+    }
     final hiddenCount = canCollapse && !_showAllSteps
         ? filteredSteps.length - 2
         : 0;
@@ -5177,15 +5398,17 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
 
     final card = buildSharedChatSurface(
       context,
+      target: ChatBubbleStyleTarget.thinkingToolCard,
       borderRadius: BorderRadius.circular(16),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: timelineCardHorizontalPadding,
+        vertical: 4,
+      ),
       defaultColor: cs.primaryContainer.withValues(
         alpha: theme.brightness == Brightness.dark ? 0.25 : 0.30,
       ),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 300),
+      child: _TimelineAnimatedSize(
         curve: Curves.easeInOutCubicEmphasized,
-        alignment: Alignment.topLeft,
         child: _RecoveredAskUserAction(
           conversationId: widget.conversationId,
           onSubmit: widget.onRecoveredAnswer,
@@ -5239,7 +5462,8 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                     ),
                   ),
                 ViewportBlockList(
-                  storageId: ('steps', widget.key),
+                  storageId: ('steps', widget.key, showBrowserPageCards),
+                  revealIndex: findStep >= 0 ? findStep - hiddenCount : null,
                   itemCount: visibleSteps.length,
                   structureToken: (visibleSteps.length, hiddenCount),
                   itemKey: (i) {
@@ -5256,7 +5480,14 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                       toolName: step.tool!.toolName,
                     );
                   },
-                  estimateExtent: (i, width) => 36,
+                  estimateExtent: (i, width) {
+                    final step = visibleSteps[i];
+                    if (!showBrowserPageCards || step.browserTools == null) {
+                      return 36;
+                    }
+                    return 36 +
+                        estimateBrowserGroupBodyHeight(lite: step.browserLite);
+                  },
                   keepAlive: (i) =>
                       visibleSteps[i].tool?.toolName ==
                           LocalToolNames.askUser &&
@@ -5297,6 +5528,8 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                     }
                     final part = step.tool!;
                     if (step.browserTools case final tools?) {
+                      final expandAllSteps =
+                          widget.collapseThinkingSteps == false;
                       return _CachedTimelineStep(
                         key: ValueKey(
                           'browser-group-${tools.first.id}-${step.sourceOrdinal}',
@@ -5318,6 +5551,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                             ),
                           ),
                           step.browserLite,
+                          expandAllSteps,
                           isFirst,
                           isLast,
                           fg,
@@ -5332,6 +5566,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                           sourceOrdinal: step.sourceOrdinal,
                           tools: tools,
                           lite: step.browserLite,
+                          expandAllSteps: expandAllSteps,
                           conversationId: widget.conversationId,
                           isFirst: isFirst,
                           isLast: isLast,
@@ -5382,7 +5617,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
     return Align(
       alignment: Alignment.centerLeft,
       widthFactor: fillWidth ? null : 1,
-      child: card,
+      child: ChatSurfaceTheme(palette: fg, child: card),
     );
   }
 }
@@ -5514,7 +5749,7 @@ class _TimelineStepBody extends StatelessWidget {
     final body = visible
         ? Padding(
             padding: EdgeInsets.only(
-              left: _timelineIconColumnWidth + _timelineGap,
+              left: timelineStepContentInset,
               top: 4,
               bottom: bottomPadding,
             ),
@@ -5538,15 +5773,72 @@ class _TimelineStepBody extends StatelessWidget {
             ),
           ),
         if (animate)
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
+          _TimelineAnimatedSize(
             curve: const Cubic(0.2, 0.8, 0.2, 1),
-            alignment: Alignment.topLeft,
             child: body,
           )
         else
           body,
       ],
+    );
+  }
+}
+
+class _TimelineAnimatedSize extends StatefulWidget {
+  const _TimelineAnimatedSize({required this.curve, required this.child});
+
+  final Curve curve;
+  final Widget child;
+
+  static void snapAncestors(BuildContext context, int layoutFrames) {
+    context.visitAncestorElements((element) {
+      if (element case StatefulElement(
+        state: final _TimelineAnimatedSizeState state,
+      )) {
+        state._snap(layoutFrames);
+      }
+      return true;
+    });
+  }
+
+  @override
+  State<_TimelineAnimatedSize> createState() => _TimelineAnimatedSizeState();
+}
+
+class _TimelineAnimatedSizeState extends State<_TimelineAnimatedSize> {
+  final _bodyKey = GlobalKey();
+  int _snapFrames = 0;
+
+  void _snap(int frames) {
+    if (_snapFrames > 0) {
+      _snapFrames = math.max(_snapFrames, frames);
+      return;
+    }
+    setState(() => _snapFrames = frames);
+    WidgetsBinding.instance.addPostFrameCallback(_finishFrame);
+  }
+
+  void _finishFrame(Duration _) {
+    if (!mounted) return;
+    if (_snapFrames > 1) {
+      _snapFrames--;
+      WidgetsBinding.instance.addPostFrameCallback(_finishFrame);
+    } else {
+      setState(() => _snapFrames = 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Apply an asynchronously decoded size within the anchored layouts, while
+    // keeping the interactive subtree mounted when the animation is bypassed.
+    final body = KeyedSubtree(key: _bodyKey, child: widget.child);
+    if (_snapFrames > 0) return body;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: widget.curve,
+      alignment: Alignment.topLeft,
+      child: body,
     );
   }
 }
@@ -5681,10 +5973,6 @@ class _ChainOfThoughtReasoningStepState
         : _ReasoningStepState.collapsed;
   }
 
-  String _sanitize(String s) {
-    return s.replaceAll('\r', '').trim();
-  }
-
   String _elapsed() {
     final start = widget.step.startAt;
     if (start == null) return '';
@@ -5770,11 +6058,19 @@ class _ChainOfThoughtReasoningStepState
     final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableReasoningMarkdown,
     );
-    final state = _stepState;
-    final display = _sanitize(widget.step.text);
+    final find = ConversationFindHighlights.of(context);
+    final target = find?.current;
+    final selected =
+        target?.part == FindPart.reasoning &&
+        target?.block == widget.sourceOrdinal;
+    if (selected) _localExpanded = true;
+    final state = selected ? _ReasoningStepState.expanded : _stepState;
+    final display = reasoningDisplayText(widget.step.text);
+    final ranges =
+        find?.ranges(FindPart.reasoning, widget.sourceOrdinal) ??
+        const <SourceSpan>[];
     final label = ThinkingSheen(
       enabled: widget.step.loading,
-      color: fg.strong,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -5809,18 +6105,41 @@ class _ChainOfThoughtReasoningStepState
     );
 
     Widget reasoningContent(String text) {
-      if (enableReasoningMarkdown) {
-        return RepaintBoundary(
-          child: MarkdownWithCodeHighlight(
-            text: text.isNotEmpty ? text : '…',
-            baseStyle: TextStyle(fontSize: 12.5, height: 1.32),
-            streaming: widget.step.loading,
-          ),
-        );
-      }
-      return Text(
-        text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
-        style: TextStyle(fontSize: 12.5, height: 1.32),
+      final source = text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…';
+      const style = TextStyle(fontSize: 12.5, height: 1.32);
+      return QuoteSourceAnchor(
+        message: widget.message,
+        source: source,
+        findPart: FindPart.reasoning,
+        findBlock: widget.sourceOrdinal,
+        markdown: enableReasoningMarkdown,
+        child: AppSelectionArea(
+          message: widget.message,
+          quoteTextOnly: true,
+          child: enableReasoningMarkdown
+              ? RepaintBoundary(
+                  child: MarkdownWithCodeHighlight(
+                    text: source,
+                    highlightRanges: ranges,
+                    highlightColor: context.appColors.searchHighlight,
+                    baseStyle: style,
+                    streaming: widget.step.loading,
+                  ),
+                )
+              : plainMessageText(
+                  text: source,
+                  style: style,
+                  buildSpan: ranges.isEmpty
+                      ? null
+                      : (start, end) => highlightedQuoteSource(
+                          source,
+                          ranges,
+                          context.appColors.searchHighlight,
+                          start: start,
+                          end: end,
+                        ),
+                ),
+        ),
       );
     }
 
@@ -5854,20 +6173,12 @@ class _ChainOfThoughtReasoningStepState
             // Bouncing physics already declines drags when content fits.
             // Keeping it stable also retains ScrollPosition on overflow.
             physics: const BouncingScrollPhysics(),
-            child: AppSelectionArea(
-              message: widget.message,
-              quoteTextOnly: true,
-              child: reasoningContent(display),
-            ),
+            child: reasoningContent(display),
           ),
         ),
       );
     } else if (state == _ReasoningStepState.expanded) {
-      content = AppSelectionArea(
-        message: widget.message,
-        quoteTextOnly: true,
-        child: reasoningContent(display),
-      );
+      content = reasoningContent(display);
     }
 
     return _TimelineStepShell(
@@ -5907,6 +6218,7 @@ class _ChainOfThoughtBrowserGroup extends StatefulWidget {
     required this.sourceOrdinal,
     required this.tools,
     required this.lite,
+    required this.expandAllSteps,
     required this.conversationId,
     required this.isFirst,
     required this.isLast,
@@ -5917,6 +6229,7 @@ class _ChainOfThoughtBrowserGroup extends StatefulWidget {
   final int sourceOrdinal;
   final List<ToolUIPart> tools;
   final bool lite, isFirst, isLast, hideImages, showPageCard, streaming;
+  final bool expandAllSteps;
   final String conversationId;
   @override
   State<_ChainOfThoughtBrowserGroup> createState() =>
@@ -6083,12 +6396,14 @@ class _ChainOfThoughtBrowserGroupState
     super.dispose();
   }
 
-  bool get _isExpanded => _userToggled
-      ? _expanded!
-      : !widget.lite &&
-            !_executing &&
-            _displayAction == null &&
-            _actions.any((action) => action.failed);
+  bool get _isExpanded =>
+      widget.expandAllSteps ||
+      (_userToggled
+          ? _expanded!
+          : !widget.lite &&
+                !_executing &&
+                _displayAction == null &&
+                _actions.any((action) => action.failed));
 
   void _finishStepsAnimation() {
     if (!_isExpanded && _keepSteps) {
@@ -6112,8 +6427,10 @@ class _ChainOfThoughtBrowserGroupState
     final expanded = _isExpanded;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final tools = widget.tools;
+    final expandAllSteps = widget.expandAllSteps;
     final firstVisible =
         _keepSteps &&
+            !expandAllSteps &&
             !_showAll &&
             widget.tools.length > _browserStepsFoldThreshold
         ? widget.tools.length - _browserStepsTail
@@ -6130,7 +6447,7 @@ class _ChainOfThoughtBrowserGroupState
           ? _loadingIcon(fg.strong)
           : Icon(Lucide.AppWindow, size: 16, color: fg.strong),
       label: Semantics(
-        button: true,
+        button: !expandAllSteps,
         expanded: expanded,
         label: l.browserGroupToggleSemantics,
         child: Row(
@@ -6139,7 +6456,6 @@ class _ChainOfThoughtBrowserGroupState
             Flexible(
               child: ThinkingSheen(
                 enabled: running,
-                color: fg.strong,
                 child: AnimatedSwitcher(
                   duration: reduceMotion
                       ? Duration.zero
@@ -6191,19 +6507,23 @@ class _ChainOfThoughtBrowserGroupState
       ),
       isFirst: widget.isFirst,
       isLast: widget.isLast && !_keepSteps,
-      onTap: () => setState(() {
-        _expanded = !expanded;
-        _userToggled = true;
-        // Keep the current rows (including revealed earlier steps) until
-        // closing ends, so reversal starts at the same visual position.
-        _keepSteps = !reduceMotion || _expanded!;
-        if (!_keepSteps) _showAll = false;
-      }),
-      indicator: Icon(
-        expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
-        size: 16,
-        color: fg.muted,
-      ),
+      onTap: expandAllSteps
+          ? null
+          : () => setState(() {
+              _expanded = !expanded;
+              _userToggled = true;
+              // Keep the current rows (including revealed earlier steps) until
+              // closing ends, so reversal starts at the same visual position.
+              _keepSteps = !reduceMotion || _expanded!;
+              if (!_keepSteps) _showAll = false;
+            }),
+      indicator: expandAllSteps
+          ? null
+          : Icon(
+              expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
+              size: 16,
+              color: fg.muted,
+            ),
     );
     final steps = <Widget>[];
     if (_keepSteps) {
@@ -6317,14 +6637,18 @@ class _ChainOfThoughtBrowserGroupState
     final fg = chatSurfaceForegroundPalette(context);
     final cs = Theme.of(context).colorScheme;
     final l = AppLocalizations.of(context)!;
-    final tab = action.action == 'switch_tab'
-        ? BrowserService.instance.tabs
-              .where((tab) => tab.id == action.tabId)
-              .firstOrNull
-        : null;
-    final target = tab == null
+    final tabUrl = switch ((action.action, widget.expandAllSteps)) {
+      ('switch_tab', true) => action.url,
+      ('switch_tab', false) =>
+        BrowserService.instance.tabs
+            .where((tab) => tab.id == action.tabId)
+            .firstOrNull
+            ?.url,
+      _ => null,
+    };
+    final target = tabUrl == null
         ? action.target(l, [if (snapshot != null) snapshot])
-        : browserUrlLabel(tab.url, includePath: true);
+        : browserUrlLabel(tabUrl, includePath: true);
     final content = <Widget>[
       if (action.failed)
         Text(
@@ -6383,7 +6707,6 @@ class _ChainOfThoughtBrowserGroupState
             Flexible(
               child: ThinkingSheen(
                 enabled: action.loading,
-                color: fg.strong,
                 child: Text(
                   action.failed
                       ? l.browserActionFailed(action.label(l))
@@ -6438,6 +6761,121 @@ class _ChainOfThoughtBrowserGroupState
           conversationId: widget.conversationId,
         ),
       ),
+    );
+  }
+}
+
+class _SingleToolImageThumbnail extends StatefulWidget {
+  const _SingleToolImageThumbnail({
+    super.key,
+    required this.path,
+    required this.knownAspect,
+  });
+
+  final String path;
+  final double? knownAspect;
+
+  @override
+  State<_SingleToolImageThumbnail> createState() =>
+      _SingleToolImageThumbnailState();
+}
+
+class _SingleToolImageThumbnailState extends State<_SingleToolImageThumbnail> {
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  (ImageProvider, Map<String, double>)? _listenedInput;
+
+  @override
+  void didUpdateWidget(_SingleToolImageThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path ||
+        oldWidget.knownAspect != widget.knownAspect) {
+      _stopListening();
+      _listenedInput = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopListening();
+    super.dispose();
+  }
+
+  void _stopListening() {
+    final listener = _listener;
+    if (listener != null) _stream?.removeListener(listener);
+    _stream = null;
+    _listener = null;
+  }
+
+  void _listenForAspect(ImageProvider provider, Map<String, double> aspects) {
+    final input = (provider, aspects);
+    if (_listenedInput == input) return;
+    _stopListening();
+    _listenedInput = input;
+    final path = widget.path;
+    _stream = provider.resolve(createLocalImageConfiguration(context));
+    _listener = ImageStreamListener((info, synchronous) {
+      final aspect = info.image.width / info.image.height;
+      info.dispose();
+      _stopListening();
+      void applyAspect() {
+        if (!mounted || _listenedInput != input) return;
+        final frames = ViewportBlockList.layoutFramesForChildResize(context);
+        preserveScrollLayoutAnchor(context, layoutFrames: frames);
+        _TimelineAnimatedSize.snapAncestors(context, frames);
+        setState(() => aspects[path] = aspect);
+      }
+
+      // Cached pixels may arrive during build even when a recycled row has
+      // no measured aspect. Wait for its reserved height to be laid out so
+      // we can anchor the same resize as an asynchronously decoded frame.
+      if (synchronous) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => applyAspect());
+      } else {
+        applyAspect();
+      }
+    }, onError: (_, _) => _stopListening());
+    _stream!.addListener(_listener!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final path = widget.path;
+    final provider = _previewImageProvider(
+      path,
+      logicalWidth: kToolImageTimelineMaxWidth,
+      logicalHeight: kToolImageTimelineHeight,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+      fit: BoxFit.contain,
+    );
+    var aspect = widget.knownAspect;
+    if (aspect == null && provider != null) {
+      final storage = PageStorage.of(context);
+      const id = timelineToolImageAspectsStorageId;
+      final cached =
+          storage.readState(context, identifier: id) as Map<String, double>?;
+      final aspects = cached ?? <String, double>{};
+      if (cached == null) storage.writeState(context, aspects, identifier: id);
+      if (!aspects.containsKey(path)) _listenForAspect(provider, aspects);
+      aspect = aspects[path];
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = timelineToolImageSize(constraints.maxWidth, aspect);
+        return GestureDetector(
+          onTap: () => _showToolFullImage(context, path),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: _buildPreviewImage(
+              context,
+              provider,
+              width: size.width,
+              height: size.height,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -6614,7 +7052,6 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
     );
     final label = ThinkingSheen(
       enabled: widget.part.loading && !_isAskUser,
-      color: fg.strong,
       child: Text(
         title,
         maxLines: 2,
@@ -6628,7 +7065,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
     );
 
     final cleanText = _cleanText;
-    final imagePaths = _imagePaths;
+    final imagePaths = _liveToolImages(context, widget.part, _imagePaths);
     final screenTimeResult = widget.part.toolName == LocalToolNames.screenTime
         ? ScreenTimeResult.tryParse(cleanText)
         : null;
@@ -6688,10 +7125,21 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
               color: fg.body,
             ),
           );
-    final Widget? imageThumbnails =
-        (!_isAskUser && !hideToolResultImages && imagePaths.isNotEmpty)
-        ? SizedBox(
-            key: ValueKey('tool-image-thumbnails:${widget.part.id}'),
+    final showImages =
+        !_isAskUser && !hideToolResultImages && imagePaths.isNotEmpty;
+    final useCompactImage =
+        showImages && usesCompactToolImage(widget.part.toolName, imagePaths);
+    final thumbnailsKey = ValueKey('tool-image-thumbnails:${widget.part.id}');
+    final Widget? imageThumbnails = !showImages
+        ? null
+        : useCompactImage
+        ? _SingleToolImageThumbnail(
+            key: thumbnailsKey,
+            path: imagePaths.single,
+            knownAspect: viewImageResultAspect(cleanText),
+          )
+        : SizedBox(
+            key: thumbnailsKey,
             height: kToolImageTimelineHeight,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
@@ -6713,8 +7161,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
                 );
               },
             ),
-          )
-        : null;
+          );
     final Widget? content =
         (summaryContent == null &&
             imageThumbnails == null &&
@@ -6899,7 +7346,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final hideToolResultImages = context.select<SettingsProvider, bool>(
       (s) => s.hideToolResultImages,
     );
-    final hasImages = !hideToolResultImages && _imagePaths.isNotEmpty;
+    final imagePaths = _liveToolImages(context, widget.part, _imagePaths);
+    final hasImages = !hideToolResultImages && imagePaths.isNotEmpty;
     final l10n = AppLocalizations.of(context)!;
     final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
         ? _textToSpeechToolText(widget.part.arguments)
@@ -6933,6 +7381,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
       padding: EdgeInsets.zero,
       child: buildSharedChatSurface(
         context,
+        target: ChatBubbleStyleTarget.thinkingToolCard,
         borderRadius: BorderRadius.circular(16),
         padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
         defaultColor: cs.primaryContainer.withValues(
@@ -6985,7 +7434,6 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       // Title: always show tool name; add "waiting" badge when pending
                       ThinkingSheen(
                         enabled: widget.part.loading && !isPendingApproval,
-                        color: fg.strong,
                         child: Text(
                           _titleFor(
                             context,
@@ -7186,12 +7634,12 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 height: kToolImageCardHeight,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: _imagePaths.length,
+                  itemCount: imagePaths.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (ctx, i) {
-                    final path = _imagePaths[i];
+                    final path = imagePaths[i];
                     return GestureDetector(
-                      onTap: () => _showFullImage(context, path),
+                      onTap: () => _showToolFullImage(context, path),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: _buildImageFromPath(
@@ -7222,36 +7670,6 @@ class _ToolCallItemState extends State<_ToolCallItem> {
       return;
     }
     _showToolDetail(context, widget.part);
-  }
-
-  /// Show full-size image using ImageViewerPage for save/share/copy support.
-  /// [path] can be a local file path or HTTP URL.
-  void _showFullImage(BuildContext context, String path) {
-    Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: false,
-        pageBuilder: (_, __, ___) => ImageViewerPage(images: [path]),
-        transitionDuration: const Duration(milliseconds: 360),
-        reverseTransitionDuration: const Duration(milliseconds: 280),
-        transitionsBuilder: (context, anim, sec, child) {
-          final curved = CurvedAnimation(
-            parent: anim,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.02),
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
-      ),
-    );
   }
 }
 
@@ -7290,6 +7708,7 @@ class _AskUserToolCardState extends State<_AskUserToolCard> {
     final expanded = _expanded ?? true;
     return buildSharedChatSurface(
       context,
+      target: ChatBubbleStyleTarget.thinkingToolCard,
       borderRadius: BorderRadius.circular(16),
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       defaultColor: cs.primaryContainer.withValues(alpha: isDark ? 0.25 : 0.30),
@@ -8347,7 +8766,6 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
             const SizedBox(width: 8),
             ThinkingSheen(
               enabled: loading,
-              color: fg.strong,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -8417,8 +8835,8 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
           ),
         );
       }
-      return Text(
-        text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
+      return plainMessageText(
+        text: text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
         style: baseStyle,
         strutStyle: baseStrut,
         textHeightBehavior: baseTHB,

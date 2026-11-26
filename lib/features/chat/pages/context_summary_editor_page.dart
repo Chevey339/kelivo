@@ -7,7 +7,7 @@ import '../../../shared/text_input/message_editing_controller.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/long_message_editor.dart';
 import '../../../theme/app_semantic_colors.dart';
-import '../widgets/context_compression_status.dart';
+import '../widgets/compression_error_notice.dart';
 import '../widgets/context_dialog.dart';
 
 class ContextSummaryEditorPage extends StatefulWidget {
@@ -17,8 +17,12 @@ class ContextSummaryEditorPage extends StatefulWidget {
     required this.onSave,
     this.estimate,
     this.budget,
+    this.hint,
+    this.emptyHint,
+    this.title,
   });
   final String summary;
+  final String? hint, emptyHint, title;
   final Future<bool> Function(String) onSave;
   final Future<CompressionBudget?> Function(String)? estimate;
   final CompressionBudget? budget;
@@ -73,12 +77,7 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
       if (mounted && saved) Navigator.of(context).pop(true);
     } catch (error) {
       if (mounted) {
-        setState(
-          () => _error = compressionErrorLabel(
-            AppLocalizations.of(context)!,
-            error.toString(),
-          ),
-        );
+        setState(() => _error = error.toString());
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -100,7 +99,7 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
           onPressed: _saving ? null : () => Navigator.of(context).pop(false),
         ),
         title: Text(
-          l10n.contextEditTitle,
+          widget.title ?? l10n.contextEditTitle,
           style: const TextStyle(fontSize: 17),
         ),
         centerTitle: true,
@@ -118,7 +117,16 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (widget.hint != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    widget.hint!,
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                ),
               Expanded(
+                flex: 3,
                 child: LongMessageEditor(
                   controller: _editor,
                   autofocus: true,
@@ -151,23 +159,27 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                _error ??
-                    (empty
-                        ? l10n.contextEditEmpty
-                        : _budget == null
-                        ? l10n.contextSummaryHint
-                        : l10n.contextEditPreview(
-                            contextTokenValue(_budget!.usedTokens),
-                          )),
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.4,
-                  color: empty || _error != null
-                      ? cs.error
-                      : cs.onSurfaceVariant,
+              if (_error case final error?)
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: CompressionErrorNotice(error: error),
+                  ),
+                )
+              else
+                Text(
+                  empty
+                      ? widget.emptyHint ?? l10n.contextEditEmpty
+                      : _budget == null
+                      ? l10n.contextSummaryHint
+                      : l10n.contextEditPreview(
+                          contextTokenValue(_budget!.usedTokens),
+                        ),
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: empty ? cs.error : cs.onSurfaceVariant,
+                  ),
                 ),
-              ),
             ],
           ),
         ),

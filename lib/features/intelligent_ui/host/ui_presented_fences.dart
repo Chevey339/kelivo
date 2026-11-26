@@ -32,8 +32,14 @@ final class UiMessageTimeline {
   final bool inlineThinking;
 }
 
-UiMessageTimeline uiMessageTimeline(ChatMessage message) =>
-    _messageTimeline(message, _decodeReasoning(message.reasoningSegmentsJson));
+UiMessageTimeline uiMessageTimeline(
+  ChatMessage message, {
+  String? inlineThinking,
+}) => _messageTimeline(
+  message,
+  _decodeReasoning(message.reasoningSegmentsJson),
+  inlineThinking: inlineThinking,
+);
 
 /// Historical splits can cut a fence into ordinary code, so raw fence ordinals
 /// cannot stand in for the ordinals assigned by the timeline renderer. Source
@@ -83,9 +89,10 @@ List<({UiSourceFence fence, int ordinal})> uiPresentedNativeFences(
 
 UiMessageTimeline _messageTimeline(
   ChatMessage message,
-  _DecodedReasoning? decoded,
-) {
-  final inlineThinking = messageHasProviderReasoning(message)
+  _DecodedReasoning? decoded, {
+  String? inlineThinking,
+}) {
+  inlineThinking ??= messageHasProviderReasoning(message)
       ? ''
       : ThinkingTagParser.parseLegacyInlineBlocks(
           message.content,

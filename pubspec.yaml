@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.3.5+85
+version: 1.3.7+89
 
 environment:
   sdk: ^3.12.1
@@ -47,12 +47,14 @@ dependencies:
     sdk: flutter
   provider: ^6.0.5
   collection: ^1.19.1
+  clock: ^1.1.2
+  connectivity_plus: ^6.1.5
+  visibility_detector: ^0.4.0+2
   dynamic_color: ^1.8.1
   material_color_utilities: ^0.13.0
   lucide_icons_flutter: ^3.1.13
   shared_preferences: ^2.2.3
   image_picker: 1.1.2
-  image_cropper: ^12.2.1
   flutter_svg: ^2.2.1
   fl_chart: 1.3.0
   http: ^1.5.0
@@ -77,10 +79,13 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.4
   file_picker: ^10.3.10
+  chinese_codec: 0.1.2
   archive: ^4.5.2
   xml: ^6.5.0
   open_filex: ^4.5.0
-  easy_image_viewer: ^1.4.6
+  video_player: ^2.14.1
+  video_player_win: 3.3.1
+  fc_native_video_thumbnail: 2.1.1
   share_plus: ^12.0.2
   pretty_qr_code: ^3.5.0
   mobile_scanner: ^7.0.1
@@ -125,7 +130,7 @@ dependencies:
   flutter_tts:
     path: ./dependencies/flutter_tts
   flutter_local_notifications: ^17.2.3
-  image: ^4.8.0
+  image: ^4.13.0
   downsize:
     path: ./dependencies/downsize
   petitparser: ^6.1.0
@@ -144,6 +149,9 @@ dependencies:
   glob: ^2.2.0
   terminal_view: # ^0.2.1
     path: ./dependencies/terminal_view
+  flutter_secure_storage: ^10.3.4
+  super_drag_and_drop: ^0.9.1
+  json_schema: ^5.2.2
 
 dev_dependencies:
   vector_graphics_compiler: ^1.3.0
@@ -167,6 +175,7 @@ dev_dependencies:
   fake_async: ^1.3.3
 
   path_provider_platform_interface: ^2.1.3
+  image_picker_platform_interface: ^2.11.1
   timezone: ^0.9.4
   irondash_message_channel: ^0.7.0
   super_native_extensions: ^0.9.1
@@ -214,8 +223,6 @@ dependency_overrides:
 flutter:
   generate: true
   config:
-    # Existing iOS plugins require incompatible TOCropViewController ranges.
-    # Keep CocoaPods until those plugins can share an SPM dependency graph.
     enable-swift-package-manager: false
 
   # The following line ensures that the Material Icons font is

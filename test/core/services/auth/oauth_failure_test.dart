@@ -158,7 +158,7 @@ void main() {
       test('$name is classified and sanitized (status: $status)', () async {
         final client = DioHttpClient(
           adapter: _Adapter(cause, statusCode: status),
-          logRequests: false,
+          logMode: HttpLogMode.disabled,
         );
         addTearDown(client.close);
         final error = await _failure(

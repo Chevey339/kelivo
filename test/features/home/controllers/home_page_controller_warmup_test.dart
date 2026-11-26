@@ -10,6 +10,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 class _RecordingChatService extends ChatService {
+  int releases = 0;
+  @override
+  void releaseInactiveMessageCaches(Set<String> keepConversationIds) {
+    releases++;
+  }
+
   final List<String> timelineCalls = <String>[];
   void Function()? onFirstTimelineCall;
 
@@ -33,6 +39,24 @@ class _RecordingChatService extends ChatService {
 }
 
 void main() {
+  testWidgets(
+    'hiding during a warm-up drops the page that finishes after the transition',
+    (tester) async {
+      final service = _RecordingChatService();
+      late HomePageController controller;
+      await tester.pumpWidget(_buildHarness(service, (c) => controller = c));
+      service.onFirstTimelineCall = () =>
+          controller.onAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await controller.warmUpRecentConversations([
+        'one',
+        'two',
+      ], controller.debugWarmupSerial);
+      expect(service.timelineCalls, ['one']);
+      expect(service.releases, 2);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets('startup warm-up loads each queued conversation serially', (
     tester,
   ) async {

@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:ui' show PointerDeviceKind, Tristate;
+
+import 'package:Kelivo/core/database/business_data.dart';
 import 'package:Kelivo/core/models/provider_oauth.dart';
 import "support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
+import 'package:Kelivo/desktop/widgets/desktop_form_dialog.dart';
+import 'package:Kelivo/desktop/widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/features/provider/widgets/provider_custom_request_editor.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
@@ -10,6 +16,7 @@ import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/model_tag_wrap.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -81,6 +88,7 @@ Future<SettingsProvider> _buildSettings(WidgetTester tester) async {
 Future<void> _pumpProviderSettings(
   WidgetTester tester,
   SettingsProvider settings, {
+  String initialProviderKey = 'ProviderA',
   double width = 1400,
   TextScaler textScaler = TextScaler.noScaling,
   Widget? body,
@@ -93,7 +101,7 @@ Future<void> _pumpProviderSettings(
   await tester.pumpWidget(
     _harness(
       settings,
-      initialProviderKey: 'ProviderA',
+      initialProviderKey: initialProviderKey,
       textScaler: textScaler,
       body: body,
     ),
@@ -104,6 +112,118 @@ Future<void> _pumpProviderSettings(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'global balance defaults are reachable by keyboard from the provider list',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await _pumpProviderSettings(tester, settings, width: 360);
+      await tester.tap(find.byKey(const ValueKey('desktop-pane-back')).last);
+      await tester.pumpAndSettle();
+
+      Future<void> focus(Finder control) async {
+        final node = Focus.of(tester.element(control));
+        for (var i = 0; i < 64 && !node.hasPrimaryFocus; i++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(node.hasPrimaryFocus, isTrue, reason: control.toString());
+      }
+
+      Future<void> press(LogicalKeyboardKey key) async {
+        await tester.sendKeyEvent(key);
+        await tester.pumpAndSettle();
+      }
+
+      await focus(find.text('ProviderB'));
+      await press(LogicalKeyboardKey.enter);
+      await focus(
+        find.descendant(
+          of: find.byKey(const ValueKey('desktop-provider-settings-ProviderB')),
+          matching: find.byType(Icon),
+        ),
+      );
+      await press(LogicalKeyboardKey.enter);
+      await focus(find.text('This provider'));
+      await press(LogicalKeyboardKey.enter);
+      await press(LogicalKeyboardKey.arrowDown);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Global defaults'))
+            .flagsCollection
+            .isFocused,
+        Tristate.isTrue,
+      );
+      await press(LogicalKeyboardKey.space);
+      await focus(find.text('Off'));
+      await press(LogicalKeyboardKey.enter);
+      await press(LogicalKeyboardKey.arrowDown);
+      await press(LogicalKeyboardKey.arrowDown);
+      await press(LogicalKeyboardKey.enter);
+      await focus(find.text('Refresh after replies'));
+      expect(settings.balanceRefreshOnReply, isTrue);
+      await press(LogicalKeyboardKey.space);
+      expect(settings.balanceRefreshInterval, 5);
+      expect(settings.balanceRefreshOnReply, isFalse);
+      final config = settings.getProviderConfig('ProviderB');
+      expect(config.balanceRefreshInterval, isNull);
+      expect(config.balanceRefreshOnReply, isNull);
+    },
+    variant: TargetPlatformVariant({TargetPlatform.macOS}),
+  );
+
+  testWidgets(
+    'first desktop refresh override preserves a preset display name',
+    (tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await _pumpProviderSettings(
+        tester,
+        settings,
+        initialProviderKey: 'Aliyun',
+        textScaler: const TextScaler.linear(2),
+      );
+      final detail = find.byType(DesktopProviderDetailPane);
+      final l10n = AppLocalizations.of(tester.element(detail))!;
+      expect(l10n.providersPageAliyunName, '阿里云千问');
+      expect(
+        tester.widget<DesktopProviderDetailPane>(detail).displayName,
+        l10n.providersPageAliyunName,
+      );
+      expect(settings.providerConfigs.containsKey('Aliyun'), isFalse);
+
+      Future<void> tap(Finder finder) async {
+        await tester.ensureVisible(finder);
+        await tester.tap(finder);
+        await tester.pumpAndSettle();
+      }
+
+      await tap(find.byKey(const ValueKey('desktop-provider-settings-Aliyun')));
+      final inheritedReply = find.text(
+        l10n.providerBalanceFollowDefault(l10n.providerBalanceRefreshOn),
+      );
+      expect(
+        tester.renderObject<RenderParagraph>(inheritedReply).didExceedMaxLines,
+        isFalse,
+      );
+      await tap(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is DesktopSelectDropdown &&
+              widget.semanticLabel == l10n.providerBalanceInterval,
+        ),
+      );
+      await tap(find.text(l10n.providerBalanceRefreshMinutes(5)));
+      final config = settings.providerConfigs['Aliyun']!;
+      expect(config.name, l10n.providersPageAliyunName);
+      expect(config.balanceRefreshInterval, 5);
+      expect(config.balanceEnabled, isNot(true));
+    },
+    variant: TargetPlatformVariant({TargetPlatform.macOS}),
+  );
 
   testWidgets(
     '360px settings navigates provider list and preserves edits on resize',
@@ -131,6 +251,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('desktop-pane-back')).last);
       await tester.pumpAndSettle();
       expect(find.byType(DesktopProviderDetailPane), findsNothing);
+      expect(find.text('Automatic balance refresh'), findsNothing);
+      expect(find.text('Timed refresh'), findsNothing);
       await tester.tap(find.text('ProviderB').first);
       await tester.pumpAndSettle();
       expect(
@@ -218,6 +340,114 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(IosCheckbox), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'desktop saves a cross-group drop even when the sort dialog closes immediately',
+    (tester) async {
+      final storage = (await tester.runAsync(createBusinessTestHarness))!;
+      final models = [
+        'zeta/regular',
+        'alpha/vision',
+        'beta/fast',
+        for (var i = 0; i < 697; i++) 'bulk/model-$i',
+      ];
+      const disabledModel = 'alpha/vision';
+      final settings = (await tester.runAsync(() async {
+        final settings = SettingsProvider(storage.preferences);
+        await settings.loaded;
+        await settings.setProviderConfig(
+          'ProviderA',
+          _providerConfig(
+            'ProviderA',
+          ).copyWith(models: models, disabledModels: const {disabledModel}),
+        );
+        await settings.setProvidersOrder(const ['ProviderA']);
+        return settings;
+      }))!;
+      addTearDown(settings.dispose);
+      await _pumpProviderSettings(tester, settings);
+
+      final reorderButton = find.byTooltip('Reorder models');
+      await tester.ensureVisible(reorderButton);
+      await tester.tap(reorderButton);
+      await tester.pumpAndSettle();
+
+      final dialog = find.byType(DesktopFormDialog);
+      final handles = find.descendant(
+        of: dialog,
+        matching: find.byType(ReorderableDragStartListener),
+      );
+      expect(handles.evaluate().length, lessThan(models.length));
+      final first = tester.getCenter(handles.at(0));
+      final destination = tester.getCenter(handles.at(2)) + const Offset(0, 18);
+      final mouse = await tester.startGesture(
+        first,
+        kind: PointerDeviceKind.mouse,
+      );
+      for (var step = 1; step <= 12; step++) {
+        await mouse.moveTo(Offset.lerp(first, destination, step / 12)!);
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      await tester.pump(const Duration(milliseconds: 300));
+      final expected = [models[1], models[2], models[0], ...models.skip(3)];
+      final saved = await tester.runAsync(() async {
+        await mouse.up();
+        await tester.pump();
+        await tester.tap(
+          find.descendant(of: dialog, matching: find.byTooltip('Close')),
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 180));
+        await tester.pumpAndSettle();
+        await storage.preferences.flushPendingWrites();
+        final providers = await storage.repository.readEntities(
+          BusinessEntityKind.provider,
+        );
+        final row = providers.singleWhere((row) => row.id == 'ProviderA');
+        return ProviderConfig.fromJson(
+          jsonDecode(row.payload) as Map<String, dynamic>,
+        );
+      });
+      expect(settings.getProviderConfig('ProviderA').models, expected);
+      expect(saved!.models, expected);
+      expect(saved.disabledModels, {disabledModel});
+
+      expect(dialog, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'desktop model reorder is unavailable during filtering or selection',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await settings.setProviderConfig(
+        'ProviderA',
+        _providerConfig(
+          'ProviderA',
+        ).copyWith(models: ['alpha-one', 'beta-two']),
+      );
+      await _pumpProviderSettings(tester, settings);
+
+      final reorderButton = find.byTooltip('Reorder models');
+      expect(reorderButton, findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('search-icon')));
+      await tester.pumpAndSettle();
+      final search = find.byKey(const ValueKey('search-field'));
+      await tester.enterText(search, 'alpha');
+      await tester.pumpAndSettle();
+      expect(reorderButton, findsNothing);
+
+      await tester.enterText(search, '');
+      await tester.pumpAndSettle();
+      expect(reorderButton, findsOneWidget);
+      await tester.tap(find.byTooltip('Multi-select').first);
+      await tester.pumpAndSettle();
+      expect(reorderButton, findsNothing);
     },
   );
 

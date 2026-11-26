@@ -569,7 +569,10 @@ void main() {
         server.toolsListRequestTimes[1].difference(
           server.toolsListRequestTimes[0],
         ),
-        greaterThanOrEqualTo(const Duration(milliseconds: 1900)),
+        allOf(
+          greaterThanOrEqualTo(const Duration(milliseconds: 200)),
+          lessThan(const Duration(milliseconds: 1800)),
+        ),
       );
 
       server.coordinateCooldown = true;
@@ -581,13 +584,11 @@ void main() {
       final limited = await provider.callTool(id, 'limited', const {});
       final callsAfterLimit = server.count('tools/call');
       expect((await olderSuccess)?.isError, isFalse);
-      expect(provider.isInCooldown(id), isTrue);
-      final blocked = await provider.callTool(id, 'echo', const {});
+      final next = await provider.callTool(id, 'echo', const {});
 
       expect(limited?.isError, isTrue);
-      expect(blocked?.isError, isTrue);
-      expect(provider.isInCooldown(id), isTrue);
-      expect(server.count('tools/call'), callsAfterLimit);
+      expect(next?.isError, isFalse);
+      expect(server.count('tools/call'), callsAfterLimit + 1);
       expect(server.count('initialize'), 1);
     } finally {
       provider.dispose();
@@ -918,6 +919,96 @@ void main() {
     }
   }, timeout: const Timeout(Duration(seconds: 8)));
 
+  test(
+    'connection failures back off on demand and manual reconnect resets the limit',
+    () async {
+      final server = await _MockMcpServer.start(failInitialize: true);
+      final harness = await BusinessTestHarness.create();
+      var now = DateTime(2026);
+      final provider = McpProvider(
+        preferences: harness.preferences,
+        now: () => now,
+      );
+      try {
+        await provider.loaded;
+        final id = await provider.addServer(
+          enabled: true,
+          name: 'Offline',
+          transport: McpTransportType.http,
+          url: server.url,
+        );
+        await _waitUntil(() => provider.statusFor(id) == McpStatus.error);
+        for (final delay in [10, 20, 40, 80]) {
+          final count = server.count('initialize');
+          now = now.add(Duration(seconds: delay - 1));
+          await provider.ensureConnected(id);
+          expect(server.count('initialize'), count);
+          now = now.add(const Duration(seconds: 1));
+          // Elapsed time alone does not create a background connection.
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          expect(server.count('initialize'), count);
+          await Future.wait([
+            provider.ensureConnected(id),
+            provider.ensureConnected(id),
+          ]);
+          expect(server.count('initialize'), count + 1);
+        }
+        expect(server.count('initialize'), 5);
+        now = now.add(const Duration(days: 1));
+        expect(await provider.refreshTools(id), isFalse);
+        expect(
+          (await provider.callTool(id, 'echo', const {}))?.isError,
+          isTrue,
+        );
+        expect(server.count('initialize'), 5);
+        server.failInitialize = false;
+        expect(await provider.reconnect(id), isTrue);
+        expect(server.count('initialize'), 6);
+        expect(
+          (await provider.callTool(id, 'echo', const {}))?.isError,
+          isFalse,
+        );
+      } finally {
+        provider.dispose();
+        await harness.close();
+        await server.close();
+      }
+    },
+  );
+
+  test(
+    'manual disconnect cancels a reconnect waiting for initialize',
+    () async {
+      final gate = Completer<void>();
+      final server = await _MockMcpServer.start(firstInitializeGate: gate);
+      final harness = await BusinessTestHarness.create();
+      final provider = McpProvider(preferences: harness.preferences);
+      try {
+        await provider.loaded;
+        final id = await provider.addServer(
+          enabled: true,
+          name: 'Pending',
+          transport: McpTransportType.http,
+          url: server.url,
+        );
+        await _waitUntil(() => server.count('initialize') == 1);
+        final reconnect = provider.reconnect(id);
+        final disconnect = provider.disconnect(id);
+        gate.complete();
+        await disconnect;
+        expect(await reconnect, isFalse);
+        await provider.ensureConnected(id);
+        expect(provider.isConnected(id), isFalse);
+        expect(server.count('initialize'), 1);
+      } finally {
+        if (!gate.isCompleted) gate.complete();
+        provider.dispose();
+        await harness.close();
+        await server.close();
+      }
+    },
+  );
+
   test('connect and manual reconnect are single-flight', () async {
     final firstInitializeGate = Completer<void>();
     final server = await _MockMcpServer.start(
@@ -943,6 +1034,8 @@ void main() {
       );
 
       final reconnect = provider.reconnect(id);
+      final concurrentReconnect = provider.reconnect(id);
+      expect(identical(reconnect, concurrentReconnect), isTrue);
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(server.count('initialize'), 1);
       firstInitializeGate.complete();
@@ -1528,8 +1621,14 @@ void main() {
         expect(provider.getEnabledToolsForServers({id}), hasLength(1));
         expect(provider.toolNeedsApproval('echo'), isTrue);
 
-        final reconnected = await provider.callTool(id, 'echo', const {});
-        expect(reconnected?.isError, isFalse);
+        final disconnected = await provider.callTool(id, 'echo', const {});
+        expect(disconnected?.isError, isTrue);
+        expect(server.count('initialize'), 1);
+        expect(await provider.reconnect(id), isTrue);
+        expect(
+          (await provider.callTool(id, 'echo', const {}))?.isError,
+          isFalse,
+        );
         expect(server.count('initialize'), 2);
       } finally {
         provider.dispose();
@@ -1590,7 +1689,7 @@ final class _FakeOAuthCallback implements OAuthCallback {
 class _MockMcpServer {
   List<Map<String, dynamic>> icons = [];
   final HttpServer _server;
-  final bool failInitialize;
+  bool failInitialize;
   final bool failFirstInitialize;
   final bool failFirstToolsList;
   final bool sendToolsChangedBurst;
@@ -1759,6 +1858,7 @@ class _MockMcpServer {
     }
     if (failInitialize) {
       request.response.statusCode = HttpStatus.internalServerError;
+      request.response.headers.set(HttpHeaders.retryAfterHeader, '3600');
       await request.response.close();
       return;
     }

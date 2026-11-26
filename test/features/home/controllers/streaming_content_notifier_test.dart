@@ -1,8 +1,38 @@
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/message_part_snapshot.dart';
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('a text tick reuses the structural tokens of completed tools', () {
+    final builder = MessagePartSnapshotBuilder();
+    final parts = <MessagePart>[
+      for (var i = 0; i < 1000; i++)
+        ToolCallPart('{"id":"t$i","name":"calculate"}'),
+      const TextPart('a'),
+    ];
+    final before = StreamingContentData(
+      content: 'a',
+      totalTokens: 0,
+      parts: builder.update(parts),
+    );
+    parts.last = const TextPart('ab');
+    final after = before.copyWith(
+      content: 'ab',
+      parts: builder.update(parts, changed: {1000}),
+    );
+    expect(after.partStructureTokens, same(before.partStructureTokens));
+    expect(after.timelineStructureSignature, before.timelineStructureSignature);
+    parts[200] = const ToolCallPart('{"id":"replacement","name":"lookup"}');
+    final changed = after.copyWith(
+      parts: builder.update(parts, changed: {200}),
+    );
+    expect(
+      changed.timelineStructureSignature,
+      isNot(after.timelineStructureSignature),
+    );
+  });
+
   test('StreamingContentData treats equal part values as equal', () {
     final a = StreamingContentData(
       content: 'hi',

@@ -496,17 +496,37 @@ void main() {
   );
 
   test(
-    'image preferences survive fork and backup, remap pins, and delete with their conversation',
+    'image preferences survive fork and backup, remap pins and exclusions, and delete with their conversation',
     () async {
+      final originalKey = const ContextImageIdentity('u1', 'part:1').key;
+      await repo.setToolEvents('a1', [
+        {
+          'id': 'read1',
+          'name': 'view_image',
+          'content': 'Saved observation',
+          'metadata': {
+            kMcpResultMetadataKey: mcpResultMetadata([
+              'data:image/png;base64,YWJj',
+            ]),
+            'chatImage': {
+              'version': 1,
+              'sourceKey': originalKey,
+              'directAsset': true,
+              'mime': 'image/png',
+            },
+          },
+        },
+      ]);
       final settings = ImageContextSettings(
         automatic: false,
-        allowRecall: false,
-        pinned: {
-          const ContextImageIdentity('u1', 'part:1').key,
-          const ContextImageIdentity('u3', 'part:0').key,
-        },
+        allowRecall: true,
+        pinned: {originalKey, const ContextImageIdentity('u3', 'part:0').key},
       );
       await repo.saveImageContextSettings('chat', settings);
+      await repo.updateImageContextSettings(
+        'chat',
+        (current) => current.exclude(settings.pinned, true),
+      );
       final fork = (await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a1',
@@ -514,10 +534,21 @@ void main() {
       final forkMessages = (await repo.readContextSnapshot(fork.id)).messages;
       final forkSettings = await repo.readImageContextSettings(fork.id);
       expect(forkSettings.automatic, isFalse);
-      expect(forkSettings.allowRecall, isFalse);
+      expect(forkSettings.allowRecall, isTrue);
       expect(forkSettings.pinned, {
         ContextImageIdentity(forkMessages.first.id, 'part:1').key,
       });
+      expect(forkSettings.excluded, forkSettings.pinned);
+      final forkAlias = RequestImageContext.collect(
+        await repo.readImageContextHistory(fork.id),
+      ).single;
+      expect(forkAlias.materializationKey, originalKey);
+      expect(forkAlias.sourceContextKey, forkSettings.excluded.single);
+      final forkImages = await RequestImageContext(
+        settings: forkSettings,
+        images: [forkAlias],
+      ).preview();
+      expect(forkImages.single.inheritedExclusion, isTrue);
       final snapshot = File('${dir.path}/images.sqlite');
       await ChatDatabaseRepository.createConsistentSnapshot(
         sourceFile: File('${dir.path}/chat.sqlite'),
@@ -540,11 +571,25 @@ void main() {
           importedId,
         );
         expect(importedSettings.automatic, isFalse);
-        expect(importedSettings.allowRecall, isFalse);
+        expect(importedSettings.allowRecall, isTrue);
         expect(importedSettings.pinned, {
           ContextImageIdentity(importedMessages.first.id, 'part:1').key,
           ContextImageIdentity(importedMessages[4].id, 'part:0').key,
         });
+        expect(importedSettings.excluded, importedSettings.pinned);
+        final importedAlias = RequestImageContext.collect(
+          await target.readImageContextHistory(importedId),
+        ).single;
+        expect(importedAlias.materializationKey, originalKey);
+        expect(
+          importedAlias.sourceContextKey,
+          ContextImageIdentity(importedMessages.first.id, 'part:1').key,
+        );
+        final importedImages = await RequestImageContext(
+          settings: importedSettings,
+          images: [importedAlias],
+        ).preview();
+        expect(importedImages.single.inheritedExclusion, isTrue);
         expect(
           (await target.mergeBackupSnapshot(snapshot)).importedConversations,
           0,
@@ -560,7 +605,7 @@ void main() {
         );
         expect(
           (await target.readImageContextSettings(importedId)).allowRecall,
-          isTrue,
+          isFalse,
         );
       } finally {
         await target.close();
@@ -706,6 +751,30 @@ void main() {
         'Original u3',
         'Original a3',
       ]);
+    },
+  );
+
+  test(
+    'deleting inactive versions keeps a summary of the selected revision',
+    () async {
+      final edited = (await repo.appendMessageVersion(
+        messageId: 'u1',
+        content: 'selected',
+      ))!.message;
+      await compact('S1', ['u1', 'a1']);
+      final before = await effective();
+      final result = await repo.deleteMessages(
+        conversationId: 'chat',
+        messageIds: {'u1'},
+        versionSelectionChanges: {},
+        retainedMessageId: edited.id,
+      );
+      expect(result?.messages.map((m) => m.id), ['u1']);
+      expect(
+        (await repo.readContextOperations('chat')).single.revoked,
+        isFalse,
+      );
+      expect(await effective(), before);
     },
   );
 

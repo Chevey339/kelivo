@@ -66,6 +66,7 @@ void main() {
         'skills': RestorePreviousAssetRootState.missing,
         'workspaces': RestorePreviousAssetRootState.missing,
         'sessions': RestorePreviousAssetRootState.missing,
+        'generations': RestorePreviousAssetRootState.missing,
       });
       expect(bundle.plan.assets?.entries.keys, [
         'fonts/font.bin',
@@ -320,6 +321,25 @@ void main() {
         );
       });
     }
+
+    test('rejects a file that case-folds to a directory name', () async {
+      final upload = Directory(p.join(root.path, 'upload'));
+      await Directory(p.join(upload.path, 'Photos')).create(recursive: true);
+      final alias = p.join(upload.path, 'photos');
+      if (await Directory(alias).exists()) return;
+      await File(alias).create(exclusive: true);
+
+      await expectLater(
+        RestorePreviousBuilder.inspectAssets(root),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'restore_previous_asset_case_collision',
+          ),
+        ),
+      );
+    });
 
     test('rejects a linked root and identifies its path and type', () async {
       if (Platform.isWindows) return;

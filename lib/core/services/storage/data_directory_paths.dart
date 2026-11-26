@@ -7,6 +7,7 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:markstream/markstream_core.dart';
 
 import '../../../shared/markdown/markdown_image_sources.dart';
+import '../../database/gen_ui_derived_schema.dart';
 
 /// Rewrites references inside a copied data directory, before it becomes live.
 /// External files and portable kelivo-file URIs keep their existing identity.
@@ -186,8 +187,8 @@ final class DataDirectoryPaths {
         }
         db.execute('BEGIN IMMEDIATE');
         try {
-          // Only app-owned payload/path columns. SQLite indexes and triggers
-          // stay in charge of derived data; no schema or identity is changed.
+          // Rewrite app-owned payload/path columns in the copied database.
+          var rewroteMessageText = false;
           final tables = db.select(
             "SELECT name FROM sqlite_master WHERE type = 'table'",
           );
@@ -251,9 +252,19 @@ final class DataDirectoryPaths {
                     'UPDATE "$table" SET "$name" = ? WHERE rowid = ?',
                     [after, cursor],
                   );
+                  if (table == 'message_part_rows' &&
+                      item['part_kind'] == 'text') {
+                    rewroteMessageText = true;
+                  }
                 }
               }
             }
+          }
+          if (rewroteMessageText) {
+            // A relocated path can change a card's source hash and search text.
+            db.execute('DELETE FROM chat_storage_meta_rows WHERE key = ?', [
+              GenUiDerivedSchema.searchBackfillKey,
+            ]);
           }
           db.execute('COMMIT');
         } catch (_) {

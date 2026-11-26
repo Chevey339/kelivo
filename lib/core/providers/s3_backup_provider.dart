@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../database/business_preferences.dart';
 import '../database/business_repository.dart';
@@ -12,14 +11,14 @@ import '../services/backup/backup_encryption.dart';
 import '../services/backup/backup_task_progress.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/s3_client.dart';
-import '../services/backup/temporary_restore_file.dart';
+import '../services/backup/backup_staging.dart';
+import '../services/backup/backup_partials.dart';
 import '../services/chat/chat_service.dart';
 
 class S3BackupProvider extends ChangeNotifier {
   final DataSync _dataSync;
   final S3BackupClient _client;
 
-  S3Config _cfg;
   bool _busy = false;
   String? _message;
 
@@ -27,25 +26,17 @@ class S3BackupProvider extends ChangeNotifier {
     required ChatService chatService,
     required BusinessRepository businessRepository,
     required BusinessPreferences businessPreferences,
-    S3Config? initialConfig,
   }) : _dataSync = DataSync(
          chatService: chatService,
          businessRepository: businessRepository,
          businessPreferences: businessPreferences,
        ),
-       _client = const S3BackupClient(),
-       _cfg = initialConfig ?? const S3Config();
+       _client = S3BackupClient(partials: BackupPartials(businessPreferences));
 
-  S3Config get config => _cfg;
   bool get busy => _busy;
   String? get message => _message;
   int get skippedConversations =>
       _dataSync.lastMergeReport?.skippedConversations ?? 0;
-
-  void updateConfig(S3Config cfg) {
-    _cfg = cfg;
-    notifyListeners();
-  }
 
   static String _normalizePrefix(String prefix) {
     var s = prefix.trim().replaceAll(RegExp(r'^/+'), '');
@@ -63,30 +54,14 @@ class S3BackupProvider extends ChangeNotifier {
     return path;
   }
 
-  Future<Directory> _ensureTempDir() async {
-    Directory dir = await getTemporaryDirectory();
-    if (!await dir.exists()) {
-      try {
-        await dir.create(recursive: true);
-      } catch (_) {}
-    }
-    if (!await dir.exists()) {
-      dir = await Directory.systemTemp.createTemp('kelivo_tmp_');
-    }
-    return dir;
-  }
+  Future<void> cleanPartials(S3Config cfg) => _client.cleanPartials(cfg);
 
-  WebDavConfig _scopeAsWebdavConfig() {
-    // DataSync uses the same selection for local, WebDAV and S3 backups.
-    return WebDavConfig(scope: _cfg.scope);
-  }
-
-  Future<void> test() async {
+  Future<void> test(S3Config cfg) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      await _client.test(_cfg);
+      await _client.test(cfg);
       _message = 'OK';
     } catch (e) {
       _message = e.toString();
@@ -96,7 +71,8 @@ class S3BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> backup({
+  Future<bool> backup(
+    S3Config cfg, {
     String? password,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
@@ -107,16 +83,16 @@ class S3BackupProvider extends ChangeNotifier {
     File? file;
     try {
       file = await _dataSync.prepareBackupFile(
-        _scopeAsWebdavConfig(),
+        WebDavConfig(scope: cfg.scope),
         password: password,
         onProgress: onProgress,
         cancelToken: cancelToken,
       );
-      final prefix = _normalizePrefix(_cfg.prefix);
+      final prefix = _normalizePrefix(cfg.prefix);
       final key = '$prefix${p.basename(file.path)}';
       // Use file-stream upload to avoid loading entire ZIP into memory.
       await _client.uploadFile(
-        _cfg,
+        cfg,
         key: key,
         file: file,
         onProgress: onProgress,
@@ -135,18 +111,20 @@ class S3BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<List<BackupFileItem>> listRemote({
+  Future<List<BackupFileItem>> listRemote(
+    S3Config cfg, {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
     return _client.listObjects(
-      _cfg,
+      cfg,
       onProgress: onProgress,
       cancelToken: cancelToken,
     );
   }
 
   Future<void> restoreFromItem(
+    S3Config cfg,
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
@@ -160,11 +138,10 @@ class S3BackupProvider extends ChangeNotifier {
     File? file;
     try {
       final key = _keyFromItem(item);
-      final tmp = await _ensureTempDir();
-      file = await createTemporaryRestoreFile(tmp);
+      file = await BackupStaging.createDownload();
       // Download directly to file to avoid holding entire object in memory.
       await _client.downloadToFile(
-        _cfg,
+        cfg,
         key: key,
         destination: file,
         onProgress: onProgress,
@@ -173,7 +150,7 @@ class S3BackupProvider extends ChangeNotifier {
       );
       await _dataSync.restoreFromLocalFile(
         file,
-        _scopeAsWebdavConfig(),
+        WebDavConfig(scope: cfg.scope),
         mode: mode,
         onProgress: onProgress,
         cancelToken: cancelToken,
@@ -187,6 +164,7 @@ class S3BackupProvider extends ChangeNotifier {
       _message = e.toString();
       rethrow;
     } finally {
+      if (file != null) BackupStaging.release(file.path);
       try {
         if (file != null && await file.exists()) {
           await file.delete();
@@ -197,9 +175,12 @@ class S3BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<List<BackupFileItem>> deleteAndReload(BackupFileItem item) async {
+  Future<List<BackupFileItem>> deleteAndReload(
+    S3Config cfg,
+    BackupFileItem item,
+  ) async {
     final key = _keyFromItem(item);
-    await _client.deleteObject(_cfg, key: key);
-    return _client.listObjects(_cfg);
+    await _client.deleteObject(cfg, key: key);
+    return _client.listObjects(cfg);
   }
 }

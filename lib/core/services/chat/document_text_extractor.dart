@@ -1,137 +1,97 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:xml/xml.dart';
 import 'package:path/path.dart' as p;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import '../../models/chat_input_data.dart';
+import '../../utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/unicode_sanitizer.dart';
+import 'text_file_decoder.dart';
 
-/// Data passed to the background isolate for document extraction.
-class _ExtractorParams {
-  final String path;
-  final String mime;
-  _ExtractorParams(this.path, this.mime);
-}
+export 'text_file_decoder.dart'
+    show AttachmentProblem, AttachmentReadError, DocumentText;
 
-class AttachmentRequiresWorkspace implements Exception {
-  const AttachmentRequiresWorkspace(this.name);
-  final String name;
-  @override
-  String toString() => 'Attachment requires workspace file tools: $name';
-}
+typedef _Input = ({String path, String name, String mime});
 
 class DocumentTextExtractor {
-  /// Extracts text from a document file at [path] with [mime] type.
-  ///
-  /// Resolves via [SandboxPathResolver.resolveForIo] once, then delegates to
-  /// [extractResolved]. Prefer [extractResolved] when the caller already
-  /// resolved the path (avoid a second pass).
-  static Future<String> extract({
+  static Future<DocumentText> extractResolved({
     required String path,
     required String mime,
-  }) async {
-    final resolved = SandboxPathResolver.resolveForIo(path);
-    if (resolved == null) return '[[File not found: $path]]';
-    return extractResolved(path: resolved, mime: mime);
-  }
+    String? name,
+  }) => compute(_extractTask, (
+    path: path,
+    mime: mime,
+    name: name ?? p.basename(path),
+  ));
 
-  /// Extract using an already-resolved absolute filesystem path.
-  /// Does **not** call [SandboxPathResolver.fix] / [resolveForIo].
-  static Future<String> extractResolved({
-    required String path,
-    required String mime,
-  }) {
-    // Offload the heavy work to a separate isolate using compute.
-    return compute(_extractTask, _ExtractorParams(path, mime));
-  }
-
-  /// The heavy extraction logic that runs in a background isolate.
-  static String _extractTask(_ExtractorParams params) {
-    final path = params.path;
-    final mime = params.mime;
-
+  static DocumentText _extractTask(_Input input) {
+    const docx =
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    final mime = input.mime.split(';').first.trim().toLowerCase();
+    final structured =
+        mime == 'application/pdf' ||
+        mime == docx ||
+        mime == 'application/msword';
     try {
-      final source = File(path);
-      if (!source.existsSync()) return '[[File not found: $path]]';
-      // Receiving a file is independent of inlining it in a model request.
-      // Larger files remain available to workspace tools without a full read.
-      if (source.lengthSync() > 16 * 1024 * 1024) {
-        throw AttachmentRequiresWorkspace(p.basename(path));
+      final file = File(input.path).openSync();
+      late Uint8List bytes;
+      late int size;
+      try {
+        size = file.lengthSync();
+        if (structured && size > kMaxDocumentExtractBytes) {
+          throw AttachmentReadError(AttachmentProblem.tooLarge, input.name);
+        }
+        if (mime == 'application/msword') {
+          const text =
+              '[[DOC format (.doc) not supported for text extraction]]';
+          return DocumentText(text, count: text.length);
+        }
+        bytes = file.readSync(math.min(size, kMaxDocumentExtractBytes));
+      } finally {
+        file.closeSync();
       }
+      if (!structured) {
+        return decodeTextFile(
+          bytes,
+          name: input.name,
+          byteLimit: size > kMaxDocumentExtractBytes,
+        );
+      }
+      final String text;
       if (mime == 'application/pdf') {
         try {
-          final file = File(path);
-          if (!file.existsSync()) return '[[File not found: $path]]';
-
-          final bytes = file.readAsBytesSync();
-          // Heavy synchronous PDF parsing happens here, in the sub-thread.
           final document = PdfDocument(inputBytes: bytes);
-          final extractor = PdfTextExtractor(document);
-          final extracted = extractor.extractText();
-          final text = UnicodeSanitizer.sanitize(extracted);
-
-          document.dispose();
-
-          if (text.trim().isNotEmpty) return text;
-          return '[PDF] Unable to extract text from file.';
+          try {
+            final extracted = UnicodeSanitizer.sanitize(
+              PdfTextExtractor(document).extractText(),
+            );
+            text = extracted.trim().isNotEmpty
+                ? extracted
+                : '[PDF] Unable to extract text from file.';
+          } finally {
+            document.dispose();
+          }
         } catch (e) {
-          return '[[Failed to read PDF: $e]]';
+          return DocumentText('[[Failed to read PDF: $e]]');
         }
+      } else {
+        text = _extractDocxSync(bytes);
       }
-
-      if (mime == 'application/msword') {
-        return '[[DOC format (.doc) not supported for text extraction]]';
-      }
-
-      if (mime ==
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        return _extractDocxSync(path);
-      }
-
-      // Unknown types may be archives or executables. Probe a small prefix
-      // before deciding whether a text read is useful.
-      final probe = source.openSync();
-      try {
-        final prefix = probe.readSync(8192);
-        if (prefix.contains(0)) {
-          throw AttachmentRequiresWorkspace(p.basename(path));
-        }
-        final decoder = utf8.decoder.startChunkedConversion(
-          StringConversionSink.fromStringSink(StringBuffer()),
-        );
-        try {
-          decoder.add(prefix);
-          if (source.lengthSync() <= prefix.length) decoder.close();
-        } on FormatException {
-          throw AttachmentRequiresWorkspace(p.basename(path));
-        }
-      } finally {
-        probe.closeSync();
-      }
-      // Read only bounded, text-like files.
-      final file = File(path);
-      if (!file.existsSync()) return '[[File not found: $path]]';
-      final bytes = file.readAsBytesSync();
-      return UnicodeSanitizer.sanitize(
-        utf8.decode(bytes, allowMalformed: true),
-      );
-    } on AttachmentRequiresWorkspace {
-      rethrow;
-    } catch (e) {
-      return '[[Failed to read file: $e]]';
+      return DocumentText(text, count: text.runes.length);
+    } on FileSystemException {
+      throw AttachmentReadError(AttachmentProblem.missing, input.name);
     }
   }
 
   /// Synchronous DOCX extraction for isolate use.
-  static String _extractDocxSync(String path) {
+  static String _extractDocxSync(Uint8List input) {
     try {
-      final file = File(path);
-      if (!file.existsSync()) return '[DOCX] file not found';
-
-      final input = file.readAsBytesSync();
       final archive = ZipDecoder().decodeBytes(input);
       final docXml = archive.findFile('word/document.xml');
       if (docXml == null) return '[DOCX] document.xml not found';
@@ -152,6 +112,81 @@ class DocumentTextExtractor {
       return UnicodeSanitizer.sanitize(buffer.toString());
     } catch (e) {
       return '[[Failed to parse DOCX: $e]]';
+    }
+  }
+}
+
+typedef _Version = ({String path, String mime, DateTime modified, int size});
+
+/// Shared by the composer, its send guard and prompt builder. Stat even on a
+/// cache hit: a restored draft or a replaced/deleted file must be rechecked.
+/// Cache the complete result (including truncation), never a localized notice.
+class DocumentExtractionCache {
+  final _entries = <_Version, Future<DocumentText>>{};
+
+  _Version _version(File file, String mime, FileStat stat) =>
+      (path: file.path, mime: mime, modified: stat.modified, size: stat.size);
+
+  void _remember(_Version key, Future<DocumentText> result) {
+    _entries[key] = result;
+    if (_entries.length > 32) _entries.remove(_entries.keys.first);
+  }
+
+  /// Publication copies a private draft to a new path. Transfer the verified
+  /// result only when its actual source is unchanged across the copy.
+  Future<void> reusePublishedCopy(
+    DocumentAttachment doc,
+    File source,
+    FileStat beforeCopy,
+    File destination,
+  ) async {
+    final mime = resolveDocumentAttachmentMime(doc);
+    final sourceVersion = _version(source, mime, beforeCopy);
+    final cached = _entries[sourceVersion];
+    if (cached == null) return;
+    try {
+      await cached;
+      final after = await source.stat();
+      final published = await destination.stat();
+      if (after.type == FileSystemEntityType.file &&
+          _version(source, mime, after) == sourceVersion &&
+          published.type == FileSystemEntityType.file &&
+          published.size == beforeCopy.size) {
+        _remember(_version(destination, mime, published), cached);
+      }
+    } on AttachmentReadError {
+      // Never copy failures: the published file gets its own preflight.
+    } on FileSystemException {
+      // If the copy or source disappeared, the normal send guard handles it.
+    }
+  }
+
+  Future<DocumentText> read(DocumentAttachment file) async {
+    final path = SandboxPathResolver.resolveForIo(file.path);
+    if (path == null) {
+      throw AttachmentReadError(AttachmentProblem.missing, file.fileName);
+    }
+    final mime = resolveDocumentAttachmentMime(file);
+    final source = File(path);
+    final FileStat stat;
+    try {
+      stat = await source.stat();
+    } on FileSystemException {
+      throw AttachmentReadError(AttachmentProblem.missing, file.fileName);
+    }
+    if (stat.type != FileSystemEntityType.file) {
+      throw AttachmentReadError(AttachmentProblem.missing, file.fileName);
+    }
+    final key = _version(source, mime, stat);
+    final result =
+        _entries.remove(key) ??
+        DocumentTextExtractor.extractResolved(path: path, mime: mime);
+    _remember(key, result);
+    try {
+      return await result;
+    } on AttachmentReadError catch (e) {
+      if (identical(_entries[key], result)) _entries.remove(key);
+      throw AttachmentReadError(e.problem, file.fileName);
     }
   }
 }

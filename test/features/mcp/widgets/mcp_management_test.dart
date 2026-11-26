@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
-import 'package:Kelivo/features/mcp/widgets/mcp_text_dialog.dart';
-import 'package:Kelivo/features/mcp/widgets/mcp_form.dart';
+import 'package:Kelivo/shared/widgets/text_input_dialog.dart';
+import 'package:Kelivo/shared/widgets/adaptive_form.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/desktop/widgets/desktop_form_dialog.dart';
@@ -112,7 +112,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
-    expect(find.byType(McpTextDialog), findsOneWidget);
+    expect(find.byType(TextInputDialog), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Keyboard group');
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
@@ -120,7 +120,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await _settleWrites(tester, harness);
     expect(harness.mcp.groups.single.name, 'Keyboard group');
-    expect(find.byType(McpTextDialog), findsNothing);
+    expect(find.byType(TextInputDialog), findsNothing);
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
@@ -383,7 +383,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(
           find.descendant(
-            of: find.byType(McpForm),
+            of: find.byType(AdaptiveForm),
             matching: find.text('Development'),
           ),
         );

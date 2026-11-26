@@ -200,6 +200,9 @@ String browserErrorSummary(AppLocalizations l, String error) {
   if (error.contains('browser_action_timeout_outcome_unknown')) {
     return l.browserErrActionTimeout;
   }
+  if (error.contains('browser_observation_required')) {
+    return l.browserErrObservationRequired;
+  }
   if (error.toLowerCase().contains('timeout')) return l.browserErrTimeout;
   if (error.contains('browser_human_control')) return l.browserErrHumanControl;
   if (error.contains('browser_tab_closed') ||

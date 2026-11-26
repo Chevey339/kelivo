@@ -13,6 +13,7 @@ import '../../core/providers/mcp_provider.dart';
 import '../../core/providers/workspace_provider.dart';
 import '../../core/providers/world_book_provider.dart';
 import '../../core/services/chat/chat_service.dart';
+import '../../core/services/chat/document_text_extractor.dart';
 import '../../core/services/scheduled_tasks_service.dart';
 import '../home/controllers/chat_actions.dart';
 import '../home/controllers/home_view_model.dart';
@@ -149,7 +150,8 @@ Future<Map<String, Object?>> runScheduledTask(
   if (cancellation.cancelled) await cancellation.cancel();
   cancellation.check();
   if (!result.success) {
-    throw StateError(result.errorMessage ?? 'generation_failed');
+    final error = result.errorMessage ?? 'generation_failed';
+    throw AttachmentReadError.fromMessage(error) ?? StateError(error);
   }
   final repository = chat.chatRepositoryOrNull!;
   final runId = result.generationRunId;

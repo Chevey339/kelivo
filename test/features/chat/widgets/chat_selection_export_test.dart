@@ -1,12 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/chat/widgets/message_export_sheet.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+
+import '../../../support/business_test_harness.dart';
 
 Future<void> _openExport(
   WidgetTester tester, {
@@ -16,6 +20,9 @@ Future<void> _openExport(
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  final settings = SettingsProvider(createBusinessTestPreferences());
+  addTearDown(settings.dispose);
+  await settings.loaded;
   await tester.pumpWidget(
     MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -24,7 +31,7 @@ Future<void> _openExport(
         data: MediaQuery.of(
           context,
         ).copyWith(textScaler: TextScaler.linear(textScale)),
-        child: child!,
+        child: ChangeNotifierProvider.value(value: settings, child: child!),
       ),
       home: Builder(
         builder: (context) => Scaffold(

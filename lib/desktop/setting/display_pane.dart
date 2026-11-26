@@ -31,6 +31,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   const _RowDivider(),
                   const _MessageStyleRow(),
                   const _RowDivider(),
+                  const _FullWidthChatRow(),
+                  const _RowDivider(),
                   const _AutoRetryRow(),
                   const _RowDivider(),
                   const _TopicPositionRow(),
@@ -95,6 +97,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowShowThinkingCards(),
                   _RowDivider(),
                   _ToggleRowShowToolCards(),
+                  _RowDivider(),
+                  _ChatImageDisplayRows(),
                   _RowDivider(),
                   _ToggleRowShowProducedFiles(),
                   _RowDivider(),
@@ -884,6 +888,22 @@ class _MessageStyleRow extends StatelessWidget {
         display: styleLabel,
         onTap: () => showMessageStyleSettingsDialog(context),
       ),
+    );
+  }
+}
+
+class _FullWidthChatRow extends StatelessWidget {
+  const _FullWidthChatRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.desktopDisplaySettingsFullWidthChatTitle,
+      tip: l10n.desktopDisplaySettingsFullWidthChatSubtitle,
+      value: settings.desktopFullWidthChat,
+      onChanged: settings.setDesktopFullWidthChat,
     );
   }
 }
@@ -2694,6 +2714,37 @@ class _ToggleRowShowToolCards extends StatelessWidget {
       tip: l10n.displaySettingsPageShowToolCardsSubtitle,
       value: sp.showToolCards,
       onChanged: (v) => context.read<SettingsProvider>().setShowToolCards(v),
+    );
+  }
+}
+
+class _ChatImageDisplayRows extends StatelessWidget {
+  const _ChatImageDisplayRows();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        _ToggleRow(
+          label: l10n.displayChatImagesAtToolCall,
+          value: settings.inlineChatImages,
+          onChanged: settings.setInlineChatImages,
+        ),
+        const _RowDivider(),
+        _ToggleRow(
+          label: l10n.displayChatImageInfo,
+          value: settings.showChatImageInfo,
+          onChanged: settings.setShowChatImageInfo,
+        ),
+        const _RowDivider(),
+        _ToggleRow(
+          label: l10n.displayChatImageLink,
+          value: settings.showChatImageLink,
+          onChanged: settings.setShowChatImageLink,
+        ),
+      ],
     );
   }
 }

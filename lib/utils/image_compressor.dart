@@ -23,6 +23,53 @@ class ImageCompressConfig {
 class ImageCompressor {
   static const int kMinBytesToCompress = 64 * 1024;
 
+  /// Keeps the imported pixels as an edit baseline without making our own
+  /// source copy look like a shared upload during a second dedupe pass.
+  static Future<({UploadWrite source, UploadWrite? image})?> prepareForEditing(
+    String sourcePath,
+    Directory directory,
+    ImageCompressConfig config, {
+    bool ownsSource = false,
+    bool reuseSourceInPlace = false,
+    Future<UploadWrite> Function(String sourcePath)? renderEdits,
+  }) async {
+    try {
+      final bytes = await File(sourcePath).readAsBytes();
+      final source =
+          (ownsSource || reuseSourceInPlace) &&
+              _inDirectory(sourcePath, directory)
+          ? UploadWrite(sourcePath, reused: !ownsSource)
+          : await _writeToUploadDir(
+              sourcePath,
+              directory,
+              bytes,
+              asJpeg: false,
+            );
+      try {
+        if (renderEdits != null) {
+          return (source: source, image: await renderEdits(source.path));
+        }
+        final compressed = await compressBytes(bytes, config);
+        if (compressed == null) return (source: source, image: source);
+        final image = await _writeToUploadDir(
+          sourcePath,
+          directory,
+          compressed,
+          asJpeg: true,
+        );
+        return (source: source, image: image);
+      } catch (error) {
+        debugPrint(
+          '[ImageCompressor] Failed to prepare image $sourcePath: $error',
+        );
+        return (source: source, image: null);
+      }
+    } catch (error) {
+      debugPrint('[ImageCompressor] Failed to import $sourcePath: $error');
+      return null;
+    }
+  }
+
   /// Compresses [srcPath] into [dir].
   ///
   /// Images that are skipped, fail to decode, or would grow are copied
@@ -31,18 +78,18 @@ class ImageCompressor {
   static Future<UploadWrite?> compressToUploadDir(
     String srcPath,
     Directory dir,
-    ImageCompressConfig config,
-  ) async {
+    ImageCompressConfig config, {
+    bool reuseSourceInPlace = false,
+  }) async {
     Uint8List? originalBytes;
     try {
       originalBytes = await File(srcPath).readAsBytes();
-      final compressed = await compressBytes(originalBytes, config);
-      return await _writeToUploadDir(
-        srcPath,
-        dir,
-        compressed ?? originalBytes,
-        asJpeg: compressed != null,
-      );
+      if (reuseSourceInPlace && _inDirectory(srcPath, dir)) {
+        final compressed = await compressBytes(originalBytes, config);
+        if (compressed == null) return UploadWrite(srcPath, reused: true);
+        return await _writeToUploadDir(srcPath, dir, compressed, asJpeg: true);
+      }
+      return await storeEncodedImage(srcPath, dir, originalBytes, config);
     } catch (error, stackTrace) {
       debugPrint('[ImageCompressor] Failed to compress $srcPath: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -62,6 +109,26 @@ class ImageCompressor {
       }
       return null;
     }
+  }
+
+  static bool _inDirectory(String path, Directory directory) =>
+      p.equals(File(path).absolute.parent.path, directory.absolute.path);
+
+  /// Persists already encoded pixels without introducing a second owner for
+  /// the file that this operation just created.
+  static Future<UploadWrite> storeEncodedImage(
+    String name,
+    Directory directory,
+    Uint8List bytes,
+    ImageCompressConfig config,
+  ) async {
+    final compressed = await compressBytes(bytes, config);
+    return _writeToUploadDir(
+      name,
+      directory,
+      compressed ?? bytes,
+      asJpeg: compressed != null,
+    );
   }
 
   /// Returns a smaller JPEG, or `null` when compression should be skipped.

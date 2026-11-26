@@ -53,66 +53,30 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
 
     Widget avatarWidget({double size = 56}) {
       final bg = cs.primary.withValues(alpha: isDark ? 0.18 : 0.12);
-      Widget inner;
-      final av = a.avatar?.trim();
-      if (av != null && av.isNotEmpty) {
-        if (av.startsWith('http')) {
-          inner = FutureBuilder<String?>(
-            future: AvatarCache.getPath(av),
-            builder: (ctx, snap) {
-              final p = snap.data;
-              if (p != null && File(p).existsSync()) {
-                return ClipOval(
-                  child: Image.file(
-                    File(p),
-                    width: size,
-                    height: size,
-                    fit: BoxFit.cover,
-                  ),
-                );
-              }
-              return ClipOval(
-                child: Image.network(
-                  av,
-                  width: size,
-                  height: size,
-                  fit: BoxFit.cover,
-                ),
-              );
-            },
-          );
-        } else if (av.startsWith('/') || av.contains(':')) {
-          final fixed = SandboxPathResolver.fix(av);
-          inner = ClipOval(
-            child: Image.file(
-              File(fixed),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-            ),
-          );
-        } else {
-          inner = Text(
-            av,
-            style: TextStyle(
-              color: cs.primary,
-              fontWeight: AppFontWeights.emphasis,
-              fontSize: size * 0.42,
-            ),
-          );
-        }
-      } else {
-        inner = Text(
-          (a.name.trim().isNotEmpty
-              ? String.fromCharCode(a.name.trim().runes.first).toUpperCase()
-              : 'A'),
-          style: TextStyle(
-            color: cs.primary,
-            fontWeight: AppFontWeights.emphasis,
-            fontSize: size * 0.42,
-          ),
-        );
-      }
+      final av = a.avatar?.trim() ?? '';
+      final isImage =
+          av.startsWith('http') || av.startsWith('/') || av.contains(':');
+      final name = a.name.trim();
+      final label = Text(
+        av.isNotEmpty && !isImage
+            ? av
+            : (name.isEmpty
+                  ? 'A'
+                  : String.fromCharCode(name.runes.first).toUpperCase()),
+        style: TextStyle(
+          color: cs.primary,
+          fontWeight: AppFontWeights.emphasis,
+          fontSize: size * 0.42,
+        ),
+      );
+      final inner = isImage
+          ? AvatarImage(
+              source: av,
+              isNetwork: av.startsWith('http'),
+              size: size,
+              fallback: label,
+            )
+          : label;
       return InkWell(
         customBorder: const CircleBorder(),
         onTap: () => _showAvatarPicker(context, a),

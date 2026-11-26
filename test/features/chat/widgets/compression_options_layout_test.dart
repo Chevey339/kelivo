@@ -25,6 +25,8 @@ import 'package:Kelivo/theme/theme_factory.dart';
 import '../../../support/business_test_harness.dart';
 
 void main() {
+  const sonnetModelId = 'claude-sonnet-4-20250514';
+  const haikuModelId = 'claude-haiku-4-5';
   for (final mobile in [false, true]) {
     for (final dark in [false, true]) {
       testWidgets('compression layout mobile=$mobile dark=$dark', (
@@ -58,10 +60,14 @@ void main() {
               enabled: true,
               apiKey: '',
               baseUrl: 'https://example.test',
-              models: const ['Claude Sonnet 4', 'Claude Haiku 4.5'],
+              models: const [sonnetModelId, haikuModelId],
+              modelOverrides: const {
+                sonnetModelId: {'name': 'Claude Sonnet 4'},
+                haikuModelId: {'name': 'Claude Haiku 4.5'},
+              },
             ),
           );
-          await settings.setCurrentModel('preview', 'Claude Sonnet 4');
+          await settings.setCurrentModel('preview', sonnetModelId);
           if (capture != null) {
             final loader = FontLoader('CompressionPreview')
               ..addFont(
@@ -119,11 +125,8 @@ void main() {
                           context: context,
                           builder: (sheet) => CompressContextOptionsDialog(
                             sheet: sheet,
-                            previewRequest: (options, config) async => (
-                              prompt: 'Preview',
-                              estimatedRequests: 1,
-                              maxRequestAttempts: config.maxRequestAttempts,
-                            ),
+                            previewRequest: (options, config) async =>
+                                (prompt: 'Preview', estimatedRequests: 1),
                             loadHistory: () async =>
                                 CompressionHistory.fromMessages([
                                   for (var i = 0; i < 10; i++)
@@ -513,6 +516,7 @@ void main() {
         await screenshot('settings');
         expect(field(l10n.compressionTrigger), findsNothing);
         expect(field(l10n.compressionTarget), findsNothing);
+        await tester.ensureVisible(find.text(l10n.compressionAutoNotify));
         await tester.tap(find.text(l10n.compressionAutoNotify));
         await settleCompressionOptions(tester);
         expect(field(l10n.compressionTrigger), findsOneWidget);
@@ -533,6 +537,17 @@ void main() {
         await tester.tap(find.text(l10n.compressionAdvancedOptions));
         await settleCompressionOptions(tester);
         await screenshot('settings-details');
+        final injections = find.text(l10n.compressionInstructionInjections);
+        final references = find.text(l10n.compressionReference);
+        await tester.ensureVisible(injections);
+        await tester.tap(injections);
+        await tester.ensureVisible(references);
+        await tester.tap(references);
+        await settleCompressionOptions(tester);
+        expect(injections, findsNothing);
+        await tester.tap(references);
+        await settleCompressionOptions(tester);
+        expect(injections, findsOneWidget);
         await tester.ensureVisible(field(l10n.compressionWindow));
         await tester.enterText(field(l10n.compressionWindow), '64000');
         await tester.ensureVisible(find.text(l10n.compressionAdvancedOptions));
@@ -541,11 +556,16 @@ void main() {
         expect(field(l10n.compressionWindow), findsNothing);
         await saveForm();
         await waitFor(find.text(l10n.compressionManage));
-        expect(settings.compressionDefaults.modelId, 'Claude Haiku 4.5');
+        expect(settings.compressionDefaults.modelId, haikuModelId);
         expect(settings.compressionDefaults.providerId, 'preview');
         expect(settings.compressionDefaults.triggerInputRatio, .75);
         expect(settings.compressionDefaults.targetInputRatio, .55);
         expect(settings.compressionDefaults.planningWindow, 64000);
+        expect(settings.compressionDefaults.includeReference, isTrue);
+        expect(
+          settings.compressionDefaults.includeInstructionInjections,
+          isFalse,
+        );
         final selected = await tester.runAsync(
           () => chat.chatRepositoryOrNull!.compression.templates(),
         );

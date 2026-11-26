@@ -521,6 +521,14 @@ class SettingsSearchIndex {
     }
 
     // Display rows share their localized labels with the navigation anchors.
+    if (desktop) {
+      add(
+        'desktopDisplaySettingsFullWidthChatTitle',
+        SettingsSearchDestination.display,
+        (l) => l.desktopDisplaySettingsFullWidthChatTitle,
+        keywords: 'chat width full width wide layout 聊天宽度 聊天寬度 全宽 全寬 宽屏 寬螢幕',
+      );
+    }
     add(
       'displaySettingsPageLanguageTitle',
       SettingsSearchDestination.display,
@@ -630,6 +638,24 @@ class SettingsSearchIndex {
       'displaySettingsPageShowToolCardsTitle',
       SettingsSearchDestination.chatDisplay,
       (l) => l.displaySettingsPageShowToolCardsTitle,
+    );
+    add(
+      'displayChatImagesAtToolCall',
+      SettingsSearchDestination.chatDisplay,
+      (l) => l.displayChatImagesAtToolCall,
+      keywords: 'image generation 图片 生图 创作 工具',
+    );
+    add(
+      'displayChatImageInfo',
+      SettingsSearchDestination.chatDisplay,
+      (l) => l.displayChatImageInfo,
+      keywords: 'image generation 图片 生图 创作 工具',
+    );
+    add(
+      'displayChatImageLink',
+      SettingsSearchDestination.chatDisplay,
+      (l) => l.displayChatImageLink,
+      keywords: 'image generation 图片 生图 创作 工具',
     );
     add(
       'displaySettingsPageShowProducedFilesTitle',

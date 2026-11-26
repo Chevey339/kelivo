@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/services/conversation_find_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -30,6 +31,7 @@ const _config = WebDavConfig(
       BackupCategory.files,
       BackupCategory.skills,
       BackupCategory.workspaces,
+      BackupCategory.creations,
     },
   ),
 );
@@ -84,7 +86,7 @@ void main() {
       (await ChatDatabaseRepository.inspectPreparedSnapshot(
         file,
       )).schemaVersion,
-      5,
+      AppDatabase.currentSchemaVersion,
     );
     final database = AppDatabase.open(file: file, requireExisting: true);
     final repository = ChatDatabaseRepository(database, databaseFile: file);
@@ -114,12 +116,12 @@ void main() {
       expect(found.map((match) => match.messageId), ['a1']);
       expect(found.single.searchableText, contains('Synthetic total: 6'));
       expect(found.single.matchedSurfaceKey, '0:0');
-      final miniMap = await repository.searchMiniMapMatches(
-        'genui-legacy',
+      final inChat = await const ConversationFindService().search(
+        repository.conversationFindCandidates('genui-legacy'),
         'Synthetic total: 6',
+        defaultFindOptions,
       );
-      expect(miniMap.single.messageId, 'a1');
-      expect(miniMap.single.matchedSurfaceKey, '0:0');
+      expect(inChat['a1']!.single.surfaceKey, '0:0');
       final afterIndex = await (database.select(
         database.genUiSurfaceStateRows,
       )..where((row) => row.revisionId.equals('a1'))).getSingle();

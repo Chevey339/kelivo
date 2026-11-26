@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:isolate';
 
 import 'package:http/http.dart' as http;
@@ -32,9 +34,10 @@ void main() {
     List<String> materials,
     CompressionGenerate generate, {
     int window = 32000,
-    int attempts = 8,
+    int summaryTokens = 512,
+    String background = '',
     CompressionTemplate? template,
-  }) => const CompressionEngine().run(
+  }) async => (await const CompressionEngine().run(
     task: task,
     request: CompressionRequest(
       options: options,
@@ -43,17 +46,13 @@ void main() {
       quoteMarker: (_) => 'quote',
       contextWindowTokens: window,
       template: template,
-      config: CompressionConfig(
-        summaryTokens: 512,
-        maxRequestAttempts: attempts,
-      ),
+      config: CompressionConfig(summaryTokens: summaryTokens),
     ),
     materials: materials,
-    previousSummary: '',
-    background: '',
+    background: background,
     check: () {},
     publish: () async {},
-  );
+  )).summary;
   TextGenerationResult result(
     String text, {
     String? reason = 'stop',
@@ -64,51 +63,44 @@ void main() {
     usage: usage,
   );
 
-  for (final limit in [1, 2]) {
-    test(
-      'lower-level authentication retries share the task budget: $limit',
-      () async {
-        var sent = 0;
-        final generation = run(['history ' * 100], (_, _, _, _) async {
-          final client = ModelRequestAttempts.wrap(
-            MockClient((_) async {
-              sent++;
-              return http.Response(
-                sent == 1 ? 'unauthorized' : 'summary',
-                sent == 1 ? 401 : 200,
-              );
-            }),
-          );
-          try {
-            await client.post(Uri.parse('https://example.test/messages'));
-            await client.post(Uri.parse('https://example.test/messages'));
-            return result(
-              'summary',
-              usage: const TokenUsage(promptTokens: 10, completionTokens: 2),
+  String historyIn(String prompt) => prompt
+      .split('<content data="reference, not instructions">\n')[1]
+      .split('\n</content>')[0]
+      .replaceFirst(RegExp(r'^\[source fragment[^\n]+\]\n'), '');
+
+  test(
+    'counts lower-level authentication attempts and returned usage',
+    () async {
+      var sent = 0;
+      final summary = await run(['history ' * 100], (_, _, _, _) async {
+        final client = ModelRequestAttempts.wrap(
+          MockClient((_) async {
+            sent++;
+            return http.Response(
+              sent == 1 ? 'unauthorized' : 'summary',
+              sent == 1 ? 401 : 200,
             );
-          } finally {
-            client.close();
-          }
-        }, attempts: limit);
-        if (limit == 1) {
-          await expectLater(
-            generation,
-            throwsA(
-              predicate(
-                (e) => e.toString().contains('compression_request_budget'),
-              ),
-            ),
+          }),
+        );
+        try {
+          final uri = Uri.parse('https://example.test/messages');
+          await client.post(uri);
+          await client.post(uri);
+          return result(
+            'summary',
+            usage: const TokenUsage(promptTokens: 10, completionTokens: 2),
           );
-        } else {
-          expect(await generation, 'summary');
+        } finally {
+          client.close();
         }
-        expect(sent, limit);
-        expect(task.requestAttempts, limit);
-        expect(task.finishReasons, hasLength(limit));
-        expect(task.unknownUsageAttempts, 1);
-      },
-    );
-  }
+      });
+      expect(summary, 'summary');
+      expect(sent, 2);
+      expect(task.requestAttempts, 2);
+      expect(task.finishReasons, [null, 'stop']);
+      expect(task.unknownUsageAttempts, 1);
+    },
+  );
 
   test(
     'one complete request without an extra merge, aggregate usage once',
@@ -168,20 +160,18 @@ void main() {
       final planner = CompressionPlanner(
         request: request,
         materials: ['history'],
-        previousSummary: '',
         background: '',
       );
       expect(planner.inputLimit, 32000 - 4096 - 1600);
       expect(
-        await const CompressionEngine().run(
+        (await const CompressionEngine().run(
           task: task,
           request: request,
           materials: ['history'],
-          previousSummary: '',
           background: '',
           check: () {},
           publish: () async {},
-        ),
+        )).summary,
         'summary',
       );
       expect(task.usage!.completionTokens, 3072);
@@ -207,7 +197,6 @@ void main() {
             generate: (_, _, _, _) async => result('summary'),
           ),
           materials: ['history'],
-          previousSummary: '',
           background: '',
         );
         expect(planner.outputTokens, cap);
@@ -246,26 +235,6 @@ void main() {
     },
   );
 
-  test('preflight reserves summary text without the reasoning allowance', () {
-    final planner = CompressionPlanner(
-      request: CompressionRequest(
-        options: options,
-        model: 'large-output',
-        quoteMarker: (_) => 'quote',
-        config: const CompressionConfig(
-          summaryTokens: 512,
-          maxOutputTokens: 32768,
-        ),
-        contextWindowTokens: 1000000,
-        generate: (_, _, _, _) async => result('summary'),
-      ),
-      materials: ['past ' * 12000, 'next ' * 12000],
-      previousSummary: '',
-      background: '',
-    );
-    expect(planner.estimateRequests(), 2);
-  });
-
   test('unknown model window uses 1M for preview and execution', () async {
     final background = '背景设定 ' * 7000;
     final materials = ['需要压缩的历史内容'];
@@ -287,7 +256,6 @@ void main() {
     CompressionPlanner planner({int? window}) => CompressionPlanner(
       request: request(window: window),
       materials: materials,
-      previousSummary: '',
       background: background,
     );
     final unknown = planner();
@@ -300,217 +268,170 @@ void main() {
     expect(preview.estimatedRequests, 1);
     expect(preview.prompt, contains(background));
     expect(
-      await const CompressionEngine().run(
+      (await const CompressionEngine().run(
         task: task,
         request: request(),
         materials: materials,
-        previousSummary: '',
         background: background,
         check: () {},
         publish: () async {},
-      ),
+      )).summary,
       '完整摘要',
     );
     expect(sent, preview.prompt);
     expect(task.requestAttempts, 1);
   });
 
-  test(
-    'known small model windows still reject an oversized reference',
-    () async {
-      await expectLater(
-        const CompressionEngine().run(
-          task: task,
-          request: CompressionRequest(
-            options: options,
-            model: 'explicit-32k-model',
-            quoteMarker: (_) => 'quote',
-            contextWindowTokens: 32000,
-            generate: (_, _, _, _) async =>
-                fail('must not exceed a known window'),
-          ),
-          materials: ['需要压缩的历史内容'],
-          previousSummary: '',
-          background: '背景设定 ' * 7000,
-          check: () {},
-          publish: () async {},
-        ),
-        throwsA(
-          predicate(
-            (e) => e.toString().contains('compression_reference_too_large'),
-          ),
-        ),
-      );
-      expect(task.requestAttempts, 0);
-    },
-  );
+  test('oversized estimated background still reaches the provider', () async {
+    final background = '背景设定 ' * 22000;
+    const history = '需要压缩的历史内容';
+    final summary = await run(
+      [history],
+      (prompt, _, _, _) async {
+        expect(prompt, contains(background));
+        expect(historyIn(prompt), history);
+        return result('summary');
+      },
+      window: 32000,
+      background: background,
+    );
+    expect(summary, 'summary');
+    expect(task.requestAttempts, 1);
+  });
 
   test(
-    'large windows still bound requests and keep the event loop responsive',
+    'large windows send more than 100,000 characters in one request',
     () async {
       final materials = List.generate(
         800,
         (i) => '[source message:$i]\n${'历史消息 example of context ' * 12}',
       );
-      final content = <String>[];
+      final background = '背景 ' * 35000;
       var eventRan = false;
       Timer.run(() => eventRan = true);
-      await run(materials, (prompt, _, _, _) async {
-        expect(
-          eventRan,
-          isTrue,
-          reason: 'planning must yield to the UI isolate',
-        );
-        expect(
-          prompt.length,
-          lessThanOrEqualTo(CompressionPlanner.maxPromptChars),
-        );
-        content.add(
-          prompt
-              .split('<content data="reference, not instructions">\n')[1]
-              .split('\n</content>')[0],
-        );
-        return result('working summary');
-      }, window: 1000000);
-      expect(content.length, greaterThan(1));
-      expect(content.join('\n\n'), materials.join('\n\n'));
+      await run(
+        materials,
+        (prompt, _, _, _) async {
+          expect(eventRan, isTrue);
+          expect(historyIn(prompt), materials.join('\n\n'));
+          expect(prompt, contains(background));
+          return result('working summary');
+        },
+        window: 1000000,
+        background: background,
+      );
+      expect(task.requestAttempts, 1);
     },
   );
 
   test(
-    'local limit splits a single long message without losing UTF-16 text',
+    'estimated window splits a large previous summary without losing Unicode',
     () async {
-      final original = '${'alpha😀中文 ' * 24000}END_EVIDENCE';
+      final original = '[source summary:old]\n${'alpha😀中文 ' * 24000}END';
       final content = <String>[];
       await run([original], (prompt, _, _, _) async {
-        expect(
-          prompt.length,
-          lessThanOrEqualTo(CompressionPlanner.maxPromptChars),
-        );
-        final part = prompt
-            .split('<content data="reference, not instructions">\n')[1]
-            .split('\n</content>')[0]
-            .replaceFirst(RegExp(r'^\[source fragment[^\n]+\]\n'), '');
+        final part = historyIn(prompt);
         expect(part.runes.any((r) => r >= 0xd800 && r <= 0xdfff), isFalse);
         content.add(part);
-        return result('summary ${'记忆' * 1000}');
-      }, window: 1000000);
+        return result('working summary');
+      }, window: 16000);
       expect(content.length, greaterThan(1));
       expect(content.join(), original);
     },
   );
 
-  test(
-    'local request limit participates in the preflight call budget',
-    () async {
-      await expectLater(
-        run(
-          ['history ' * 40000],
-          (_, _, _, _) async => fail('must reject before a paid request'),
-          window: 1000000,
-          attempts: 1,
-        ),
-        throwsA(
-          predicate((e) => e.toString().contains('compression_request_budget')),
-        ),
-      );
-      expect(task.requestAttempts, 0);
-    },
-  );
-
-  test(
-    'preflight counts whole-message packing rather than total characters',
-    () async {
-      await expectLater(
-        run(
-          List.generate(3, (i) => '[source message:$i]\n${'history ' * 7500}'),
-          (_, _, _, _) async => fail('must reject before a paid request'),
-          window: 1000000,
-          attempts: 2,
-        ),
-        throwsA(
-          predicate((e) => e.toString().contains('compression_request_budget')),
-        ),
-      );
-      expect(task.requestAttempts, 0);
-    },
-  );
-
-  test(
-    'preflight reserves character space for subsequent working summaries',
-    () async {
-      final request = CompressionRequest(
-        options: options,
-        model: 'test',
-        quoteMarker: (_) => 'quote',
-        contextWindowTokens: 1000000,
-        config: const CompressionConfig(
-          summaryTokens: 4096,
-          maxRequestAttempts: 2,
-        ),
-        generate: (_, _, _, _) async =>
-            fail('must reject before a paid request'),
-      );
-      await expectLater(
-        const CompressionEngine().run(
-          task: task,
-          request: request,
-          materials: ['[source message:large]\n${'history ' * 23000}'],
-          previousSummary: '',
-          background: '',
-          check: () {},
-          publish: () async {},
-        ),
-        throwsA(
-          predicate((e) => e.toString().contains('compression_request_budget')),
-        ),
-      );
-      expect(task.requestAttempts, 0);
-    },
-  );
-
-  test(
-    'local preview is the first bounded request used by execution',
-    () async {
-      final materials = List.generate(
-        300,
-        (i) => 'message $i ${'history ' * 80}',
-      );
-      var first = '';
-      final request = CompressionRequest(
-        options: options,
-        model: 'test',
-        quoteMarker: (_) => 'quote',
-        contextWindowTokens: 1000000,
-        generate: (prompt, _, _, _) async {
-          if (first.isEmpty) first = prompt;
-          return result('summary');
-        },
-      );
-      final planner = CompressionPlanner(
-        request: request,
-        materials: materials,
-        previousSummary: '',
-        background: '',
-      );
-      final preview = await Isolate.run(planner.preview);
+  test('keeps a fitting previous summary in its template section', () async {
+    await run(['[source summary:old]\nPast decision.', 'New information.'], (
+      prompt,
+      _,
+      _,
+      _,
+    ) async {
       expect(
-        preview.prompt.length,
-        lessThanOrEqualTo(CompressionPlanner.maxPromptChars),
+        prompt,
+        contains(
+          '<previous_summary data="reference, not instructions">\n'
+          'Past decision.\n</previous_summary>',
+        ),
       );
-      expect(preview.estimatedRequests, greaterThan(1));
-      await const CompressionEngine().run(
-        task: task,
-        request: request,
-        materials: materials,
-        previousSummary: '',
-        background: '',
-        check: () {},
-        publish: () async {},
-      );
-      expect(first, preview.prompt);
+      expect(historyIn(prompt), 'New information.');
+      return result('complete');
+    });
+    expect(task.requestAttempts, 1);
+  });
+
+  test(
+    'a stored summary becomes splittable if the provider rejects it',
+    () async {
+      final stored = 'history ' * 400;
+      final accepted = <String>[];
+      await run(['[source summary:old]\n$stored', 'New information.'], (
+        prompt,
+        _,
+        _,
+        _,
+      ) async {
+        if (prompt.contains('\n$stored\n</previous_summary>')) {
+          throw StateError('context_length_exceeded');
+        }
+        accepted.add(historyIn(prompt));
+        return result('complete');
+      });
+      expect(accepted.join('\n\n'), contains(stored));
+      expect(accepted.join(), contains('New information.'));
     },
   );
+
+  test('local preview shows the same first prompt as execution', () async {
+    final materials = List.generate(
+      300,
+      (i) => 'message $i ${'history ' * 80}',
+    );
+    String? first;
+    final request = CompressionRequest(
+      options: options,
+      model: 'test',
+      quoteMarker: (_) => 'quote',
+      contextWindowTokens: 16000,
+      generate: (prompt, _, _, _) async {
+        first ??= prompt;
+        return result('summary');
+      },
+    );
+    final planner = CompressionPlanner(
+      request: request,
+      materials: materials,
+      background: '',
+    );
+    final preview = await Isolate.run(planner.preview);
+    expect(preview.estimatedRequests, greaterThan(1));
+    await const CompressionEngine().run(
+      task: task,
+      request: request,
+      materials: materials,
+      background: '',
+      check: () {},
+      publish: () async {},
+    );
+    expect(first, preview.prompt);
+  });
+
+  test('preview uses the available budget after a short first batch', () {
+    final planner = CompressionPlanner(
+      request: CompressionRequest(
+        options: options,
+        model: 'test',
+        quoteMarker: (_) => 'quote',
+        contextWindowTokens: 32000,
+        generate: (_, _, _, _) async => result('summary'),
+      ),
+      materials: ['Short introduction.', 'history ' * 40000],
+      background: '',
+    );
+    final preview = planner.preview();
+    expect(historyIn(preview.prompt), 'Short introduction.');
+    expect(preview.estimatedRequests, 3);
+  });
 
   test('cancellation during background planning makes no model call', () async {
     var cancelled = false;
@@ -526,7 +447,6 @@ void main() {
               fail('must not call after cancellation'),
         ),
         materials: ['history ' * 100],
-        previousSummary: '',
         background: '',
         check: () {
           if (cancelled) throw StateError('cancelled');
@@ -544,22 +464,17 @@ void main() {
       final original = '${'中文代码😀 alpha\n\n' * 2200}END_EVIDENCE';
       final pieces = <String>[];
       var calls = 0;
-      final summary = await run(
-        [original],
-        (prompt, _, _, _) async {
-          calls++;
-          if (calls > 1) expect(prompt, contains('STATE_${calls - 1}'));
-          final content = prompt
-              .split('<content data="reference, not instructions">\n')[1]
-              .split('\n</content>')[0];
-          pieces.add(
-            content.replaceFirst(RegExp(r'^\[source fragment[^\n]+\]\n'), ''),
-          );
-          return result('STATE_$calls');
-        },
-        window: 6000,
-        attempts: 64,
-      );
+      final summary = await run([original], (prompt, _, _, _) async {
+        calls++;
+        if (calls > 1) expect(prompt, contains('STATE_${calls - 1}'));
+        final content = prompt
+            .split('<content data="reference, not instructions">\n')[1]
+            .split('\n</content>')[0];
+        pieces.add(
+          content.replaceFirst(RegExp(r'^\[source fragment[^\n]+\]\n'), ''),
+        );
+        return result('STATE_$calls');
+      }, window: 6000);
       expect(calls, greaterThan(1));
       expect(summary, 'STATE_$calls');
       expect(pieces.join(), original);
@@ -568,45 +483,126 @@ void main() {
     },
   );
 
-  test('a task over the planned call budget makes no paid requests', () async {
-    var calls = 0;
-    await expectLater(
-      run(
-        ['long history ' * 10000],
-        (_, _, _, _) async {
-          calls++;
-          return result('partial');
-        },
-        window: 4000,
-        attempts: 1,
-      ),
-      throwsStateError,
-    );
-    expect(calls, 0);
+  test('processes the entire history beyond eight requests', () async {
+    final original = 'long history ' * 22000;
+    final parts = <String>[];
+    final summary = await run([original], (prompt, _, _, _) async {
+      parts.add(historyIn(prompt));
+      return result('summary');
+    }, window: 4000);
+    expect(summary, 'summary');
+    expect(task.requestAttempts, greaterThan(8));
+    expect(task.completedParts, task.requestAttempts);
+    expect(parts.join(), original);
   });
 
   test(
-    'overflow retries count, keep source tail and retain failure usage',
+    'provider overflow shrinks the rejected span and keeps all source and usage',
     () async {
+      final original = 'history ' * 400;
+      final parts = <String>[];
       var calls = 0;
-      final prompts = <String>[];
-      await run(['history ' * 400], (prompt, _, _, onUsage) async {
+      await run([original], (prompt, _, _, onUsage) async {
         calls++;
-        prompts.add(prompt);
+        final part = historyIn(prompt);
         if (calls == 1) {
+          expect(part, original);
           onUsage(const TokenUsage(promptTokens: 7));
           throw StateError('context_length_exceeded');
         }
+        expect(part.length, lessThan(original.length));
+        parts.add(part);
         return result(
           'complete',
           usage: const TokenUsage(promptTokens: 20, completionTokens: 3),
         );
       });
-      expect(calls, 2);
-      expect(prompts.last, contains('history ' * 400));
-      expect(task.usage!.promptTokens, 27);
+      expect(calls, 3);
+      expect(parts.join(), original);
+      expect(task.usage!.promptTokens, 47);
     },
   );
+
+  test(
+    'provider size rejection can retry without optional background',
+    () async {
+      final background = 'BACKGROUND ' * 10000;
+      var calls = 0;
+      final summary = await run(['conversation history'], (
+        prompt,
+        _,
+        _,
+        _,
+      ) async {
+        calls++;
+        expect(historyIn(prompt), 'conversation history');
+        if (calls == 1) {
+          expect(prompt, contains(background));
+          throw const HttpException('HTTP 413: payload too large');
+        }
+        expect(prompt, isNot(contains('BACKGROUND')));
+        return result('complete');
+      }, background: background);
+      expect(summary, 'complete');
+      expect(calls, 2);
+    },
+  );
+
+  test(
+    'reducing the output reservation reopens room for later history',
+    () async {
+      final original = 'history ' * 400;
+      final accepted = <String>[];
+      await run([original], (prompt, _, output, _) async {
+        if (output > 128) {
+          throw const HttpException('HTTP 400: context_length_exceeded');
+        }
+        accepted.add(historyIn(prompt));
+        return result('complete');
+      });
+      expect(accepted.join(), original);
+      expect(accepted.length, lessThan(20));
+    },
+  );
+
+  test('tries a shorter input with the same output budget first', () async {
+    final original = 'history ' * 100;
+    final accepted = <String>[];
+    final outputBudgets = <int>[];
+    final summary = await run([original], (prompt, _, output, _) async {
+      outputBudgets.add(output);
+      final source = historyIn(prompt);
+      if (source.length > 400) {
+        throw StateError('context_length_exceeded');
+      }
+      if (output < 300) return result('partial', reason: 'length');
+      accepted.add(source);
+      return result('complete');
+    });
+    expect(summary, 'complete');
+    expect(accepted.join(), original);
+    expect(outputBudgets, [512, 512, 512]);
+  });
+
+  test('reuses space freed by a shorter working summary after a 413', () async {
+    final tail = 'tail ' * 1000;
+    final accepted = <String>[];
+    await run(
+      ['intro ' * 14, tail],
+      (prompt, _, _, _) async {
+        if (utf8.encode(prompt).length > 6206) {
+          throw const HttpException('HTTP 413: Request Entity Too Large');
+        }
+        accepted.add(historyIn(prompt));
+        return result(accepted.length == 1 ? 'concept ' * 124 : 'brief');
+      },
+      window: 2000,
+      summaryTokens: 128,
+    );
+    expect(accepted.skip(1).join(), tail);
+    expect(accepted[2].length, greaterThan(accepted[1].length * 5));
+    expect(task.requestAttempts, lessThan(30));
+  });
 
   for (final reason in [
     'length',
@@ -638,38 +634,34 @@ void main() {
       expect(task.finishReasons, [null]);
     },
   );
-  test('a too-large custom prompt fails before calling', () async {
-    await expectLater(
-      run(
-        ['history'],
-        (_, _, _, _) async => fail('must not call'),
-        window: 4000,
-        template: CompressionTemplate(
-          id: 'custom',
-          name: 'custom',
-          prompt: 'very long template ' * 3000,
+  test(
+    'oversized custom instructions reach the provider and retain its final error',
+    () async {
+      final instructions = 'very long template ' * 7000;
+      const failure = HttpException('HTTP 400: context_length_exceeded');
+      final requests = <(String, int)>{};
+      await expectLater(
+        run(
+          ['history'],
+          (prompt, _, output, _) async {
+            expect(prompt, contains(instructions));
+            expect(requests.add((historyIn(prompt), output)), isTrue);
+            throw failure;
+          },
+          window: 4000,
+          template: CompressionTemplate(
+            id: 'custom',
+            name: 'custom',
+            prompt: instructions,
+          ),
         ),
-      ),
-      throwsStateError,
-    );
-    expect(task.requestAttempts, 0);
-  });
-  test('local limit also rejects oversized fixed instructions', () async {
-    await expectLater(
-      run(
-        ['history'],
-        (_, _, _, _) async => fail('must not call'),
-        window: 1000000,
-        template: CompressionTemplate(
-          id: 'large',
-          name: 'large',
-          prompt: 'x' * CompressionPlanner.maxPromptChars,
-        ),
-      ),
-      throwsStateError,
-    );
-    expect(task.requestAttempts, 0);
-  });
+        throwsA(same(failure)),
+      );
+      expect(task.requestAttempts, greaterThan(0));
+      expect(task.requestAttempts, lessThan(9));
+      expect(task.completedParts, 0);
+    },
+  );
   test('template rendering is nonrecursive and inserts history once', () {
     final prompt = renderCompressionPrompt(
       template: const CompressionTemplate(

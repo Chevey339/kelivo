@@ -1,7 +1,10 @@
 import 'package:markstream/markstream_core.dart';
 
 /// Image destinations as rendered in message Markdown, excluding code samples.
-Iterable<String> markdownImageSources(String source) sync* {
+Iterable<String> markdownImageSources(
+  String source, {
+  bool includeLinks = false,
+}) sync* {
   final pending = <MarkdownNode>[
     MarkdownParser(
       inlineSyntaxes: const [LocalImagePathSyntax()],
@@ -11,6 +14,11 @@ Iterable<String> markdownImageSources(String source) sync* {
     final node = pending.removeLast();
     if (node is ImageNode) {
       yield node.destination;
+    } else if (includeLinks && node is LinkNode) {
+      yield node.destination;
+    } else if (includeLinks && node is HtmlElementNode && node.tag == 'a') {
+      final href = node.attributes['href'];
+      if (href != null && isSafeHtmlUrl(href)) yield href;
     } else if (node is HtmlElementNode && node.tag == 'img') {
       final source = node.attributes['src'];
       if (source != null && isSafeHtmlUrl(source, image: true)) yield source;

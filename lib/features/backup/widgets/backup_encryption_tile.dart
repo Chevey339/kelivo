@@ -2,89 +2,187 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/backup_encryption.dart';
+import '../../../core/services/backup/backup_secure_password_store.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
 import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
+import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_settings_rows.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../backup_restore_error_message.dart';
 
-/// The saved preference is independent of the in-memory session password.
-class BackupEncryptionTile extends StatelessWidget {
-  const BackupEncryptionTile({
-    super.key,
-    required this.enabled,
-    required this.onChanged,
-  });
+class BackupEncryptionTile extends StatefulWidget {
+  const BackupEncryptionTile({super.key, this.busy = false});
+  final bool busy;
 
-  final bool enabled;
-  final Future<void> Function(String?)? onChanged;
+  @override
+  State<BackupEncryptionTile> createState() => _BackupEncryptionTileState();
+}
+
+class _BackupEncryptionTileState extends State<BackupEncryptionTile> {
+  bool _editing = false;
+
+  Future<void> _edit(Future<void> Function() action) async {
+    if (_editing || widget.busy) return;
+    setState(() => _editing = true);
+    try {
+      await action();
+    } on BackupCancelledException {
+      return;
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: backupRestoreErrorMessage(
+            AppLocalizations.of(context)!,
+            error,
+          ),
+          type: NotificationType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _editing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    final enabled = settings.backupEncryptionEnabled;
+    final remembered = settings.backupPasswordRemembered;
+    final editable = !widget.busy && !_editing;
     final l10n = AppLocalizations.of(context)!;
-    Future<void> change(bool enabled) async {
-      if (onChanged == null) return;
-      try {
-        if (!enabled) {
-          await onChanged!(null);
-          return;
-        }
-        final value = await showBackupPasswordDialog(context, creating: true);
-        if (context.mounted && value != null) await onChanged!(value);
-      } catch (error) {
-        if (context.mounted) {
-          showAppSnackBar(
-            context,
-            message: error.toString(),
-            type: NotificationType.error,
-          );
-        }
+    Future<void> change(bool value) => _edit(() async {
+      if (!value) return settings.setBackupEncryptionPassword(null);
+      final choice = await _showBackupPasswordDialog(
+        context,
+        purpose: _PasswordPurpose.create,
+        offerRemember: !remembered,
+      );
+      if (choice == null || !context.mounted) return;
+      await settings.setBackupEncryptionPassword(choice.password);
+      if (choice.remember) {
+        await settings.rememberBackupPassword(choice.password);
       }
-    }
-
-    return IosNavRow(
+    });
+    Future<void> remember(bool value) => _edit(() async {
+      if (!value) return settings.forgetBackupPassword();
+      final password = await backupPasswordForRemembering(context);
+      if (password != null) await settings.rememberBackupPassword(password);
+    });
+    final toggle = IosNavRow(
       icon: Lucide.Lock,
       label: l10n.backupEncryptionTitle,
       subtitle: !enabled
           ? l10n.backupEncryptionOffHint
+          : remembered
+          ? l10n.backupEncryptionOnHintRemembered
           : l10n.backupEncryptionOnHint,
       subtitleMaxLines: null,
-      onTap: onChanged == null ? null : () => change(!enabled),
+      onTap: editable ? () => change(!enabled) : null,
       trailing: IosSwitch(
         key: const ValueKey('backup-encryption-switch'),
         semanticLabel: l10n.backupEncryptionTitle,
         value: enabled,
-        onChanged: onChanged == null ? null : change,
+        onChanged: editable ? change : null,
       ),
+    );
+    if (!enabled) return toggle;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        toggle,
+        IosNavRow(
+          icon: Lucide.KeyRound,
+          label: l10n.backupRememberPasswordOnDevice,
+          subtitle: settings.autoBackupEnabled
+              ? l10n.backupForgetDisablesAutomaticHint
+              : null,
+          subtitleMaxLines: null,
+          onTap: editable ? () => remember(!remembered) : null,
+          trailing: IosSwitch(
+            key: const ValueKey('backup-remember-password-switch'),
+            semanticLabel: l10n.backupRememberPasswordOnDevice,
+            value: remembered,
+            onChanged: editable ? remember : null,
+          ),
+        ),
+        IosNavRow(
+          label: l10n.backupEncryptionChangePassword,
+          icon: Lucide.Pencil,
+          onTap: editable ? () => change(true) : null,
+        ),
+      ],
     );
   }
 }
 
-Future<String?> backupPasswordForExport(BuildContext context) {
-  return context.read<SettingsProvider>().resolveBackupEncryptionPassword(
-    () async {
-      if (!context.mounted) return null;
-      return showBackupPasswordDialog(context, creating: true);
-    },
-  );
+Future<String?> backupPasswordForExport(BuildContext context) =>
+    _resolvePassword(context, offerRemember: true);
+
+Future<String?> backupPasswordForRemembering(BuildContext context) =>
+    _resolvePassword(context, offerRemember: false);
+
+Future<String?> _resolvePassword(
+  BuildContext context, {
+  required bool offerRemember,
+}) async {
+  final settings = context.read<SettingsProvider>();
+  var remember = false;
+  final password = await settings.resolveBackupEncryptionPassword(() async {
+    if (!context.mounted) return null;
+    final choice = await _showBackupPasswordDialog(
+      context,
+      purpose: settings.hasBackupPasswordVerifier
+          ? _PasswordPurpose.manualBackup
+          : _PasswordPurpose.create,
+      offerRemember: offerRemember,
+    );
+    remember = choice?.remember == true;
+    return choice?.password;
+  });
+  if (remember && password != null) {
+    try {
+      await settings.rememberBackupPassword(password);
+    } on BackupKeychainUnavailable {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.backupManualPasswordNotSaved,
+          type: NotificationType.warning,
+        );
+      }
+    }
+  }
+  return password;
 }
 
 BackupPasswordPrompt backupPasswordPrompt(BuildContext context) {
   return ({required retry}) async {
     if (!context.mounted) return null;
-    return showBackupPasswordDialog(context, retry: retry);
+    return (await _showBackupPasswordDialog(
+      context,
+      purpose: _PasswordPurpose.restore,
+      retry: retry,
+    ))?.password;
   };
 }
 
-Future<String?> showBackupPasswordDialog(
+enum _PasswordPurpose { create, manualBackup, restore }
+
+typedef _PasswordChoice = ({String password, bool remember});
+
+Future<_PasswordChoice?> _showBackupPasswordDialog(
   BuildContext context, {
-  bool creating = false,
+  required _PasswordPurpose purpose,
+  bool offerRemember = false,
   bool retry = false,
 }) {
   final platform = Theme.of(context).platform;
@@ -94,24 +192,32 @@ Future<String?> showBackupPasswordDialog(
       platform == TargetPlatform.windows ||
       platform == TargetPlatform.linux;
   final editor = _BackupPasswordEditor(
-    creating: creating,
+    purpose: purpose,
+    offerRemember: offerRemember,
     retry: retry,
     desktop: desktop,
   );
   if (desktop) {
-    return showAppDialog<String>(context, maxWidth: 400, child: editor);
+    return showAppDialog<_PasswordChoice>(
+      context,
+      maxWidth: 400,
+      child: editor,
+    );
   }
-  return showFormSheet<String>(context, builder: (_) => editor);
+  return showFormSheet<_PasswordChoice>(context, builder: (_) => editor);
 }
 
 class _BackupPasswordEditor extends StatefulWidget {
   const _BackupPasswordEditor({
-    required this.creating,
+    required this.purpose,
+    required this.offerRemember,
     required this.retry,
     required this.desktop,
   });
 
-  final bool creating;
+  final _PasswordPurpose purpose;
+  bool get creating => purpose == _PasswordPurpose.create;
+  final bool offerRemember;
   final bool retry;
   final bool desktop;
 
@@ -123,6 +229,7 @@ class _BackupPasswordEditorState extends State<_BackupPasswordEditor> {
   final _password = TextEditingController();
   final _confirmation = TextEditingController();
   bool _visible = false;
+  bool _remember = false;
 
   bool get _valid =>
       _password.text.isNotEmpty &&
@@ -136,16 +243,20 @@ class _BackupPasswordEditorState extends State<_BackupPasswordEditor> {
   }
 
   void _submit() {
-    if (_valid) Navigator.of(context).pop(_password.text);
+    if (_valid) {
+      Navigator.of(
+        context,
+      ).pop((password: _password.text, remember: _remember));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final title = widget.creating
-        ? l10n.backupEncryptionTitle
-        : l10n.backupEncryptionUnlockTitle;
+    final title = widget.purpose == _PasswordPurpose.restore
+        ? l10n.backupEncryptionUnlockTitle
+        : l10n.backupEncryptionTitle;
     final visibilityLabel = _visible
         ? l10n.backupEncryptionHidePassword
         : l10n.backupEncryptionShowPassword;
@@ -211,9 +322,11 @@ class _BackupPasswordEditorState extends State<_BackupPasswordEditor> {
       Align(
         alignment: Alignment.centerLeft,
         child: Text(
-          widget.creating
-              ? l10n.backupEncryptionPasswordHint
-              : l10n.backupEncryptionUnlockHint,
+          switch (widget.purpose) {
+            _PasswordPurpose.create => l10n.backupEncryptionPasswordHint,
+            _PasswordPurpose.manualBackup => l10n.backupManualPasswordHint,
+            _PasswordPurpose.restore => l10n.backupEncryptionUnlockHint,
+          },
           style: TextStyle(
             fontSize: 12,
             height: 1.45,
@@ -221,13 +334,26 @@ class _BackupPasswordEditorState extends State<_BackupPasswordEditor> {
           ),
         ),
       ),
+      if (widget.offerRemember)
+        IosNavRow(
+          label: l10n.backupRememberPasswordOnDevice,
+          leading: IosCheckbox(
+            key: const ValueKey('backup-password-remember'),
+            semanticLabel: l10n.backupRememberPasswordOnDevice,
+            value: _remember,
+            onChanged: (value) => setState(() => _remember = value),
+          ),
+          onTap: () => setState(() => _remember = !_remember),
+        ),
     ];
     final actions = FormSheetActions(
       key: const ValueKey('backup-password-actions'),
       cancelLabel: l10n.backupPageCancel,
-      confirmLabel: widget.creating
-          ? l10n.backupPageSave
-          : l10n.backupEncryptionUnlock,
+      confirmLabel: switch (widget.purpose) {
+        _PasswordPurpose.create => l10n.backupPageSave,
+        _PasswordPurpose.manualBackup => l10n.backupPageOK,
+        _PasswordPurpose.restore => l10n.backupEncryptionUnlock,
+      },
       onCancel: () => Navigator.of(context).pop(),
       onConfirm: _valid ? _submit : null,
     );

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/models/api_keys.dart';
+import 'package:Kelivo/core/services/api_key_manager.dart';
 import 'package:Kelivo/core/services/provider_balance_service.dart';
 
 ProviderConfig _providerConfig(
@@ -97,6 +98,87 @@ void main() {
           requests.single.headers.value(HttpHeaders.authorizationHeader),
           'Bearer balance-key',
         );
+      },
+    );
+
+    test(
+      'fal uses account billing, handles empty credit and accepts a separate billing key',
+      () async {
+        final official = ProviderConfig.defaultsFor(
+          'fal',
+        ).copyWith(apiKey: 'inference-fixture', balanceEnabled: true);
+        expect(
+          ProviderBalanceService.balanceUri(official).toString(),
+          'https://api.fal.ai/v1/account/billing?expand=credits',
+        );
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        final relay = official.copyWith(
+          baseUrl: 'http://127.0.0.1:${server.port}/relay',
+        );
+        final auth = <String?>[];
+        final replies = [
+          (
+            200,
+            {
+              'credits': {'current_balance': 0, 'currency': 'USD'},
+            },
+          ),
+          (
+            200,
+            {
+              'credits': {'current_balance': 24.5, 'currency': 'USD'},
+            },
+          ),
+          (
+            403,
+            {
+              'error': {'message': 'Access denied'},
+            },
+          ),
+          (200, {'credits': {}}),
+        ];
+        server.listen((request) async {
+          final (code, body) = replies[auth.length];
+          auth.add(request.headers.value('Authorization'));
+          expect(request.method, 'GET');
+          expect(request.uri.path, '/relay/v1/account/billing');
+          expect(request.uri.queryParameters, {'expand': 'credits'});
+          request.response.statusCode = code;
+          request.response.write(jsonEncode(body));
+          await request.response.close();
+        });
+        expect(await ProviderBalanceService.fetchBalance(relay), '0.00 USD');
+        expect(
+          await ProviderBalanceService.fetchBalance(
+            relay.copyWith(
+              balanceHeaders: const [
+                {'name': 'Authorization', 'value': 'Key billing-fixture'},
+              ],
+            ),
+          ),
+          '24.50 USD',
+        );
+        await expectLater(
+          ProviderBalanceService.fetchBalance(relay),
+          throwsA(
+            isA<ProviderBalanceException>().having(
+              (e) => e.message,
+              'status',
+              contains('403'),
+            ),
+          ),
+        );
+        await expectLater(
+          ProviderBalanceService.fetchBalance(relay),
+          throwsA(isA<ProviderBalanceException>()),
+        );
+        expect(auth, [
+          'Key inference-fixture',
+          'Key billing-fixture',
+          'Key inference-fixture',
+          'Key inference-fixture',
+        ]);
       },
     );
 
@@ -350,14 +432,20 @@ void main() {
       );
 
       test(
-        'selects a multi-key once for auth, headers and body per request',
+        'uses a stable balance key without advancing chat key rotation',
         () async {
           config = config.copyWith(
             id: 'multi-key-balance-substitution-${kind.name}',
             balanceMethod: 'POST',
             multiKeyEnabled: true,
             apiKeys: const [
-              ApiKeyConfig(id: 'a', key: 'key-a', createdAt: 0, updatedAt: 0),
+              ApiKeyConfig(
+                id: 'a',
+                key: 'key-a',
+                priority: 10,
+                createdAt: 0,
+                updatedAt: 0,
+              ),
               ApiKeyConfig(id: 'b', key: 'key-b', createdAt: 0, updatedAt: 0),
             ],
             balanceHeaders: const [
@@ -366,13 +454,14 @@ void main() {
             balanceBody: '{"api_key":"{{apiKey}}"}',
           );
           await ProviderBalanceService.fetchBalance(config);
+          expect(ApiKeyManager().effectiveKeyForProvider(config), 'key-a');
           await ProviderBalanceService.fetchBalance(config);
+          expect(ApiKeyManager().effectiveKeyForProvider(config), 'key-b');
           expect(requests, hasLength(2));
-          for (var i = 0; i < requests.length; i++) {
-            final key = i == 0 ? 'key-a' : 'key-b';
-            expect(requests[i].headers.value('authorization'), 'Bearer $key');
-            expect(requests[i].headers.value('x-api-key'), key);
-            expect(jsonDecode(requests[i].body), {'api_key': key});
+          for (final request in requests) {
+            expect(request.headers.value('authorization'), 'Bearer key-b');
+            expect(request.headers.value('x-api-key'), 'key-b');
+            expect(jsonDecode(request.body), {'api_key': 'key-b'});
           }
         },
       );

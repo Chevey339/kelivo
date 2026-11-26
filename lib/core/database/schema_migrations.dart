@@ -5,6 +5,11 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'app_database.dart';
 
+/// Work that can keep the user waiting during an installed database upgrade.
+enum DatabaseUpgradeStage { checking, backingUp, updating, restoring, opening }
+
+typedef DatabaseUpgradeStageSink = void Function(DatabaseUpgradeStage stage);
+
 /// The result of considering a database file for upgrade.
 ///
 /// [upgraded] is false when the file was already at [toVersion], in which case
@@ -20,10 +25,9 @@ typedef DatabaseUpgradeOutcome = ({
 /// This is the single place that turns a published-but-older database into the
 /// current schema. It is deliberately unaware of policy: it takes no backup,
 /// validates nothing afterwards, and leaves durability to the caller.
-/// [ChatDatabaseRepository.migrateInstalledDatabase] wraps it with the
-/// backup/verify/rollback policy the installed database needs; the restore
-/// pipeline calls it directly because a staged snapshot is already a
-/// disposable copy.
+/// The restore pipeline upgrades staged snapshots here. Installed databases
+/// run the same Drift steps on a locked connection so backup and validation
+/// see the same database.
 ///
 /// ## Adding a schema version
 ///
@@ -186,9 +190,8 @@ final class SchemaMigrations {
   /// A file already at the current schema is left untouched. Anything newer or
   /// unpublished throws `StateError('database_schema_version')`.
   ///
-  /// Atomicity comes from drift: `onUpgrade` and the `PRAGMA user_version`
-  /// write share one transaction, so a crash leaves the file either wholly at
-  /// the old schema or wholly at the new one.
+  /// AppDatabase wraps the versioned DDL and its user_version writes in a
+  /// single transaction.
   static Future<DatabaseUpgradeOutcome> upgradeFileInPlace(File file) async {
     final installed = readSchemaVersion(file);
     if (installed == AppDatabase.currentSchemaVersion) {

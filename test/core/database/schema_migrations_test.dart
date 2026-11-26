@@ -8,6 +8,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/database/schema_migrations.dart';
 
 import 'generated_schema/schema.dart';
@@ -112,6 +113,93 @@ void main() {
     }
   });
 
+  test(
+    'a later migration failure rolls back earlier DDL and version writes',
+    () async {
+      final file = await createV1Database();
+      final before = columnsOf(file, 'conversation_rows');
+      final db = sqlite.sqlite3.open(file.path);
+      db.execute('CREATE TABLE generation_topic_rows (id TEXT PRIMARY KEY)');
+      db.close();
+
+      await expectLater(
+        SchemaMigrations.upgradeFileInPlace(file),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains('no such column: updated_at'),
+          ),
+        ),
+      );
+      expect(SchemaMigrations.readSchemaVersion(file), 1);
+      expect(columnsOf(file, 'conversation_rows'), before);
+      expect(columnsOf(file, 'gen_ui_surface_state_rows'), isEmpty);
+    },
+  );
+
+  test(
+    'resumes partially applied legacy DDL with newer chat data intact',
+    () async {
+      final file = await createV1Database();
+      await file.copy('${file.path}.premigrate-v1');
+      final db = sqlite.sqlite3.open(file.path);
+      db.execute(
+        'ALTER TABLE conversation_rows ADD COLUMN chat_model_provider TEXT',
+      );
+      db.execute(
+        "UPDATE conversation_rows SET title = 'After the backup', chat_model_provider = 'local'",
+      );
+      db.close();
+
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: workspace,
+      );
+      expect(
+        (await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: workspace,
+        )).databaseId,
+        receipt.databaseId,
+      );
+      final restored = sqlite.sqlite3.open(
+        file.path,
+        mode: sqlite.OpenMode.readOnly,
+      );
+      try {
+        expect(restored.userVersion, AppDatabase.currentSchemaVersion);
+        final row = restored
+            .select('SELECT title, chat_model_provider FROM conversation_rows')
+            .single;
+        expect(row['title'], 'After the backup');
+        expect(row['chat_model_provider'], 'local');
+      } finally {
+        restored.close();
+      }
+    },
+  );
+
+  test('rejects an incompatible same-name column in an old database', () async {
+    final file = await createV1Database();
+    final db = sqlite.sqlite3.open(file.path);
+    db.execute(
+      'ALTER TABLE conversation_rows ADD COLUMN chat_model_provider INTEGER',
+    );
+    db.close();
+
+    await expectLater(
+      SchemaMigrations.upgradeFileInPlace(file),
+      throwsA(
+        predicate(
+          (error) =>
+              error.toString().contains('database_migration_column_mismatch'),
+        ),
+      ),
+    );
+    expect(SchemaMigrations.readSchemaVersion(file), 1);
+    expect(
+      columnsOf(file, 'conversation_rows'),
+      isNot(contains('chat_model_id')),
+    );
+  });
+
   test('upgrades a schema 2 file preserving message rows', () async {
     final file = databasePath();
     final database = v2.DatabaseAtV2(NativeDatabase(file));
@@ -179,6 +267,75 @@ void main() {
       raw.close();
     }
   });
+
+  for (final (version, oldIndex) in [
+    (5, null),
+    (5, "(target_revision_id) WHERE state = 'streaming'"),
+    (6, null),
+    (6, '(target_revision_id)'),
+  ]) {
+    test('schema $version indexes branch deletion before opening a timeline '
+        '(old index: ${oldIndex ?? 'absent'})', () async {
+      const index = 'idx_timeline_generation_target';
+      final file = databasePath();
+      final legacy = GeneratedHelper().databaseForVersion(
+        NativeDatabase(file),
+        version,
+      );
+      try {
+        await legacy.customStatement('PRAGMA user_version = $version');
+        await legacy.customStatement('''
+            INSERT INTO conversation_rows(id, title, created_at, updated_at)
+            VALUES ('parent', 'Parent', 1, 1), ('branch', 'Branch', 1, 1)
+          ''');
+        await legacy.customStatement('''
+            INSERT INTO message_rows(id, conversation_id, role, timestamp, message_order)
+            VALUES ('p', 'parent', 'assistant', 1, 0), ('b', 'branch', 'assistant', 1, 0)
+          ''');
+        await legacy.customStatement('''
+            INSERT INTO generation_run_rows(id, conversation_id, target_revision_id,
+              state, created_at, updated_at, terminal_at)
+            VALUES ('run', 'parent', 'p', 'completed', 1, 1, 1)
+          ''');
+        if (oldIndex != null) {
+          await legacy.customStatement(
+            'CREATE INDEX $index ON generation_run_rows $oldIndex',
+          );
+        }
+      } finally {
+        await legacy.close();
+      }
+
+      await SchemaMigrations.upgradeFileInPlace(file);
+      // Restore discards the timeline's derived objects after migration.
+      await ChatDatabaseRepository.prepareSnapshotForRestore(file);
+
+      final raw = sqlite.sqlite3.open(file.path);
+      try {
+        raw.execute('PRAGMA foreign_keys = ON');
+        final lookups = raw
+            .select(
+              'EXPLAIN QUERY PLAN DELETE FROM message_rows WHERE id = ?',
+              ['b'],
+            )
+            .map((row) => row['detail'] as String)
+            .where((detail) => detail.contains('generation_run_rows'));
+        expect(lookups, hasLength(1));
+        expect(lookups.single, startsWith('SEARCH generation_run_rows'));
+        expect(lookups.single, contains(index));
+
+        raw.execute("DELETE FROM conversation_rows WHERE id = 'branch'");
+        expect(raw.select('SELECT id FROM message_rows').single['id'], 'p');
+        expect(
+          raw.select('SELECT id FROM generation_run_rows').single['id'],
+          'run',
+        );
+        expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+      } finally {
+        raw.close();
+      }
+    });
+  }
 
   test('migrated shape matches a freshly created database', () async {
     final file = await createV1Database();

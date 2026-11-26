@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import "../../../support/business_test_harness.dart";
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -11,8 +12,12 @@ import 'package:Kelivo/core/providers/tag_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/widgets/side_drawer.dart';
+import 'package:Kelivo/features/home/widgets/conversation_title_builder.dart';
 import 'package:Kelivo/features/home/pages/home_mobile_layout.dart';
+import 'package:Kelivo/shared/animations/status_animation.dart';
+import 'package:Kelivo/shared/animations/widgets.dart';
 import 'package:Kelivo/shared/widgets/interactive_drawer.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/visible_route_theme.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
@@ -116,6 +121,24 @@ class _TestChatService extends ChatService {
   }
 }
 
+class _DelayedSearchService extends _TestChatService {
+  final queries = <String, Completer<List<ConversationSearchMatch>>>{};
+
+  @override
+  Future<List<ConversationSearchMatch>> searchConversationMatches({
+    required List<String> tokens,
+    int limit = 200,
+    bool includeAllRevisions = false,
+    String? conversationId,
+    String? excludeConversationId,
+    String? assistantId,
+  }) {
+    final pending = Completer<List<ConversationSearchMatch>>();
+    queries[tokens.single] = pending;
+    return pending.future;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -166,10 +189,12 @@ void main() {
     ChatService service, {
     bool desktopTopicsOnly = true,
     bool desktopAssistantsOnly = false,
+    bool useDesktopTabs = false,
     bool globalSearchMode = false,
     String globalSearchQuery = '',
     Locale locale = const Locale('en'),
     ValueNotifier<Locale>? localeListenable,
+    ValueNotifier<Set<String>>? loadingConversationIds,
     bool showChatListDate = false,
     AssistantProvider? assistantProvider,
     InteractiveDrawerController? mobileDrawer,
@@ -191,7 +216,7 @@ void main() {
     final scaffoldKey = GlobalKey<ScaffoldState>();
     final closeTick = ValueNotifier(0);
     addTearDown(closeTick.dispose);
-    Widget materialFor(Locale currentLocale) {
+    Widget materialFor(Locale currentLocale, Set<String> loadingIds) {
       return MaterialApp(
         locale: currentLocale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -202,8 +227,8 @@ void main() {
                   scaffoldKey: scaffoldKey,
                   drawerController: mobileDrawer,
                   assistantPickerCloseTick: closeTick,
-                  loadingConversationIds: const {},
-                  title: 'Conversation',
+                  loadingConversationIds: loadingIds,
+                  conversationId: service.currentConversationId,
                   providerName: null,
                   modelDisplay: null,
                   onToggleDrawer: mobileDrawer.toggle,
@@ -232,6 +257,8 @@ void main() {
                   embedded: true,
                   desktopTopicsOnly: desktopTopicsOnly,
                   desktopAssistantsOnly: desktopAssistantsOnly,
+                  useDesktopTabs: useDesktopTabs,
+                  loadingConversationIds: loadingIds,
                   globalSearchMode: globalSearchMode,
                   globalSearchQuery: globalSearchQuery,
                   showBottomBar: false,
@@ -239,6 +266,15 @@ void main() {
                 ),
               ),
       );
+    }
+
+    Widget withLoadingIds(Locale currentLocale) {
+      return loadingConversationIds == null
+          ? materialFor(currentLocale, const {})
+          : ValueListenableBuilder<Set<String>>(
+              valueListenable: loadingConversationIds,
+              builder: (_, ids, __) => materialFor(currentLocale, ids),
+            );
     }
 
     await tester.pumpWidget(
@@ -268,10 +304,11 @@ void main() {
           ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ],
         child: localeListenable == null
-            ? materialFor(locale)
+            ? withLoadingIds(locale)
             : ValueListenableBuilder<Locale>(
                 valueListenable: localeListenable,
-                builder: (_, currentLocale, __) => materialFor(currentLocale),
+                builder: (_, currentLocale, __) =>
+                    withLoadingIds(currentLocale),
               ),
       ),
     );
@@ -289,6 +326,225 @@ void main() {
     }
     await tester.pump(const Duration(milliseconds: 400));
   }
+
+  Finder assistantLoadingDots(String name) => find.descendant(
+    of: find.ancestor(of: find.text(name), matching: find.byType(IosCardPress)),
+    matching: find.byType(StatusAnimation),
+  );
+
+  for (final useTabs in [false, true]) {
+    testWidgets(
+      'desktop assistant indicators aggregate generation (tabs: $useTabs)',
+      (tester) async {
+        await asDesktop(() async {
+          final service = createService();
+          late AssistantProvider assistants;
+          final loading = ValueNotifier(<String>{});
+          addTearDown(loading.dispose);
+          late String first;
+          late String second;
+          late Conversation firstTopic;
+          late Conversation anotherFirstTopic;
+          late Conversation secondTopic;
+          await tester.runAsync(() async {
+            await service.init();
+            assistants = AssistantProvider(
+              preferences: createBusinessTestPreferences(),
+            );
+            await assistants.loaded;
+            first = await assistants.addAssistant(name: 'First');
+            second = await assistants.addAssistant(name: 'Second');
+            await assistants.setCurrentAssistant(first);
+            firstTopic = await service.createConversation(assistantId: first);
+            anotherFirstTopic = await service.createConversation(
+              assistantId: first,
+            );
+            secondTopic = await service.createConversation(assistantId: second);
+          });
+          addTearDown(assistants.dispose);
+          await pumpDrawer(
+            tester,
+            service,
+            assistantProvider: assistants,
+            loadingConversationIds: loading,
+            desktopTopicsOnly: false,
+            desktopAssistantsOnly: !useTabs,
+            useDesktopTabs: useTabs,
+          );
+          expect(assistantLoadingDots('First'), findsNothing);
+          expect(assistantLoadingDots('Second'), findsNothing);
+
+          loading.value = {firstTopic.id, anotherFirstTopic.id, secondTopic.id};
+          await tester.pump();
+          expect(assistantLoadingDots('First'), findsOneWidget);
+          expect(assistantLoadingDots('Second'), findsOneWidget);
+          final rowComputes = SideDrawer.debugSidebarRowsComputeCount;
+          final listBuilds = SideDrawer.debugConversationListBuildCount;
+          service.poke();
+          await tester.pump(const Duration(milliseconds: 100));
+          expect(SideDrawer.debugSidebarRowsComputeCount, rowComputes);
+          expect(SideDrawer.debugConversationListBuildCount, listBuilds);
+
+          // Completing one conversation must leave the other one's assistant
+          // indicator alive, including after switching the selected assistant.
+          loading.value = {anotherFirstTopic.id, secondTopic.id};
+          await tester.runAsync(() => assistants.setCurrentAssistant(second));
+          await tester.pump();
+          expect(assistantLoadingDots('First'), findsOneWidget);
+          expect(assistantLoadingDots('Second'), findsOneWidget);
+
+          loading.value = {secondTopic.id};
+          await tester.pump();
+          expect(assistantLoadingDots('First'), findsNothing);
+          expect(assistantLoadingDots('Second'), findsOneWidget);
+
+          // A stale ID must not light up the selected assistant.
+          loading.value = {'missing-conversation'};
+          await tester.pump();
+          expect(assistantLoadingDots('First'), findsNothing);
+          expect(assistantLoadingDots('Second'), findsNothing);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      },
+    );
+  }
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets('mobile assistant indicators update on $platform', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = platform;
+      try {
+        final service = createService();
+        late AssistantProvider assistants;
+        final loading = ValueNotifier(<String>{});
+        addTearDown(loading.dispose);
+        late String first;
+        late String second;
+        late Conversation firstTopic;
+        late Conversation secondTopic;
+        await tester.runAsync(() async {
+          await service.init();
+          assistants = AssistantProvider(
+            preferences: createBusinessTestPreferences(),
+          );
+          await assistants.loaded;
+          first = await assistants.addAssistant(name: 'First');
+          second = await assistants.addAssistant(name: 'Second');
+          await assistants.setCurrentAssistant(first);
+          firstTopic = await service.createConversation(assistantId: first);
+          secondTopic = await service.createConversation(assistantId: second);
+        });
+        addTearDown(assistants.dispose);
+        final drawer = InteractiveDrawerController();
+        addTearDown(drawer.dispose);
+        await pumpDrawer(
+          tester,
+          service,
+          assistantProvider: assistants,
+          loadingConversationIds: loading,
+          mobileDrawer: drawer,
+        );
+        await drawer.open();
+        await tester.pumpAndSettle();
+        expect(assistantLoadingDots('First'), findsNothing);
+        loading.value = {firstTopic.id, secondTopic.id};
+        await tester.pump();
+        expect(assistantLoadingDots('First'), findsOneWidget);
+
+        await tester.tap(find.text('First'));
+        await tester.pumpAndSettle();
+        // Current-assistant header and its expanded list row both show a dot.
+        expect(assistantLoadingDots('First'), findsNWidgets(2));
+        expect(assistantLoadingDots('Second'), findsOneWidget);
+        await tester.runAsync(() => assistants.setCurrentAssistant(second));
+        await tester.pumpAndSettle();
+        expect(assistantLoadingDots('First'), findsOneWidget);
+        expect(assistantLoadingDots('Second'), findsNWidgets(2));
+
+        loading.value = {firstTopic.id};
+        await tester.pump();
+        expect(assistantLoadingDots('First'), findsOneWidget);
+        expect(assistantLoadingDots('Second'), findsNothing);
+        loading.value = {};
+        await tester.pump();
+        expect(assistantLoadingDots('First'), findsNothing);
+        expect(assistantLoadingDots('Second'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+  }
+
+  testWidgets('assistant indicators follow conversation ownership updates', (
+    tester,
+  ) async {
+    await asDesktop(() async {
+      final service = createService();
+      late AssistantProvider assistants;
+      final loading = ValueNotifier(<String>{});
+      addTearDown(loading.dispose);
+      late String first;
+      late String second;
+      late Conversation topic;
+      late Conversation orphan;
+      late Conversation unbound;
+      await tester.runAsync(() async {
+        await service.init();
+        assistants = AssistantProvider(
+          preferences: createBusinessTestPreferences(),
+        );
+        await assistants.loaded;
+        first = await assistants.addAssistant(name: 'First');
+        second = await assistants.addAssistant(name: 'Second');
+        await assistants.setCurrentAssistant(first);
+        topic = await service.createConversation(assistantId: first);
+        orphan = await service.createConversation(assistantId: 'missing-owner');
+        unbound = await service.createConversation();
+      });
+      addTearDown(assistants.dispose);
+      loading.value = {topic.id};
+      await pumpDrawer(
+        tester,
+        service,
+        assistantProvider: assistants,
+        loadingConversationIds: loading,
+        desktopTopicsOnly: false,
+        desktopAssistantsOnly: true,
+      );
+      expect(assistantLoadingDots('First'), findsOneWidget);
+      expect(assistantLoadingDots('Second'), findsNothing);
+      await tester.runAsync(
+        () => service.moveConversationToAssistant(
+          conversationId: topic.id,
+          assistantId: second,
+        ),
+      );
+      await tester.pump();
+      expect(assistantLoadingDots('First'), findsNothing);
+      expect(assistantLoadingDots('Second'), findsOneWidget);
+      await tester.runAsync(() => service.deleteConversation(topic.id));
+      await tester.pump();
+      expect(assistantLoadingDots('Second'), findsNothing);
+
+      // Orphaned conversations keep their recovery assistant across selection
+      // changes, while unbound conversations follow the selected assistant.
+      loading.value = {orphan.id};
+      await tester.runAsync(() => assistants.setCurrentAssistant(second));
+      await tester.pump();
+      expect(assistantLoadingDots('First'), findsOneWidget);
+      expect(assistantLoadingDots('Second'), findsNothing);
+      loading.value = {unbound.id};
+      await tester.pump();
+      expect(assistantLoadingDots('First'), findsNothing);
+      expect(assistantLoadingDots('Second'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
 
   testWidgets(
     'mobile topic taps close the drawer unless keep-open is enabled',
@@ -466,6 +722,106 @@ void main() {
       expect(find.text('Orphaned topic'), findsOneWidget);
       expect(find.text('Second topic'), findsOneWidget);
     });
+  });
+
+  testWidgets('the open chat header rebuilds only for its own title', (
+    tester,
+  ) async {
+    final service = createService();
+    late Conversation open;
+    late Conversation other;
+    await tester.runAsync(() async {
+      other = await service.createConversation(title: 'Other chat');
+      open = await service.createConversation(title: 'Open chat');
+    });
+    final drawer = InteractiveDrawerController();
+    addTearDown(drawer.dispose);
+    await pumpDrawer(tester, service, mobileDrawer: drawer);
+    await tester.pumpAndSettle();
+
+    final appBar = find.byType(AppBar);
+    AnimatedTextSwap header() => tester.widget<AnimatedTextSwap>(
+      find.descendant(of: appBar, matching: find.byType(AnimatedTextSwap)),
+    );
+    final initial = header();
+    expect(initial.text, 'Open chat');
+
+    // Appending replaces the service's cached Conversation for the same ID.
+    await tester.runAsync(() async {
+      await service.addMessage(
+        conversationId: open.id,
+        role: 'user',
+        content: 'Hello',
+      );
+      await service.renameConversation(other.id, 'Another name');
+    });
+    await tester.pumpAndSettle();
+    expect(header(), same(initial));
+
+    final initialBar = tester.widget<AppBar>(appBar);
+    await tester.runAsync(() => service.renameConversation(open.id, 'Renamed'));
+    await tester.pumpAndSettle();
+    expect(header().text, 'Renamed');
+    expect(tester.widget<AppBar>(appBar), same(initialBar));
+
+    await tester.runAsync(() => service.renameConversation(open.id, '   '));
+    await tester.pumpAndSettle();
+    expect(
+      header().text,
+      AppLocalizations.of(tester.element(appBar))!.titleForLocale,
+    );
+  });
+
+  testWidgets('temporary and empty headers stop observing the previous chat', (
+    tester,
+  ) async {
+    final service = createService();
+    late Conversation open;
+    late Conversation temporary;
+    await tester.runAsync(() async {
+      open = await service.createConversation(title: 'Open');
+      temporary = await service.createDraftConversation(temporary: true);
+    });
+
+    var builds = 0;
+    Future<void> showHeader(String? id) async {
+      await tester.pumpWidget(
+        ChangeNotifierProvider<ChatService>.value(
+          value: service,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: ConversationTitleBuilder(
+              conversationId: id,
+              isTemporary: service.isTemporaryConversation(id),
+              builder: (_, title) {
+                builds++;
+                return Text(title);
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    for (final id in [temporary.id, null]) {
+      await showHeader(open.id);
+      await showHeader(id);
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(ConversationTitleBuilder)),
+      )!;
+      expect(
+        find.text(id == null ? l10n.titleForLocale : l10n.temporaryChatTitle),
+        findsOneWidget,
+      );
+      final before = builds;
+      await tester.runAsync(
+        () => service.renameConversation(open.id, 'Renamed while showing $id'),
+      );
+      await tester.pumpAndSettle();
+      expect(builds, before);
+    }
   });
 
   testWidgets('list does not rebuild on unrelated ChatService notify', (
@@ -960,6 +1316,40 @@ void main() {
       expect(find.byType(SideDrawer.debugChatTileType), findsNothing);
     });
   });
+
+  testWidgets('editing a pending sidebar search dismisses its spinner', (
+    tester,
+  ) async {
+    final service = _DelayedSearchService();
+    services.add(service);
+    await tester.runAsync(() => service.init());
+    await pumpDrawer(
+      tester,
+      service,
+      desktopTopicsOnly: false,
+      globalSearchMode: true,
+    );
+    final field = find.byType(EditableText);
+    final spinner = find.byType(CircularProgressIndicator);
+    await tester.enterText(field, 'first');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    expect(spinner, findsOneWidget);
+
+    await tester.enterText(field, 'second');
+    await tester.pump();
+    expect(spinner, findsNothing);
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    service.queries['first']!.complete([]);
+    await tester.pump();
+    expect(spinner, findsOneWidget);
+    service.queries['second']!.complete([]);
+    await tester.pump();
+    expect(spinner, findsNothing);
+    final l10n = AppLocalizations.of(tester.element(field))!;
+    expect(find.text(l10n.sideDrawerGlobalSearchNoResults), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets(
     'global search mode uses its independent results path without errors',

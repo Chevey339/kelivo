@@ -1,6 +1,7 @@
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/file_upload_service.dart';
+import 'package:Kelivo/features/home/services/composer_document_route.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -94,34 +95,33 @@ void main() {
   );
 
   test(
-    'archives need a workspace; media and cloud-sandbox data keep existing routes',
+    'regular chats inspect unknown file contents; only delivered files bypass inspection',
     () {
-      DocumentAttachment file(String name, String mime) =>
-          DocumentAttachment(path: '/upload/$name', fileName: name, mime: mime);
-      expect(
-        FileUploadService.supportsWithoutWorkspace(
-          file('app.apk', 'application/octet-stream'),
-        ),
-        isFalse,
+      DocumentAttachment file(String name) => DocumentAttachment(
+        path: '/upload/$name',
+        fileName: name,
+        mime: 'application/octet-stream',
       );
-      expect(
-        FileUploadService.supportsWithoutWorkspace(
-          file('notes.pdf', 'application/pdf'),
-        ),
-        isTrue,
+      for (final name in ['app.apk', 'report.pdf', 'draft.log', 'data.xlsx']) {
+        expect(regularDocumentRoute.needsLocalText(file(name)), isTrue);
+      }
+      expect(regularDocumentRoute.needsLocalText(file('song.m4a')), isFalse);
+      const hosted = (
+        workspaceBound: false,
+        workspaceFiles: false,
+        nativePdf: true,
+        sandboxData: true,
       );
-      expect(
-        FileUploadService.supportsWithoutWorkspace(
-          file('song.m4a', 'audio/mp4'),
-        ),
-        isTrue,
+      expect(hosted.needsLocalText(file('report.pdf')), isFalse);
+      expect(hosted.needsLocalText(file('data.xlsx')), isFalse);
+      expect(hosted.needsLocalText(file('notes.txt')), isTrue);
+      const workspace = (
+        workspaceBound: true,
+        workspaceFiles: true,
+        nativePdf: false,
+        sandboxData: false,
       );
-      expect(
-        FileUploadService.supportsWithoutWorkspace(
-          file('data.xlsx', 'application/octet-stream'),
-        ),
-        isTrue,
-      );
+      expect(workspace.needsLocalText(file('app.apk')), isFalse);
     },
   );
 }

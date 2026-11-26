@@ -135,15 +135,18 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
     }
   }
 
-  Future<void> _save(ImageContextSettings settings) async {
+  Future<void> _save(
+    ImageContextSettings Function(ImageContextSettings) update,
+  ) async {
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await widget.chat.setImageContextSettings(
+      await widget.chat.updateImageContextSettings(
         widget.conversationId,
-        settings,
+        update,
       );
       await widget.usage.refresh(widget.conversationId, force: true);
       if (mounted) await _load();
@@ -266,11 +269,7 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
                         description: l10n.imageContextAutomaticDescription,
                         value: settings.automatic,
                         onChanged: (value) => _save(
-                          ImageContextSettings(
-                            automatic: value,
-                            allowRecall: settings.allowRecall,
-                            pinned: settings.pinned,
-                          ),
+                          (current) => current.copyWith(automatic: value),
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -279,11 +278,7 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
                         description: l10n.imageContextAllowRecallDescription,
                         value: settings.allowRecall,
                         onChanged: (value) => _save(
-                          ImageContextSettings(
-                            automatic: settings.automatic,
-                            allowRecall: value,
-                            pinned: settings.pinned,
-                          ),
+                          (current) => current.copyWith(allowRecall: value),
                         ),
                       ),
                     ],
@@ -451,8 +446,14 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
             final originalIndex = items.length - index - 1;
             final item = items[originalIndex];
             final image = item.image;
+            final excludedWithOriginal = item.inheritedExclusion;
+            final pinned = item.pinned && !item.excluded;
             final available = !image.unavailable && item.bytes != null;
-            final status = !available
+            final status = excludedWithOriginal
+                ? l10n.imageContextExcludedWithOriginal
+                : item.excluded
+                ? l10n.imageContextExcluded
+                : !available
                 ? l10n.imageContextMissing
                 : item.included
                 ? l10n.imageContextIncluded
@@ -486,7 +487,7 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
                               fontWeight: AppFontWeights.medium,
                             ),
                           ),
-                          if ((item.bytes ?? 0) > 0 || item.pinned) ...[
+                          if ((item.bytes ?? 0) > 0 || pinned) ...[
                             const SizedBox(height: 4),
                             Text(
                               [
@@ -497,7 +498,7 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
                                     (item.bytes! / RequestBudget.mib)
                                         .toStringAsFixed(2),
                                   ),
-                                if (item.pinned) l10n.imageContextPinned,
+                                if (pinned) l10n.imageContextPinned,
                               ].join(' · '),
                               style: TextStyle(
                                 fontSize: 12,
@@ -535,20 +536,43 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
                     ),
                     const SizedBox(width: 8),
                     IosIconButton(
-                      icon: item.pinned ? Lucide.PinOff : Lucide.Pin,
+                      icon: item.excluded ? Lucide.RotateCcw : Lucide.ImageOff,
                       size: 17,
                       minSize: 36,
-                      color: item.pinned
+                      color: item.excluded
                           ? cs.primary
                           : cs.onSurface.withValues(alpha: 0.55),
-                      tooltip: item.pinned
-                          ? l10n.imageContextUnpin
-                          : l10n.imageContextPin,
-                      enabled: !_busy,
+                      tooltip: excludedWithOriginal
+                          ? l10n.imageContextExcludedWithOriginal
+                          : item.excluded
+                          ? l10n.imageContextRestore
+                          : l10n.imageContextExclude,
+                      enabled:
+                          !_busy &&
+                          !excludedWithOriginal &&
+                          (available || item.excluded),
                       onTap: () => _save(
-                        _request!.settings.pin(image.key, !item.pinned),
+                        (current) => current.exclude({
+                          image.exclusionKey,
+                        }, !item.excluded),
                       ),
                     ),
+                    if (!item.excluded)
+                      IosIconButton(
+                        icon: item.pinned ? Lucide.PinOff : Lucide.Pin,
+                        size: 17,
+                        minSize: 36,
+                        color: item.pinned
+                            ? cs.primary
+                            : cs.onSurface.withValues(alpha: 0.55),
+                        tooltip: item.pinned
+                            ? l10n.imageContextUnpin
+                            : l10n.imageContextPin,
+                        enabled: !_busy,
+                        onTap: () => _save(
+                          (current) => current.pin(image.key, !item.pinned),
+                        ),
+                      ),
                     if (widget.onAttach != null)
                       IosIconButton(
                         icon: Lucide.Plus,

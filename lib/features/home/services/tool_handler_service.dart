@@ -1,4 +1,6 @@
+import '../../../utils/kelivo_file_uri.dart';
 import '../../../core/services/api/request_image_context.dart';
+import '../../../core/services/api/request_tool_declarations.dart';
 import 'package:Kelivo/core/services/conversation_tool_permissions.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -8,7 +10,6 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
-import '../../../core/models/model_spec.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
@@ -21,6 +22,9 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/builtin_tools.dart' as native_tools;
 import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../core/services/media/chat_image_generation_service.dart';
+import '../../../core/services/media/media_generation_runner.dart';
+import '../../../core/services/media/media_models.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/browser/browser_tools_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
@@ -30,6 +34,7 @@ import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/search/web_fetch_service.dart';
 import '../../../core/services/search/web_fetch_tool_service.dart';
 import '../../../core/services/tools/tool_schema_overrides.dart';
+import '../../../core/services/tools/view_image_tool.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../core/services/workspace/tool_run_registry.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
@@ -56,13 +61,7 @@ class ToolHandlerService {
     try {
       final chat = contextProvider.read<ChatService>();
       final workspaces = contextProvider.read<WorkspaceProvider>();
-      Future<void> Function(String skillId)? onSkillRead;
-      Future<void> Function()? onShellCompleted;
-      try {
-        final skills = contextProvider.read<SkillsService>();
-        onSkillRead = skills.incrementUseCount;
-        onShellCompleted = skills.rescan;
-      } catch (_) {}
+      final skills = contextProvider.read<SkillsService?>();
       return WorkspaceToolsService(
         registry: contextProvider.read<ToolRunRegistry>(),
         runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
@@ -70,8 +69,9 @@ class ToolHandlerService {
         readPermissionState: ConversationToolPermissions.forChat(chat).read,
         permissionChanges: chat,
         touchLastUsed: workspaces.touchLastUsed,
-        onSkillRead: onSkillRead,
-        onShellCompleted: onShellCompleted,
+        onSkillRead: skills?.incrementUseCount,
+        refreshSkills: skills?.rescan,
+        isLinkedSkillEntrypoint: skills?.isLinkedEntrypointTarget,
         loadEnvironment: contextProvider
             .read<EnvironmentProvider?>()
             ?.loadExecutionConfig,
@@ -87,6 +87,12 @@ class ToolHandlerService {
   // Tool Schema Sanitization
   // ============================================================================
 
+  // Match the model segment, including names such as databricks-gemini-3-pro.
+  static final _geminiRelayId = RegExp(
+    r'^gemini-|[-_:]gemini-\d',
+    caseSensitive: false,
+  );
+
   /// Sanitize/translate JSON Schema to each provider's accepted subset.
   ///
   /// Different providers (Google, OpenAI, Claude) have different requirements
@@ -94,25 +100,85 @@ class ToolHandlerService {
   /// all providers.
   static Map<String, dynamic> sanitizeToolParametersForProvider(
     Map<String, dynamic> schema,
-    ProviderKind kind,
-  ) {
-    Map<String, dynamic> clone = _deepCloneMap(schema);
-    // Inline local references before translating provider-specific schema fields.
-    clone = resolveJsonSchemaRefs(
-      clone,
-      preserveJsonSchema: kind != ProviderKind.google,
-    );
-    if (kind != ProviderKind.google) return clone;
-    return _sanitizeGoogleNode(clone) as Map<String, dynamic>;
+    ProviderKind kind, {
+    String? upstreamModelId,
+    String? upstreamModelFamily,
+  }) {
+    final native = kind == ProviderKind.google;
+    final input = _deepCloneMap(schema);
+    final resolved = resolveJsonSchemaRefs(input, preserveJsonSchema: !native);
+    final family = upstreamModelFamily?.toLowerCase();
+    final geminiRelay =
+        kind == ProviderKind.openai &&
+        (family == 'gemini' ||
+            (family?.startsWith('gemini-') ?? false) ||
+            _geminiRelayId.hasMatch(upstreamModelId?.split('/').last ?? ''));
+    if (!native && !geminiRelay) return resolved;
+    if (geminiRelay &&
+        identical(input, resolved) &&
+        hasJsonSchemaReferences(resolved)) {
+      return resolved;
+    }
+    return _sanitizeGoogleNode(resolved, native: native, parameterRoot: true)
+        as Map<String, dynamic>;
   }
 
-  static dynamic _sanitizeGoogleNode(dynamic node) {
+  static dynamic _sanitizeGoogleNode(
+    dynamic node, {
+    required bool native,
+    bool parameterRoot = false,
+  }) {
     if (node is List) {
-      return node.map(_sanitizeGoogleNode).toList();
+      return [
+        for (final child in node) _sanitizeGoogleNode(child, native: native),
+      ];
     }
     if (node is! Map) return node;
 
     final m = Map<String, dynamic>.from(node);
+    // Function parameters themselves must remain an object on both transports.
+    if (!parameterRoot) {
+      final alternatives = geminiRequiredObjectAlternatives(m, native: native);
+      if (alternatives != null) {
+        return {
+          'anyOf': [
+            for (final option in alternatives)
+              _sanitizeGoogleNode(option, native: native),
+          ],
+        };
+      }
+    }
+    if (native) {
+      // A wrapper can delegate to its selected branch. When other validation
+      // keywords are present, they must be processed in their own scope.
+      final selected = firstStandaloneGoogleBranch(m);
+      if (selected != null) {
+        return _sanitizeGoogleNode(
+          selected,
+          native: true,
+          parameterRoot: parameterRoot,
+        );
+      }
+      _simplifyNativeGoogleNode(m);
+    }
+    if (m['items'] is Map || m['items'] is List) {
+      m['items'] = _sanitizeGoogleNode(m['items'], native: native);
+    }
+    if (m['properties'] is Map) {
+      m['properties'] = <String, dynamic>{
+        for (final entry in (m['properties'] as Map).entries)
+          entry.key as String: _sanitizeGoogleNode(entry.value, native: native),
+      };
+    }
+    if (!native) {
+      for (final key in ['anyOf', 'oneOf', 'allOf']) {
+        if (m[key] is List) m[key] = _sanitizeGoogleNode(m[key], native: false);
+      }
+    }
+    return m;
+  }
+
+  static void _simplifyNativeGoogleNode(Map<String, dynamic> m) {
     // Remove $schema as it's not needed for tool definitions
     m.remove(r'$schema');
 
@@ -138,29 +204,18 @@ class ToolHandlerService {
       m.remove('const');
     }
 
-    // Keep Google's existing conversion to the native Schema subset.
-    for (final key in [
-      'anyOf',
-      'oneOf',
-      'allOf',
-      'any_of',
-      'one_of',
-      'all_of',
-    ]) {
-      final variants = m[key];
-      if (variants is! List) continue;
-      if (variants.isNotEmpty) {
-        final first = variants.first;
-        final flattened = _sanitizeGoogleNode(first);
-        m.remove(key);
-        if (flattened is Map<String, dynamic>) {
-          m
-            ..remove('type')
-            ..remove('properties')
-            ..remove('items');
-          m.addAll(flattened);
-        }
+    for (final key in jsonSchemaCompositionKeywords) {
+      final variants = m.remove(key);
+      if (variants is! List || variants.isEmpty || variants.first is! Map) {
+        continue;
       }
+      final first = Map<String, dynamic>.from(variants.first as Map);
+      _simplifyNativeGoogleNode(first);
+      m
+        ..remove('type')
+        ..remove('properties')
+        ..remove('items')
+        ..addAll(first);
     }
 
     // Google's native Schema needs a single type.
@@ -174,19 +229,6 @@ class ToolHandlerService {
     if (items is List && items.isNotEmpty) {
       m['items'] = items.first;
     }
-    if (m['items'] is Map || m['items'] is List) {
-      m['items'] = _sanitizeGoogleNode(m['items']);
-    }
-
-    if (m['properties'] is Map) {
-      final props = Map<String, dynamic>.from(m['properties']);
-      final norm = <String, dynamic>{};
-      props.forEach((k, v) {
-        norm[k] = _sanitizeGoogleNode(v);
-      });
-      m['properties'] = norm;
-    }
-
     const allowed = {
       'type',
       'description',
@@ -194,9 +236,10 @@ class ToolHandlerService {
       'required',
       'items',
       'enum',
+      'pattern',
     };
+    if (m['type'] != 'string' || m['pattern'] is! String) m.remove('pattern');
     m.removeWhere((k, v) => !allowed.contains(k));
-    return m;
   }
 
   static Map<String, dynamic> _deepCloneMap(Map<String, dynamic> input) {
@@ -270,39 +313,11 @@ class ToolHandlerService {
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
-    // Keep this candidate for images returned later in the tool loop.
-    // RequestImageContext gates its declaration on every outgoing request.
-    if (supportsTools &&
-        conversationId != null &&
-        ModelSpecResolver.instance
-            .spec(settings.getProviderConfig(providerKey), modelId)
-            .supportsImageInput) {
-      toolDefs.add({
-        'type': 'function',
-        'function': {
-          'name': 'read_chat_image',
-          'description':
-              'Read an image from this conversation using its image_id. Omit image_id to list available images, then use next_offset to list more. Reading adds a fresh observation without rewriting earlier history.',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'image_id': {
-                'type': 'string',
-                'description':
-                    'The img_ identifier from an image placeholder or listing.',
-              },
-              'offset': {
-                'type': 'integer',
-                'minimum': 0,
-                'description': 'Offset for listing images; default 0.',
-              },
-            },
-
-            'additionalProperties': false,
-          },
-        },
-      });
-    }
+    final model = ModelSpecResolver.instance.resolve(
+      settings.getProviderConfig(providerKey),
+      modelId,
+    );
+    final canImageInput = model.spec.supportsImageInput;
 
     // Search tool (skip when Gemini built-in search is active)
     if (assistant?.searchEnabled == true &&
@@ -338,10 +353,23 @@ class ToolHandlerService {
     }
 
     // Local tools
+    final imageModel =
+        conversationId != null &&
+            !_isTemporaryConversation(conversationId) &&
+            supportsTools &&
+            (assistant?.localToolIds.contains(LocalToolNames.generateImage) ??
+                false)
+        ? resolveDefaultImageModel(settings)
+        : null;
     toolDefs.addAll(
       LocalToolsService.buildToolDefinitions(
         assistant: assistant,
         supportsTools: supportsTools,
+        imageReferenceLimit: imageModel?.capabilities
+            .referenceLimits(const {})
+            .max,
+        minimumImageReferences:
+            imageModel?.capabilities.referenceLimits(const {}).min ?? 0,
       ).where(
         (definition) =>
             (definition['function'] as Map)['name'] !=
@@ -355,6 +383,7 @@ class ToolHandlerService {
       settings: settings,
       assistant: assistant,
       providerKey: providerKey,
+      model: model,
       supportsTools: supportsTools,
       mcpRouteSnapshot: mcpRouteSnapshot,
       conversationId: conversationId,
@@ -362,10 +391,6 @@ class ToolHandlerService {
     toolDefs.addAll(mcpTools);
 
     if (supportsTools && workspaceContext != null) {
-      final canImageInput = ModelSpecResolver.instance
-          .spec(settings.getProviderConfig(providerKey), modelId)
-          .input
-          .contains(Modality.image);
       toolDefs.addAll(
         _workspaceTools()
             .buildToolDefinitions(workspaceContext)
@@ -375,6 +400,19 @@ class ToolHandlerService {
                   (definition['function'] as Map)['name'] != 'view_image',
             ),
       );
+    }
+
+    // Keep one candidate for images returned later in the tool loop. Each
+    // outgoing request gates conversation lookup independently of file access.
+    if (supportsTools && canImageInput && conversationId != null) {
+      final index = toolDefs.indexWhere(
+        (tool) => (tool['function'] as Map?)?['name'] == ViewImageTool.name,
+      );
+      if (index < 0) {
+        toolDefs.add(ViewImageTool.withHistory());
+      } else {
+        toolDefs[index] = ViewImageTool.withHistory(toolDefs[index]);
+      }
     }
 
     final overrides = settings.toolSchemaOverrides;
@@ -387,6 +425,7 @@ class ToolHandlerService {
     required SettingsProvider settings,
     required Assistant? assistant,
     required String providerKey,
+    required ResolvedModelSpec model,
     required bool supportsTools,
     McpToolRouteSnapshot? mcpRouteSnapshot,
     String? conversationId,
@@ -413,6 +452,16 @@ class ToolHandlerService {
       providerCfg.id,
       explicitType: providerCfg.providerType,
     );
+    final upstreamId = model.spec.upstreamId;
+    final catalog = model.catalog?.model;
+    // A lookup can fall back to the display alias. Only use family metadata
+    // from the model that will actually receive the tool declaration.
+    final family =
+        catalog != null &&
+            catalog.id.split('/').last.toLowerCase() ==
+                upstreamId.split('/').last.toLowerCase()
+        ? catalog.family
+        : null;
 
     return tools.map((t) {
       Map<String, dynamic> baseSchema;
@@ -434,6 +483,8 @@ class ToolHandlerService {
       final sanitized = sanitizeToolParametersForProvider(
         baseSchema,
         providerKind,
+        upstreamModelId: upstreamId,
+        upstreamModelFamily: family,
       );
       return {
         'type': 'function',
@@ -475,6 +526,15 @@ class ToolHandlerService {
     try {
       permissionChat = contextProvider.read<ChatService>();
     } catch (_) {}
+    final runner = contextProvider.read<MediaGenerationRunner?>();
+    final imageGeneration = runner == null || permissionChat == null
+        ? null
+        : ChatImageGenerationService(
+            runner: runner,
+            chat: permissionChat,
+            settings: settings,
+          );
+    final imageCalls = <(String, String), Future<ClientToolResult>>{};
     final routes =
         mcpRouteSnapshot ??
         toolSvc.captureRoutesForAssistant(
@@ -561,12 +621,70 @@ class ToolHandlerService {
     }
 
     final workspaceTools = workspaceContext == null ? null : _workspaceTools();
+    final askUserEnabled =
+        assistant?.localToolIds.contains(LocalToolNames.askUser) ?? false;
 
     return (name, args, {toolCallId}) async {
       final permission = permissionFor(name, toolCallId);
       Future<Object?> execute() async {
         try {
-          if (name == 'read_chat_image') {
+          if (name == LocalToolNames.generateImage) {
+            final imageContext = RequestImageContext.current;
+            final declarations = RequestToolDeclarations.current;
+            bool enabled() =>
+                assistant != null &&
+                (assistantProvider
+                        .getById(assistant.id)
+                        ?.localToolIds
+                        .contains(name) ??
+                    false);
+            if (imageGeneration == null ||
+                imageContext == null ||
+                conversationId == null ||
+                !enabled() ||
+                (declarations != null &&
+                    declarations.advertisedName(name) == null)) {
+              return ChatImageGenerationService.error(
+                'The image generation tool is unavailable.',
+              );
+            }
+            Future<ClientToolResult> run() => imageGeneration.run(
+              args,
+              conversationId: conversationId,
+              context: imageContext,
+              enabled: enabled,
+              toolCallId: toolCallId,
+            );
+            final id = toolCallId;
+            return id == null || id.isEmpty
+                ? await run()
+                : await imageCalls.putIfAbsent((
+                    imageContext.targetMessageId,
+                    id,
+                  ), run);
+          }
+          final candidateHandle = name == ViewImageTool.name
+              ? ViewImageTool.imageIdFromPath(args['path'])
+              : null;
+          final handleInPath =
+              candidateHandle != null &&
+                  RequestImageContext.current?.isGeneratedHandle(
+                        candidateHandle,
+                      ) ==
+                      true
+              ? candidateHandle
+              : null;
+          if (name == ViewImageTool.name &&
+              (args['image_id'] != null ||
+                  args['path'] == null ||
+                  handleInPath != null)) {
+            if (args['path'] != null && args['image_id'] != null) {
+              return _toolError(
+                error: 'invalid_arguments',
+                message: 'Supply either image_id or path, never both.',
+                tool: name,
+              );
+            }
             final imageContext = RequestImageContext.current;
             final chat = permissionChat;
             if (imageContext == null ||
@@ -576,21 +694,43 @@ class ToolHandlerService {
                 'Image is unavailable in the current conversation context.',
               );
             }
-            if (!(await chat.imageContextSettings(
+            final imageSettings = await chat.imageContextSettings(
               conversationId,
-            )).allowRecall) {
-              return const ClientToolResult(
-                'Image recall is disabled for this conversation. Ask the user to attach the image again if needed.',
-              );
-            }
+            );
             final allowed = await chat.imageContextHistory(
               conversationId,
               throughMessageId: imageContext.targetMessageId,
             );
-            return imageContext.readImage(
-              (args['image_id'] ?? '').toString(),
+            final handle = (args['image_id'] ?? handleInPath ?? '').toString();
+            final result = imageContext.readImage(
+              handle,
+              allowHistory: imageSettings.allowRecall,
               allowedMessages: allowed.map((m) => m.id).toSet(),
+              excluded: imageSettings.excluded,
               offset: args['offset'] is int ? args['offset'] as int : 0,
+            );
+            final source = mcpResultImageUris(
+              readMcpResultMetadata(result.metadata),
+            ).firstOrNull;
+            if (source != null &&
+                KelivoFileUri.generationImageItemId(source) != null &&
+                (await chat.chatRepositoryOrNull?.mediaRepository.ownsImage(
+                          source,
+                        ) !=
+                        true ||
+                    await imageContext.localAttachmentPath(handle) == null)) {
+              return const ClientToolResult(
+                'This image was removed from Creation and is no longer available.',
+              );
+            }
+            return result;
+          }
+          if (name == ViewImageTool.name && workspaceContext == null) {
+            return _toolError(
+              error: 'tool_disabled',
+              message:
+                  'File viewing requires an enabled workspace image viewer.',
+              tool: name,
             );
           }
           if (name == BrowserToolsService.toolName) {
@@ -719,9 +859,7 @@ class ToolHandlerService {
             return localResult;
           }
 
-          if (name == LocalToolNames.askUser &&
-              assistant != null &&
-              assistant.localToolIds.contains(LocalToolNames.askUser)) {
+          if (name == LocalToolNames.askUser && askUserEnabled) {
             if (askUserService == null) {
               return _toolError(
                 error: 'ask_user_unavailable',
@@ -747,7 +885,26 @@ class ToolHandlerService {
             }
           }
 
-          return await approveAndExecuteMcp(name, args, permission);
+          if (BuiltInToolNames.functions.contains(name)) {
+            throw const ToolPermissionException(
+              'tool_disabled',
+              'This built-in tool is unavailable for this request.',
+            );
+          }
+
+          final retryName = name == 'ask_user_input' && askUserEnabled
+              ? RequestToolDeclarations.current?.advertisedName(
+                  LocalToolNames.askUser,
+                )
+              : null;
+          return _toolError(
+            error: 'unknown_tool',
+            message: 'Unknown tool name.',
+            tool: name,
+            instruction: retryName == null
+                ? null
+                : 'Retry using the full tool name `$retryName`.',
+          );
         } on ToolPermissionException catch (e) {
           permission.byFullAccess = false;
           return ClientToolResult(

@@ -122,11 +122,19 @@ void main() {
   );
 
   test('scheduling keeps live paths unchanged until a cold restart', () async {
+    await File(
+      p.join(source.path, 'kelivo_backup_staging', 'orphan.kbackup'),
+    ).create(recursive: true);
     await storage.schedule(target);
     expect((await storage.directory).path, source.path);
     expect(await File(p.join(target.path, 'kelivo.db')).exists(), isFalse);
     expect((await storage.state).pending!.path, target.path);
     await restart();
+    expect(
+      await Directory(p.join(target.path, 'kelivo_backup_staging')).exists(),
+      false,
+    );
+
     expect((await storage.directory).path, target.path);
     expect((await storage.state).pending, isNull);
     expect((await storage.state).previous!.path, source.path);

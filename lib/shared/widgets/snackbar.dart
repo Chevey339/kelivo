@@ -39,7 +39,8 @@ class AppSnackBarManager extends ChangeNotifier {
 
   void show(BuildContext context, AppNotification notification) {
     final navigator =
-        Navigator.maybeOf(context) ?? rootNavigatorKey.currentState;
+        Navigator.maybeOf(context, rootNavigator: true) ??
+        rootNavigatorKey.currentState;
     if (navigator == null) {
       throw FlutterError(
         'No Navigator is available to show an app notification.',

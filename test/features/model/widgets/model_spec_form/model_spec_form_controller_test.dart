@@ -1,5 +1,12 @@
 import '../../../../support/business_test_harness.dart';
+import '../../../../support/fal_catalog_fixture.dart';
+import 'dart:convert';
+import 'package:Kelivo/core/services/media/adapters/fal_media.dart';
+import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:flutter/material.dart';
+import 'package:Kelivo/core/services/media/fal_model_discovery.dart';
+import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/model_spec.dart';
@@ -44,6 +51,242 @@ void main() {
   setUpAll(() async {
     l10n = await AppLocalizations.delegate.load(const Locale('en'));
   });
+
+  test(
+    'manual fal video with a new endpoint ID survives editing and reload',
+    () async {
+      final config = ProviderConfig.defaultsFor('fal').copyWith(enabled: true);
+      final settings = await _settings(config);
+      addTearDown(settings.dispose);
+      final form = ModelSpecFormController(
+        config: config,
+        modelKey: '',
+        isNew: true,
+      );
+      addTearDown(form.dispose);
+      form.apiModelIdController.text = 'private-model';
+      expect(form.validate(l10n), l10n.falInvalidEndpointId);
+      expect(await form.save(settings), isFalse);
+      const id = 'my-team/new-motion';
+      form.apiModelIdController.text = id;
+      form.setApiModelId(id);
+      form.setType(ModelType.video);
+      final client = MockClient((request) async {
+        expect(request.url.queryParameters['endpoint_id'], id);
+        return http.Response('{"models":[]}', 200);
+      });
+      addTearDown(client.close);
+      expect(
+        await form.save(settings, falCatalog: FalModelDiscovery(client)),
+        isTrue,
+      );
+      final saved = ProviderConfig.fromJson(
+        settings.getProviderConfig('fal').toJson(),
+      );
+      expect(saved.models, contains(id));
+      expect(ModelSpecResolver.instance.spec(saved, id).type, ModelType.video);
+    },
+  );
+
+  test(
+    'manual public fal ID stores the same schema as the catalog and rejects unsupported output',
+    () async {
+      const id = 'fal-ai/birefnet/v2';
+      var supportsOutput = true;
+      final client = MockClient((request) async {
+        expect(request.url.queryParameters['endpoint_id'], id);
+        return http.Response(
+          jsonEncode({
+            'models': [
+              falCatalogFixture(
+                id: id,
+                category: 'image-to-image',
+                inputs: {
+                  'image_url': {'type': 'string'},
+                },
+                requiredInputs: ['image_url'],
+                outputs: supportsOutput
+                    ? {'image': falFileFixture}
+                    : {
+                        'rle': {'type': 'array'},
+                      },
+              ),
+            ],
+          }),
+          200,
+        );
+      });
+      addTearDown(client.close);
+      final catalog = FalModelDiscovery(client);
+      final expected = await catalog.lookup(id);
+      final config = ProviderConfig.defaultsFor(
+        'fal',
+      ).copyWith(enabled: true, models: []);
+      final settings = await _settings(config);
+      addTearDown(settings.dispose);
+      final form = ModelSpecFormController(
+        config: config,
+        modelKey: '',
+        isNew: true,
+      );
+      addTearDown(form.dispose);
+      form.apiModelIdController.text = id;
+      form.setApiModelId(id);
+      supportsOutput = false;
+      expect(await form.save(settings, falCatalog: catalog), isFalse);
+      expect(settings.getProviderConfig('fal').models, isEmpty);
+      expect(form.saveErrorMessage(l10n), l10n.falUnsupportedOutput);
+      supportsOutput = true;
+      expect(await form.save(settings, falCatalog: catalog), isTrue);
+      final saved = settings.getProviderConfig('fal');
+      expect(saved.modelOverrides[id]['falEndpoint'], expected);
+      expect(FalMediaAdapter.knownModel(saved, id)?.imageField, 'image_url');
+      expect(
+        const FalMediaAdapter(
+          MediaMode.image,
+        ).capabilities(saved, id).acceptsPrompt,
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'chat image aliases preview, persist and clear a per-model creation protocol',
+    () async {
+      const id = 'my-image-model';
+      final cfg = _cfg(
+        models: [id],
+        overrides: {
+          id: {
+            'apiModelId': 'deployment-321',
+            'type': 'chat',
+            'output': ['text', 'image'],
+          },
+        },
+      );
+      final settings = await _settings(cfg);
+      addTearDown(settings.dispose);
+      final form = ModelSpecFormController(
+        config: cfg,
+        modelKey: id,
+        isNew: false,
+      );
+      addTearDown(form.dispose);
+      expect(form.hasMediaSettings, true);
+      expect(form.mediaDefaults.maxReferences, 1);
+      expect(form.mediaDefaults.aspectRatios, ['auto']);
+      form.setMediaValue('protocol', 'geminiImage');
+      expect(form.mediaDefaults.maxReferences, 14);
+      expect(await form.save(settings), true);
+      final saved = settings.getProviderConfig(cfg.id);
+      final reopened = ModelSpecFormController(
+        config: saved,
+        modelKey: id,
+        isNew: false,
+      );
+      addTearDown(reopened.dispose);
+      expect(reopened.spec.type, ModelType.chat);
+      expect(reopened.mediaProtocol.name, 'geminiImage');
+      reopened.setMediaValue('protocol', 'auto');
+      expect(reopened.mediaDefaults.maxReferences, 1);
+      expect(await reopened.save(settings), true);
+      expect(
+        settings.getProviderConfig(cfg.id).modelOverrides[id],
+        isNot(contains('media')),
+      );
+    },
+  );
+  test('media settings save per model and reset to adapter defaults', () async {
+    const id = 'gpt-image-2';
+    final cfg = _cfg(
+      models: const [id],
+      overrides: const {
+        id: {'keepThis': true},
+      },
+    );
+    final settings = await _settings(cfg);
+    addTearDown(settings.dispose);
+    final form = ModelSpecFormController(
+      config: cfg,
+      modelKey: id,
+      isNew: false,
+    );
+    addTearDown(form.dispose);
+    expect(form.hasMediaModelData, isTrue);
+    final defaultLimit = form.mediaCapabilities.maxReferences;
+    form.setMediaValue('maxReferences', 0);
+    form.setMediaValue('aspectRatios', ['1:1', '3:2']);
+    form.mediaExtraController.text = '[]';
+    form.mediaExtraChanged('[]');
+    expect(form.validate(l10n), l10n.modelSpecFormInvalidJson);
+    form.mediaExtraController.text = '{"render":{"strength":4}}';
+    expect(form.validate(l10n), isNull);
+    expect(await form.save(settings), isTrue);
+    final saved = settings.getProviderConfig(cfg.id);
+    final reopened = ModelSpecFormController(
+      config: saved,
+      modelKey: id,
+      isNew: false,
+    );
+    addTearDown(reopened.dispose);
+    expect(reopened.mediaCapabilities.maxReferences, 0);
+    expect(reopened.mediaCapabilities.aspectRatios, ['1:1', '3:2']);
+    expect(reopened.media.extra, {
+      'render': {'strength': 4},
+    });
+    reopened.resetMedia();
+    expect(reopened.mediaCapabilities.maxReferences, defaultLimit);
+    expect(await reopened.save(settings), isTrue);
+    final restored =
+        settings.getProviderConfig(cfg.id).modelOverrides[id] as Map;
+    expect(restored['keepThis'], isTrue);
+    expect(restored.containsKey('media'), isFalse);
+  });
+
+  test(
+    'speed tiers persist as a model override and reset to inheritance',
+    () async {
+      final cfg = _cfg(
+        overrides: const {
+          'plain-model': {
+            'body': [
+              {'key': 'other', 'value': 'true'},
+            ],
+          },
+        },
+      );
+      final settings = await _settings(cfg);
+      addTearDown(settings.dispose);
+      final controller = ModelSpecFormController(
+        config: cfg,
+        modelKey: 'plain-model',
+        isNew: false,
+      );
+      addTearDown(controller.dispose);
+      controller.setResponseSpeedTiers(const [ResponseSpeed.fast]);
+      expect(await controller.save(settings), isTrue);
+      Map override() =>
+          settings.getProviderConfig(cfg.id).modelOverrides['plain-model']
+              as Map;
+      expect(override()['responseSpeedTiers'], ['fast']);
+      final reopened = ModelSpecFormController(
+        config: settings.getProviderConfig(cfg.id),
+        modelKey: 'plain-model',
+        isNew: false,
+      );
+      addTearDown(reopened.dispose);
+      expect(reopened.draft.responseSpeedTiers, [ResponseSpeed.fast]);
+      reopened.setResponseSpeedTier(ResponseSpeed.fast, false);
+      expect(await reopened.save(settings), isTrue);
+      expect(override()['responseSpeedTiers'], isEmpty);
+      reopened.setResponseSpeedTiers(null);
+      expect(await reopened.save(settings), isTrue);
+      expect(override(), isNot(contains('responseSpeedTiers')));
+      expect(override()['body'], [
+        {'key': 'other', 'value': 'true'},
+      ]);
+    },
+  );
 
   test(
     'image tool options persist independently and reset without stale complexity',

@@ -20,11 +20,25 @@ import 'package:Kelivo/core/services/memory/memory_pipeline.dart';
 import 'package:Kelivo/core/services/memory/memory_prompts.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _CountingTextRepository extends ChatDatabaseRepository {
+  _CountingTextRepository(super.db);
+
+  final textReads = <int>[];
+
+  @override
+  Future<List<ChatMessageText>> getMessageTexts(
+    List<String> ids, {
+    int? trimmedPrefixLength,
+  }) {
+    textReads.add(ids.length);
+    return super.getMessageTexts(ids, trimmedPrefixLength: trimmedPrefixLength);
+  }
+}
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -54,6 +68,8 @@ void main() {
   late MemoryRepository memoryRepository;
   late ChatService chatService;
   late SettingsProvider settings;
+  late AssistantProvider assistants;
+  late List<String> modelPrompts;
   late MemoryPipelineService pipeline;
   late Directory tempDir;
   late PathProviderPlatform previousPathProvider;
@@ -64,11 +80,7 @@ void main() {
     previousPathProvider = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
 
-    database = AppDatabase(
-      NativeDatabase.memory(
-        setup: (raw) => raw.execute('PRAGMA foreign_keys = ON;'),
-      ),
-    );
+    database = AppDatabase.open(file: File('${tempDir.path}/chat.sqlite'));
     final businessRepository = BusinessRepository(database);
     preferences = BusinessPreferences(businessRepository);
     chatRepository = ChatDatabaseRepository(database);
@@ -91,7 +103,7 @@ void main() {
       cfg.copyWith(models: ['gpt-test']),
     );
 
-    final assistants = AssistantProvider(
+    assistants = AssistantProvider(
       preferences: preferences,
       chatService: chatService,
     );
@@ -102,6 +114,7 @@ void main() {
       chatRepository: chatRepository,
     );
 
+    modelPrompts = [];
     pipeline = MemoryPipelineService(
       chatService: chatService,
       repository: memoryRepository,
@@ -116,8 +129,10 @@ void main() {
             required String prompt,
             String? conversationId,
             ReasoningRequest reasoning = ReasoningRequest.auto,
-          }) async =>
-              throw StateError('use processWindow llmCall in these tests'),
+          }) async {
+            modelPrompts.add(prompt);
+            return '<gate><user_memory>false</user_memory></gate>';
+          },
     );
   });
 
@@ -216,6 +231,26 @@ void main() {
   });
 
   group('buildConversationText', () {
+    test('retains the same suffix after applying both text limits', () {
+      final messages = List.generate(
+        30,
+        (i) => ChatMessage(
+          role: 'user',
+          conversationId: 'c',
+          content: '$i-${'x' * 2100}',
+        ),
+      );
+      final full = messages
+          .map((m) => 'User: ${m.content.substring(0, 2000)}…')
+          .join('\n\n');
+      expect(
+        MemoryPipelineService.buildConversationText(
+          messages,
+          MemoryPromptLang.en,
+        ),
+        '…${full.substring(full.length - 12000)}',
+      );
+    });
     test('uses zh/en prefixes and TextPart text only', () {
       final msgs = [
         ChatMessage(
@@ -247,6 +282,243 @@ void main() {
       expect(en, contains('User: '));
       expect(en, contains('Assistant: '));
     });
+  });
+
+  group('memory organize window', () {
+    test(
+      'worker bounds trimmed text and keeps Unicode intact at the prompt limit',
+      () async {
+        final convo = await chatService.createConversation(title: 'long text');
+        final prefix = 'a' * 1999;
+        final message = await chatService.addMessage(
+          conversationId: convo.id,
+          role: 'user',
+          parts: [
+            TextPart('\u2003$prefix'),
+            const ReasoningPart('private'),
+            TextPart('😀 \u0000${'b' * 100000}  '),
+          ],
+        );
+        final rows = await chatRepository.getMessageTexts([
+          message.id,
+        ], trimmedPrefixLength: 2000);
+        expect(rows.single.text, '$prefix😀');
+        final prompt = MemoryPipelineService.buildConversationText([
+          message,
+        ], MemoryPromptLang.en);
+        expect(prompt, 'User: $prefix…');
+        expect(
+          await chatService.generateSummarySource(convo.id, start: 0, end: 1),
+          prefix,
+        );
+      },
+    );
+
+    test(
+      'manual organize advances the saved watermark and excludes prior text on the next run',
+      () async {
+        final id = await assistants.addAssistant(name: 'Memory');
+        await assistants.updateAssistant(
+          assistants.getById(id)!.copyWith(enableMemory: true),
+        );
+        final convo = await chatService.createConversation(
+          title: 'manual',
+          assistantId: id,
+        );
+        await chatService.addMessage(
+          conversationId: convo.id,
+          role: 'user',
+          content: 'first question',
+        );
+        await chatService.addMessage(
+          conversationId: convo.id,
+          role: 'assistant',
+          parts: const [
+            ReasoningPart('hidden payload'),
+            TextPart('first answer'),
+          ],
+        );
+        final first = await pipeline.runNow(
+          conversationId: convo.id,
+          assistantId: id,
+        );
+        expect(first.advanced, isTrue);
+        expect(first.windowSize, 2);
+        expect(
+          (await chatRepository.getConversation(
+            convo.id,
+          ))!.lastMemoryExtractedOrder,
+          1,
+        );
+        expect(
+          modelPrompts.single,
+          contains('用户：first question\n\n助手：first answer'),
+        );
+        expect(modelPrompts.single, isNot(contains('hidden payload')));
+        await chatService.addMessage(
+          conversationId: convo.id,
+          role: 'user',
+          content: 'new question',
+        );
+        final next = await pipeline.runNow(
+          conversationId: convo.id,
+          assistantId: id,
+        );
+        expect(next.windowSize, 1);
+        expect(
+          (await chatRepository.getConversation(
+            convo.id,
+          ))!.lastMemoryExtractedOrder,
+          2,
+        );
+        expect(modelPrompts.last, contains('用户：new question'));
+        expect(modelPrompts.last, isNot(contains('first question')));
+      },
+    );
+
+    test(
+      '8,000 revisions read only eligible text and keep full window bounds',
+      () async {
+        final convo = await chatService.createConversation(
+          title: 'long history',
+        );
+        await database.customStatement(
+          '''
+WITH RECURSIVE history(n) AS (
+ SELECT 0 UNION ALL SELECT n + 1 FROM history WHERE n < 7999
+)
+INSERT INTO message_rows (id, conversation_id, role, timestamp, message_order)
+SELECT 'm' || n, ?, CASE n % 2 WHEN 0 THEN 'user' ELSE 'assistant' END, n, n FROM history
+''',
+          [convo.id],
+        );
+        await database.customStatement(
+          '''
+INSERT INTO message_part_rows (conversation_id, revision_id, ordinal, kind, payload, created_at, updated_at)
+SELECT conversation_id, id, 0, 'text', id, 0, 0 FROM message_rows WHERE conversation_id = ?
+''',
+          [convo.id],
+        );
+        final reader = _CountingTextRepository(database);
+        final visited = <String>[];
+        Future<({int startOrder, int endOrder, int length})?> read(
+          int watermark,
+          int turns, {
+          int limit = 20,
+        }) {
+          visited.clear();
+          return reader.readMemoryOrganizeWindow(
+            convo.id,
+            watermark: watermark,
+            minAssistantTurns: turns,
+            firstWindowLimit: 20,
+            textPrefixLength: 2001,
+            addText: (role, text) {
+              visited.add(text);
+              return visited.length < limit;
+            },
+          );
+        }
+
+        expect((await read(7998, 2))!.length, 0);
+        expect(visited, isEmpty);
+        expect(reader.textReads, isEmpty);
+        expect(await read(7998, 1), (
+          startOrder: 7999,
+          endOrder: 7999,
+          length: 1,
+        ));
+        expect(visited, ['m7999']);
+        expect(reader.textReads, [1]);
+        expect(await read(-1, 20), (
+          startOrder: 7980,
+          endOrder: 7999,
+          length: 20,
+        ));
+        expect(visited, List.generate(20, (i) => 'm${7999 - i}'));
+        expect(await read(9, 20, limit: 3), (
+          startOrder: 10,
+          endOrder: 7999,
+          length: 7990,
+        ));
+        expect(visited, ['m7999', 'm7998', 'm7997']);
+        expect(reader.textReads, [1, 20, 20]);
+      },
+    );
+
+    test(
+      'uses raw positions across gaps and only counts the selected revisions',
+      () async {
+        final convo = await chatService.createConversation(title: 'versions');
+        Future<void> put(
+          String id,
+          String role,
+          int order, {
+          String? group,
+          int version = 0,
+          bool live = false,
+          List<MessagePart>? parts,
+        }) => chatRepository.putMessage(
+          ChatMessage(
+            id: id,
+            conversationId: convo.id,
+            role: role,
+            content: id,
+            parts: parts,
+            groupId: group,
+            version: version,
+            isStreaming: live,
+          ),
+          messageOrder: order,
+        );
+        Future<List<String>?> window(
+          int watermark,
+          int minTurns, {
+          int cap = 20,
+        }) async {
+          final contents = <String>[];
+          final bounds = await chatRepository.readMemoryOrganizeWindow(
+            convo.id,
+            watermark: watermark,
+            minAssistantTurns: minTurns,
+            firstWindowLimit: cap,
+            textPrefixLength: 2001,
+            addText: (role, text) {
+              contents.add(text);
+              return true;
+            },
+          );
+          return bounds == null ? null : contents.reversed.toList();
+        }
+
+        await put('u', 'user', 10);
+        await put('a', 'assistant', 20);
+        await put('b', 'assistant', 35);
+        await put(
+          'a1',
+          'assistant',
+          90,
+          group: 'a',
+          version: 1,
+          parts: const [
+            TextPart('a'),
+            ReasoningPart('private reasoning'),
+            ImagePart(uri: 'photo.png'),
+            TextPart('1'),
+          ],
+        );
+        await put('u2', 'user', 100);
+        expect(await window(-1, 3), isEmpty);
+        expect(await window(-1, 2, cap: 1), ['u2']);
+        expect(await window(2, 1), ['a1', 'u2']);
+        await chatService.setSelectedVersion(convo.id, 'a', 0);
+        expect(await window(2, 1), isEmpty);
+        expect(await window(0, 2), ['a', 'b', 'u2']);
+        expect(await window(2, 0), ['u2']);
+        await put('pending', 'assistant', 200, live: true);
+        expect(await window(0, 0), isNull);
+      },
+    );
   });
 
   group('temporary conversations', () {

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import './app_directories.dart';
@@ -25,6 +26,29 @@ class SandboxPathResolver {
   static String? _docsDir;
   static String? _supportDir;
   static bool debug = false;
+
+  /// Resolves an existing managed file without following links out of its
+  /// recorded location. The content root itself may be a platform alias.
+  static Future<File?> managedFile(String uri, {String? contentRoot}) async {
+    final root = contentRoot ?? _docsDir;
+    if (root == null) return null;
+    final path = KelivoFileUri.resolveToAbsolute(uri, root: root);
+    if (path == null) return null;
+    try {
+      if (await FileSystemEntity.type(path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        return null;
+      }
+      final realRoot = await Directory(root).resolveSymbolicLinks();
+      final file = File(path);
+      final real = await file.resolveSymbolicLinks();
+      return p.equals(real, p.join(realRoot, p.relative(path, from: root)))
+          ? file
+          : null;
+    } on FileSystemException {
+      return null;
+    }
+  }
 
   /// Call once during app startup to cache the current Documents directory.
   static Future<void> init() async {
@@ -330,10 +354,9 @@ class SandboxPathResolver {
       final host = parsed.host.toLowerCase();
       // Non-local hosts (SMB/UNC via file://server/...) are rejected.
       if (host.isNotEmpty && host != 'localhost') return null;
-      // Dart's toFilePath rejects file://localhost/... on non-Windows; drop
-      // the authority first. Empty-host UNC forms (file:////server/share)
-      // still decode to //server/... and are rejected below.
-      final local = host.isEmpty
+      // Only the path identifies the file. Keep its percent escapes intact
+      // when removing localhost or a document link's query and fragment.
+      final local = host.isEmpty && !parsed.hasQuery && !parsed.hasFragment
           ? parsed
           : Uri(scheme: 'file', path: parsed.path);
       final path = local.toFilePath();

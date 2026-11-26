@@ -12,6 +12,7 @@ import 'package:Kelivo/core/services/search/providers/querit_search_service.dart
 import 'package:Kelivo/core/services/search/providers/tavily_search_service.dart';
 import 'package:Kelivo/core/services/search/providers/tinyfish_search_service.dart';
 import 'package:Kelivo/core/services/search/providers/you_search_service.dart';
+import 'package:Kelivo/core/services/search/providers/keenable_search_service.dart';
 import 'package:Kelivo/core/services/search/search_service.dart';
 import 'package:Kelivo/core/services/search/web_fetch.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -295,6 +296,30 @@ void main() {
       'urls': [_url],
       'advanced_settings': {'full_content': true},
     });
+    expect(page.content, 'Body');
+  });
+
+  test('Keenable fetches public content with the title header', () async {
+    final mock = _respond({'url': _url, 'title': 'Post', 'content': 'Body'});
+    final page = await KeenableSearchService(client: mock.client).fetch(
+      url: _url,
+      commonOptions: _common,
+      serviceOptions: KeenableOptions(id: 'k'),
+    );
+    final request = mock.requests.single;
+    expect(request.method, 'GET');
+    expect(
+      request.url.toString(),
+      startsWith(KeenableSearchService.publicFetchUrl),
+    );
+    expect(request.url.queryParameters['url'], _url);
+    expect(
+      request.url.queryParameters['max_chars'],
+      '$webFetchMaxContentLength',
+    );
+    expect(request.headers['X-Keenable-Title'], KeenableSearchService.appTitle);
+    expect(request.headers['X-API-Key'], isNull);
+    expect(page.title, 'Post');
     expect(page.content, 'Body');
   });
 

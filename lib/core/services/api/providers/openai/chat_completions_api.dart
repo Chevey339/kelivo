@@ -1,3 +1,4 @@
+import '../../../../models/carried_original.dart';
 import '../../../network/provider_http_exception.dart';
 import '../../../../models/image_context.dart';
 import '../../request_history_context.dart';
@@ -359,6 +360,8 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     outMsg.remove(multimodalInternalImageReferencesKey);
     outMsg.remove(multimodalInternalMediaPathsKey);
     outMsg.remove(multimodalInternalLiteralTextKey);
+    outMsg.remove(carriedTextOnlyKey);
+    outMsg.remove(carriedImageHandlesKey);
     outMsg.remove(multimodalInternalDocumentPathsKey);
     outMsg.remove(multimodalInternalRevisionIdKey);
     outMsg.remove(multimodalInternalClaudeContainerKey);

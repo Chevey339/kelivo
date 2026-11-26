@@ -150,7 +150,10 @@ class _GatedDraftStore extends ComposerDraftStore {
   final releasePreparation = Completer<void>();
 
   @override
-  Future<ChatInputData> prepareSubmissionInput(ChatInputData input) async {
+  Future<ChatInputData> prepareSubmissionInput(
+    ChatInputData input, {
+    DocumentCopyObserver? onDocumentCopied,
+  }) async {
     preparationStarted.complete();
     await releasePreparation.future;
     return input; // Text-only submission has no attachment transformations.

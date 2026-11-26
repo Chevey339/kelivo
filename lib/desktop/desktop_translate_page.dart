@@ -8,6 +8,7 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'macos_window_drag_area.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
+import '../core/models/translation_language.dart';
 import '../features/home/widgets/model_icon.dart';
 import '../core/providers/settings_provider.dart';
 import '../theme/app_semantic_colors.dart';
@@ -15,11 +16,15 @@ import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
 import '../core/services/api/stream/stream_chunk.dart';
 import '../shared/widgets/snackbar.dart';
+import '../shared/widgets/ios_tactile.dart';
+import '../shared/widgets/ios_text_button.dart';
+import '../features/settings/widgets/custom_theme_widgets.dart';
+import '../features/translate/widgets/translation_languages_editor.dart';
 import '../features/translate/widgets/translation_output.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
 import '../features/settings/widgets/language_select_sheet.dart'
-    show LanguageOption, supportedLanguages;
+    show languageDisplayName;
 
 class DesktopTranslatePage extends StatefulWidget {
   const DesktopTranslatePage({super.key});
@@ -32,7 +37,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   final TextEditingController _source = TextEditingController();
   final ValueNotifier<String> _output = ValueNotifier('');
 
-  LanguageOption? _targetLang;
   String? _modelProviderKey;
   String? _modelId;
 
@@ -60,15 +64,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     final settings = context.read<SettingsProvider>();
     final assistant = context.read<AssistantProvider>().currentAssistant;
 
-    final savedLang = _languageForCode(settings.translateTargetLang);
-    final locale = Localizations.localeOf(context).languageCode.toLowerCase();
-    final localeLang = locale.startsWith('zh')
-        ? _languageForCode('zh-CN')
-        : _languageForCode(locale) ?? _languageForCode('en');
-    setState(() {
-      _targetLang = savedLang ?? localeLang ?? supportedLanguages.first;
-    });
-
     // Default model: translate model -> assistant's chat model -> global default
     final providerKey =
         settings.translateModelProvider ??
@@ -82,46 +77,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       _modelProviderKey = providerKey;
       _modelId = modelId;
     });
-  }
-
-  LanguageOption? _languageForCode(String? code) {
-    if (code == null || code.isEmpty) return null;
-    try {
-      return supportedLanguages.firstWhere((e) => e.code == code);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _onLanguageChanged(LanguageOption? lang) async {
-    if (lang == null) return;
-    setState(() => _targetLang = lang);
-    await context.read<SettingsProvider>().setTranslateTargetLang(lang.code);
-  }
-
-  String _displayNameFor(AppLocalizations l10n, String code) {
-    switch (code) {
-      case 'zh-CN':
-        return l10n.languageDisplaySimplifiedChinese;
-      case 'en':
-        return l10n.languageDisplayEnglish;
-      case 'zh-TW':
-        return l10n.languageDisplayTraditionalChinese;
-      case 'ja':
-        return l10n.languageDisplayJapanese;
-      case 'ko':
-        return l10n.languageDisplayKorean;
-      case 'fr':
-        return l10n.languageDisplayFrench;
-      case 'de':
-        return l10n.languageDisplayGerman;
-      case 'it':
-        return l10n.languageDisplayItalian;
-      case 'es':
-        return l10n.languageDisplaySpanish;
-      default:
-        return code;
-    }
   }
 
   Future<void> _pickModel() async {
@@ -143,7 +98,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     await settings.setTranslateModel(sel.providerKey, sel.modelId);
   }
 
-  Future<void> _startTranslate() async {
+  Future<void> _startTranslate(LanguageOption target) async {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
 
@@ -163,10 +118,9 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
     final cfg = settings.getProviderConfig(providerKey);
 
-    final lang = _targetLang ?? supportedLanguages.first;
     final prompt = settings.translatePrompt
         .replaceAll('{source_text}', text)
-        .replaceAll('{target_lang}', _displayNameFor(l10n, lang.code));
+        .replaceAll('{target_lang}', languageDisplayName(l10n, target.code));
 
     setState(() {
       _translating = true;
@@ -225,25 +179,75 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     if (mounted) setState(() => _translating = false);
   }
 
+  Future<void> _manageLanguages() async {
+    await showAppDialog<void>(
+      context,
+      maxWidth: 400,
+      child: Builder(
+        builder: (dialogContext) => TranslationLanguagesEditor(
+          compact: true,
+          onSaved: () {
+            if (ModalRoute.of(dialogContext)?.isCurrent == true) {
+              Navigator.of(dialogContext).pop();
+            }
+          },
+          builder: (context, body, onSave) => ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppDialogHeader(
+                  title: AppLocalizations.of(
+                    context,
+                  )!.translationLanguageManagerTitle,
+                  actions: [
+                    IosTextButton(
+                      label: MaterialLocalizations.of(context).saveButtonLabel,
+                      onPressed: onSave,
+                    ),
+                  ],
+                ),
+                Flexible(child: body),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    const paneTextPadding = EdgeInsets.fromLTRB(14, 14, 46, 14);
+    const paneTextStyle = TextStyle(fontSize: 14.5, height: 1.4);
     final cs = Theme.of(context).colorScheme;
     final compact = MediaQuery.sizeOf(context).width < 600;
     final l10n = AppLocalizations.of(context)!;
+    final (languages, selectedCode) = context.select(
+      (SettingsProvider settings) =>
+          (settings.visibleTranslationLanguages, settings.translateTargetLang),
+    );
+    final target = standaloneTranslationLanguage(
+      languages,
+      selectedCode: selectedCode,
+      localeLanguageCode: Localizations.localeOf(context).languageCode,
+    );
 
     final topBar = SizedBox(
       height: 36,
       child: Align(
-        alignment: Alignment.centerLeft,
+        alignment: AlignmentDirectional.centerStart,
         child: Padding(
-          padding: const EdgeInsets.only(left: 16, top: 8),
+          padding: const EdgeInsetsDirectional.only(start: 16, top: 8),
           child: Text(
-            l10n.desktopNavTranslateTooltip, // 显示“翻译”
+            l10n.desktopNavTranslateTooltip,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 14,
               fontWeight: AppFontWeights.semibold,
               color: cs.onSurface,
-              decoration: TextDecoration.none,
             ),
           ),
         ),
@@ -287,16 +291,33 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                     children: [
                                       Flexible(
                                         child: _LanguageDropdown(
-                                          value: _targetLang,
+                                          value: target,
+                                          languages: languages,
                                           onChanged: _translating
                                               ? null
-                                              : _onLanguageChanged,
+                                              : (language) => context
+                                                    .read<SettingsProvider>()
+                                                    .setTranslateTargetLang(
+                                                      language.code,
+                                                    ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: 4),
+                                      IosIconButton(
+                                        icon: lucide.Lucide.SlidersHorizontal,
+                                        size: 16,
+                                        minSize: 30,
+                                        color: cs.onSurfaceVariant,
+                                        tooltip: l10n
+                                            .translationLanguageManagerTitle,
+                                        enabled: !_translating,
+                                        onTap: _manageLanguages,
+                                      ),
+                                      const SizedBox(width: 4),
                                       _TranslateButton(
                                         translating: _translating,
-                                        onTranslate: _startTranslate,
+                                        onTranslate: () =>
+                                            _startTranslate(target),
                                         onStop: _stopTranslate,
                                       ),
                                     ],
@@ -351,11 +372,15 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   expands: true,
                                   decoration: InputDecoration(
                                     hintText: l10n.translatePageInputHint,
+                                    hintStyle: paneTextStyle.copyWith(
+                                      color: Theme.of(context).hintColor,
+                                    ),
                                     border: InputBorder.none,
                                     isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
+                                    visualDensity: VisualDensity.standard,
+                                    contentPadding: paneTextPadding,
                                   ),
-                                  style: TextStyle(fontSize: 14.5, height: 1.4),
+                                  style: paneTextStyle,
                                 ),
                               ),
                             ),
@@ -384,16 +409,8 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                 child: TranslationOutput(
                                   text: _output,
                                   streaming: _translating,
-                                  padding: const EdgeInsets.fromLTRB(
-                                    14,
-                                    44,
-                                    14,
-                                    14,
-                                  ),
-                                  style: const TextStyle(
-                                    fontSize: 14.5,
-                                    height: 1.4,
-                                  ),
+                                  padding: paneTextPadding,
+                                  style: paneTextStyle,
                                 ),
                               ),
                             ),
@@ -439,9 +456,14 @@ class _PaneContainer extends StatelessWidget {
 }
 
 class _LanguageDropdown extends StatefulWidget {
-  const _LanguageDropdown({required this.value, required this.onChanged});
-  final LanguageOption? value;
-  final ValueChanged<LanguageOption?>? onChanged;
+  const _LanguageDropdown({
+    required this.value,
+    required this.languages,
+    required this.onChanged,
+  });
+  final LanguageOption value;
+  final List<LanguageOption> languages;
+  final ValueChanged<LanguageOption>? onChanged;
 
   @override
   State<_LanguageDropdown> createState() => _LanguageDropdownState();
@@ -500,7 +522,8 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                   widget.onChanged?.call(opt);
                   _close();
                 },
-                selected: widget.value ?? supportedLanguages.first,
+                selected: widget.value,
+                languages: widget.languages,
               ),
             ),
           ],
@@ -520,8 +543,8 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
     final hoverBorder = cs.primary; // hover/focus border
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
 
-    final selected = widget.value ?? supportedLanguages.first;
-    final label = _displayNameFor(l10n, selected.code);
+    final selected = widget.value;
+    final label = languageDisplayName(l10n, selected.code);
 
     return CompositedTransformTarget(
       link: _link,
@@ -600,31 +623,6 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
       ),
     );
   }
-
-  String _displayNameFor(AppLocalizations l10n, String code) {
-    switch (code) {
-      case 'zh-CN':
-        return l10n.languageDisplaySimplifiedChinese;
-      case 'en':
-        return l10n.languageDisplayEnglish;
-      case 'zh-TW':
-        return l10n.languageDisplayTraditionalChinese;
-      case 'ja':
-        return l10n.languageDisplayJapanese;
-      case 'ko':
-        return l10n.languageDisplayKorean;
-      case 'fr':
-        return l10n.languageDisplayFrench;
-      case 'de':
-        return l10n.languageDisplayGerman;
-      case 'it':
-        return l10n.languageDisplayItalian;
-      case 'es':
-        return l10n.languageDisplaySpanish;
-      default:
-        return code;
-    }
-  }
 }
 
 class _LangDropdownOverlay extends StatefulWidget {
@@ -634,6 +632,7 @@ class _LangDropdownOverlay extends StatefulWidget {
     required this.onClose,
     required this.onSelected,
     required this.selected,
+    required this.languages,
   });
 
   final double width;
@@ -641,6 +640,7 @@ class _LangDropdownOverlay extends StatefulWidget {
   final VoidCallback onClose;
   final ValueChanged<LanguageOption> onSelected;
   final LanguageOption selected;
+  final List<LanguageOption> languages;
 
   @override
   State<_LangDropdownOverlay> createState() => _LangDropdownOverlayState();
@@ -679,10 +679,6 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final borderColor = cs.outlineVariant.withValues(alpha: 0.12);
-    // divider removed
-
-    final filtered = supportedLanguages;
-
     return FadeTransition(
       opacity: _opacity,
       child: SlideTransition(
@@ -719,9 +715,9 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay>
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
                       shrinkWrap: true,
-                      itemCount: filtered.length,
+                      itemCount: widget.languages.length,
                       itemBuilder: (context, index) {
-                        final item = filtered[index];
+                        final item = widget.languages[index];
                         final selected = item.code == widget.selected.code;
                         return _LangOptionTile(
                           option: item,
@@ -803,7 +799,7 @@ class _LangOptionTileState extends State<_LangOptionTile> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _localizedLabel(
+                    languageDisplayName(
                       AppLocalizations.of(context)!,
                       widget.option.code,
                     ),
@@ -829,31 +825,6 @@ class _LangOptionTileState extends State<_LangOptionTile> {
         ),
       ),
     );
-  }
-
-  String _localizedLabel(AppLocalizations l10n, String code) {
-    switch (code) {
-      case 'zh-CN':
-        return l10n.languageDisplaySimplifiedChinese;
-      case 'en':
-        return l10n.languageDisplayEnglish;
-      case 'zh-TW':
-        return l10n.languageDisplayTraditionalChinese;
-      case 'ja':
-        return l10n.languageDisplayJapanese;
-      case 'ko':
-        return l10n.languageDisplayKorean;
-      case 'fr':
-        return l10n.languageDisplayFrench;
-      case 'de':
-        return l10n.languageDisplayGerman;
-      case 'it':
-        return l10n.languageDisplayItalian;
-      case 'es':
-        return l10n.languageDisplaySpanish;
-      default:
-        return code;
-    }
   }
 }
 

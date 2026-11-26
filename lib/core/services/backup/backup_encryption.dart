@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -34,6 +35,27 @@ abstract final class BackupEncryption {
   static const _headerLength = 41;
   static const _chunkSize = 1024 * 1024;
   static const _maxPlaintextBytes = 16 * 1024 * 1024 * 1024;
+
+  /// Device-only password verifier. Its independent random salt never occurs
+  /// in an archive, so this value cannot be used as an archive key.
+  static Future<String> passwordVerifier(String password, {String? existing}) =>
+      Isolate.run(() {
+        final random = Random.secure();
+        final salt = existing == null
+            ? Uint8List.fromList(List.generate(16, (_) => random.nextInt(256)))
+            : base64Decode(existing).sublist(0, 16);
+        final bytes = Uint8List.fromList(utf8.encode(password));
+        try {
+          final derived = _deriveKey(bytes, salt, 3);
+          try {
+            return base64Encode([...salt, ...derived]);
+          } finally {
+            derived.fillRange(0, derived.length, 0);
+          }
+        } finally {
+          bytes.fillRange(0, bytes.length, 0);
+        }
+      });
 
   static Future<bool> isEncrypted(File file) async {
     final input = await file.open();

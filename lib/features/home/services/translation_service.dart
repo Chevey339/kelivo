@@ -101,7 +101,10 @@ class TranslationService {
     final assistant = context.read<AssistantProvider>().currentAssistant;
 
     // 显示语言选择器
-    final language = await showLanguageSelector(context);
+    final language = await showLanguageSelector(
+      context,
+      languages: settings.visibleTranslationLanguages,
+    );
     if (language == null) {
       return TranslationResult(type: TranslationResultType.cancelled);
     }

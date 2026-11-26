@@ -207,6 +207,8 @@ class ContextUsageSummaryHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final separateSummary =
+        snapshot?.hasUnknownNativeTokens == true || snapshot?.hasUsage != true;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -231,7 +233,7 @@ class ContextUsageSummaryHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (snapshot?.hasUnknownNativeTokens != true) ...[
+                  if (!separateSummary) ...[
                     const SizedBox(width: 8),
                     Text(
                       contextUsageSummaryText(l10n, snapshot),
@@ -246,7 +248,7 @@ class ContextUsageSummaryHeader extends StatelessWidget {
                   ],
                 ],
               ),
-              if (snapshot?.hasUnknownNativeTokens == true) ...[
+              if (separateSummary) ...[
                 const SizedBox(height: 4),
                 Text(
                   contextUsageSummaryText(l10n, snapshot),

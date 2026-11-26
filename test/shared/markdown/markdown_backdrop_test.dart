@@ -165,7 +165,7 @@ void main() {
                   borderRadius: BorderRadius.circular(16),
                   padding: const EdgeInsets.all(12),
                   defaultColor: tint,
-                  bareOnDefault: bare,
+                  bare: bare,
                   child: Builder(
                     builder: (context) {
                       kind = MarkdownSurfaceScope.maybeOf(context)?.kind;

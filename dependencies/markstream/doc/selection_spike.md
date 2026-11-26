@@ -1,9 +1,9 @@
 # Inline selection decision
 
-Keep a baseline-aligned WidgetSpan capsule for inline code. It joins the
-consumer's SelectionArea through SelectableSpanAdapter and copies its code
-text, without Markdown backticks. Like formulas and citation chips, the capsule
-is one atomic selection unit whose content length is the UTF-16 text length.
+Inline code uses a baseline-aligned WidgetSpan capsule. The capsule's
+Text.rich joins the consumer's SelectionArea through buildSelectableText, so
+selection can start and end at character boundaries inside the code. Plain-text
+copy returns the selected characters without Markdown backticks.
 
 The enclosing paragraph must use buildSelectableText. Its source-ordered
 selection delegate keeps the ordinary text fragments and inline widgets in one
@@ -16,8 +16,10 @@ The package tests cover:
 
 - Forward and reverse mouse dragging across text, code and formula atoms on
   Linux, macOS and Windows platform variants.
-- Android long press followed by dragging the visible end handle across both
-  atoms, rather than calling selection delegate methods directly.
+- Android long press and end-handle dragging across inline widgets and
+  within an inline code capsule.
+- Desktop substring dragging and Shift+Arrow extension inside a capsule, with
+  exact source offsets and Markdown copy.
 - Cmd/Ctrl+C through Flutter shortcuts, with the platform clipboard mocked.
 - Narrow 180-pixel layouts at text scales 1.0 and 1.3, with long code wrapping
   inside its available width and remaining fully copyable.

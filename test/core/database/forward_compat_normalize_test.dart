@@ -53,6 +53,14 @@ void main() {
       'CREATE INDEX idx_future_flag ON conversation_rows (future_flag);',
     );
     raw.execute(
+      'ALTER TABLE generation_run_rows ADD COLUMN future_hidden INTEGER DEFAULT 0',
+    );
+    raw.execute('DROP INDEX idx_timeline_generation_target');
+    raw.execute(
+      'CREATE INDEX idx_timeline_generation_target ON generation_run_rows '
+      '(target_revision_id) WHERE future_hidden = 0',
+    );
+    raw.execute(
       'CREATE TABLE future_rows ('
       'id TEXT PRIMARY KEY, '
       'conversation_id TEXT REFERENCES conversation_rows (id) '
@@ -179,6 +187,13 @@ void main() {
           .map((row) => row['name'])
           .toList();
       expect(tables, isNot(contains('future_rows')));
+      final runIndex = raw
+          .select(
+            "SELECT partial FROM pragma_index_list('generation_run_rows') "
+            "WHERE name = 'idx_timeline_generation_target'",
+          )
+          .single;
+      expect(runIndex['partial'], 0);
 
       // The rows themselves survive: only the parts this build cannot
       // understand are dropped.

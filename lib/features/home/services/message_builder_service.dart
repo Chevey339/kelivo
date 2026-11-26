@@ -1,3 +1,4 @@
+import '../../../core/models/carried_original.dart';
 import '../../../core/models/native_compaction.dart';
 import '../../../core/services/api/request_image_context.dart';
 import '../../../l10n/app_localizations.dart';
@@ -7,7 +8,6 @@ import '../../../utils/utf16_safe_cut.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:convert';
-import 'dart:io';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
@@ -28,7 +28,6 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../utils/mcp_structured_image.dart';
-import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/logging/context_log_models.dart';
 import '../../../core/services/memory/memory_block_builder.dart';
@@ -166,7 +165,8 @@ class MessageBuilderService {
     this.ocrHandler,
     this.ocrPrefetch,
     this.providerArtifactLookup,
-  });
+    DocumentExtractionCache? documentCache,
+  }) : documentCache = documentCache ?? DocumentExtractionCache();
 
   final ChatService chatService;
 
@@ -220,10 +220,7 @@ class MessageBuilderService {
     return providerArtifactLookup?.call(message, kind);
   }
 
-  /// Cache for document text extraction to avoid re-reading files on every message
-  /// Keyed by path, validated with (modified + size) to avoid stale reuse.
-  final Map<String, _DocTextCacheEntry> _docTextCache =
-      <String, _DocTextCacheEntry>{};
+  final DocumentExtractionCache documentCache;
 
   /// Read-only, bounded context for a result that will be published later.
   /// In particular, World Book timers and prompt/memory receipts are not written.
@@ -384,6 +381,7 @@ class MessageBuilderService {
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
+    Set<String> imageFilteredRevisions = const {},
     bool includeToolMessages = false,
     bool preserveToolTurns = false,
     ResponsesReplayScope? responsesScope,
@@ -397,16 +395,49 @@ class MessageBuilderService {
     void identify(Map<String, dynamic> message, String id) {
       message[imageContextOwnerKey] = id;
       if (message['role'] == 'tool') {
-        message['metadata'] = <String, dynamic>{
+        final metadata = <String, dynamic>{
           ...?(message['metadata'] as Map?)?.cast<String, dynamic>(),
           imageContextOwnerKey: id,
-          '_kelivo_image_call': message['tool_call_id'],
         };
+        metadata.putIfAbsent(
+          imageContextCallKey,
+          () => message['tool_call_id'],
+        );
+        message['metadata'] = metadata;
       }
     }
 
     final thinkingRecovery = ClaudeThinkingRecovery();
     for (final m in source) {
+      if (isCarriedMessageId(m.id)) {
+        final media = mediaRefsFromParts(m);
+        final message = <String, dynamic>{
+          'role': m.role,
+          'content': m.content,
+          '_contextSummary': true,
+          imageContextOwnerKey: m.id,
+          if (m.providerArtifactSnapshot[carriedArtifactKind]
+              case final frozen?)
+            carriedWireKey: jsonDecode(frozen),
+          if (media.isNotEmpty) internalMediaPathsKey: media,
+          if (m.providerArtifactSnapshot[carriedImageHandlesKey]
+              case final handles?)
+            carriedImageHandlesKey: jsonDecode(handles),
+          if (m.providerArtifactSnapshot.containsKey(
+            carriedTextOnlyArtifactKind,
+          )) ...{
+            carriedTextOnlyKey: true,
+            multimodalInternalLiteralTextKey: m.content,
+          },
+        };
+        ContextSegmentTags.replaceWithSingle(
+          message,
+          source: ContextSource.chatHistory,
+          length: m.content.length,
+        );
+        out.add(message);
+        continue;
+      }
       final native = NativeCompactionPayload.forMessage(m);
       if (native != null) {
         out.add({
@@ -415,6 +446,9 @@ class MessageBuilderService {
           '_contextSummary': true,
           imageContextOwnerKey: m.id,
           nativeCompactionMessageKey: native.toJson(),
+          if (m.providerArtifactSnapshot[nativeUserSourcesKey]
+              case final sources?)
+            nativeUserSourcesKey: jsonDecode(sources),
         });
         continue;
       }
@@ -631,6 +665,7 @@ class MessageBuilderService {
           (plainClaudeTurn?.isEmpty ?? true) &&
           !hasClaudeToolTurn &&
           mediaRefs.isEmpty &&
+          !imageFilteredRevisions.contains(m.id) &&
           !_hasUsableAttachmentPart(m)) {
         continue;
       }
@@ -708,7 +743,10 @@ class MessageBuilderService {
     final refs = <Map<String, dynamic>>[];
     for (final part in message.parts) {
       if (part is ImagePart) {
-        if (part.unavailable) continue;
+        if (part.unavailable ||
+            (part.generationItemId != null && message.role != 'user')) {
+          continue;
+        }
         final uri = part.uri.trim();
         if (uri.isEmpty) continue;
         refs.add(encodeInternalMediaRef(uri: uri, mime: part.mime));
@@ -1031,7 +1069,7 @@ class MessageBuilderService {
       final mediaPaths = <String>{};
       for (final document in parsed.documents) {
         final mime = _effectiveAttachmentMime(document);
-        if (nativePdfInput && isPdfMime(mime)) continue;
+        if (isImageMime(mime) || (nativePdfInput && isPdfMime(mime))) continue;
         if (isVideoMime(mime) || isAudioMime(mime)) {
           final path = document.path.trim();
           if (path.isNotEmpty) mediaPaths.add(path);
@@ -1081,20 +1119,21 @@ class MessageBuilderService {
     Assistant? assistant, {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
+    Set<String> imageFilteredRevisions = const {},
     bool sandboxDataFiles = false,
     bool nativePdfInput = false,
     bool previewOnly = false,
     Map<String, AttachmentInfo> workspaceAttachments = const {},
     bool useWorkspaceForDocuments = true,
   }) async {
-    late final quoteMarker = lookupAppLocalizations(
+    late final l10n = lookupAppLocalizations(
       basicLocaleListResolution(
         settings.isFollowingSystemLocale
             ? WidgetsBinding.instance.platformDispatcher.locales
             : [settings.appLocale],
         AppLocalizations.supportedLocales,
       ),
-    ).selectionQuoteMarker;
+    );
     final bool ocrActive =
         settings.ocrEnabled &&
         settings.ocrModelProvider != null &&
@@ -1159,9 +1198,10 @@ class MessageBuilderService {
           if (!nativePdfRevisionIds.contains(entry.key)) entry.key: entry.value,
     };
 
-    // Prefetch OCR only for messages that still need generation (no freeze yet).
+    // Filtered frozen prompts may reuse per-image OCR even in a preview.
     OcrPrepareSession? ocrSession;
-    if (!previewOnly && ocrActive && ocrPrefetch != null) {
+    if (ocrPrefetch != null &&
+        ((!previewOnly && ocrActive) || imageFilteredRevisions.isNotEmpty)) {
       final revisionIds = <String>[];
       final allImagePaths = <String>{};
       for (final message in apiMessages) {
@@ -1169,7 +1209,15 @@ class MessageBuilderService {
         final revisionId = (message[internalRevisionIdKey] ?? '')
             .toString()
             .trim();
-        if (frozenPrompts.containsKey(revisionId)) continue;
+        final frozen = frozenPrompts[revisionId];
+        if (frozen != null) {
+          if (!imageFilteredRevisions.contains(revisionId) ||
+              !OcrService.hasOcrBlock(frozen.payload)) {
+            continue;
+          }
+        } else if (previewOnly || !ocrActive) {
+          continue;
+        }
         final revisionForParse = revisionId;
         final chatForParse = _resolveChatMessage(
           revisionId: revisionForParse,
@@ -1209,55 +1257,6 @@ class MessageBuilderService {
         } catch (_) {
           ocrSession = null;
         }
-      }
-    }
-
-    Future<String?> readDocument(DocumentAttachment d) async {
-      if (previewOnly) return null;
-      // Resolve once so cache key and extractor share the same absolute path.
-      // null means rejected (UNC/SMB) — never fall back to the raw path.
-      final resolvedPath = SandboxPathResolver.resolveForIo(d.path);
-      if (resolvedPath == null) return null;
-      // Use file stat to detect content changes without hashing.
-      FileStat? stat;
-      try {
-        stat = await File(resolvedPath).stat();
-      } catch (_) {
-        stat = null;
-      }
-      if (stat != null) {
-        final cached = _docTextCache[resolvedPath];
-        if (cached != null &&
-            cached.modifiedMs == stat.modified.millisecondsSinceEpoch &&
-            cached.size == stat.size) {
-          return cached.text;
-        }
-      }
-      try {
-        final text = await DocumentTextExtractor.extractResolved(
-          path: resolvedPath,
-          mime: _effectiveAttachmentMime(d),
-        );
-        // Cache only when stat is available; otherwise avoid staleness.
-        if (stat != null) {
-          _docTextCache[resolvedPath] = _DocTextCacheEntry(
-            text: text,
-            modifiedMs: stat.modified.millisecondsSinceEpoch,
-            size: stat.size,
-          );
-        }
-        return text;
-      } on AttachmentRequiresWorkspace {
-        throw AttachmentRequiresWorkspace(d.fileName);
-      } catch (_) {
-        if (stat != null) {
-          _docTextCache[resolvedPath] = _DocTextCacheEntry(
-            text: null,
-            modifiedMs: stat.modified.millisecondsSinceEpoch,
-            size: stat.size,
-          );
-        }
-        return null;
       }
     }
 
@@ -1432,17 +1431,51 @@ class MessageBuilderService {
         lastUserImagePaths = List<String>.of(parsedUser.imagePaths);
       }
 
-      // Reuse only the frozen prompts retained for this request.
+      final canRunOcr = !previewOnly && ocrActive && ocrHandler != null;
+      Future<String?> describeImages({bool cacheOnly = false}) async {
+        final targets = {
+          for (final path in parsedUser.imagePaths.map((p) => p.trim()))
+            if (path.isNotEmpty &&
+                !videoPaths.contains(path) &&
+                !audioPaths.contains(path))
+              path,
+        };
+        if (targets.isEmpty) return '';
+        if (cacheOnly) {
+          return ocrSession?.cachedTextForPaths(targets, revisionId);
+        }
+        return ocrHandler!(
+          targets.toList(),
+          revisionId: revisionId.isEmpty ? null : revisionId,
+          session: ocrSession,
+          requestId: conversation?.id,
+        );
+      }
+
+      String wrapOcr(String text) =>
+          (ocrTextWrapper ?? OcrService.formatOcrBlock)(text);
+
+      // Reuse the frozen text and replace only its OCR for filtered requests.
       final existing = frozenPrompts[revisionId];
       if (existing != null) {
-        final sendPayload = _legacyAwareFrozenPayload(
+        var sendPayload = _legacyAwareFrozenPayload(
           payload: existing.payload,
           carriesMemorySnapshot: existing.carriesMemorySnapshot,
           settings: settings,
         );
-        apiMessages[i]['content'] = sendPayload;
         final carriesSnapshot =
             existing.carriesMemorySnapshot && sendPayload == existing.payload;
+        if (imageFilteredRevisions.contains(revisionId) &&
+            OcrService.hasOcrBlock(sendPayload)) {
+          final text = await describeImages(cacheOnly: !canRunOcr);
+          sendPayload = OcrService.replaceOcrBlocks(
+            sendPayload,
+            text == null || text.trim().isEmpty
+                ? ''
+                : wrapOcr(text).trimRight(),
+          );
+        }
+        apiMessages[i]['content'] = sendPayload;
         if (carriesSnapshot) snapshotRevisionIds.add(revisionId);
         _tagFrozenUserPrompt(
           apiMessages[i],
@@ -1456,7 +1489,7 @@ class MessageBuilderService {
       final replacedUserText = applyAssistantRegexes(
         parsedUser.quotes.isEmpty
             ? parsedUser.text
-            : parsedUser.quotedText(quoteMarker),
+            : parsedUser.quotedText(l10n.selectionQuoteMarker),
         assistant: assistant,
         scope: AssistantRegexScope.user,
         target: AssistantRegexTransformTarget.send,
@@ -1471,63 +1504,69 @@ class MessageBuilderService {
           : '$frozenUi\n\n$ordinaryUser';
 
       final filePrompts = StringBuffer();
-      var leftToSandbox = false;
+      var canFreezeDocuments = true;
       for (final d in parsedUser.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (nativePdfInput && isPdfMime(effectiveMime)) continue;
         if (useWorkspaceForDocuments &&
             workspaceAttachments.containsKey(d.path)) {
-          leftToSandbox = true;
+          canFreezeDocuments = false;
           continue;
         }
-        if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
+        if (isImageMime(effectiveMime) ||
+            isVideoMime(effectiveMime) ||
+            isAudioMime(effectiveMime)) {
           continue;
         }
         if (sandboxDataFiles &&
             isSandboxDataFile(fileName: d.fileName, mime: effectiveMime)) {
-          leftToSandbox = true;
+          canFreezeDocuments = false;
           continue;
         }
-        final text = await readDocument(d);
-        if (text == null || text.trim().isEmpty) continue;
+        if (previewOnly) continue;
+        final DocumentText result;
+        try {
+          result = await documentCache.read(d);
+        } on AttachmentReadError catch (error) {
+          if (error.problem != AttachmentProblem.missing || i == lastUserIdx) {
+            rethrow;
+          }
+          // An expired historical source cannot block new messages. Leave the
+          // prompt unfrozen so restoring the file can restore its contents.
+          canFreezeDocuments = false;
+          continue;
+        }
+        final hasText = result.text.trim().isNotEmpty;
+        if (!hasText && !result.truncated) continue;
         filePrompts.writeln('## user sent a file: ${d.fileName}');
-        filePrompts.writeln('<content>');
-        filePrompts.writeln('```');
-        filePrompts.writeln(text);
-        filePrompts.writeln('```');
-        filePrompts.writeln('</content>');
+        if (hasText) {
+          filePrompts.writeln('<content>');
+          filePrompts.writeln('```');
+          filePrompts.writeln(result.text);
+          filePrompts.writeln('```');
+          filePrompts.writeln('</content>');
+        }
+        if (result.truncated) {
+          filePrompts.writeln(l10n.attachmentTruncatedNotice(result.count));
+        }
         filePrompts.writeln();
       }
 
       String merged = (filePrompts.toString() + cleanedUser).trim();
-      var canFreezePrompt = !previewOnly && !leftToSandbox && !hasNativePdf;
+      // Image exclusions are reversible. A prompt built from only some of a
+      // revision's images must never replace its original text or OCR.
+      var canFreezePrompt =
+          !previewOnly &&
+          canFreezeDocuments &&
+          !hasNativePdf &&
+          !imageFilteredRevisions.contains(revisionId);
 
-      if (!previewOnly && ocrActive && ocrHandler != null) {
-        final ocrTargets = parsedUser.imagePaths
-            .map((p) => p.trim())
-            .where(
-              (p) =>
-                  p.isNotEmpty &&
-                  !videoPaths.contains(p) &&
-                  !audioPaths.contains(p),
-            )
-            .toSet()
-            .toList();
-        if (ocrTargets.isNotEmpty) {
-          final ocrText = await ocrHandler!(
-            ocrTargets,
-            revisionId: revisionId.isEmpty ? null : revisionId,
-            session: ocrSession,
-            requestId: conversation?.id,
-          );
-          if (ocrText == null) {
-            canFreezePrompt = false;
-          } else if (ocrText.trim().isNotEmpty) {
-            final wrapped = ocrTextWrapper != null
-                ? ocrTextWrapper!(ocrText)
-                : _defaultWrapOcrBlock(ocrText);
-            merged = (wrapped + merged).trim();
-          }
+      if (canRunOcr) {
+        final ocrText = await describeImages();
+        if (ocrText == null) {
+          canFreezePrompt = false;
+        } else if (ocrText.trim().isNotEmpty) {
+          merged = (wrapOcr(ocrText) + merged).trim();
         }
       }
 
@@ -1594,6 +1633,20 @@ class MessageBuilderService {
       message['content'] = body.isEmpty
           ? entry.value
           : '$body\n\n${entry.value}';
+    }
+
+    for (final message in apiMessages) {
+      if (imageFilteredRevisions.contains(message[imageContextOwnerKey]) &&
+          message['content'] == '' &&
+          message[internalMediaPathsKey] == null &&
+          message[multimodalInternalDocumentPathsKey] == null) {
+        message['content'] = excludedImageContextText;
+        ContextSegmentTags.replaceWithSingle(
+          message,
+          source: ContextSource.chatHistory,
+          length: excludedImageContextText.length,
+        );
+      }
     }
 
     return lastUserImagePaths ?? <String>[];
@@ -2032,19 +2085,6 @@ class MessageBuilderService {
     );
   }
 
-  /// Default OCR text wrapper
-  String _defaultWrapOcrBlock(String ocrText) {
-    final buf = StringBuffer();
-    buf.writeln(
-      "The image_file_ocr tag contains a description of an image that the user uploaded to you, not the user's prompt.",
-    );
-    buf.writeln('<image_file_ocr>');
-    buf.writeln(ocrText.trim());
-    buf.writeln('</image_file_ocr>');
-    buf.writeln();
-    return buf.toString();
-  }
-
   /// Inject system prompt into apiMessages.
   void injectSystemPrompt(
     List<Map<String, dynamic>> apiMessages,
@@ -2080,10 +2120,10 @@ class MessageBuilderService {
   ///
   /// Pure function of `(enableMemory, allowPastConversationRecall, lang,
   /// user template)` — must not vary with memory content or the clock (§11.1).
-  /// Relative order among remaining system injections is preserved by the
-  /// caller (`injectSystemPrompt` → this → `injectSearchPrompt` →
-  /// `injectInstructionPrompts` → `injectWorldBookPrompts` →
-  /// `injectWorkspacePrompt` → `injectSkillsPrompt`).
+  /// Generation assembles persona, memory, search, instructions, workspace and
+  /// skills in that order. World Book scans just after instructions, prepends
+  /// before-persona entries, and appends after-persona entries after skills.
+  /// Memory snapshots and optional timestamps remain on user messages.
   Future<void> injectMemoryAndRecentChats(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant, {
@@ -2138,16 +2178,12 @@ class MessageBuilderService {
     if (assistant.enableMemory) {
       final resolved = settings ?? contextProvider.read<SettingsProvider>();
       final memory = await _legacyMemoryBlock(assistant.id);
-      final currentHour = _formatCurrentHour(DateTime.now());
       final buf = StringBuffer(memory);
       final template = resolved.resolvedMemoryPromptLang == MemoryPromptLang.zh
           ? resolved.legacyMemoryPromptZh
           : resolved.legacyMemoryPromptEn;
       buf.writeln(
-        template.replaceAll(
-          MemoryPrompts.legacyCurrentTimePlaceholder,
-          currentHour,
-        ),
+        template.replaceAll(MemoryPrompts.legacyCurrentTimePlaceholder, ''),
       );
       _appendToSystemMessage(
         apiMessages,
@@ -2189,10 +2225,6 @@ class MessageBuilderService {
         );
       }
     }
-  }
-
-  String _formatCurrentHour(DateTime now) {
-    return '${now.year}年${now.month}月${now.day}日的${now.hour}点';
   }
 
   /// Inject search tool usage prompt into apiMessages.
@@ -2240,8 +2272,8 @@ class MessageBuilderService {
     } catch (_) {}
   }
 
-  /// Inject the workspace path / tool prompt after other system injections.
-  Future<void> injectWorkspacePrompt(
+  /// Append workspace facts and report whether they added a system section.
+  Future<bool> injectWorkspacePrompt(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant, {
     String? conversationId,
@@ -2258,23 +2290,26 @@ class MessageBuilderService {
             runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
             chatService: chatService,
           );
-      if (ctx == null) return;
+      if (ctx == null) return false;
       final environment = await environmentProvider?.loadExecutionConfig();
       final fragment = WorkspaceToolsService.buildPromptFragment(
         ctx,
         environmentVariableNames: environment?.variables.keys ?? const [],
       );
-      if (fragment.trim().isEmpty) return;
+      if (fragment.trim().isEmpty) return false;
       _appendToSystemMessage(
         apiMessages,
         fragment,
         source: ContextSource.workspace,
       );
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Inject the `<available_skills>` list after the workspace prompt.
-  Future<void> injectSkillsPrompt(
+  Future<bool> injectSkillsPrompt(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant, {
     String? conversationId,
@@ -2294,7 +2329,7 @@ class MessageBuilderService {
         assistant,
         conversationOverride: override,
       );
-      if (skills.isEmpty) return;
+      if (skills.isEmpty) return false;
       final skillsModelRoot =
           workspaceContext?.paths.modelSkillsDir ?? '/skills';
       final fragment = buildAvailableSkillsFragment(
@@ -2302,16 +2337,21 @@ class MessageBuilderService {
         skillsModelRoot: skillsModelRoot,
         selectedSkillIds: override ?? assistant?.skillIds ?? const [],
       );
-      if (fragment.trim().isEmpty) return;
+      if (fragment.trim().isEmpty) return false;
       _appendToSystemMessage(
         apiMessages,
         fragment,
         source: ContextSource.skills,
       );
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
-  /// Inject world book (lorebook) entries into apiMessages.
+  /// Scan once and inject the activated entries at their chosen positions.
+  /// Generation defers only the after-persona text until workspace and skills
+  /// are present. Detached and compression requests can place it immediately.
   Future<void> injectWorldBookPrompts(
     List<Map<String, dynamic>> apiMessages,
     String? assistantId, {
@@ -2322,6 +2362,7 @@ class MessageBuilderService {
     // activation timers or an expansion back into the current conversation.
     bool restrictToSourceMessages = false,
     bool persistActivation = true,
+    void Function(String content)? deferAfterSystemPrompt,
     void Function(int before, int after)? onActivationPersisted,
   }) async {
     final compressionDefaults = contextProvider
@@ -2525,111 +2566,21 @@ class MessageBuilderService {
         byPosition.putIfAbsent(t.position, () => <WorldBookEntry>[]).add(t);
       }
 
-      // BEFORE/AFTER_SYSTEM_PROMPT: merge into system message.
-      final beforeContent = joinContents(
-        byPosition[WorldBookInjectionPosition.beforeSystemPrompt] ??
-            const <WorldBookEntry>[],
+      _mergeWorldBookSystemPrompt(
+        apiMessages,
+        joinContents(
+          byPosition[WorldBookInjectionPosition.beforeSystemPrompt] ?? const [],
+        ),
+        position: WorldBookInjectionPosition.beforeSystemPrompt,
       );
       final afterContent = joinContents(
-        byPosition[WorldBookInjectionPosition.afterSystemPrompt] ??
-            const <WorldBookEntry>[],
+        byPosition[WorldBookInjectionPosition.afterSystemPrompt] ?? const [],
       );
-
-      if (beforeContent.isNotEmpty || afterContent.isNotEmpty) {
-        final systemIndex = apiMessages.indexWhere(
-          (m) => (m['role'] ?? '').toString() == 'system',
-        );
-        if (systemIndex >= 0) {
-          final original = (apiMessages[systemIndex]['content'] ?? '')
-              .toString();
-          final sb = StringBuffer();
-          if (beforeContent.isNotEmpty) {
-            sb.write(beforeContent);
-            sb.write('\n');
-          }
-          sb.write(original);
-          if (afterContent.isNotEmpty) {
-            sb.write('\n');
-            sb.write(afterContent);
-          }
-          apiMessages[systemIndex]['content'] = sb.toString();
-          final sysMsg = apiMessages[systemIndex];
-          if (beforeContent.isNotEmpty) {
-            ContextSegmentTags.prepend(
-              sysMsg,
-              source: ContextSource.worldBook,
-              length: beforeContent.length + 1,
-              meta: {
-                'position': WorldBookInjectionPosition.beforeSystemPrompt
-                    .toJson(),
-              },
-            );
-          }
-          if (afterContent.isNotEmpty) {
-            ContextSegmentTags.append(
-              sysMsg,
-              source: ContextSource.worldBook,
-              length: 1 + afterContent.length,
-              meta: {
-                'position': WorldBookInjectionPosition.afterSystemPrompt
-                    .toJson(),
-              },
-            );
-          }
+      if (afterContent.isNotEmpty) {
+        if (deferAfterSystemPrompt != null) {
+          deferAfterSystemPrompt(afterContent);
         } else {
-          final sb = StringBuffer();
-          if (beforeContent.isNotEmpty) sb.write(beforeContent);
-          if (afterContent.isNotEmpty) {
-            if (sb.isNotEmpty) sb.write('\n');
-            sb.write(afterContent);
-          }
-          if (sb.isNotEmpty) {
-            final created = <String, dynamic>{
-              'role': 'system',
-              'content': sb.toString(),
-            };
-            if (beforeContent.isNotEmpty && afterContent.isNotEmpty) {
-              ContextSegmentTags.write(created, [
-                ContextSegmentTags.item(
-                  source: ContextSource.worldBook,
-                  length: beforeContent.length + 1,
-                  meta: {
-                    'position': WorldBookInjectionPosition.beforeSystemPrompt
-                        .toJson(),
-                  },
-                ),
-                ContextSegmentTags.item(
-                  source: ContextSource.worldBook,
-                  length: afterContent.length,
-                  meta: {
-                    'position': WorldBookInjectionPosition.afterSystemPrompt
-                        .toJson(),
-                  },
-                ),
-              ]);
-            } else if (beforeContent.isNotEmpty) {
-              ContextSegmentTags.replaceWithSingle(
-                created,
-                source: ContextSource.worldBook,
-                length: beforeContent.length,
-                meta: {
-                  'position': WorldBookInjectionPosition.beforeSystemPrompt
-                      .toJson(),
-                },
-              );
-            } else {
-              ContextSegmentTags.replaceWithSingle(
-                created,
-                source: ContextSource.worldBook,
-                length: afterContent.length,
-                meta: {
-                  'position': WorldBookInjectionPosition.afterSystemPrompt
-                      .toJson(),
-                },
-              );
-            }
-            apiMessages.insert(0, created);
-          }
+          appendWorldBookAfterPrompt(apiMessages, afterContent);
         }
       }
 
@@ -2650,11 +2601,19 @@ class MessageBuilderService {
         );
       }
 
-      // BOTTOM_OF_CHAT: insert before last message.
+      // World Book chat entries stay behind leading system messages, even in
+      // an empty conversation preview where there is no real last turn yet.
+      final historyStart = apiMessages
+          .takeWhile((message) => message['role'] == 'system')
+          .length;
+      // BOTTOM_OF_CHAT: insert before the last chat message.
       final bottomInjections =
           byPosition[WorldBookInjectionPosition.bottomOfChat];
       if (bottomInjections != null && bottomInjections.isNotEmpty) {
-        var insertIndex = apiMessages.isEmpty ? 0 : (apiMessages.length - 1);
+        var insertIndex = (apiMessages.length - 1).clamp(
+          historyStart,
+          apiMessages.length,
+        );
         insertIndex = findSafeInsertIndex(apiMessages, insertIndex);
         apiMessages.insertAll(
           insertIndex,
@@ -2677,9 +2636,6 @@ class MessageBuilderService {
         final depths = byDepth.keys.toList(growable: false)
           ..sort((a, b) => b.compareTo(a));
         final originalLength = apiMessages.length;
-        final historyStart = apiMessages
-            .takeWhile((message) => message['role'] == 'system')
-            .length;
         var insertedCount = 0;
 
         for (final depth in depths) {
@@ -2699,6 +2655,65 @@ class MessageBuilderService {
         }
       }
     } catch (_) {}
+  }
+
+  /// Keep the original single newline beside the persona when there is no
+  /// intervening workspace or skills section. New sections use a blank line.
+  void appendWorldBookAfterPrompt(
+    List<Map<String, dynamic>> apiMessages,
+    String content, {
+    bool afterNewSection = false,
+  }) {
+    _mergeWorldBookSystemPrompt(
+      apiMessages,
+      content,
+      position: WorldBookInjectionPosition.afterSystemPrompt,
+      separator: afterNewSection ? '\n\n' : '\n',
+    );
+  }
+
+  void _mergeWorldBookSystemPrompt(
+    List<Map<String, dynamic>> apiMessages,
+    String content, {
+    required WorldBookInjectionPosition position,
+    String separator = '\n',
+  }) {
+    if (content.isEmpty) return;
+    final meta = {'position': position.toJson()};
+    final index = apiMessages.indexWhere(
+      (message) => message['role'] == 'system',
+    );
+    if (index < 0) {
+      final message = <String, dynamic>{'role': 'system', 'content': content};
+      ContextSegmentTags.replaceWithSingle(
+        message,
+        source: ContextSource.worldBook,
+        length: content.length,
+        meta: meta,
+      );
+      apiMessages.insert(0, message);
+      return;
+    }
+    final message = apiMessages[index];
+    final original = message['content'] ?? '';
+    final length = content.length + separator.length;
+    if (position == WorldBookInjectionPosition.beforeSystemPrompt) {
+      message['content'] = '$content$separator$original';
+      ContextSegmentTags.prepend(
+        message,
+        source: ContextSource.worldBook,
+        length: length,
+        meta: meta,
+      );
+    } else {
+      message['content'] = '$original$separator$content';
+      ContextSegmentTags.append(
+        message,
+        source: ContextSource.worldBook,
+        length: length,
+        meta: meta,
+      );
+    }
   }
 
   /// Helper to append content to the system message (or create one if missing).
@@ -2792,16 +2807,4 @@ class MessageBuilderService {
       return false;
     }
   }
-}
-
-class _DocTextCacheEntry {
-  const _DocTextCacheEntry({
-    required this.text,
-    required this.modifiedMs,
-    required this.size,
-  });
-
-  final String? text;
-  final int modifiedMs;
-  final int size;
 }

@@ -23,6 +23,7 @@ import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/models/carried_original.dart';
 import 'package:Kelivo/core/services/chat/context_compression_service.dart';
 import 'package:Kelivo/features/chat/widgets/context_operations_panel.dart';
 import 'package:Kelivo/features/chat/widgets/context_operation_actions.dart';
@@ -31,6 +32,7 @@ import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import '../../../support/business_test_harness.dart';
 
@@ -53,6 +55,10 @@ void check(String name, WidgetTesterCallback body) {
     try {
       await body(tester);
     } finally {
+      // Actions reached via runAsync can leave a real-time toast timer.
+      // Finish its exit animation while this test still owns the navigator.
+      AppSnackBarManager().dismissAll();
+      await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox.shrink());
       debugDefaultTargetPlatformOverride = null;
     }
@@ -186,7 +192,10 @@ void main() {
     await pumpUntil(
       tester,
       () =>
-          find.text('Saved history: 60 messages').evaluate().isNotEmpty &&
+          find
+              .text(AppLocalizationsEn().contextOperationsStored(60))
+              .evaluate()
+              .isNotEmpty &&
           find.text('Loading...').evaluate().isEmpty,
     );
   }
@@ -230,7 +239,10 @@ void main() {
     await pumpUntil(
       tester,
       () =>
-          find.text('Saved history: 60 messages').evaluate().isNotEmpty &&
+          find
+              .text(AppLocalizationsEn().contextOperationsStored(60))
+              .evaluate()
+              .isNotEmpty &&
           find.text('Loading...').evaluate().isEmpty,
     );
     await tester.pump(const Duration(seconds: 1));
@@ -550,6 +562,151 @@ void main() {
     });
   });
 
+  check('detail actions use the latest copy after editing without reopening', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      chat.contextCompression.estimateCandidate =
+          (_, _, {bool? fixedContextStart}) async =>
+              (usedTokens: 100, contextWindow: 20000);
+      await start(
+        (_, _) async => 'summary',
+        options: const CompressContextOptions(
+          mode: CompressContextLimitMode.keepRecent,
+          keepUserMessages: 2,
+          carry: CarrySetting(mode: CarryMode.count, count: 1),
+        ),
+      );
+      await until(
+        () =>
+            chat.contextCompression.taskFor(id)!.phase ==
+            CompressionPhase.completed,
+      );
+    });
+    final original = chat.contextOperationsFor(id).single;
+    late BuildContext page;
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: settings,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              page = context;
+              return const Scaffold();
+            },
+          ),
+        ),
+      ),
+    );
+    final closed = showContextOperationDetails(
+      page,
+      chat: chat,
+      conversationId: id,
+      operation: original,
+    );
+    await tester.pump();
+    final detail = find.byType(ContextOperationContent);
+    await pumpUntil(
+      tester,
+      () =>
+          detail.evaluate().isNotEmpty &&
+          tester.widget<ContextOperationContent>(detail).onSaveCarried != null,
+    );
+    final actions = tester.widget<ContextOperationContent>(detail);
+    final list = original.carried!;
+    expect(
+      await tester.runAsync(
+        () => actions.onSaveCarried!(
+          list.withItems([
+            list.items.single.copyWith(editedText: 'fixed copy'),
+          ]),
+        ),
+      ),
+      true,
+    );
+    expect(await tester.runAsync(() => actions.onUndo!()), true);
+    expect(chat.contextOperationsFor(id).single.revoked, true);
+    Navigator.of(tester.element(detail)).pop();
+    await tester.pumpAndSettle();
+    await closed;
+  });
+  check('compression history shows the name or keeps the recorded model ID', (
+    tester,
+  ) async {
+    const primaryProviderId = 'summary-provider';
+    const providerId = '$primaryProviderId / backup';
+    const modelId = 'namespace/summary-model';
+    await tester.runAsync(() async {
+      await settings.setProviderConfig(
+        providerId,
+        ProviderConfig(
+          id: providerId,
+          name: 'Summary Provider / Backup',
+          enabled: true,
+          apiKey: '',
+          baseUrl: 'https://example.test',
+          models: const [modelId, 'shared-model', 'other-model'],
+          modelOverrides: const {
+            modelId: {'name': 'Summary Model'},
+            'shared-model': {'name': 'Backup Model'},
+          },
+        ),
+      );
+      await settings.setProviderConfig(
+        primaryProviderId,
+        ProviderConfig(
+          id: primaryProviderId,
+          name: 'Summary Provider',
+          enabled: true,
+          apiKey: '',
+          baseUrl: 'https://example.test',
+          models: const ['backup / shared-model'],
+        ),
+      );
+    });
+    for (final (storedModel, expected) in const [
+      ('$providerId / $modelId', 'Summary Model'),
+      ('$providerId / other-model', '$providerId / other-model'),
+      ('$providerId / shared-model', '$providerId / shared-model'),
+      ('removed-provider / $modelId', 'removed-provider / $modelId'),
+      ('legacy-model-id', 'legacy-model-id'),
+    ]) {
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: ContextOperationContent(
+                  key: ValueKey(storedModel),
+                  operation: ContextOperation(
+                    id: 'compression',
+                    kind: ContextOperationKind.compress,
+                    anchorGroupId: 'anchor',
+                    appliedAfterGroupId: 'anchor',
+                    sourceGroups: const ['anchor'],
+                    dependencies: const [],
+                    createdAt: DateTime(2026, 5, 1),
+                    model: storedModel,
+                  ),
+                  onClose: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('context-summary-details-toggle')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('$expected · '), findsOneWidget);
+    }
+  });
   check('operation details paint and close while budgets are pending', (
     tester,
   ) async {
@@ -658,7 +815,7 @@ void main() {
           addTearDown(() => chat.contextCompression.removeListener(observe));
           String? opened;
           await pumpTaskEntry(tester, onOpenConversation: (id) => opened = id);
-          expect(find.text('Dismiss status'), findsNothing);
+          expect(find.text('Dismiss'), findsNothing);
           expect(chat.contextCompression.taskFor(id), isNotNull);
           await tester.tap(
             openResult ? find.text('Open new chat') : closePanel,
@@ -869,11 +1026,12 @@ void main() {
       ContextOperation? opened;
       await pumpPanel(tester, onOpen: (op) => opened = op);
       await tester.pumpAndSettle();
-      expect(find.text('Saved history: 60 messages'), findsOneWidget);
       expect(
-        find.text(
-          'History for the next request: 1 summaries + 50 original messages',
-        ),
+        find.text(AppLocalizationsEn().contextOperationsStored(60)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(AppLocalizationsEn().contextOperationsEffective(1, 50)),
         findsOneWidget,
       );
       final record = find.byKey(ValueKey('context-operation-${operation.id}'));
@@ -893,17 +1051,13 @@ void main() {
       await pumpUntil(
         tester,
         () => find
-            .text(
-              'History for the next request: 0 summaries + 60 original messages',
-            )
+            .text(AppLocalizationsEn().contextOperationsEffective(0, 60))
             .evaluate()
             .isNotEmpty,
       );
       await tester.pumpAndSettle();
       expect(
-        find.text(
-          'History for the next request: 0 summaries + 60 original messages',
-        ),
+        find.text(AppLocalizationsEn().contextOperationsEffective(0, 60)),
         findsOneWidget,
       );
       expect(find.textContaining('Undone'), findsOneWidget);
@@ -978,7 +1132,7 @@ void main() {
       );
       expect(find.text('Retry'), findsOneWidget);
       await tester.runAsync(() async {
-        await tester.tap(find.text('Dismiss status'));
+        await tester.tap(find.text('Dismiss'));
         await until(() => chat.contextCompression.taskFor(id) == null);
       });
       await tester.pumpAndSettle();

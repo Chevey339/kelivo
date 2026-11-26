@@ -44,6 +44,9 @@ class FakeSkillsService extends ChangeNotifier implements SkillsService {
   List<Skill> get skills => List.unmodifiable(_skills);
 
   @override
+  bool isLinkedEntrypointTarget(String resolvedHostPath) => false;
+
+  @override
   Future<void> rescan() async {
     notifyListeners();
   }

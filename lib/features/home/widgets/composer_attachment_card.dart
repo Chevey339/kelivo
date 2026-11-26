@@ -1,3 +1,5 @@
+import '../../../utils/sandbox_path_resolver.dart';
+import '../../../core/utils/multimodal_input_utils.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,6 +13,10 @@ import '../../../shared/utils/format_bytes.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+import '../../../shared/widgets/snackbar.dart';
+
+typedef ComposerAttachmentNotice = ({String label, String detail, bool failed});
 
 /// Metadata only: never read an attachment's contents to draw its preview.
 class ComposerAttachmentCard extends StatefulWidget {
@@ -26,10 +32,12 @@ class ComposerAttachmentCard extends StatefulWidget {
     required this.file,
     required this.onRemove,
     this.removeKey,
+    this.notice,
   });
   final DocumentAttachment file;
   final VoidCallback onRemove;
   final Key? removeKey;
+  final ComposerAttachmentNotice? notice;
 
   @override
   State<ComposerAttachmentCard> createState() => _ComposerAttachmentCardState();
@@ -50,9 +58,15 @@ class _ComposerAttachmentCardState extends State<ComposerAttachmentCard> {
   }
 
   void _loadSize() {
-    _size = File(
-      widget.file.path,
-    ).length().then<int?>((value) => value, onError: (_) => null);
+    final raw = widget.file.path;
+    final local = isRemoteOrDataUri(raw)
+        ? null
+        : SandboxPathResolver.resolveForIo(raw);
+    _size = local == null
+        ? Future.value(null)
+        : File(
+            local,
+          ).length().then<int?>((value) => value, onError: (_) => null);
   }
 
   @override
@@ -82,36 +96,62 @@ class _ComposerAttachmentCardState extends State<ComposerAttachmentCard> {
           ].contains(extension)
         ? Lucide.FileCode
         : Lucide.FileText;
+    final notice = widget.notice;
+    final accent = notice == null
+        ? null
+        : notice.failed
+        ? cs.error
+        : context.appColors.warning;
     return Tooltip(
-      message: file.fileName,
+      message: notice?.detail ?? file.fileName,
       child: Container(
         width: 96,
         height: ComposerAttachmentCard.heightFor(context),
         decoration: BoxDecoration(
           color: cs.onSurface.withValues(alpha: 0.035),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.onSurface.withValues(alpha: 0.07)),
+          border: Border.all(
+            color: accent ?? cs.onSurface.withValues(alpha: 0.07),
+          ),
         ),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(7, 7, 7, 6),
-              child: audio
-                  ? AudioClipPlayer(
-                      path: file.path,
-                      builder: (context, button, time) => _details(
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: notice == null
+                  ? null
+                  : () => showAppSnackBar(
+                      context,
+                      message: notice.detail,
+                      type: notice.failed
+                          ? NotificationType.error
+                          : NotificationType.warning,
+                    ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(7, 7, 7, 6),
+                child: audio
+                    ? AudioClipPlayer(
+                        path: file.path,
+                        builder: (context, button, time) => _details(
+                          context,
+                          extension: extension,
+                          leading: button,
+                          footer: time,
+                        ),
+                      )
+                    : _details(
                         context,
                         extension: extension,
-                        leading: button,
-                        footer: time,
+                        leading: Icon(
+                          notice?.failed == true ? Lucide.TriangleAlert : icon,
+                          size: 19,
+                          color: accent ?? cs.primary,
+                        ),
+                        footer: notice?.label,
+                        footerColor: accent,
                       ),
-                    )
-                  : _details(
-                      context,
-                      extension: extension,
-                      leading: Icon(icon, size: 19, color: cs.primary),
-                    ),
+              ),
             ),
             Positioned(
               top: 0,
@@ -140,9 +180,13 @@ class _ComposerAttachmentCardState extends State<ComposerAttachmentCard> {
     required String extension,
     required Widget leading,
     String? footer,
+    Color? footerColor,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final footerStyle = TextStyle(fontSize: 9, color: cs.onSurfaceVariant);
+    final footerStyle = TextStyle(
+      fontSize: 9,
+      color: footerColor ?? cs.onSurfaceVariant,
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [

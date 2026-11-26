@@ -1,3 +1,4 @@
+import 'package:uuid/uuid.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:sqlite3/sqlite3.dart' as composer_sqlite;
 import 'dart:async';
@@ -11,7 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+
 import 'package:xml/xml.dart';
 
 import '../../database/business_repository.dart';
@@ -29,20 +30,26 @@ import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
 import '../storage/attachment_file_lock.dart';
+import '../workspace/workspace_file_coordinator.dart';
 import '../migration/legacy_message_content_decoder.dart';
 import '../migration/legacy_record_sanitizer.dart';
 import '../../utils/multimodal_input_utils.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/kelivo_file_uri.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../database/backup_portability.dart';
+import '../../database/media_repository.dart';
 import 'backup_settings_validator.dart';
 import 'restore_bundle_preparation.dart';
 import 'restore_durability.dart';
 import 'restore_workspace_lock.dart';
 import 'restore_business_lease.dart';
-import 'temporary_restore_file.dart';
+import 'backup_staging.dart';
+import 'backup_partials.dart';
 import 'backup_cancel_token.dart';
 import 'backup_encryption.dart';
+import 'backup_file_digest.dart';
+import 'backup_archive_limits.dart';
 import 'backup_isolate_runner.dart';
 import 'backup_task_progress.dart';
 import 'streaming_zip_entry.dart';
@@ -126,6 +133,7 @@ List<MessagePart> _normalizeAttachmentPartUris(List<MessagePart> parts) {
             uri: uri,
             mime: part.mime,
             assetId: part.assetId,
+            generationItemId: part.generationItemId,
             unavailable: part.unavailable,
           ),
         );
@@ -170,6 +178,7 @@ List<MessagePart> _remapRestoredAttachmentPartUris(List<MessagePart> parts) {
             uri: uri,
             mime: part.mime,
             assetId: part.assetId,
+            generationItemId: part.generationItemId,
             unavailable: part.unavailable,
           ),
         );
@@ -217,6 +226,7 @@ List<MessagePart> recomputeAttachmentAvailability(
           uri: part.uri,
           mime: part.mime,
           assetId: part.assetId,
+          generationItemId: part.generationItemId,
           unavailable: unavailable,
         ),
       );
@@ -299,15 +309,8 @@ class DataSync {
     'skills',
     'workspaces',
     'sessions',
+    'generations',
   ];
-  // A 16 MiB metadata cap keeps manifest parsing and entry metadata bounded.
-  static const _maxManifestBytes = 16 * 1024 * 1024;
-  // Settings are parsed as one JSON object, so keep their decoded input bound.
-  static const _maxSettingsBytes = 1024 * 1024 * 1024;
-  // ZIP64 supports larger entries. Restore keeps explicit, diagnosable bounds.
-  static const _maxRestoreEntryBytes = 8 * 1024 * 1024 * 1024;
-  static const _maxRestoreTotalBytes = 16 * 1024 * 1024 * 1024;
-  static const _maxRestoreEntries = 100000;
 
   final ChatService chatService;
   final BusinessRepository businessRepository;
@@ -315,6 +318,9 @@ class DataSync {
   final RestoreDurability? _restoreDurability;
   BackupMergeReport? _lastMergeReport;
   BackupMergeReport? get lastMergeReport => _lastMergeReport;
+  Future<bool> get _hasCreations =>
+      chatService.chatRepositoryOrNull?.mediaRepository.hasCreations ??
+      businessRepository.hasCreations;
 
   DataSync({
     required this.chatService,
@@ -353,33 +359,40 @@ class DataSync {
   }) {
     var canResume = true;
     void Function()? resumeUi;
-    return _runLiveBusinessRestore<void>(() async {
-      await RestoreBundlePreparation.prepare(
-        appDataDirectory: Directory(appDataPath),
-        extractedDirectory: Directory(extractedPath),
-        sourceManifestSha256: sourceManifestSha256,
-        bundleIncludesChats: includeChats,
-        bundleIncludesFiles: includeFiles,
-        restoreChats: restoreChats,
-        restoreFiles: restoreFiles,
-        scope: scope,
-        validatedSettings: validatedSettings,
-        onProgress: onProgress,
-        cancelToken: cancelToken,
-        durability: _restoreDurability,
-        beforePublish: () async {
-          final uiStore = chatService.chatRepositoryOrNull?.genUiStates;
-          await uiStore?.pauseAndDrain();
-          resumeUi = uiStore?.resume;
-          // This conclusion also controls settings, even with no mounted UI store.
-          canResume = false;
-        },
-        onUnpublishedDiscarded: () {
-          canResume = true;
-          resumeUi?.call();
-        },
-      );
-    }, canResumeOnError: () => canResume);
+    return _runLiveBusinessRestore<void>(
+      () => AttachmentFileLock.synchronized(() async {
+        final media = chatService.chatRepositoryOrNull?.mediaRepository;
+        await RestoreBundlePreparation.prepare(
+          appDataDirectory: Directory(appDataPath),
+          extractedDirectory: Directory(extractedPath),
+          consumeExtractedFiles: true,
+          sourceManifestSha256: sourceManifestSha256,
+          bundleIncludesChats: includeChats,
+          bundleIncludesFiles: includeFiles,
+          restoreChats: restoreChats,
+          restoreFiles: restoreFiles,
+          scope: scope,
+          validatedSettings: validatedSettings,
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+          durability: _restoreDurability,
+          beforePublish: () async {
+            final uiStore = chatService.chatRepositoryOrNull?.genUiStates;
+            await uiStore?.pauseAndDrain();
+            resumeUi = uiStore?.resume;
+            media?.pauseWrites();
+            // This conclusion also controls settings, even with no mounted UI store.
+            canResume = false;
+          },
+          onUnpublishedDiscarded: () {
+            canResume = true;
+            resumeUi?.call();
+            media?.resumeWrites();
+          },
+        );
+      }),
+      canResumeOnError: () => canResume,
+    );
   }
 
   /// Prepares a local snapshot without opening the live database or providers.
@@ -408,10 +421,9 @@ class DataSync {
           !p.equals(lease.lockFile.absolute.path, expectedLeasePath)) {
         throw StateError('restore_startup_business_lease');
       }
-      extractDir = await Directory.systemTemp.createTemp(
-        'kelivo-startup-snapshot-',
+      extractDir = await BackupStaging.createDirectory(
+        'kelivo-startup-snapshot-${const Uuid().v4()}',
       );
-      registerLiveTempPath(extractDir.path);
       await runBackupIsolate<void, _BackupExtractArgs>(
         body: _extractZipInIsolate,
         payload: _BackupExtractArgs(
@@ -430,7 +442,9 @@ class DataSync {
             ),
             onProgress: onProgress,
           );
-      if (!info.includeChats || info.databaseInfo == null) {
+      if (!info.scope.includes(BackupCategory.chats) ||
+          !info.includeChats ||
+          info.databaseInfo == null) {
         throw const FormatException('restore_preparation_database_required');
       }
       final settings = await runBackupIsolate<Map<String, dynamic>, String>(
@@ -493,10 +507,9 @@ class DataSync {
   static Future<ChatDatabaseSnapshotInfo> inspectRecoverySnapshot(
     File snapshot,
   ) async {
-    final extracted = await Directory.systemTemp.createTemp(
-      'kelivo-recovery-check-',
+    final extracted = await BackupStaging.createDirectory(
+      'kelivo-recovery-check-${const Uuid().v4()}',
     );
-    registerLiveTempPath(extracted.path);
     Object? failure;
     try {
       await runBackupIsolate<void, _BackupExtractArgs>(
@@ -515,7 +528,7 @@ class DataSync {
               allowUnverifiedForwardCompatible: false,
             ),
           );
-      if (!info.includeChats) {
+      if (!info.scope.includes(BackupCategory.chats) || !info.includeChats) {
         throw const FormatException('restore_preparation_database_required');
       }
       final settings = await runBackupIsolate<Map<String, dynamic>, String>(
@@ -683,7 +696,9 @@ class DataSync {
     }
     final archive = await _prepareBackupArchive(
       chatService: chatService,
+      verifyPayload: false,
       includeChats: cfg.scope.includes(BackupCategory.chats),
+      hasCreations: () => _hasCreations,
       includeFiles: cfg.scope.assetRoots.isNotEmpty,
       scope: cfg.scope,
       exportSettings: () =>
@@ -750,20 +765,21 @@ class DataSync {
   /// backup rather than needing a restore path of its own.
   static Future<PreparedBackupArchive> _prepareBackupArchive({
     ChatService? chatService,
+    bool verifyPayload = true,
     required bool includeChats,
     required bool includeFiles,
+    Future<bool> Function()? hasCreations,
     BackupScope scope = const BackupScope(),
     required _BackupSettingsSource exportSettings,
     required _BackupDatabaseSource snapshotDatabase,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
-    final tmp = await _ensureTempDir();
-    await _cleanupPreviousBackupTempFiles(tmp);
+    await BackupStaging.sweep();
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final workDir = Directory(p.join(tmp.path, 'kelivo_backup_$timestamp'));
-    await workDir.create(recursive: true);
-    registerLiveTempPath(workDir.path);
+    final workDir = await BackupStaging.createDirectory(
+      'kelivo_backup_$timestamp',
+    );
 
     final outPath = p.join(workDir.path, 'kelivo_backup_$timestamp.zip');
     final outFile = File(outPath);
@@ -815,6 +831,12 @@ class DataSync {
 
       ChatDatabaseSnapshotInfo? snapshotInfo;
       var publishedDraftFiles = <String>{};
+      var publishedCreationFiles = const <String>{};
+      if (!includeChats &&
+          scope.includes(BackupCategory.creations) &&
+          hasCreations != null) {
+        includeChats = await hasCreations();
+      }
       if (includeChats) {
         final databaseFile = File(p.join(workDir.path, '_bk_kelivo.db'));
         databaseTmp = databaseFile;
@@ -827,7 +849,30 @@ class DataSync {
         );
         snapshotInfo = await snapshotDatabase(databaseFile);
         publishedDraftFiles = _publishedDraftFilesFrom(databaseFile);
-        await _sanitizeBackupDatabase(databaseFile, scope: scope);
+        final hasCreations = await _sanitizeBackupDatabase(
+          databaseFile,
+          scope: scope,
+        );
+        if (!scope.includes(BackupCategory.chats)) {
+          includeChats = hasCreations;
+          snapshotInfo = hasCreations
+              ? (
+                  schemaVersion: AppDatabase.currentSchemaVersion,
+                  conversationCount: 0,
+                  messageCount: 0,
+                )
+              : null;
+        }
+        if (hasCreations && includeFiles) {
+          final database = AppDatabase.open(file: databaseFile);
+          try {
+            publishedCreationFiles = await MediaRepository(
+              database,
+            ).referencedFiles();
+          } finally {
+            await database.close();
+          }
+        }
       }
 
       if (!includeChats && includeFiles) {
@@ -859,13 +904,22 @@ class DataSync {
       };
       final manifestPath = manifestFile.path;
       final settingsPath = settingsFile.path;
-      final databasePath = databaseTmp?.path;
+      final databasePath = includeChats ? databaseTmp!.path : null;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
-      await runBackupIsolate<void, _BackupPackArgs>(
+      // Enumeration starts before the worker knows the byte total.
+      onProgress?.call(
+        BackupProgress(
+          phase: includeFiles ? BackupPhase.scanning : BackupPhase.packing,
+          processed: 0,
+          cancellable: true,
+        ),
+      );
+      final packed = await runBackupIsolate<BackupProgress, _BackupPackArgs>(
         body: _packAndVerifyInIsolate,
         payload: _BackupPackArgs(
           outPath: outPath,
+          verifyPayload: verifyPayload,
           manifestPath: manifestPath,
           settingsPath: settingsPath,
           databasePath: databasePath,
@@ -877,10 +931,13 @@ class DataSync {
           scope: scope,
           assetRootPaths: assetRootPaths,
           publishedDraftFiles: publishedDraftFiles,
+          publishedCreationFiles: publishedCreationFiles,
         ),
         cancelToken: cancelToken,
         onProgress: onProgress,
       );
+      // The result also delivers any omissions after throttled worker updates.
+      if (packed.skippedEntries.isNotEmpty) onProgress?.call(packed);
 
       return (
         file: takePreparedBackupFile(outFile, cancelToken),
@@ -973,11 +1030,9 @@ class DataSync {
         sourceDatabase.path,
       );
     }
-    final tmp = await _ensureTempDir();
-    final stagingDirectory = await Directory(
-      p.join(tmp.path, 'kelivo_adopt_${DateTime.now().microsecondsSinceEpoch}'),
-    ).create(recursive: true);
-    registerLiveTempPath(stagingDirectory.path);
+    final stagingDirectory = await BackupStaging.createDirectory(
+      'kelivo_adopt_${const Uuid().v4()}',
+    );
     try {
       final working = File(
         p.join(stagingDirectory.path, AppDatabase.databaseFileName),
@@ -1042,7 +1097,6 @@ class DataSync {
     } catch (_) {}
   }
 
-  @visibleForTesting
   static Future<void> completeLocalFileExport({
     required File exported,
     required Future<void> Function(File exported) persist,
@@ -1109,116 +1163,34 @@ class DataSync {
     );
   }
 
-  static final Set<String> _liveTempPaths = {};
-
-  static void registerLiveTempPath(String path) {
-    _liveTempPaths.add(p.normalize(p.absolute(path)));
-  }
-
-  static void unregisterLiveTempPath(String path) {
-    _liveTempPaths.remove(p.normalize(p.absolute(path)));
-  }
-
-  static bool _isLiveTempPath(String path) {
-    final normalized = p.normalize(p.absolute(path));
-    for (final live in _liveTempPaths) {
-      if (normalized == live ||
-          p.isWithin(live, normalized) ||
-          p.isWithin(normalized, live)) {
-        return true;
-      }
-    }
-    return false;
-  }
+  static void registerLiveTempPath(String path) => BackupStaging.register(path);
+  static void unregisterLiveTempPath(String path) =>
+      BackupStaging.release(path);
 
   @visibleForTesting
-  static Future<void> debugCleanupPreviousBackupTempFiles(Directory tmp) {
-    return _cleanupPreviousBackupTempFiles(tmp);
-  }
+  static Future<void> debugCleanupPreviousBackupTempFiles(Directory tmp) =>
+      BackupStaging.sweep(temporary: tmp);
 
-  /// Parses the creation time out of a `kelivo_backup_<iso-with-dashes>` name
-  /// (see [prepareBackupFile], which replaces ':' with '-'). Returns null for
-  /// names that do not carry a timestamp.
-  static DateTime? _backupTempTimestampFromName(String name) {
-    const prefix = 'kelivo_backup_';
-    if (!name.startsWith(prefix)) return null;
-    var core = name.substring(prefix.length);
-    if (core.endsWith('.zip')) {
-      core = core.substring(0, core.length - 4);
-    }
-    final match = RegExp(
-      r'^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})(.*)$',
-    ).firstMatch(core);
-    if (match == null) return null;
-    return DateTime.tryParse(
-      '${match[1]}T${match[2]}:${match[3]}:${match[4]}${match[5]}',
-    );
-  }
-
-  static Future<void> _cleanupPreviousBackupTempFiles(Directory tmp) async {
-    try {
-      if (!await tmp.exists()) return;
-      // Only reclaim entries that are clearly abandoned. WebDAV, S3 and local
-      // export are independent providers with no shared busy flag, so an
-      // age-blind sweep here would delete the working directory of a backup
-      // that another provider is still packing or uploading.
-      final cutoff = DateTime.now().subtract(const Duration(hours: 6));
-      Future<bool> isStale(FileSystemEntity entity, String name) async {
-        final fromName = _backupTempTimestampFromName(name);
-        if (fromName != null) return fromName.isBefore(cutoff);
-        try {
-          return (await entity.stat()).modified.isBefore(cutoff);
-        } catch (_) {
-          // Unknown age: keep it rather than risk racing a live backup.
-          return false;
-        }
-      }
-
-      await for (final ent in tmp.list(followLinks: false)) {
-        if (_isLiveTempPath(ent.path)) continue;
-        final name = p.basename(ent.path);
-        if (ent is Directory &&
-            (name.startsWith('kelivo_backup_') ||
-                name.startsWith('kelivo_decrypted_'))) {
-          if (await isStale(ent, name)) await _deleteDirectoryQuietly(ent);
-        } else if (ent is File &&
-            ((name.startsWith('kelivo_backup_') && name.endsWith('.zip')) ||
-                name == '_bk_settings.json' ||
-                name == '_bk_chats.json' ||
-                name == '_bk_manifest.json' ||
-                name == '_bk_kelivo.db')) {
-          if (await isStale(ent, name)) await _deleteFileQuietly(ent);
-        }
-      }
-    } catch (_) {}
-  }
-
-  /// Synchronous ZIP packing — runs inside an Isolate.
-  static void _packAndVerifyInIsolate(
+  static BackupProgress _packAndVerifyInIsolate(
     BackupIsolateContext ctx,
     _BackupPackArgs args,
-  ) {
-    final expectedEntries = _packZipSync(
-      outPath: args.outPath,
-      manifestPath: args.manifestPath,
-      settingsPath: args.settingsPath,
-      databasePath: args.databasePath,
-      snapshotInfo: args.snapshotInfo,
-      includeChats: args.includeChats,
-      includeFiles: args.includeFiles,
-      appVersion: args.appVersion,
-      businessEntityRowIds: args.businessEntityRowIds,
-      scope: args.scope,
-      assetRootPaths: args.assetRootPaths,
-      publishedDraftFiles: args.publishedDraftFiles,
-      ctx: ctx,
-    );
-    _verifyPackedBackupSync(
-      zipPath: args.outPath,
-      expectedEntries: expectedEntries,
-      ctx: ctx,
-    );
-  }
+  ) => _packZipSync(
+    verifyPayload: args.verifyPayload,
+    outPath: args.outPath,
+    manifestPath: args.manifestPath,
+    settingsPath: args.settingsPath,
+    databasePath: args.databasePath,
+    snapshotInfo: args.snapshotInfo,
+    includeChats: args.includeChats,
+    includeFiles: args.includeFiles,
+    appVersion: args.appVersion,
+    businessEntityRowIds: args.businessEntityRowIds,
+    scope: args.scope,
+    assetRootPaths: args.assetRootPaths,
+    publishedDraftFiles: args.publishedDraftFiles,
+    publishedCreationFiles: args.publishedCreationFiles,
+    ctx: ctx,
+  );
 
   static int _fileSizeSync(String? path) {
     if (path == null) return 0;
@@ -1226,16 +1198,44 @@ class DataSync {
     return file.existsSync() ? file.lengthSync() : 0;
   }
 
-  static List<File> _listFilesSync(String dirPath) {
+  static Iterable<File> _listFilesSync(
+    String dirPath, {
+    required bool excludeSessionTemp,
+    required void Function(String path) onUnreadable,
+    BackupIsolateContext? ctx,
+  }) sync* {
     final dir = Directory(dirPath);
-    if (!dir.existsSync()) return const [];
-    return [
-      for (final entity in dir.listSync(recursive: true, followLinks: false))
-        if (entity is File) entity,
-    ];
+    if (!dir.existsSync()) return;
+    final pending = [dir];
+    while (pending.isNotEmpty) {
+      ctx?.throwIfCancelled();
+      final current = pending.removeLast();
+      final isSession =
+          excludeSessionTemp && p.equals(current.parent.path, dir.path);
+      final List<FileSystemEntity> children;
+      try {
+        children = current.listSync(followLinks: false);
+      } on FileSystemException {
+        onUnreadable(current.path);
+        continue;
+      }
+      for (final entity in children) {
+        ctx?.throwIfCancelled();
+        if (entity is File) {
+          yield entity;
+        } else if (entity is Directory) {
+          // /tmp is ephemeral scratch bound to sessions/<id>/tmp. Prune it
+          // before listing: guest tools can leave unreadable directories here.
+          // Other directories named tmp can contain persistent user files.
+          if (isSession && p.basename(entity.path) == 'tmp') continue;
+          pending.add(entity);
+        }
+      }
+    }
   }
 
-  static Map<String, _BackupEntryMetadata> _packZipSync({
+  static BackupProgress _packZipSync({
+    required bool verifyPayload,
     required String outPath,
     required String manifestPath,
     required String settingsPath,
@@ -1248,6 +1248,7 @@ class DataSync {
     required BackupScope scope,
     required Map<String, String> assetRootPaths,
     Set<String> publishedDraftFiles = const {},
+    Set<String> publishedCreationFiles = const {},
     BackupIsolateContext? ctx,
   }) {
     if (includeChats != (databasePath != null && snapshotInfo != null)) {
@@ -1258,33 +1259,79 @@ class DataSync {
             !_assetRootNames.every(assetRootPaths.containsKey))) {
       throw StateError('backup_asset_roots');
     }
-    final assetFiles = includeFiles
-        ? {
-            for (final name in scope.assetRoots)
-              name: _listFilesSync(assetRootPaths[name]!).where((file) {
-                if (!RegExp(
-                  r'^draft-[0-9a-f-]{36}-[0-9]+',
-                ).hasMatch(p.basename(file.path))) {
-                  return true;
-                }
-                final relative = p.relative(
+    final skippedEntries = <String>{};
+    void recordUnreadable(String root, String path) {
+      skippedEntries.add(
+        _zipEntryName(
+          p.join(root, p.relative(path, from: assetRootPaths[root]!)),
+        ),
+      );
+    }
+
+    final assetFiles = <String, List<File>>{};
+    final fileSizes = <String, int>{};
+    var totalBytes = BackupArchiveLimits.addFile(
+      0,
+      'settings.json',
+      _fileSizeSync(settingsPath),
+    );
+    if (databasePath != null) {
+      totalBytes = BackupArchiveLimits.addFile(
+        totalBytes,
+        _databaseEntryName,
+        _fileSizeSync(databasePath),
+      );
+    }
+    final draftName = RegExp(r'^draft-[0-9a-f-]{36}-[0-9]+');
+    if (includeFiles) {
+      for (final name in scope.assetRoots) {
+        final root = assetRootPaths[name]!;
+        final files = assetFiles[name] = [];
+        for (final file in _listFilesSync(
+          root,
+          excludeSessionTemp: name == 'sessions',
+          onUnreadable: (path) => recordUnreadable(name, path),
+          ctx: ctx,
+        )) {
+          if (name == 'generations' &&
+              !publishedCreationFiles.contains(
+                KelivoFileUri.encodeFromAbsolute(
                   file.path,
-                  from: p.dirname(assetRootPaths[name]!),
-                );
-                final uri =
-                    'kelivo-file:///${p.split(relative).map(Uri.encodeComponent).join('/')}';
-                return publishedDraftFiles.contains(uri);
-              }).toList(),
+                  root: p.dirname(root),
+                ),
+              )) {
+            continue;
           }
-        : const <String, List<File>>{};
-    var totalBytes = _fileSizeSync(settingsPath) + _fileSizeSync(databasePath);
-    for (final files in assetFiles.values) {
-      for (final file in files) {
-        totalBytes += file.lengthSync();
+          if (draftName.hasMatch(p.basename(file.path))) {
+            final relative = p.relative(file.path, from: p.dirname(root));
+            final uri =
+                'kelivo-file:///${p.split(relative).map(Uri.encodeComponent).join('/')}';
+            if (!publishedDraftFiles.contains(uri)) continue;
+          }
+          try {
+            final size = file.lengthSync();
+            fileSizes[file.path] = size;
+            // This is a progress estimate. Only entries the writer can open
+            // count against the archive's limits; unreadable assets are skipped.
+            totalBytes += size;
+            files.add(file);
+          } on FileSystemException {
+            recordUnreadable(name, file.path);
+            continue;
+          }
+          ctx?.reportProgress(
+            BackupProgress(
+              phase: BackupPhase.scanning,
+              processed: fileSizes.length,
+              unit: BackupProgressUnit.items,
+            ),
+          );
+        }
       }
     }
-    final meter = _BackupByteMeter(
-      ctx: ctx,
+    final meter = BackupByteProgress(
+      onProgress: ctx?.reportProgress,
+      checkCancelled: ctx?.throwIfCancelled,
       phase: BackupPhase.packing,
       total: totalBytes,
     );
@@ -1319,11 +1366,16 @@ class DataSync {
             name,
             entries,
             collisionKeys,
-            files: assetFiles[name],
+            files: assetFiles[name]!,
+            fileSizes: fileSizes,
+            onUnreadable: (path) => recordUnreadable(name, path),
           );
         }
       }
 
+      if (entries.length + 1 > BackupArchiveLimits.entries) {
+        throw const FormatException('zip_entry_count');
+      }
       final manifestJson = _buildBackupManifestJson(
         entries: entries,
         snapshotInfo: snapshotInfo,
@@ -1332,9 +1384,14 @@ class DataSync {
         appVersion: appVersion,
         businessEntityRowIds: businessEntityRowIds,
         scope: scope,
+        skippedEntries: skippedEntries.toList(),
       );
+      final manifestBytes = utf8.encode(manifestJson);
+      if (manifestBytes.length > BackupArchiveLimits.manifestBytes) {
+        throw const FormatException('manifest_size');
+      }
       final manifestFile = File(manifestPath)
-        ..writeAsStringSync(manifestJson, flush: true);
+        ..writeAsBytesSync(manifestBytes, flush: true);
       entries[_manifestEntryName] = writer.addFile(
         manifestFile,
         _manifestEntryName,
@@ -1343,7 +1400,27 @@ class DataSync {
         reportProgress: false,
       );
       writer.closeSync();
-      return entries;
+      if (verifyPayload) {
+        _verifyPackedBackupSync(
+          zipPath: outPath,
+          expectedEntries: entries,
+          ctx: ctx,
+        );
+      } else {
+        writer.verifyIndex(outPath, entries[_manifestEntryName]!, ctx);
+      }
+      final completed = verifyPayload
+          ? entries.values.fold<int>(0, (sum, entry) => sum + entry.bytes)
+          : entries.length;
+      return BackupProgress(
+        phase: BackupPhase.verifying,
+        processed: completed,
+        total: completed,
+        unit: verifyPayload
+            ? BackupProgressUnit.bytes
+            : BackupProgressUnit.items,
+        skippedEntries: skippedEntries.toList(),
+      );
     } finally {
       writer.closeIfNeededSync();
     }
@@ -1355,6 +1432,17 @@ class DataSync {
     BackupIsolateContext? ctx,
   }) {
     final expectedNames = {...expectedEntries.keys, _manifestEntryName};
+    final verifyTotal = expectedEntries.values.fold<int>(
+      0,
+      (sum, metadata) => sum + metadata.bytes,
+    );
+    final meter = BackupByteProgress(
+      onProgress: ctx?.reportProgress,
+      checkCancelled: ctx?.throwIfCancelled,
+      phase: BackupPhase.verifying,
+      total: verifyTotal,
+    );
+    meter.report();
     final inputStream = InputFileStream(zipPath);
     try {
       final rawEntryNames = <String>[];
@@ -1375,16 +1463,6 @@ class DataSync {
           throw const FormatException('backup_entries');
         }
 
-        final verifyTotal = expectedEntries.values.fold<int>(
-          0,
-          (sum, metadata) => sum + metadata.bytes,
-        );
-        final meter = _BackupByteMeter(
-          ctx: ctx,
-          phase: BackupPhase.verifying,
-          total: verifyTotal,
-        );
-        meter.report();
         for (final entry in archive) {
           if (!entry.isFile) continue;
           final canonical = _zipEntryName(entry.name);
@@ -1429,48 +1507,44 @@ class DataSync {
     Set<String> collisionKeys,
   ) {
     final file = File(filePath);
-    if (!file.existsSync()) {
-      throw FileSystemException('Backup entry does not exist', filePath);
-    }
     final canonicalName = _zipEntryName(entryName);
     final collisionKey = canonicalName.toLowerCase();
-    if (!collisionKeys.add(collisionKey)) {
+    if (collisionKeys.contains(collisionKey)) {
       throw StateError('backup_entry_collision:$canonicalName');
     }
     entries[canonicalName] = writer.addFile(file, canonicalName);
+    collisionKeys.add(collisionKey);
   }
 
-  /// Add all files from [srcDirPath] into the zip under [zipPrefix].
+  /// Add the enumerated files from [srcDirPath] under [zipPrefix].
   static void _addDirectoryToZip(
     _StreamingZipWriter writer,
     String srcDirPath,
     String zipPrefix,
     Map<String, _BackupEntryMetadata> entries,
     Set<String> collisionKeys, {
-    List<File>? files,
+    required List<File> files,
+    required Map<String, int> fileSizes,
+    required void Function(String path) onUnreadable,
   }) {
-    final fileSystemEntries =
-        files ??
-        [
-          for (final entity
-              in Directory(srcDirPath).existsSync()
-                  ? Directory(
-                      srcDirPath,
-                    ).listSync(recursive: true, followLinks: false)
-                  : const <FileSystemEntity>[])
-            if (entity is File) entity,
-        ];
-    for (final ent in fileSystemEntries) {
+    for (final ent in files) {
       final rel = p.relative(ent.path, from: srcDirPath);
       // ZIP entries must use forward slashes regardless of platform
       final relPosix = rel.replaceAll('\\', '/');
-      _addFileToZip(
-        writer,
-        ent.path,
-        '$zipPrefix/$relPosix',
-        entries,
-        collisionKeys,
-      );
+      final before = writer.meter?.processed ?? 0;
+      try {
+        _addFileToZip(
+          writer,
+          ent.path,
+          '$zipPrefix/$relPosix',
+          entries,
+          collisionKeys,
+        );
+      } on _BackupSourceReadException {
+        onUnreadable(ent.path);
+        final read = (writer.meter?.processed ?? 0) - before;
+        writer.meter?.skipUnreadBytes(fileSizes[ent.path]! - read);
+      }
     }
   }
 
@@ -1507,10 +1581,38 @@ class DataSync {
     _extractZipSync(args.zipPath, args.extractDirPath, ctx: ctx);
   }
 
+  /// User imports can be edited archives. Hash their actual extracted bytes
+  /// while checking the ZIP CRC, then keep that inventory on the same worker.
+  static Future<_VersionedBackupInfo?> _extractUserBackupInIsolate(
+    BackupIsolateContext ctx,
+    _BackupExtractArgs args,
+  ) async {
+    final entries = <String, _BackupEntryMetadata>{};
+    _extractZipSync(
+      args.zipPath,
+      args.extractDirPath,
+      ctx: ctx,
+      extractedEntries: entries,
+    );
+    if (!File(p.join(args.extractDirPath, 'settings.json')).existsSync()) {
+      throw const FormatException('settings.json');
+    }
+    final manifest = File(p.join(args.extractDirPath, _manifestEntryName));
+    if (!manifest.existsSync()) return null;
+    return _preflightVersionedBackup(
+      manifestPath: manifest.path,
+      extractDirPath: args.extractDirPath,
+      allowUnverifiedForwardCompatible: args.allowUnverifiedForwardCompatible,
+      extractedEntries: entries,
+      ctx: ctx,
+    );
+  }
+
   static void _extractZipSync(
     String zipPath,
     String extractDirPath, {
     BackupIsolateContext? ctx,
+    Map<String, _BackupEntryMetadata>? extractedEntries,
   }) {
     final inputStream = InputFileStream(zipPath);
     try {
@@ -1520,7 +1622,7 @@ class DataSync {
         callback: (entry) => rawEntryNames.add(entry.name),
       );
       try {
-        if (rawEntryNames.length > _maxRestoreEntries) {
+        if (rawEntryNames.length > BackupArchiveLimits.entries) {
           throw const FormatException('zip_entry_count');
         }
         final seenNames = <String>{};
@@ -1545,26 +1647,26 @@ class DataSync {
         }
         _validateZipPathPrefixes(allEntryNames, archiveFiles.keys);
 
-        final settingsEntry = archiveFiles['settings.json'];
-        if (settingsEntry != null &&
-            (settingsEntry.size <= 0 ||
-                settingsEntry.size > _maxSettingsBytes)) {
-          throw const FormatException('settings_size');
+        var declaredTotalBytes = 0;
+        for (final entry in archiveFiles.entries) {
+          declaredTotalBytes = BackupArchiveLimits.addFile(
+            declaredTotalBytes,
+            entry.key,
+            entry.value.size,
+          );
         }
 
         final manifestEntry = archiveFiles[_manifestEntryName];
         if (manifestEntry != null) {
-          if (manifestEntry.size < 0 ||
-              manifestEntry.size > _maxManifestBytes) {
-            throw const FormatException('manifest_size');
-          }
           final manifestPath = p.join(extractDirPath, _manifestEntryName);
           final manifestOutput = _BoundedOutputFileStream(
             manifestPath,
             expectedBytes: manifestEntry.size,
             expectedCrc32: manifestEntry.crc32!,
-            maxEntryBytes: _maxManifestBytes,
-            budget: _ExtractionBudget(maxTotalBytes: _maxManifestBytes),
+            maxEntryBytes: BackupArchiveLimits.manifestBytes,
+            budget: _ExtractionBudget(
+              maxTotalBytes: BackupArchiveLimits.manifestBytes,
+            ),
           );
           try {
             writeZipEntryStreaming(
@@ -1580,18 +1682,8 @@ class DataSync {
           throw const FormatException('database_manifest');
         }
 
-        var declaredTotalBytes = 0;
-        for (final entry in archiveFiles.values) {
-          if (entry.size < 0 || entry.size > _maxRestoreEntryBytes) {
-            throw FormatException('zip_entry_size:${entry.name}');
-          }
-          declaredTotalBytes += entry.size;
-          if (declaredTotalBytes > _maxRestoreTotalBytes) {
-            throw const FormatException('zip_total_size');
-          }
-        }
         final extractionBudget = _ExtractionBudget(
-          maxTotalBytes: _maxRestoreTotalBytes,
+          maxTotalBytes: BackupArchiveLimits.totalBytes,
         );
         if (manifestEntry != null) {
           extractionBudget.reserve(manifestEntry.size);
@@ -1599,26 +1691,46 @@ class DataSync {
         final extractTotal = archiveFiles.entries
             .where((entry) => entry.key != _manifestEntryName)
             .fold<int>(0, (sum, entry) => sum + entry.value.size);
-        final meter = _BackupByteMeter(
-          ctx: ctx,
+        final meter = BackupByteProgress(
+          onProgress: ctx?.reportProgress,
+          checkCancelled: ctx?.throwIfCancelled,
           phase: BackupPhase.extracting,
           total: extractTotal,
         );
         meter.report();
+        final directories = {extractDirPath};
+        void ensureDirectory(Directory directory) {
+          if (directories.add(directory.path)) {
+            directory.createSync(recursive: true);
+          }
+        }
+
         for (final entry in archive) {
           final canonical = _validatedZipEntryName(entry.name);
           if (canonical == _manifestEntryName) continue;
           final parts = canonical.split('/');
           final outPath = p.joinAll([extractDirPath, ...parts]);
           if (entry.isFile) {
-            File(outPath).parent.createSync(recursive: true);
+            ensureDirectory(File(outPath).parent);
+            // Distinct ZIP names can refer to the same file on the target
+            // volume (for example NFC and NFD on APFS).
+            if (FileSystemEntity.typeSync(outPath, followLinks: false) !=
+                FileSystemEntityType.notFound) {
+              throw FormatException('duplicate_zip_entry:$canonical');
+            }
             final output = _BoundedOutputFileStream(
               outPath,
               expectedBytes: entry.size,
               expectedCrc32: entry.crc32!,
-              maxEntryBytes: _maxRestoreEntryBytes,
+              maxEntryBytes: BackupArchiveLimits.entryBytes,
               budget: extractionBudget,
               meter: meter,
+              // Preparing the SQLite database changes it; its final bytes are
+              // hashed after normalization. Legacy JSON imports need no inventory.
+              hashContents:
+                  extractedEntries != null &&
+                  manifestEntry != null &&
+                  canonical != _databaseEntryName,
             );
             try {
               writeZipEntryStreaming(
@@ -1626,7 +1738,8 @@ class DataSync {
                 output,
                 checkCancelled: ctx?.throwIfCancelled,
               );
-              output.verifyComplete();
+              final metadata = output.verifyComplete();
+              if (metadata != null) extractedEntries![canonical] = metadata;
             } finally {
               output.closeSync();
             }
@@ -1637,7 +1750,7 @@ class DataSync {
               } catch (_) {}
             }
           } else {
-            Directory(outPath).createSync(recursive: true);
+            ensureDirectory(Directory(outPath));
           }
         }
         if (extractTotal > 0 && meter.processed != extractTotal) {
@@ -1707,64 +1820,91 @@ class DataSync {
       if (cancelToken?.isCancelled == true) {
         throw const BackupCancelledException();
       }
-      final target = _fileUri(cfg, p.basename(file.path));
-      final fileLen = await file.length();
-      // Use a streamed request so we don't load the entire file into RAM.
-      final req = http.StreamedRequest('PUT', target);
-      req.headers.addAll({
-        'content-type': password == null
-            ? 'application/zip'
-            : 'application/octet-stream',
-        'content-length': fileLen.toString(),
-        ..._authHeaders(cfg),
-        ..._extraHeaders(cfg),
-      });
-      // Pipe the file stream into the request body. addStream honors the
-      // sink's pause signal, so a slow network throttles disk reads instead of
-      // buffering the whole zip in RAM (which OOM-killed large mobile uploads).
-      unawaited(
-        req.sink
-            .addStream(
-              _watchedByteStream(
-                file.openRead(),
-                phase: BackupPhase.uploading,
-                total: fileLen,
-                onProgress: onProgress,
-                cancelToken: cancelToken,
+      final finalName = p.basename(file.path);
+      final name = '$finalName.partial';
+      final target = _fileUri(cfg, name);
+      await BackupPartials(businessPreferences).publish(
+        scope: _webDavScope(cfg),
+        name: name,
+        removePartial: () => _deletePartial(cfg, target),
+        write: () async {
+          final fileLen = await file.length();
+          // Use a streamed request so we don't load the entire file into RAM.
+          final req = http.StreamedRequest('PUT', target);
+          req.headers.addAll({
+            'content-type': password == null
+                ? 'application/zip'
+                : 'application/octet-stream',
+            'content-length': fileLen.toString(),
+            ..._authHeaders(cfg),
+            ..._extraHeaders(cfg),
+          });
+          // Pipe the file stream into the request body. addStream honors the
+          // sink's pause signal, so a slow network throttles disk reads instead of
+          // buffering the whole zip in RAM (which OOM-killed large mobile uploads).
+          unawaited(
+            req.sink
+                .addStream(
+                  _watchedByteStream(
+                    file.openRead(),
+                    phase: BackupPhase.uploading,
+                    total: fileLen,
+                    onProgress: onProgress,
+                    cancelToken: cancelToken,
+                  ),
+                )
+                .then(
+                  (_) => req.sink.close(),
+                  onError: (Object error) {
+                    req.sink.addError(error);
+                    req.sink.close();
+                  },
+                ),
+          );
+          final client = http.Client();
+          StreamSubscription<void>? cancelSub;
+          try {
+            cancelSub = cancelToken?.whenCancelled.asStream().listen((_) {
+              client.close();
+            });
+            final res = await client.send(req).then(http.Response.fromStream);
+            if (cancelToken?.isCancelled == true) {
+              throw const BackupCancelledException();
+            }
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+              throw Exception('Upload failed: ${res.statusCode}');
+            }
+            cancelToken?.throwIfCancelled();
+            cancelToken?.setCancellable(false);
+            onProgress?.call(
+              const BackupProgress(
+                phase: BackupPhase.finalizing,
+                processed: 0,
+                cancellable: false,
               ),
-            )
-            .then(
-              (_) => req.sink.close(),
-              onError: (Object error) {
-                req.sink.addError(error);
-                req.sink.close();
-              },
-            ),
+            );
+            final move = http.Request('MOVE', target)..followRedirects = false;
+            move.headers.addAll({
+              ..._authHeaders(cfg),
+              ..._extraHeaders(cfg),
+              'Destination': _fileUri(cfg, finalName).toString(),
+              'Overwrite': 'T',
+            });
+            final result = await client
+                .send(move)
+                .then(http.Response.fromStream);
+            if (!const {200, 201, 204}.contains(result.statusCode)) {
+              throw Exception('WebDAV MOVE failed: ${result.statusCode}');
+            }
+          } catch (error) {
+            cancelToken?.throwIfCancelled();
+            rethrow;
+          } finally {
+            await cancelSub?.cancel();
+            client.close();
+          }
+        },
       );
-      final client = http.Client();
-      StreamSubscription<void>? cancelSub;
-      try {
-        cancelSub = cancelToken?.whenCancelled.asStream().listen((_) {
-          client.close();
-        });
-        final res = await client.send(req).then(http.Response.fromStream);
-        if (cancelToken?.isCancelled == true) {
-          throw const BackupCancelledException();
-        }
-        if (res.statusCode < 200 || res.statusCode >= 300) {
-          throw Exception('Upload failed: ${res.statusCode}');
-        }
-      } catch (error) {
-        if (error is BackupCancelledException ||
-            cancelToken?.isCancelled == true) {
-          await _deleteRemoteQuietly(cfg, target);
-          throw const BackupCancelledException();
-        }
-        rethrow;
-      } finally {
-        await cancelSub?.cancel();
-        client.close();
-      }
     } finally {
       await cleanupTemporaryBackupFile(file);
     }
@@ -1772,6 +1912,7 @@ class DataSync {
 
   Future<List<BackupFileItem>> listBackupFiles(
     WebDavConfig cfg, {
+    bool partialsOnly = false,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
@@ -1856,15 +1997,32 @@ class DataSync {
       DateTime? mtime;
       if (mtimeStr.isNotEmpty) {
         try {
-          mtime = DateTime.parse(mtimeStr.first);
+          mtime =
+              DateTime.tryParse(mtimeStr.first) ??
+              HttpDate.parse(mtimeStr.first);
         } catch (_) {}
       }
       final name = (disp.isNotEmpty && disp.first.trim().isNotEmpty)
           ? disp.first.trim()
           : Uri.parse(href).pathSegments.last;
 
+      final fullHref = Uri.parse(abs);
+      if (fullHref.pathSegments.isEmpty || fullHref.path.endsWith('/')) {
+        continue;
+      }
+      final basename = fullHref.pathSegments.last;
+      if (partialsOnly) {
+        if (!BackupPartials.isRemoteName(basename) ||
+            fullHref != _fileUri(cfg, basename)) {
+          continue;
+        }
+      } else if (basename.toLowerCase().endsWith('.partial') ||
+          name.toLowerCase().endsWith('.partial')) {
+        continue;
+      }
+
       // If mtime is null, try to extract from filename (format: kelivo_backup_2025-01-19T12-34-56.123456.zip)
-      if (mtime == null) {
+      if (!partialsOnly && mtime == null) {
         final match = RegExp(
           r'kelivo_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.(?:zip|kbackup)',
         ).firstMatch(name);
@@ -1884,7 +2042,6 @@ class DataSync {
 
       // Skip directories
       if (abs.endsWith('/')) continue;
-      final fullHref = Uri.parse(abs);
       items.add(
         BackupFileItem(
           href: fullHref,
@@ -1959,6 +2116,7 @@ class DataSync {
     'secretsIncluded',
     'businessEntityRowIds',
     'scope',
+    'skippedEntries',
     'database',
     'entries',
   };
@@ -2050,8 +2208,7 @@ class DataSync {
         await streamed.stream.drain<void>();
         throw Exception('Download failed: ${streamed.statusCode}');
       }
-      final tmpDir = await _ensureTempDir();
-      file = await createTemporaryRestoreFile(tmpDir);
+      file = await BackupStaging.createDownload();
       final knownLength = item.size > 0 ? item.size : streamed.contentLength;
       final sink = file.openWrite();
       try {
@@ -2064,6 +2221,7 @@ class DataSync {
         ).pipe(sink);
       } catch (error) {
         await _deleteFileQuietly(file);
+        unregisterLiveTempPath(file.path);
         file = null;
         if (error is BackupCancelledException ||
             cancelToken?.isCancelled == true) {
@@ -2091,6 +2249,7 @@ class DataSync {
     } finally {
       await cancelSub?.cancel();
       client.close();
+      if (file != null) unregisterLiveTempPath(file.path);
       await _deleteFileQuietly(file);
     }
   }
@@ -2125,6 +2284,32 @@ class DataSync {
     required Map<String, ({int bytes, String sha256})> expectedEntries,
   }) {
     _verifyPackedBackupSync(zipPath: zipPath, expectedEntries: expectedEntries);
+  }
+
+  @visibleForTesting
+  static List<String> debugPackAssetFiles({
+    required File destination,
+    required Directory source,
+    required List<File> files,
+  }) {
+    final skipped = <String>[];
+    final writer = _StreamingZipWriter(destination.path);
+    try {
+      _addDirectoryToZip(
+        writer,
+        source.path,
+        'upload',
+        {},
+        {},
+        files: files,
+        fileSizes: {for (final file in files) file.path: file.lengthSync()},
+        onUnreadable: skipped.add,
+      );
+      writer.closeSync();
+      return skipped;
+    } finally {
+      writer.closeIfNeededSync();
+    }
   }
 
   @visibleForTesting
@@ -2167,10 +2352,10 @@ class DataSync {
         if (onPassword == null) {
           throw const FormatException('backup_password_required');
         }
-        final tmp = await _ensureTempDir();
-        await _cleanupPreviousBackupTempFiles(tmp);
-        decryptedDirectory = await tmp.createTemp('kelivo_decrypted_');
-        registerLiveTempPath(decryptedDirectory.path);
+        await BackupStaging.sweep();
+        decryptedDirectory = await BackupStaging.createDirectory(
+          'kelivo_decrypted_${const Uuid().v4()}',
+        );
         readable = File(p.join(decryptedDirectory.path, 'backup.zip'));
         var retry = false;
         while (true) {
@@ -2264,30 +2449,39 @@ class DataSync {
     }
   }
 
-  Future<void> _deleteRemoteQuietly(WebDavConfig cfg, Uri target) async {
+  String _webDavScope(WebDavConfig cfg) => BackupPartials.scope([
+    'webdav',
+    _collectionUri(cfg).toString(),
+    cfg.username,
+  ]);
+
+  Future<void> cleanWebDavPartials(WebDavConfig cfg) =>
+      BackupPartials(businessPreferences).sweep(
+        scope: _webDavScope(cfg),
+        owns: BackupPartials.isRemoteName,
+        remove: (name) => _deletePartial(cfg, _fileUri(cfg, name)),
+        list: () async {
+          final items = await listBackupFiles(cfg, partialsOnly: true);
+          return {
+            for (final item in items)
+              item.href.pathSegments.last: item.lastModified,
+          };
+        },
+      );
+
+  Future<void> _deletePartial(WebDavConfig cfg, Uri target) async {
     final client = http.Client();
     try {
-      final req = http.Request('DELETE', target);
+      final req = http.Request('DELETE', target)..followRedirects = false;
       req.headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)});
-      await client.send(req).then(http.Response.fromStream);
-    } catch (_) {
+      final response = await client.send(req).then(http.Response.fromStream);
+      if (response.statusCode != 404 &&
+          (response.statusCode < 200 || response.statusCode >= 300)) {
+        throw Exception('WebDAV DELETE failed: ${response.statusCode}');
+      }
     } finally {
       client.close();
     }
-  }
-
-  /// Ensures the temporary directory exists (some macOS installs may not create the cache folder until first use).
-  static Future<Directory> _ensureTempDir() async {
-    Directory dir = await getTemporaryDirectory();
-    if (!await dir.exists()) {
-      try {
-        await dir.create(recursive: true);
-      } catch (_) {}
-    }
-    if (!await dir.exists()) {
-      dir = await Directory.systemTemp.createTemp('kelivo_tmp_');
-    }
-    return dir;
   }
 
   static Future<File> _writeTempText(
@@ -2308,6 +2502,7 @@ class DataSync {
     required String appVersion,
     required Map<String, List<String>> businessEntityRowIds,
     required BackupScope scope,
+    required List<String> skippedEntries,
   }) {
     return jsonEncode({
       'format': _backupFormat,
@@ -2321,6 +2516,7 @@ class DataSync {
       'secretsIncluded': true,
       'businessEntityRowIds': businessEntityRowIds,
       'scope': scope.toJson(),
+      if (skippedEntries.isNotEmpty) 'skippedEntries': skippedEntries,
       if (snapshotInfo != null)
         'database': {
           'entry': _databaseEntryName,
@@ -2328,7 +2524,10 @@ class DataSync {
           // Lets an older build decide whether it may restore this backup by
           // dropping what it does not know, instead of refusing outright.
           SchemaMigrations.minimumReadableManifestKey:
-              SchemaMigrations.minimumReadableSchemaVersion,
+              scope.includes(BackupCategory.creations) &&
+                  !scope.includes(BackupCategory.chats)
+              ? 6 // The first reader that distinguishes creation-only SQLite payloads.
+              : SchemaMigrations.minimumReadableSchemaVersion,
           'conversationCount': snapshotInfo.conversationCount,
           'messageCount': snapshotInfo.messageCount,
         },
@@ -2347,7 +2546,6 @@ class DataSync {
   ) => _preflightVersionedBackup(
     manifestPath: args.manifestPath,
     extractDirPath: args.extractDirPath,
-    allowEditedBackup: args.allowEditedBackup,
     allowUnverifiedForwardCompatible: args.allowUnverifiedForwardCompatible,
     ctx: ctx,
   );
@@ -2355,13 +2553,14 @@ class DataSync {
   static Future<_VersionedBackupInfo> _preflightVersionedBackup({
     required String manifestPath,
     required String extractDirPath,
-    bool allowEditedBackup = false,
     bool allowUnverifiedForwardCompatible = false,
     BackupIsolateContext? ctx,
+    Map<String, _BackupEntryMetadata>? extractedEntries,
   }) async {
+    final allowEditedBackup = extractedEntries != null;
     final manifestFile = File(manifestPath);
     if (!manifestFile.existsSync() ||
-        manifestFile.lengthSync() > _maxManifestBytes) {
+        manifestFile.lengthSync() > BackupArchiveLimits.manifestBytes) {
       throw const FormatException('manifest.json');
     }
     final decoded = jsonDecode(manifestFile.readAsStringSync());
@@ -2389,23 +2588,41 @@ class DataSync {
       final declaredScope = manifest['scope'];
       if (declaredScope is! Map ||
           BackupCategory.values.any(
-            (category) => declaredScope[category.name] is! bool,
+            (category) =>
+                declaredScope[category.name] is! bool &&
+                (category != BackupCategory.creations ||
+                    declaredScope.containsKey(category.name)),
           )) {
         throw const FormatException('manifest_scope');
       }
     }
-    final scope = manifest.containsKey('scope')
-        ? BackupScope.fromJson(manifest['scope'])
-        : const BackupScope(excluded: {BackupCategory.environmentVariables});
+    final declaration = manifest['scope'];
+    final scope =
+        (manifest.containsKey('scope')
+                ? BackupScope.fromJson(declaration)
+                : const BackupScope(
+                    excluded: {BackupCategory.environmentVariables},
+                  ))
+            .withCategory(
+              BackupCategory.creations,
+              declaration is Map && declaration['creations'] == true,
+            );
 
     // A user may edit the database or add/remove attachments before repacking.
     // ZIP extraction verifies the repacked bytes. Rebuild the manifest from
     // those files instead of treating the original export's inventory as truth.
     // The new hashes still bind the payload throughout staging and cutover.
     final files = <String, File>{};
-    for (final entity in Directory(
+    ctx?.reportProgress(
+      const BackupProgress(
+        phase: BackupPhase.scanning,
+        processed: 0,
+        unit: BackupProgressUnit.items,
+      ),
+    );
+    await for (final entity in Directory(
       extractDirPath,
-    ).listSync(recursive: true, followLinks: false)) {
+    ).list(recursive: true, followLinks: false)) {
       ctx?.throwIfCancelled();
       if (entity is! File) continue;
       final name = p
@@ -2421,6 +2638,13 @@ class DataSync {
         continue;
       }
       files[name] = entity;
+      ctx?.reportProgress(
+        BackupProgress(
+          phase: BackupPhase.scanning,
+          processed: files.length,
+          unit: BackupProgressUnit.items,
+        ),
+      );
     }
     if (!files.containsKey('settings.json')) {
       throw const FormatException('settings.json');
@@ -2472,53 +2696,66 @@ class DataSync {
     // fields this one has never heard of.
     _stripUnknownManifestKeys(manifest);
 
-    final validateTotal = files.values.fold<int>(
-      0,
-      (sum, file) => sum + file.lengthSync(),
-    );
-    final meter = _BackupByteMeter(
-      ctx: ctx,
-      phase: BackupPhase.validating,
-      total: validateTotal,
-    );
-    meter.report();
     final entries = <String, _BackupEntryMetadata>{};
+    final toHash = <String, File>{};
     for (final entry in files.entries) {
       ctx?.throwIfCancelled();
-      final file = entry.value;
-      final bytes = file.lengthSync();
-      entries[entry.key] = (
-        bytes: bytes,
-        sha256: _sha256FileSync(file, ctx: ctx),
+      if (extractedEntries != null && entry.key == _databaseEntryName) continue;
+      final known = extractedEntries?[entry.key];
+      if (known != null) {
+        entries[entry.key] = known;
+      } else {
+        // Directory enumeration uses the target filesystem's spelling, which
+        // can differ from the ZIP on a case- or normalization-insensitive disk.
+        toHash[entry.key] = entry.value;
+      }
+    }
+    if (toHash.isNotEmpty) {
+      final validateTotal = toHash.values.fold<int>(
+        0,
+        (sum, file) => sum + file.lengthSync(),
       );
-      if (!allowEditedBackup) {
+      final meter = BackupByteProgress(
+        onProgress: ctx?.reportProgress,
+        checkCancelled: ctx?.throwIfCancelled,
+        phase: BackupPhase.validating,
+        total: validateTotal,
+      );
+      meter.report();
+      for (final entry in toHash.entries) {
+        ctx?.throwIfCancelled();
+        final actual = digestBackupFile(
+          entry.value,
+          checkCancelled: ctx?.throwIfCancelled,
+          onBytes: (n) => meter.add(n, detail: entry.key),
+        );
+        entries[entry.key] = actual;
+        if (allowEditedBackup) continue;
         final original = (originalEntries as Map)[entry.key];
         if (original is! Map) {
           throw FormatException('manifest_entry_metadata:${entry.key}');
         }
-        if (original['bytes'] != bytes) {
+        if (original['bytes'] != actual.bytes) {
           throw FormatException('manifest_entry_size:${entry.key}');
         }
-        if (original['sha256'] != entries[entry.key]!.sha256) {
+        if (original['sha256'] != actual.sha256) {
           throw FormatException('manifest_entry_hash:${entry.key}');
         }
       }
-      meter.add(bytes, detail: entry.key);
     }
-
-    ctx?.reportProgress(
-      const BackupProgress(
-        phase: BackupPhase.validating,
-        processed: 0,
-        cancellable: true,
-      ),
-    );
 
     ChatDatabaseSnapshotInfo? validatedDatabase;
     final rawDatabase = manifest['database'];
     if (payloadKind == 'sqlite') {
+      ctx?.reportProgress(
+        const BackupProgress(
+          phase: BackupPhase.checkingDatabase,
+          processed: 0,
+          cancellable: true,
+        ),
+      );
       if (!includeChats ||
-          !entries.containsKey(_databaseEntryName) ||
+          !files.containsKey(_databaseEntryName) ||
           rawDatabase is! Map) {
         throw const FormatException('manifest_database');
       }
@@ -2573,13 +2810,24 @@ class DataSync {
       // database's actual counts for the subsequent staging checks.
       database['conversationCount'] = databaseInfo.conversationCount;
       database['messageCount'] = databaseInfo.messageCount;
+      final dbBytes = databaseFile.lengthSync();
+      final dbMeter = BackupByteProgress(
+        onProgress: ctx?.reportProgress,
+        checkCancelled: ctx?.throwIfCancelled,
+        phase: BackupPhase.validating,
+        total: dbBytes,
+      )..report();
       entries[_databaseEntryName] = (
-        bytes: databaseFile.lengthSync(),
-        sha256: _sha256FileSync(databaseFile, ctx: ctx),
+        bytes: dbBytes,
+        sha256: digestBackupFile(
+          databaseFile,
+          checkCancelled: ctx?.throwIfCancelled,
+          onBytes: dbMeter.add,
+        ).sha256,
       );
     } else if (payloadKind == 'settings-only') {
       if (includeChats ||
-          entries.containsKey(_databaseEntryName) ||
+          files.containsKey(_databaseEntryName) ||
           rawDatabase != null) {
         throw const FormatException('manifest_database');
       }
@@ -2593,7 +2841,7 @@ class DataSync {
         name: {'bytes': entries[name]!.bytes, 'sha256': entries[name]!.sha256},
     };
     final normalizedManifestBytes = utf8.encode(jsonEncode(manifest));
-    if (normalizedManifestBytes.length > _maxManifestBytes) {
+    if (normalizedManifestBytes.length > BackupArchiveLimits.manifestBytes) {
       throw const FormatException('manifest_size');
     }
     final normalizedManifestSha256 = sha256
@@ -2662,7 +2910,7 @@ class DataSync {
     final file = File(path);
     if (!file.existsSync()) throw const FormatException('settings.json');
     final length = file.lengthSync();
-    if (length <= 0 || length > _maxSettingsBytes) {
+    if (length <= 0 || length > BackupArchiveLimits.settingsBytes) {
       throw const FormatException('settings_size');
     }
     final decoded = jsonDecode(file.readAsStringSync());
@@ -2672,27 +2920,114 @@ class DataSync {
     return decoded.cast<String, dynamic>();
   }
 
-  static String _sha256FileSync(File file, {BackupIsolateContext? ctx}) {
-    final digestSink = _DigestOutputSink();
-    final hashSink = sha256.startChunkedConversion(digestSink);
-    final input = file.openSync();
-    final buffer = Uint8List(1024 * 1024);
+  Future<void> _restoreCreations(
+    Directory payload, {
+    required bool includeDatabase,
+    required bool overwrite,
+    required bool restoreFiles,
+    BackupMergeReport? chatMerge,
+  }) async {
+    final snapshot = includeDatabase
+        ? AppDatabase.open(file: File(p.join(payload.path, _databaseEntryName)))
+        : null;
     try {
-      while (true) {
-        ctx?.throwIfCancelled();
-        final read = input.readIntoSync(buffer);
-        if (read == 0) break;
-        hashSink.add(Uint8List.sublistView(buffer, 0, read));
+      final incoming = snapshot == null ? null : MediaRepository(snapshot);
+      if (await incoming?.hasCreations != true &&
+          (!overwrite || !await _hasCreations)) {
+        return;
       }
-      hashSink.close();
+      await chatService.init();
+      final live = chatService.chatRepositoryOrNull!.mediaRepository;
+      final wanted = restoreFiles
+          ? await incoming?.referencedFiles() ?? const <String>{}
+          : const <String>{};
+      await AttachmentFileLock.synchronized(() async {
+        final previous = overwrite && restoreFiles
+            ? await live.referencedFiles()
+            : const <String>{};
+        final content = await AppDirectories.getContentDirectory();
+        final relocated = !overwrite && incoming != null
+            ? await live.existingPathsForMerge(incoming)
+            : <String, String>{};
+        final installed = <File>[];
+        final nonce = const Uuid().v4();
+        try {
+          for (final uri in wanted) {
+            final parts = _creationPathSegments(uri);
+            if (parts == null) continue;
+            final source = File(p.joinAll([payload.path, ...parts]));
+            if (!await source.exists()) continue;
+            final destination = relocated[uri] ?? uri;
+            final targetParts = _creationPathSegments(destination);
+            if (targetParts == null) {
+              throw const FormatException('creation_path');
+            }
+            var target = File(p.joinAll([content.path, ...targetParts]));
+            if (await FileSystemEntity.type(target.path, followLinks: false) !=
+                FileSystemEntityType.notFound) {
+              if (!overwrite) continue;
+              // Keep the old record's file readable until the new SQLite
+              // transaction is durable, even if both backups share a batch ID.
+              target = File(
+                p.join(
+                  target.parent.path,
+                  'restored-$nonce-${p.basename(target.path)}',
+                ),
+              );
+              relocated[uri] = KelivoFileUri.encodeFromAbsolute(
+                target.path,
+                root: content.path,
+              )!;
+            }
+            final partial = File('${target.path}.$nonce.part');
+            try {
+              await _copyRestoredFile(source, partial);
+              final output = await partial.open(mode: FileMode.append);
+              try {
+                await output.flush();
+              } finally {
+                await output.close();
+              }
+              installed.add(await partial.rename(target.path));
+            } finally {
+              await _deleteFileQuietly(partial);
+            }
+          }
+          await live.importFrom(
+            incoming,
+            overwrite: overwrite,
+            restoredPaths: relocated,
+            remappedConversations:
+                chatMerge?.remappedConversationIds ?? const {},
+            mergedMessages: chatMerge?.mergedMessageIds,
+          );
+        } catch (_) {
+          for (final file in installed) {
+            await _deleteFileQuietly(file);
+          }
+          rethrow;
+        }
+        for (final uri in previous) {
+          if (wanted.contains(uri) && !relocated.containsKey(uri)) continue;
+          final parts = _creationPathSegments(uri);
+          if (parts != null) {
+            await _deleteFileQuietly(File(p.joinAll([content.path, ...parts])));
+          }
+        }
+      });
+      // Restoring may relocate a published file to avoid replacing a live one.
+      // Resolve saved chat links after the media transaction and file lock.
+      await chatService.runAssetReferenceMaintenance();
     } finally {
-      input.closeSync();
+      await snapshot?.close();
     }
-    final digest = digestSink.digest;
-    if (digest == null) {
-      throw StateError('sha256');
-    }
-    return digest.toString();
+  }
+
+  static List<String>? _creationPathSegments(String uri) {
+    final parts = KelivoFileUri.decodeToSegments(uri);
+    return parts != null && parts.length >= 3 && parts.first == 'generations'
+        ? parts
+        : null;
   }
 
   Future<Directory> _liveAssetRoot(String name) async {
@@ -2725,26 +3060,25 @@ class DataSync {
     for (final name in assetRoots) {
       final src = Directory(p.join(payloadDirectory.path, name));
       final dst = await _liveAssetRoot(name);
-      if (overwriteRoots.contains(name) && await dst.exists()) {
-        await dst.delete(recursive: true);
-      }
-      if (!await src.exists()) continue;
-      if (!await dst.exists()) {
+      // Session cleanup and workspace writers must not see an empty directory
+      // between its creation and the arrival of its contents.
+      await WorkspaceFileCoordinator.run(dst.path, () async {
+        final overwrite = overwriteRoots.contains(name);
+        if (overwrite && await dst.exists()) await dst.delete(recursive: true);
+        if (!await src.exists()) return;
         await dst.create(recursive: true);
-      }
-      for (final ent in src.listSync(recursive: true)) {
-        if (ent is File) {
-          final rel = p.relative(ent.path, from: src.path);
-          final segments = p.split(rel);
+        for (final ent in src.listSync(recursive: true)) {
+          if (ent is! File) continue;
+          final segments = p.split(p.relative(ent.path, from: src.path));
           if (name == 'sessions' && segments.length > 1) {
             segments[0] = remappedConversationIds[segments[0]] ?? segments[0];
           }
-          final targetFile = File(p.joinAll([dst.path, ...segments]));
-          if (!await targetFile.exists()) {
-            await _copyRestoredFile(ent, targetFile);
+          final target = File(p.joinAll([dst.path, ...segments]));
+          if (overwrite || !await target.exists()) {
+            await _copyRestoredFile(ent, target);
           }
         }
-      }
+      });
     }
   }
 
@@ -3256,13 +3590,20 @@ class DataSync {
     );
   }
 
-  static Future<void> _sanitizeBackupDatabase(
+  static Future<bool> _sanitizeBackupDatabase(
     File file, {
     BackupScope scope = const BackupScope(),
   }) async {
+    if (!scope.includes(BackupCategory.chats)) {
+      return _retainOnlyCreations(file);
+    }
     final database = AppDatabase.open(file: file);
+    final bool hasCreations;
     try {
       await BackupPortability.sanitizeDatabase(database, scope: scope);
+      hasCreations =
+          scope.includes(BackupCategory.creations) &&
+          await MediaRepository(database).hasCreations;
       for (final sql in MessageTimelineIndex.discardStatements) {
         await database.customStatement(sql);
       }
@@ -3270,6 +3611,27 @@ class DataSync {
       await database.close();
     }
     await ChatDatabaseRepository.normalizeSnapshotJournal(file);
+    return hasCreations;
+  }
+
+  static Future<bool> _retainOnlyCreations(File snapshot) async {
+    final source = AppDatabase.open(file: snapshot);
+    final cleanFile = File('${snapshot.path}.creations');
+    try {
+      final sourceMedia = MediaRepository(source);
+      if (!await sourceMedia.hasCreations) return false;
+      final clean = AppDatabase.open(file: cleanFile);
+      try {
+        await MediaRepository(clean).importFrom(sourceMedia, overwrite: false);
+      } finally {
+        await clean.close();
+      }
+    } finally {
+      await source.close();
+    }
+    await ChatDatabaseRepository.normalizeSnapshotJournal(cleanFile);
+    await cleanFile.rename(snapshot.path);
+    return true;
   }
 
   /// Reads a backup file's manifest and reports what restoring it would mean.
@@ -3291,7 +3653,9 @@ class DataSync {
         final archive = ZipDecoder().decodeStream(inputStream);
         for (final entry in archive.files) {
           if (_zipEntryName(entry.name) != _manifestEntryName) continue;
-          if (!entry.isFile || entry.size > _maxManifestBytes) return null;
+          if (!entry.isFile || entry.size > BackupArchiveLimits.manifestBytes) {
+            return null;
+          }
           final decoded = jsonDecode(utf8.decode(entry.readBytes()!));
           if (decoded is Map<String, dynamic>) manifest = decoded;
           break;
@@ -3329,59 +3693,32 @@ class DataSync {
     // Extract to temp using file-stream decoding to avoid loading the full ZIP
     // into RAM (the old approach called file.readAsBytes() which for a 600-800 MB
     // file would allocate a contiguous byte array of the same size).
-    final tmp = await _ensureTempDir();
-    final extractDir = Directory(
-      p.join(tmp.path, 'restore_${DateTime.now().millisecondsSinceEpoch}'),
+    final extractDir = await BackupStaging.createDirectory(
+      'restore_${const Uuid().v4()}',
     );
-    await extractDir.create(recursive: true);
-    registerLiveTempPath(extractDir.path);
 
     Object? restoreError;
     try {
       if (cancelToken?.isCancelled == true) {
         throw const BackupCancelledException();
       }
-      await runBackupIsolate<void, _BackupExtractArgs>(
-        body: _extractZipInIsolate,
-        payload: _BackupExtractArgs(
-          zipPath: file.path,
-          extractDirPath: extractDir.path,
-        ),
-        cancelToken: cancelToken,
-        onProgress: onProgress,
-      );
+      final versionedBackup =
+          await runBackupIsolate<_VersionedBackupInfo?, _BackupExtractArgs>(
+            body: _extractUserBackupInIsolate,
+            payload: _BackupExtractArgs(
+              zipPath: file.path,
+              extractDirPath: extractDir.path,
+              allowUnverifiedForwardCompatible:
+                  allowUnverifiedForwardCompatible,
+            ),
+            cancelToken: cancelToken,
+            onProgress: onProgress,
+          );
 
-      final manifestFile = File(p.join(extractDir.path, _manifestEntryName));
       final restorePayloadDirectory = extractDir;
       final settingsFile = File(p.join(extractDir.path, 'settings.json'));
       final chatsFile = File(p.join(extractDir.path, 'chats.json'));
-      if (!await settingsFile.exists()) {
-        throw const FormatException('settings.json');
-      }
-      final _VersionedBackupInfo? versionedBackup;
-      if (await manifestFile.exists()) {
-        if (cancelToken?.isCancelled == true) {
-          throw const BackupCancelledException();
-        }
-        versionedBackup =
-            await runBackupIsolate<_VersionedBackupInfo, _BackupPreflightArgs>(
-              body: _preflightVersionedBackupInIsolate,
-              payload: _BackupPreflightArgs(
-                manifestPath: manifestFile.path,
-                extractDirPath: extractDir.path,
-                allowEditedBackup: true,
-                allowUnverifiedForwardCompatible:
-                    allowUnverifiedForwardCompatible,
-              ),
-              cancelToken: cancelToken,
-              onProgress: onProgress,
-            );
-      } else {
-        versionedBackup = null;
-      }
-      if (cancelToken?.isCancelled == true) {
-        throw const BackupCancelledException();
-      }
+      cancelToken?.throwIfCancelled();
       final settings = await runBackupIsolate<Map<String, dynamic>, String>(
         body: _readSettingsJsonInIsolate,
         payload: settingsFile.path,
@@ -3392,6 +3729,7 @@ class DataSync {
         versionedBackup?.scope ??
             BackupScope(
               excluded: {
+                BackupCategory.creations,
                 if (!settings.containsKey('environment_variables_v1'))
                   BackupCategory.environmentVariables,
               },
@@ -3434,6 +3772,10 @@ class DataSync {
         final restoreChats =
             scope.includes(BackupCategory.chats) && includeChats;
         final restoreFiles = selectedAssetRoots.isNotEmpty;
+        final restoreCreations = scope.includes(BackupCategory.creations);
+        final ordinaryAssetRoots = selectedAssetRoots.difference({
+          'generations',
+        });
         // Validate selected business data before changing any live files or chats.
         BusinessSettingsRouter.normalizeAndRoute(
           settings,
@@ -3449,8 +3791,16 @@ class DataSync {
               // skill/workspace directories together with their business rows.
               await _restoreAssetDirectories(
                 extractDir,
-                assetRoots: selectedAssetRoots,
+                assetRoots: ordinaryAssetRoots,
                 overwriteRoots: const {'skills', 'workspaces'},
+              );
+            }
+            if (restoreCreations) {
+              await _restoreCreations(
+                extractDir,
+                includeDatabase: includeChats,
+                overwrite: true,
+                restoreFiles: selectedAssetRoots.contains('generations'),
               );
             }
             await _runLiveBusinessRestore(
@@ -3517,7 +3867,15 @@ class DataSync {
           if (restoreFiles) {
             await _restoreAssetDirectories(
               extractDir,
-              assetRoots: selectedAssetRoots,
+              assetRoots: ordinaryAssetRoots,
+            );
+          }
+          if (restoreCreations) {
+            await _restoreCreations(
+              extractDir,
+              includeDatabase: includeChats,
+              overwrite: false,
+              restoreFiles: selectedAssetRoots.contains('generations'),
             );
           }
           await _runLiveBusinessRestore(pendingBusinessRestore);
@@ -3592,27 +3950,39 @@ class DataSync {
             final src = Directory(p.join(restorePayloadDirectory.path, name));
             if (!await src.exists()) continue;
             final dst = await _liveAssetRoot(name);
-            if (await dst.exists()) {
-              await dst.delete(recursive: true);
-            }
-            await dst.create(recursive: true);
-            for (final ent in src.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: src.path);
-                final target = File(p.join(dst.path, rel));
-                await _copyRestoredFile(ent, target);
+            await WorkspaceFileCoordinator.run(dst.path, () async {
+              if (await dst.exists()) {
+                await dst.delete(recursive: true);
               }
-            }
+              await dst.create(recursive: true);
+              for (final ent in src.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: src.path);
+                  final target = File(p.join(dst.path, rel));
+                  await _copyRestoredFile(ent, target);
+                }
+              }
+            });
           }
         } else {
           // Merge mode: Only copy non-existing files
           await _restoreAssetDirectories(
             restorePayloadDirectory,
-            assetRoots: selectedAssetRoots,
+            assetRoots: selectedAssetRoots.difference({'generations'}),
             remappedConversationIds:
                 _lastMergeReport?.remappedConversationIds ?? const {},
           );
         }
+      }
+      if (versionedBackup?.includeChats == true &&
+          scope.includes(BackupCategory.creations)) {
+        await _restoreCreations(
+          extractDir,
+          includeDatabase: true,
+          overwrite: false,
+          chatMerge: _lastMergeReport,
+          restoreFiles: selectedAssetRoots.contains('generations'),
+        );
       }
       // Legacy chats.json decodes before assets exist. After files land,
       // directed-remap old absolute roots onto restored managed relatives,
@@ -3762,13 +4132,25 @@ class _BoundedOutputFileStream extends OutputFileStream {
     required this.maxEntryBytes,
     required this.budget,
     this.meter,
-  }) : super.withFileHandle(FileHandle(path, mode: FileAccess.write));
+    bool hashContents = false,
+  }) : _digest = hashContents ? _DigestOutputSink() : null,
+       super.withFileHandle(
+         FileHandle(path, mode: FileAccess.write),
+         bufferSize: expectedBytes.clamp(
+           1,
+           OutputFileStream.kDefaultBufferSize,
+         ),
+       );
 
   final int expectedBytes;
   final int expectedCrc32;
   final int maxEntryBytes;
   final _ExtractionBudget budget;
-  final _BackupByteMeter? meter;
+  final BackupByteProgress? meter;
+  final _DigestOutputSink? _digest;
+  late final ByteConversionSink? _hash = _digest == null
+      ? null
+      : sha256.startChunkedConversion(_digest);
   int _entryBytes = 0;
   int _crc32 = 0;
 
@@ -3786,6 +4168,7 @@ class _BoundedOutputFileStream extends OutputFileStream {
   @override
   void writeByte(int value) {
     _reserve(1);
+    _hash?.add([value]);
     _crc32 = getCrc32([value], _crc32);
     super.writeByte(value);
   }
@@ -3802,6 +4185,7 @@ class _BoundedOutputFileStream extends OutputFileStream {
         : bytes is Uint8List
         ? Uint8List.sublistView(bytes, 0, writeLength)
         : bytes.sublist(0, writeLength);
+    _hash?.add(chunk);
     _crc32 = getCrc32(chunk, _crc32);
     super.writeBytes(bytes, length: writeLength);
   }
@@ -3810,7 +4194,7 @@ class _BoundedOutputFileStream extends OutputFileStream {
   void writeStream(InputStream stream) {
     const chunkSize = 1024 * 1024;
     while (!stream.isEOS) {
-      meter?.ctx?.throwIfCancelled();
+      meter?.checkCancelled?.call();
       final readSize = stream.length < chunkSize ? stream.length : chunkSize;
       final bytes = stream.readBytes(readSize).toUint8List();
       if (bytes.isEmpty) break;
@@ -3818,13 +4202,16 @@ class _BoundedOutputFileStream extends OutputFileStream {
     }
   }
 
-  void verifyComplete() {
+  _BackupEntryMetadata? verifyComplete() {
     if (_entryBytes != expectedBytes) {
       throw const FormatException('zip_entry_size');
     }
     if (_crc32 != expectedCrc32) {
       throw const FormatException('zip_entry_crc');
     }
+    if (_digest == null) return null;
+    _hash!.close();
+    return (bytes: _entryBytes, sha256: _digest.digest!.toString());
   }
 }
 
@@ -3832,10 +4219,12 @@ class _BackupExtractArgs {
   const _BackupExtractArgs({
     required this.zipPath,
     required this.extractDirPath,
+    this.allowUnverifiedForwardCompatible = false,
   });
 
   final String zipPath;
   final String extractDirPath;
+  final bool allowUnverifiedForwardCompatible;
 }
 
 class _LegacyChatParseArgs {
@@ -3854,13 +4243,11 @@ class _BackupPreflightArgs {
   const _BackupPreflightArgs({
     required this.manifestPath,
     required this.extractDirPath,
-    this.allowEditedBackup = false,
     this.allowUnverifiedForwardCompatible = false,
   });
 
   final String manifestPath;
   final String extractDirPath;
-  final bool allowEditedBackup;
 
   /// Set only after the user has been told the backup comes from a newer
   /// version that made no compatibility promise, and chose to continue.
@@ -3870,6 +4257,7 @@ class _BackupPreflightArgs {
 class _BackupPackArgs {
   const _BackupPackArgs({
     required this.outPath,
+    required this.verifyPayload,
     required this.manifestPath,
     required this.settingsPath,
     required this.databasePath,
@@ -3881,9 +4269,11 @@ class _BackupPackArgs {
     required this.scope,
     required this.assetRootPaths,
     this.publishedDraftFiles = const {},
+    this.publishedCreationFiles = const {},
   });
 
   final String outPath;
+  final bool verifyPayload;
   final String manifestPath;
   final String settingsPath;
   final String? databasePath;
@@ -3895,45 +4285,68 @@ class _BackupPackArgs {
   final BackupScope scope;
   final Map<String, String> assetRootPaths;
   final Set<String> publishedDraftFiles;
+  final Set<String> publishedCreationFiles;
 }
 
-class _BackupByteMeter {
-  _BackupByteMeter({
-    required this.ctx,
-    required this.phase,
-    required this.total,
-  });
+// Keep source failures distinct from ZIP destination failures (e.g. disk full).
+class _BackupSourceReadException extends FileSystemException {
+  _BackupSourceReadException(FileSystemException error)
+    : super(error.message, error.path, error.osError);
+}
 
-  final BackupIsolateContext? ctx;
-  final BackupPhase phase;
-  final int total;
-  var processed = 0;
+T _readBackupSource<T>(T Function() read) {
+  try {
+    return read();
+  } on FileSystemException catch (error) {
+    throw _BackupSourceReadException(error);
+  }
+}
 
-  void add(int bytes, {String? detail}) {
-    processed += bytes;
-    report(detail: detail);
+/// The archive stream has no truncate API. Retain its underlying file so a
+/// failed source read can discard the partial ZIP entry before continuing.
+class _BackupOutputHandle extends AbstractFileHandle {
+  _BackupOutputHandle(String path)
+    : file = File(path).openSync(mode: FileMode.write);
+
+  final RandomAccessFile file;
+  bool _open = true;
+
+  @override
+  bool get isOpen => _open;
+  @override
+  int get length => file.lengthSync();
+  @override
+  int get position => file.positionSync();
+  @override
+  set position(int value) => file.setPositionSync(value);
+  @override
+  int readInto(Uint8List buffer, [int? length]) =>
+      file.readIntoSync(buffer, 0, length);
+  @override
+  void writeFromSync(List<int> buffer, [int start = 0, int? end]) =>
+      file.writeFromSync(buffer, start, end);
+  @override
+  Future<void> close() async {
+    if (!_open) return;
+    _open = false;
+    await file.close();
   }
 
-  void report({String? detail}) {
-    ctx?.throwIfCancelled();
-    ctx?.reportProgress(
-      BackupProgress(
-        phase: phase,
-        processed: processed,
-        total: total,
-        unit: BackupProgressUnit.bytes,
-        detail: detail,
-        cancellable: true,
-      ),
-    );
+  @override
+  void closeSync() {
+    if (!_open) return;
+    _open = false;
+    file.closeSync();
   }
 }
 
 class _StreamingZipWriter {
   _StreamingZipWriter(String outPath, {this.meter})
-    : _output = OutputFileStream(outPath);
+    : _handle = _BackupOutputHandle(outPath) {
+    _output = OutputFileStream.withFileHandle(_handle);
+  }
 
-  final _BackupByteMeter? meter;
+  final BackupByteProgress? meter;
 
   static const int _localFileHeaderSignature = 0x04034b50;
   static const int _centralDirectoryHeaderSignature = 0x02014b50;
@@ -3944,12 +4357,53 @@ class _StreamingZipWriter {
   static const int _versionNeeded = 45;
   static const int _utf8Flag = 1 << 11;
   static const int _dataDescriptorFlag = 1 << 3;
+  static const int _storeMethod = 0;
   static const int _deflateMethod = 8;
+  static const _compressedExtensions = {
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.gif',
+    '.avif',
+    '.heic',
+    '.heif',
+    '.mp4',
+    '.m4v',
+    '.mov',
+    '.mkv',
+    '.webm',
+    '.mp3',
+    '.aac',
+    '.m4a',
+    '.ogg',
+    '.opus',
+    '.flac',
+    '.zip',
+    '.gz',
+    '.tgz',
+    '.bz2',
+    '.xz',
+    '.zst',
+    '.7z',
+    '.rar',
+    '.docx',
+    '.xlsx',
+    '.pptx',
+    '.epub',
+    '.apk',
+    '.woff2',
+  };
   static const int _maxZip32 = 0xffffffff;
   static const int _chunkSize = 1024 * 1024;
 
-  final OutputFileStream _output;
+  final _BackupOutputHandle _handle;
+  final _buffer = Uint8List(_chunkSize);
+  late OutputFileStream _output;
+  int _outputStart = 0;
+  int get _position => _outputStart + _output.length;
   final List<_StreamingZipEntry> _entries = <_StreamingZipEntry>[];
+  int _uncompressedBytes = 0;
   bool _closed = false;
 
   _BackupEntryMetadata addFile(
@@ -3964,12 +4418,7 @@ class _StreamingZipWriter {
       throw ArgumentError.value(entryName, 'entryName', 'must not be empty');
     }
 
-    final stat = file.statSync();
-    final uncompressedSize = stat.size;
-    // Deflate may grow incompressible input slightly, so reserve ZIP64 before
-    // the 32-bit boundary instead of discovering overflow after streaming.
-    final usesZip64Entry = uncompressedSize > _maxZip32 - (16 * 1024 * 1024);
-
+    final stat = _readBackupSource(file.statSync);
     final modified = stat.modified;
     final modTime = _zipTime(modified);
     final modDate = _zipDate(modified);
@@ -3977,44 +4426,72 @@ class _StreamingZipWriter {
     if (nameBytes.length > 0xffff) {
       throw FileSystemException('ZIP entry name exceeds ZIP32 limit');
     }
-    final localHeaderOffset = _output.length;
-
-    _writeLocalHeader(
-      nameBytes: nameBytes,
-      modTime: modTime,
-      modDate: modDate,
-      usesZip64: usesZip64Entry,
-    );
-
-    final written = _writeDeflatedFile(
-      file,
-      entryName,
-      reportProgress: reportProgress,
-    );
-    _writeDataDescriptor(written, usesZip64: usesZip64Entry);
-
-    _entries.add(
-      _StreamingZipEntry(
+    final localHeaderOffset = _position;
+    // Opening before writing the header handles ordinary permission failures
+    // without ever publishing a partial entry.
+    final input = _readBackupSource(file.openSync);
+    try {
+      final size = _readBackupSource(input.lengthSync);
+      BackupArchiveLimits.addFile(_uncompressedBytes, entryName, size);
+      // Deflate can grow incompressible input; reserve ZIP64 before overflow.
+      final usesZip64Entry = size > _maxZip32 - (16 * 1024 * 1024);
+      final method =
+          _compressedExtensions.contains(p.extension(entryName).toLowerCase())
+          ? _storeMethod
+          : _deflateMethod;
+      _writeLocalHeader(
+        method: method,
         nameBytes: nameBytes,
         modTime: modTime,
         modDate: modDate,
-        crc32: written.crc32,
-        compressedSize: written.compressedSize,
-        uncompressedSize: written.uncompressedSize,
-        localHeaderOffset: localHeaderOffset,
-        mode: stat.mode,
-      ),
-    );
-    return (bytes: written.uncompressedSize, sha256: written.sha256);
+        usesZip64: usesZip64Entry,
+      );
+      final written = _writeFile(
+        input,
+        entryName,
+        method: method,
+        reportProgress: reportProgress,
+      );
+      _uncompressedBytes = BackupArchiveLimits.addFile(
+        _uncompressedBytes,
+        entryName,
+        written.uncompressedSize,
+      );
+      _writeDataDescriptor(written, usesZip64: usesZip64Entry);
+
+      _entries.add(
+        _StreamingZipEntry(
+          method: method,
+          nameBytes: nameBytes,
+          modTime: modTime,
+          modDate: modDate,
+          crc32: written.crc32,
+          compressedSize: written.compressedSize,
+          uncompressedSize: written.uncompressedSize,
+          localHeaderOffset: localHeaderOffset,
+          mode: stat.mode,
+        ),
+      );
+      return (bytes: written.uncompressedSize, sha256: written.sha256);
+    } on _BackupSourceReadException {
+      _output.flush();
+      _handle.file.truncateSync(localHeaderOffset);
+      _handle.position = localHeaderOffset;
+      _output = OutputFileStream.withFileHandle(_handle);
+      _outputStart = localHeaderOffset;
+      rethrow;
+    } finally {
+      input.closeSync();
+    }
   }
 
   void closeSync() {
     if (_closed) return;
-    final centralDirectoryOffset = _output.length;
+    final centralDirectoryOffset = _position;
     for (final entry in _entries) {
       _writeCentralDirectoryHeader(entry);
     }
-    final centralDirectorySize = _output.length - centralDirectoryOffset;
+    final centralDirectorySize = _position - centralDirectoryOffset;
     _writeEndOfCentralDirectory(
       centralDirectoryOffset: centralDirectoryOffset,
       centralDirectorySize: centralDirectorySize,
@@ -4023,14 +4500,83 @@ class _StreamingZipWriter {
     _closed = true;
   }
 
+  // Ordinary exports have already hashed every source chunk. Read the ZIP
+  // headers and the generated manifest back; restore checks each payload CRC.
+  void verifyIndex(
+    String path,
+    _BackupEntryMetadata manifest,
+    BackupIsolateContext? ctx,
+  ) {
+    void report(int done) => ctx?.reportProgress(
+      BackupProgress(
+        phase: BackupPhase.verifying,
+        processed: done,
+        total: _entries.length,
+        unit: BackupProgressUnit.items,
+      ),
+    );
+    report(0);
+    final input = InputFileStream(path);
+    try {
+      if (input.totalLength != _position) {
+        throw const FormatException('backup_entries');
+      }
+      final directory = ZipDirectory()..read(input);
+      if (directory.fileHeaders.length != _entries.length ||
+          directory.totalCentralDirectoryEntries != _entries.length) {
+        throw const FormatException('backup_entries');
+      }
+      for (var i = 0; i < _entries.length; i++) {
+        ctx?.throwIfCancelled();
+        final header = directory.fileHeaders[i];
+        final expected = _entries[i];
+        final name = utf8.decode(expected.nameBytes);
+        if (header.filename != name ||
+            header.file?.filename != name ||
+            header.localHeaderOffset != expected.localHeaderOffset ||
+            header.compressionMethod != expected.method ||
+            header.crc32 != expected.crc32 ||
+            header.file?.crc32 != expected.crc32 ||
+            header.compressedSize != expected.compressedSize ||
+            header.uncompressedSize != expected.uncompressedSize) {
+          throw FormatException('backup_entry_metadata:$name');
+        }
+        if (name == DataSync._manifestEntryName) {
+          final digest = _NullDigestOutputStream();
+          try {
+            writeZipEntryStreaming(
+              ArchiveFile.file(name, manifest.bytes, header.file!),
+              digest,
+              checkCancelled: ctx?.throwIfCancelled,
+            );
+            if (digest.bytesWritten != manifest.bytes ||
+                digest.closeAndDigest() != manifest.sha256) {
+              throw FormatException('manifest_entry_hash:$name');
+            }
+          } finally {
+            digest.closeSync();
+          }
+        }
+        report(i + 1);
+      }
+    } finally {
+      input.closeSync();
+    }
+  }
+
   void closeIfNeededSync() {
     if (!_closed) {
-      _output.closeSync();
-      _closed = true;
+      try {
+        _output.closeSync();
+      } finally {
+        _handle.closeSync();
+        _closed = true;
+      }
     }
   }
 
   void _writeLocalHeader({
+    required int method,
     required List<int> nameBytes,
     required int modTime,
     required int modDate,
@@ -4039,7 +4585,7 @@ class _StreamingZipWriter {
     _output.writeUint32(_localFileHeaderSignature);
     _output.writeUint16(_versionNeeded);
     _output.writeUint16(_utf8Flag | _dataDescriptorFlag);
-    _output.writeUint16(_deflateMethod);
+    _output.writeUint16(method);
     _output.writeUint16(modTime);
     _output.writeUint16(modDate);
     _output.writeUint32(0);
@@ -4057,26 +4603,25 @@ class _StreamingZipWriter {
     }
   }
 
-  _StreamingZipWrittenFile _writeDeflatedFile(
-    File file,
+  _StreamingZipWrittenFile _writeFile(
+    RandomAccessFile raf,
     String entryName, {
+    required int method,
     required bool reportProgress,
   }) {
     final compressedSink = _CountingOutputSink(_output);
-    final inputSink = ZLibCodec(
-      level: ZLibOption.defaultLevel,
-      raw: true,
-    ).encoder.startChunkedConversion(compressedSink);
+    final Sink<List<int>> inputSink = method == _storeMethod
+        ? compressedSink
+        : ZLibCodec(raw: true).encoder.startChunkedConversion(compressedSink);
     final digestSink = _DigestOutputSink();
     final hashSink = sha256.startChunkedConversion(digestSink);
 
-    final raf = file.openSync();
-    final buffer = Uint8List(_chunkSize);
+    final buffer = _buffer;
     var crc32 = 0;
     var uncompressedSize = 0;
     try {
       while (true) {
-        final read = raf.readIntoSync(buffer);
+        final read = _readBackupSource(() => raf.readIntoSync(buffer));
         if (read == 0) break;
         final chunk = Uint8List.sublistView(buffer, 0, read);
         crc32 = getCrc32(chunk, crc32);
@@ -4086,13 +4631,12 @@ class _StreamingZipWriter {
         if (reportProgress) {
           meter?.add(read, detail: entryName);
         } else {
-          meter?.ctx?.throwIfCancelled();
+          meter?.checkCancelled?.call();
         }
       }
+    } finally {
       hashSink.close();
       inputSink.close();
-    } finally {
-      raf.closeSync();
     }
 
     return _StreamingZipWrittenFile(
@@ -4120,14 +4664,14 @@ class _StreamingZipWriter {
 
   void _writeCentralDirectoryHeader(_StreamingZipEntry entry) {
     final usesZip64 =
-        entry.compressedSize > _maxZip32 ||
-        entry.uncompressedSize > _maxZip32 ||
-        entry.localHeaderOffset > _maxZip32;
+        entry.compressedSize >= _maxZip32 ||
+        entry.uncompressedSize >= _maxZip32 ||
+        entry.localHeaderOffset >= _maxZip32;
     _output.writeUint32(_centralDirectoryHeaderSignature);
     _output.writeUint16(_versionNeeded);
     _output.writeUint16(_versionNeeded);
     _output.writeUint16(_utf8Flag | _dataDescriptorFlag);
-    _output.writeUint16(_deflateMethod);
+    _output.writeUint16(entry.method);
     _output.writeUint16(entry.modTime);
     _output.writeUint16(entry.modDate);
     _output.writeUint32(entry.crc32);
@@ -4154,7 +4698,7 @@ class _StreamingZipWriter {
     required int centralDirectoryOffset,
     required int centralDirectorySize,
   }) {
-    final zip64EocdOffset = _output.length;
+    final zip64EocdOffset = _position;
     _output.writeUint32(_zip64EndOfCentralDirectorySignature);
     _output.writeUint64(44);
     _output.writeUint16(_versionNeeded);
@@ -4376,6 +4920,7 @@ class _DigestOutputSink implements Sink<Digest> {
 
 class _StreamingZipEntry {
   const _StreamingZipEntry({
+    required this.method,
     required this.nameBytes,
     required this.modTime,
     required this.modDate,
@@ -4386,6 +4931,7 @@ class _StreamingZipEntry {
     required this.mode,
   });
 
+  final int method;
   final List<int> nameBytes;
   final int modTime;
   final int modDate;

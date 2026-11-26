@@ -15,9 +15,19 @@ class StatusAnimation extends StatefulWidget {
     required this.builder,
     this.paused = false,
     this.initialValue = 0,
-  }) : assert(duration > Duration.zero),
+  }) : _elapsedTime = false,
+       assert(duration > Duration.zero),
        assert(initialValue >= 0 && initialValue < 1);
 
+  /// Publishes active elapsed seconds without wrapping, for effects with several independent periods.
+  const StatusAnimation.elapsed({
+    super.key,
+    required this.builder,
+    this.paused = false,
+  }) : duration = const Duration(seconds: 1),
+       initialValue = 0,
+       _elapsedTime = true;
+  final bool _elapsedTime;
   final Duration duration;
   final Widget Function(BuildContext, ValueListenable<double>) builder;
   final bool paused;
@@ -46,12 +56,15 @@ class _StatusAnimationState extends State<StatusAnimation> {
   }
 
   void _syncPlayback() {
+    // On Android, querying the UI through an accessibility service can set
+    // accessibleNavigation independently of the system's "Remove animations".
     final active =
         !widget.paused &&
         TickerMode.valuesOf(context).enabled &&
         Visibility.of(context) &&
         !(MediaQuery.maybeDisableAnimationsOf(context) ?? false) &&
-        !(MediaQuery.maybeAccessibleNavigationOf(context) ?? false);
+        (defaultTargetPlatform == TargetPlatform.android ||
+            !(MediaQuery.maybeAccessibleNavigationOf(context) ?? false));
     if (active == _listening) return;
     _listening = active;
     if (active) {
@@ -64,11 +77,10 @@ class _StatusAnimationState extends State<StatusAnimation> {
 
   void _tick() {
     final elapsed = _clock.elapsed;
-    _progress.value =
-        (_progress.value +
-            (elapsed - _lastTick).inMicroseconds /
-                widget.duration.inMicroseconds) %
-        1;
+    final next =
+        _progress.value +
+        (elapsed - _lastTick).inMicroseconds / widget.duration.inMicroseconds;
+    _progress.value = widget._elapsedTime ? next : next % 1;
     _lastTick = elapsed;
   }
 
@@ -115,9 +127,13 @@ class _StatusAnimationClock extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) => _syncPlayback();
 
   void _syncPlayback() {
-    final lifecycle = WidgetsBinding.instance.lifecycleState;
-    if (!hasListeners ||
-        (lifecycle != null && lifecycle != AppLifecycleState.resumed)) {
+    final binding = WidgetsBinding.instance;
+    final lifecycle = binding.lifecycleState;
+    // On Android the chat can remain visible while the window loses focus.
+    final canAnimate = defaultTargetPlatform == TargetPlatform.android
+        ? binding.framesEnabled
+        : lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    if (!hasListeners || !canAnimate) {
       _stop();
     } else {
       _timer ??= Timer.periodic(_interval, (_) => _scheduleFrame());

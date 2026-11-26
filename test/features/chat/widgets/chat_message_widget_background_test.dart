@@ -28,6 +28,7 @@ import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/theme/chat_bubble_style.dart';
 
 Future<SettingsProvider> _createSettings(
   ChatMessageBackgroundStyle style,
@@ -498,7 +499,6 @@ void main() {
             assistantMessage: message,
             apiMessages: const [],
             userImagePaths: const [],
-            allowImagesApiRouting: false,
             providerKey: 'test',
             modelId: 'test-model',
             assistant: null,
@@ -649,6 +649,10 @@ void main() {
         tester.widget<Text>(find.text('Show 2 more steps')).style?.color,
         _expectedNeutralStrong(),
       );
+
+      await settings.setShowAssistantBodyBubble(false);
+      await tester.pump();
+      expect(find.byType(FrostedSurface), findsOneWidget);
     });
 
     testWidgets('thinking/tool timeline card does not use blur in solid mode', (
@@ -693,6 +697,120 @@ void main() {
         tester.widget<Text>(find.text('Web Search: Kelivo')).style?.color,
         _expectedNeutralStrong(),
       );
+    });
+
+    testWidgets('thinking and tool cards update independently of the reply', (
+      tester,
+    ) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.frosted,
+      );
+      await settings.setEnableAssistantMarkdown(false);
+      const reply = 'First paragraph\n\nSecond paragraph';
+      const replyColor = Color(0xFF224466);
+      await settings.setChatBubbleStyleOverrides(
+        ChatBubbleStyleOverrides(
+          textArgbLight: replyColor.toARGB32(),
+          cornerRadius: 6,
+        ),
+      );
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                ChatMessageWidget(
+                  message: ChatMessage(
+                    role: 'assistant',
+                    content: reply,
+                    conversationId: 'independent-card-style',
+                  ),
+                  showModelIcon: false,
+                  reasoningSegments: const [
+                    ReasoningSegment(
+                      text: 'Thinking',
+                      expanded: true,
+                      loading: false,
+                    ),
+                  ],
+                  toolParts: const [
+                    ToolUIPart(
+                      id: 'tool-1',
+                      toolName: 'search_web',
+                      arguments: {'query': 'Combined'},
+                      content: 'Results',
+                    ),
+                  ],
+                ),
+                ChatMessageWidget(
+                  message: ChatMessage(
+                    role: 'tool',
+                    content: jsonEncode({
+                      'tool': 'search_web',
+                      'arguments': {'query': 'Standalone'},
+                      'result': 'Results',
+                    }),
+                    conversationId: 'independent-card-style',
+                  ),
+                  showModelIcon: false,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      FrostedSurface surfaceFor(String label) => tester.widget<FrostedSurface>(
+        find.ancestor(
+          of: find.text(label),
+          matching: find.byType(FrostedSurface),
+        ),
+      );
+      Color? textColor(String label) =>
+          tester.widget<Text>(find.text(label)).style?.color;
+      const thinking = 'Deep Thinking';
+      const combined = 'Web Search: Combined';
+      const standalone = 'Web Search: Standalone';
+      expect(surfaceFor(thinking).style.radius, 6);
+      expect(textColor(combined), replyColor.withValues(alpha: 0.78));
+
+      const cardColor = Color(0xFFAA2200);
+      await settings.setCustomizeThinkingToolCards(true);
+      await settings.setChatBubbleStyleOverridesFor(
+        ChatBubbleStyleTarget.thinkingToolCard,
+        ChatBubbleStyleOverrides(
+          cornerRadius: 24,
+          blurSigma: 3,
+          frostedOpacity: 0.4,
+          textArgbLight: cardColor.toARGB32(),
+        ),
+      );
+      await tester.pump();
+
+      for (final label in [thinking, combined, standalone]) {
+        final style = surfaceFor(label).style;
+        expect(style.radius, 24);
+        expect(style.blurSigma, 3);
+        expect(style.background.a, closeTo(0.4, 0.001));
+        expect(textColor(label), cardColor.withValues(alpha: 0.78));
+      }
+      expect(surfaceFor(reply).style.radius, 6);
+      expect(textColor(reply), replyColor);
+
+      await settings.setAssistantBubbleSplitParagraphs(true);
+      await tester.pump();
+      expect(surfaceFor(thinking).style.radius, 24);
+      for (final label in ['First paragraph', 'Second paragraph']) {
+        expect(surfaceFor(label).style.radius, 6);
+        expect(textColor(label), replyColor);
+      }
+
+      await settings.setCustomizeThinkingToolCards(false);
+      await tester.pump();
+      expect(surfaceFor(thinking).style.radius, 6);
+      expect(textColor(standalone), replyColor.withValues(alpha: 0.78));
     });
 
     testWidgets('tool message card uses blur in frosted mode', (tester) async {
@@ -786,6 +904,16 @@ void main() {
         expect(
           tester.widget<Text>(find.text('Translation')).style?.color,
           _expectedNeutralStrong(),
+        );
+        await settings.setShowAssistantBodyBubble(false);
+        await tester.pump();
+        expect(find.byType(FrostedSurface), findsOneWidget);
+        expect(
+          find.ancestor(
+            of: find.text('Translation'),
+            matching: find.byType(FrostedSurface),
+          ),
+          findsOneWidget,
         );
       },
     );
@@ -1304,7 +1432,7 @@ void main() {
         expect(find.text('Deep Thinking'), findsOneWidget);
         expect(renderedParagraphsWith('结构化思考', exact: false), hasLength(1));
         expect(
-          renderedParagraphsWith('正文 literal 继续显示', exact: false),
+          renderedParagraphsWith('正文 <think>literal</think> 继续显示'),
           hasLength(1),
         );
       },

@@ -4,11 +4,127 @@ import 'dart:typed_data';
 
 import 'package:Kelivo/core/services/asr/asr_service_options.dart';
 import 'package:Kelivo/core/services/asr/cloud_asr_service.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
+  test(
+    'DeepSeek allows slow uploads and honors an explicit request timeout',
+    () {
+      for (final timeout in [null, const Duration(seconds: 5)]) {
+        fakeAsync((clock) {
+          final client = MockClient((_) async {
+            await Future<void>.delayed(const Duration(seconds: 45));
+            return http.Response('{"text":"finished"}', 200);
+          });
+          Future<String> recognize() async {
+            final session =
+                await CloudAsrService(
+                  httpClient: client,
+                  completionTimeout: timeout,
+                ).startSession(
+                  AudioTranscriptionAsrOptions(
+                    kind: AsrServiceKind.deepseek,
+                    apiKey: 'key',
+                  ),
+                );
+            await session.addPcm16(Uint8List(3200));
+            return session.finish();
+          }
+
+          String? transcript;
+          Object? error;
+          recognize().then<void>(
+            (value) => transcript = value,
+            onError: (Object e) {
+              error = e;
+            },
+          );
+          clock.elapse(const Duration(seconds: 45));
+          if (timeout == null) {
+            expect(transcript, 'finished');
+            expect(error, isNull);
+          } else {
+            expect(transcript, isNull);
+            expect(
+              error,
+              isA<AsrException>().having(
+                (e) => e.message,
+                'message',
+                contains('timed out'),
+              ),
+            );
+          }
+        });
+      }
+    },
+  );
+
+  for (final (sampleRate, segmentSeconds) in [(8000, 0), (48000, 300)]) {
+    test(
+      'DeepSeek bounds WAV uploads and transcribes long audio at $sampleRate Hz',
+      () async {
+        final uploaded = <int>[];
+        final client = _ControlledClient((request) async {
+          final upload = request as http.AbortableMultipartRequest;
+          expect(upload.method, 'POST');
+          expect(
+            upload.url.toString(),
+            'https://proxy.test/team/v1/tools/asr?tenant=voice',
+          );
+          expect(upload.headers['authorization'], 'Bearer deepseek-key');
+          expect(upload.fields, isEmpty);
+          final file = upload.files.single;
+          expect(file.field, 'file');
+          expect(file.filename, 'recording.wav');
+          expect(file.contentType.toString(), 'audio/wav');
+          expect(file.length, lessThanOrEqualTo(8 * 1024 * 1024));
+          final wav = await file.finalize().toBytes();
+          final header = ByteData.sublistView(wav);
+          expect(latin1.decode(wav.sublist(0, 4)), 'RIFF');
+          expect(header.getUint16(20, Endian.little), 1);
+          expect(header.getUint16(22, Endian.little), 1);
+          expect(header.getUint32(24, Endian.little), sampleRate);
+          expect(header.getUint16(34, Endian.little), 16);
+          final pcmLength = header.getUint32(40, Endian.little);
+          expect(pcmLength, wav.length - 44);
+          expect(pcmLength, lessThanOrEqualTo(120 * sampleRate * 2));
+          uploaded.add(pcmLength);
+          final text = uploaded.length == 1 ? '你好' : '世界';
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                jsonEncode({
+                  'request_id': 'request-${uploaded.length}',
+                  'text': text,
+                  'duration_ms': pcmLength * 1000 ~/ (2 * sampleRate),
+                }),
+              ),
+            ),
+            200,
+          );
+        });
+        final session = await CloudAsrService(httpClient: client).startSession(
+          AudioTranscriptionAsrOptions(
+            kind: AsrServiceKind.deepseek,
+            apiKey: ' deepseek-key ',
+            baseUrl: 'https://proxy.test/team/v1/?tenant=voice',
+            sampleRate: sampleRate,
+            segmentDurationSec: segmentSeconds,
+          ),
+        );
+        final partials = session.partialTranscripts.toList();
+        final totalBytes = sampleRate * 2 * 121;
+        await session.addPcm16(Uint8List(totalBytes));
+        expect(await session.finish(), '你好世界');
+        expect(await partials, ['你好', '你好世界']);
+        expect(uploaded.reduce((a, b) => a + b), totalBytes);
+      },
+    );
+  }
+
   for (final kind in [
     AsrServiceKind.groq,
     AsrServiceKind.mistral,
