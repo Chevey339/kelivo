@@ -12,8 +12,51 @@ const _claudeAccountBetas = [
   'extended-cache-ttl-2025-04-11',
 ];
 
+final _revokedBearer = RegExp(
+  r'\bOAuth token has been revoked\b',
+  caseSensitive: false,
+);
+
+/// A resource refused the access token. The refresh grant can still be used.
+class ClaudeOAuthBearerRejected extends ProviderOAuthException {
+  ClaudeOAuthBearerRejected(ProviderOAuthException error)
+    : super(
+        error.kind,
+        statusCode: error.statusCode,
+        code: error.code,
+        message: error.message,
+      );
+}
+
 /// OMP 6f2c14b3: rules/auth/anthropic.kdl and registry/oauth/anthropic.ts.
 class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
+  static bool isRevokedBearer(Object? errorBody) {
+    final message = errorBody is Map
+        ? oauthString(oauthMap(errorBody['error'])['message']) ??
+              oauthString(errorBody['message']) ??
+              oauthString(errorBody['error'])
+        : oauthString(errorBody);
+    return message != null && _revokedBearer.hasMatch(message);
+  }
+
+  ProviderOAuthException _resourceFailure(
+    OAuthWireResponse response,
+    ProviderOAuthCredentials credentials,
+  ) {
+    final failure = _requestFailure(
+      response,
+      credentials,
+      loginRequired: false,
+      textMessage: response.errorText,
+    );
+    if (response.status == 401 ||
+        response.status == 403 &&
+            isRevokedBearer(response.errorText ?? response.data)) {
+      return ClaudeOAuthBearerRejected(failure);
+    }
+    return failure;
+  }
+
   @override
   OAuthProvider get provider => OAuthProvider.claude;
 
@@ -248,28 +291,41 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
     OAuthWire wire,
     ProviderOAuthCredentials stored,
   ) => oauthAtStage(ProviderOAuthStage.refreshToken, () async {
-    final response = await wire.request(
-      provider.tokenEndpoint,
-      json: {
-        'grant_type': 'refresh_token',
-        'client_id': provider.clientId,
-        'refresh_token': stored.refreshToken,
-      },
-      headers: {
-        'anthropic-beta': 'oauth-2025-04-20',
-        'User-Agent':
-            'anthropic-sdk-typescript/$claudeCodeSdkVersion userOAuthProvider',
-      },
-    );
+    // OMP v19.2.0 anthropic.kdl uses a separate endpoint and scopes for renewal.
+    Future<OAuthWireResponse> exchange({required bool withScope}) =>
+        wire.request(
+          'https://platform.claude.com/v1/oauth/token',
+          json: {
+            'grant_type': 'refresh_token',
+            'client_id': provider.clientId,
+            'refresh_token': stored.refreshToken,
+            if (withScope)
+              'scope':
+                  'user:profile user:inference user:sessions:claude_code '
+                  'user:mcp_servers user:file_upload user:plugins',
+          },
+          headers: const {
+            'Accept': 'application/json, text/plain, */*',
+            'User-Agent': 'axios/1.15.2',
+          },
+        );
+    var response = await exchange(withScope: true);
+    if (response.status == 400 &&
+        _claudeOAuthError(response) == 'invalid_scope') {
+      // Omitting scope renews only the permissions the old grant already has.
+      response = await exchange(withScope: false);
+    }
     if (!response.ok) {
-      final failure = _requestFailure(response, stored);
-      throw ProviderOAuthException(
-        response.status == 401 || response.data['error'] == 'invalid_grant'
-            ? ProviderOAuthFailure.loginRequired
-            : failure.kind,
-        statusCode: response.status,
-        code: failure.code,
-        message: failure.message,
+      final description =
+          response.data['error_description'] ??
+          oauthMap(response.data['error'])['error_description'];
+      throw _requestFailure(
+        response,
+        stored,
+        loginRequired:
+            (response.status == 400 || response.status == 401) &&
+            _claudeOAuthError(response) == 'invalid_grant' &&
+            description != 'account_on_hold',
       );
     }
     return _identity(
@@ -303,7 +359,9 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
           'anthropic-dangerous-direct-browser-access': 'true',
         },
       );
-      if (!response.ok) throw _requestFailure(response, credentials);
+      if (!response.ok) {
+        throw _resourceFailure(response, credentials);
+      }
       final result = response.data;
       if (result['data'] is! List) {
         throw const ProviderOAuthException(
@@ -350,7 +408,7 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
               response.status == 408 ||
               response.status >= 500 && response.status != 501;
           if (!retryable || attempt == 2) {
-            throw _requestFailure(response, credentials);
+            throw _resourceFailure(response, credentials);
           }
           retryAfter = response.headers['retry-after'];
         } else {
@@ -386,6 +444,11 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
       await Future<void>.delayed(delay);
     }
   }
+}
+
+String? _claudeOAuthError(OAuthWireResponse response) {
+  final error = response.data['error'];
+  return oauthString(error) ?? oauthString(oauthMap(error)['type']);
 }
 
 String? _claudeAuthorizationCode(String input, String expectedState) {

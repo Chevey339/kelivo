@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/provider_oauth.dart';
 import '../logging/log_redactor.dart';
 import '../model_spec/model_list_metadata_cache.dart';
+import '../network/provider_http_exception.dart';
 import 'codex_client_version.dart';
 import 'oauth_callback.dart';
 import 'oauth_cancellation.dart';
@@ -34,17 +35,26 @@ class OAuthLoginPrompt {
 typedef OAuthPromptHandler = Future<void> Function(OAuthLoginPrompt prompt);
 
 class OAuthWireResponse {
-  const OAuthWireResponse(this.status, this.data, {this.headers = const {}});
+  const OAuthWireResponse(
+    this.status,
+    this.data, {
+    this.headers = const {},
+    this.errorText,
+  });
   final int status;
   final Map<String, dynamic> data;
   final Map<String, String> headers;
+
+  /// A non-object error body, for adapters that recognize a provider refusal.
+  final String? errorText;
   bool get ok => status >= 200 && status < 300;
 }
 
 /// Form encoding, bounded requests and redirect handling shared by adapters.
 class OAuthWire {
-  OAuthWire(this.client);
+  OAuthWire(this.client, {this.onUnauthorized});
   final http.Client client;
+  final void Function()? onUnauthorized;
 
   Future<OAuthWireResponse> request(
     String url, {
@@ -66,27 +76,39 @@ class OAuthWire {
       request.body = jsonEncode(json);
     }
     try {
-      final response = await (() async => http.Response.fromStream(
-        await client.send(request),
-      ))().timeout(timeout);
+      final response = await (() async {
+        final streamed = await client.send(request);
+        if (streamed.statusCode == 401) onUnauthorized?.call();
+        return http.Response.fromStream(streamed);
+      })().timeout(timeout);
+      final ok = response.statusCode >= 200 && response.statusCode < 300;
       Map<String, dynamic> data = const {};
+      String? errorText;
+      String? body;
       try {
-        final decoded = jsonDecode(response.body);
+        body = response.body;
+        final decoded = jsonDecode(body);
         if (decoded is Map) data = decoded.cast<String, dynamic>();
+        if (!ok && decoded is String) errorText = decoded;
       } catch (_) {
-        if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (ok) {
           throw ProviderOAuthException(
             ProviderOAuthFailure.invalidResponse,
             statusCode: response.statusCode,
           );
         }
+        errorText = body;
       }
       return OAuthWireResponse(
         response.statusCode,
         data,
         headers: response.headers,
+        errorText: errorText,
       );
     } catch (error) {
+      if (error is ProviderHttpException && error.statusCode == 401) {
+        onUnauthorized?.call();
+      }
       throw oauthFailure(error);
     }
   }
@@ -106,6 +128,8 @@ ProviderOAuthException _requestFailure(
   OAuthWireResponse response,
   ProviderOAuthCredentials? credentials, {
   List<String> secrets = const [],
+  bool? loginRequired,
+  String? textMessage,
 }) {
   final data = response.data;
   final error = oauthMap(data['error']);
@@ -115,6 +139,7 @@ ProviderOAuthException _requestFailure(
       oauthString(error['type']) ??
       oauthString(data['error']);
   final messages = <String>{
+    if (oauthString(textMessage) case final value?) value,
     if (oauthString(data['message']) case final value?) value,
     if (oauthString(error['message']) case final value?) value,
     if (oauthString(error['error_description']) case final value?) value,
@@ -169,7 +194,7 @@ ProviderOAuthException _requestFailure(
   }
 
   return ProviderOAuthException(
-    response.status == 401
+    (loginRequired ?? response.status == 401)
         ? ProviderOAuthFailure.loginRequired
         : quotaExceeded
         ? ProviderOAuthFailure.quotaExceeded

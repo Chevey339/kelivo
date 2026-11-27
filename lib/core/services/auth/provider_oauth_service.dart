@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:clock/clock.dart';
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -15,6 +16,7 @@ import '../model_spec/model_spec_resolver.dart';
 import '../api/request_image_context.dart';
 import '../network/dio_http_client.dart';
 import '../network/media_http_log.dart';
+import '../network/provider_http_exception.dart';
 import 'codex_client_version.dart';
 import 'codex_request.dart';
 import 'codex_turn_state.dart';
@@ -38,19 +40,29 @@ class ProviderOAuthService extends ChangeNotifier {
   final http.Client Function(ProviderConfig) _clientFactory;
   final CodexClientVersion? _codexVersion;
   SettingsProvider? _settings;
-  final _refreshes = <String, Future<ProviderConfig>>{};
+  final _refreshes =
+      <
+        ({SettingsProvider settings, String id, String session}),
+        ({String accessToken, Future<ProviderConfig> result})
+      >{};
+  final _claudeRenewals = <String, _ClaudeRenewal>{};
   final _modelSyncs =
       <(SettingsProvider, String, CodexVersionSnapshot?), Future<void>>{};
   final _usage = <String, ProviderUsageSnapshot>{};
   final _usageRequests = <String, Future<ProviderUsageSnapshot>>{};
   OAuthCancellation? _login;
 
-  void bind(SettingsProvider settings) => _settings = settings;
+  void bind(SettingsProvider settings) {
+    if (!identical(settings, _settings)) _claudeRenewals.clear();
+    _settings = settings;
+  }
+
   void unbind(SettingsProvider settings) {
     if (identical(settings, _settings)) {
       _login?.cancel();
       _settings = null;
       _usage.clear();
+      _claudeRenewals.clear();
     }
   }
 
@@ -70,8 +82,9 @@ class ProviderOAuthService extends ChangeNotifier {
     return current;
   }
 
-  bool isRefreshing(String id) =>
-      _refreshes.keys.any((key) => key.startsWith('$id:'));
+  bool isRefreshing(String id) => _refreshes.keys.any(
+    (key) => identical(key.settings, _settings) && key.id == id,
+  );
   bool needsLogin(String id) {
     final config = _current(id);
     return config?.isOAuth == true &&
@@ -190,6 +203,7 @@ class ProviderOAuthService extends ChangeNotifier {
             oauthCredentials: credentials,
             oauthModelsClientVersion: null,
           );
+      if (previous != null) _claudeRenewals.remove(_sessionKey(previous));
       await settings.setProviderConfig(saved.id, saved);
       if (providerId == null) {
         await settings.setProvidersOrder([
@@ -213,6 +227,7 @@ class ProviderOAuthService extends ChangeNotifier {
     if (config == null || !config.isOAuth) return;
     _login?.cancel();
     _usage.remove(_sessionKey(config));
+    _claudeRenewals.remove(_sessionKey(config));
     await _settings!.setProviderConfig(
       id,
       config.copyWith(oauthCredentials: null, oauthModelsClientVersion: null),
@@ -227,28 +242,46 @@ class ProviderOAuthService extends ChangeNotifier {
   }) async {
     if (!config.isOAuth) return config;
     final current = _requireCurrentSession(config);
-    if (current.oauthCredentials == null ||
-        current.oauthCredentials!.requiresLogin) {
+    final credentials = current.oauthCredentials;
+    if (credentials == null || credentials.requiresLogin) {
       throw ProviderOAuthException(
         ProviderOAuthFailure.loginRequired,
         providerId: config.id,
       );
     }
+    final isClaude = current.oauthProvider == OAuthProvider.claude;
+    final key = _sessionKey(current);
+    final settings = _settings!;
+    final refreshKey = (
+      settings: settings,
+      id: current.id,
+      session: credentials.sessionId,
+    );
+    final pending = _refreshes[refreshKey];
+    // Settings exposes the new bearer before its persistence future completes.
+    // Finish that rotation before a request can send and then reject the new bearer.
+    final publishing =
+        isClaude &&
+        pending != null &&
+        pending.accessToken != credentials.accessToken;
+    final renewal = _claudeRenewals[key];
+    final now = clock.now();
     if (!force &&
-        !current.oauthCredentials!.shouldRefresh(
-          DateTime.now(),
-          leeway: current.oauthProvider == OAuthProvider.claude
-              ? const Duration(minutes: 5)
-              : const Duration(minutes: 1),
-        )) {
+        !publishing &&
+        renewal?.rejects(credentials) != true &&
+        (!credentials.shouldRefresh(
+              now,
+              leeway: Duration(minutes: isClaude ? 5 : 1),
+            ) ||
+            renewal?.canDefer(credentials, now) == true)) {
       return _forRequest(current);
     }
-    final settings = _settings;
-    final key = _sessionKey(current);
-    final pending = _refreshes[key];
-    final request = pending ?? _refresh(current);
+    final request = pending?.result ?? _refresh(current);
     if (pending == null) {
-      _refreshes[key] = request;
+      _refreshes[refreshKey] = (
+        accessToken: credentials.accessToken,
+        result: request,
+      );
       notifyListeners();
     }
     try {
@@ -257,18 +290,64 @@ class ProviderOAuthService extends ChangeNotifier {
       // Refreshes are shared with usage probes. Each caller decides whether
       // its failure can invalidate the account; token rotation is still saved
       // once by _refresh regardless of who started it.
-      if (!usageProbe &&
-          identical(settings, _settings) &&
-          error.kind == ProviderOAuthFailure.loginRequired) {
-        await markLoginRequired(current);
+      if (!identical(settings, _settings) ||
+          error.kind == ProviderOAuthFailure.cancelled) {
+        rethrow;
       }
-      rethrow;
+      if (error.kind == ProviderOAuthFailure.loginRequired) {
+        if (!usageProbe) await markLoginRequired(current);
+        rethrow;
+      }
+      if (!isClaude || force) rethrow;
+      final latest = _requireCurrentSession(current);
+      final saved = latest.oauthCredentials!;
+      final now = clock.now();
+      if (saved.accessToken != credentials.accessToken ||
+          saved.requiresLogin ||
+          !saved.expiresAt.isAfter(now) ||
+          _claudeRenewals[key]?.rejects(saved) == true) {
+        rethrow;
+      }
+      if (!usageProbe) {
+        _claudeRenewals[key] = _ClaudeRenewal(
+          saved.accessToken,
+          retryAt: now.add(const Duration(seconds: 10)),
+        );
+      }
+      return _forRequest(latest);
     } finally {
       if (pending == null) {
-        _refreshes.remove(key);
+        _refreshes.remove(refreshKey);
         notifyListeners();
       }
     }
+  }
+
+  // Late refusals of an old bearer should reuse a newer token from the same
+  // login. An advisory usage probe cannot invalidate the interactive bearer.
+  void _recordBearerRejection(ProviderConfig sent, {bool usageProbe = false}) {
+    if (sent.oauthProvider != OAuthProvider.claude || usageProbe) return;
+    final credentials = sent.oauthCredentials!;
+    final current = _current(sent.id);
+    if (current?.oauthProvider == sent.oauthProvider &&
+        current?.oauthCredentials?.sessionId == credentials.sessionId &&
+        current?.oauthCredentials?.accessToken == credentials.accessToken) {
+      _claudeRenewals[_sessionKey(sent)] = _ClaudeRenewal(
+        credentials.accessToken,
+      );
+    }
+  }
+
+  Future<ProviderConfig> _recoverBearer(
+    ProviderConfig sent, {
+    bool usageProbe = false,
+  }) {
+    final current = _requireCurrentSession(sent);
+    final force =
+        current.oauthProvider != OAuthProvider.claude ||
+        current.oauthCredentials?.accessToken ==
+            sent.oauthCredentials!.accessToken;
+    return resolve(current, force: force, usageProbe: usageProbe);
   }
 
   ProviderConfig _forRequest(ProviderConfig config) => config.copyWith(
@@ -299,6 +378,7 @@ class ProviderOAuthService extends ChangeNotifier {
       }
       // Keep edits made while the refresh was in flight.
       final next = current!.copyWith(oauthCredentials: refreshed);
+      _claudeRenewals.remove(_sessionKey(original));
       await settings.setProviderConfig(next.id, next);
       return _forRequest(next);
     } on ProviderOAuthException catch (error) {
@@ -349,13 +429,15 @@ class ProviderOAuthService extends ChangeNotifier {
     bool usageProbe = false,
     bool Function()? isCurrent,
   }) async {
+    final settings = _settings;
     void checkCurrent() {
-      if (isCurrent?.call() == false) {
+      if (!identical(settings, _settings) || isCurrent?.call() == false) {
         throw ProviderOAuthException(
           ProviderOAuthFailure.cancelled,
           providerId: original.id,
         );
       }
+      _requireCurrentSession(original);
     }
 
     try {
@@ -363,29 +445,48 @@ class ProviderOAuthService extends ChangeNotifier {
       var config = await resolve(original, usageProbe: usageProbe);
       final client = _clientFactory(config);
       try {
-        try {
-          return await operation(OAuthWire(client), config);
-        } on ProviderOAuthException catch (error) {
+        for (var retried = false; ; retried = true) {
           checkCurrent();
-          if (error.kind != ProviderOAuthFailure.loginRequired) rethrow;
-          config = await resolve(config, force: true, usageProbe: usageProbe);
-          checkCurrent();
+          final sent = config;
+          final wire = OAuthWire(
+            client,
+            onUnauthorized:
+                !usageProbe && sent.oauthProvider == OAuthProvider.claude
+                ? () {
+                    if (identical(settings, _settings)) {
+                      _recordBearerRejection(sent);
+                    }
+                  }
+                : null,
+          );
           try {
-            return await operation(OAuthWire(client), config);
+            return await operation(wire, sent);
           } on ProviderOAuthException catch (error) {
             checkCurrent();
-            if (!usageProbe &&
-                error.kind == ProviderOAuthFailure.loginRequired) {
-              await markLoginRequired(config);
+            final rejected =
+                error is ClaudeOAuthBearerRejected ||
+                error.kind == ProviderOAuthFailure.loginRequired;
+            if (!rejected) rethrow;
+            _recordBearerRejection(config, usageProbe: usageProbe);
+            if (retried) {
+              if (!usageProbe &&
+                  error.kind == ProviderOAuthFailure.loginRequired) {
+                await markLoginRequired(config);
+              }
+              rethrow;
             }
-            rethrow;
+            config = await _recoverBearer(config, usageProbe: usageProbe);
           }
         }
       } finally {
         client.close();
       }
     } on ProviderOAuthException catch (error) {
-      if (!usageProbe || error.kind != ProviderOAuthFailure.loginRequired) {
+      final resourceUnauthorized =
+          error is ClaudeOAuthBearerRejected && error.statusCode == 401;
+      if (!usageProbe ||
+          (error.kind != ProviderOAuthFailure.loginRequired &&
+              !resourceUnauthorized)) {
         rethrow;
       }
       throw ProviderOAuthException(
@@ -759,6 +860,30 @@ class ProviderOAuthService extends ChangeNotifier {
       : client;
 }
 
+/// A failed proactive exchange defers the next attempt for this bearer. A
+/// resource rejection leaves no retry time: the bearer must be replaced.
+class _ClaudeRenewal {
+  const _ClaudeRenewal(this.accessToken, {this.retryAt});
+  final String accessToken;
+  final DateTime? retryAt;
+
+  bool rejects(ProviderOAuthCredentials credentials) =>
+      accessToken == credentials.accessToken && retryAt == null;
+
+  bool canDefer(ProviderOAuthCredentials credentials, DateTime now) =>
+      accessToken == credentials.accessToken &&
+      retryAt?.isAfter(now) == true &&
+      credentials.expiresAt.isAfter(now);
+}
+
+bool _claudeBodyRevokesBearer(String body) {
+  try {
+    return ClaudeOAuthAdapter.isRevokedBearer(jsonDecode(body));
+  } on FormatException {
+    return ClaudeOAuthAdapter.isRevokedBearer(body);
+  }
+}
+
 const _deletedOAuthThinkingKeys = {
   'oauthThinkingMode',
   'oauthThinkingRequired',
@@ -1030,9 +1155,11 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     service._requireCurrentSession(config);
   }
 
-  Future<void> _resolve({bool force = false}) async {
+  Future<void> _resolve({ProviderConfig? rejected}) async {
     _checkSession();
-    final pending = service.resolve(config, force: force);
+    final pending = rejected == null
+        ? service.resolve(config)
+        : service._recoverBearer(rejected);
     final cancellation = _cancelToken;
     // Refresh is shared with other requests. Stop only this caller's wait;
     // token rotation must still finish and be persisted for the other callers.
@@ -1198,43 +1325,44 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     while (true) {
       final requestVersion = claudeCodeVersion;
       final requestConfig = config;
-      final response = await inner.send(build());
+      http.StreamedResponse response;
+      try {
+        response = await inner.send(build());
+      } on ProviderHttpException catch (error) {
+        // Request logging may read a failed response before send returns.
+        if (isClaude && error.statusCode == 401) {
+          _checkSession();
+          service._recordBearerRejection(requestConfig);
+        }
+        rethrow;
+      }
       if (codexResponses &&
           response.statusCode >= 200 &&
           response.statusCode < 300) {
         _codexTurnState.capture(response.headers, requestConfig);
       }
-      if (response.statusCode == 401) {
-        await response.stream.drain<void>();
-        _checkSession();
-        if (refreshed) {
-          await service.markLoginRequired(config);
-          throw ProviderOAuthException(
-            ProviderOAuthFailure.loginRequired,
-            providerId: config.id,
-            statusCode: 401,
-          );
-        }
-        await _resolve(force: true);
-        refreshed = true;
-        continue;
-      }
-      if (claudeMessages &&
+      var rejected = response.statusCode == 401;
+      final checkVersion =
+          claudeMessages &&
           request.method == 'POST' &&
           response.statusCode == 400 &&
-          !retriedClaudeVersion) {
+          !retriedClaudeVersion;
+      if (checkVersion || isClaude && response.statusCode == 403) {
         final bytes = await response.stream.toBytes();
+        final text = utf8.decode(bytes, allowMalformed: true);
         _checkSession();
-        if (adoptRequiredClaudeCodeVersion(
-          utf8.decode(bytes, allowMalformed: true),
-          requestVersion: requestVersion,
-        )) {
+        if (checkVersion &&
+            adoptRequiredClaudeCodeVersion(
+              text,
+              requestVersion: requestVersion,
+            )) {
           retriedClaudeVersion = true;
           // Rebuild from the original body so version, billing and cch agree,
           // without duplicating system blocks or tool prefixes.
           continue;
         }
-        return http.StreamedResponse(
+        rejected = response.statusCode == 403 && _claudeBodyRevokesBearer(text);
+        response = http.StreamedResponse(
           Stream.value(bytes),
           response.statusCode,
           contentLength: response.contentLength,
@@ -1245,7 +1373,28 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
           reasonPhrase: response.reasonPhrase,
         );
       }
-      return response;
+      if (!rejected) return response;
+      try {
+        _checkSession();
+        service._recordBearerRejection(requestConfig);
+      } catch (_) {
+        // The caller cannot consume this response after its session ends.
+        await response.stream.listen(null).cancel();
+        rethrow;
+      }
+      if (refreshed && isClaude) return response;
+      await response.stream.drain<void>();
+      _checkSession();
+      if (refreshed) {
+        await service.markLoginRequired(requestConfig);
+        throw ProviderOAuthException(
+          ProviderOAuthFailure.loginRequired,
+          providerId: requestConfig.id,
+          statusCode: 401,
+        );
+      }
+      await _resolve(rejected: requestConfig);
+      refreshed = true;
     }
   }
 

@@ -477,15 +477,24 @@ void main() {
       final refreshed = await adapter.refresh(
         OAuthWire(
           MockClient((request) async {
-            expect(request.headers['anthropic-beta'], 'oauth-2025-04-20');
             expect(
-              request.headers['user-agent'],
-              'anthropic-sdk-typescript/0.128.0 userOAuthProvider',
+              request.url.toString(),
+              'https://platform.claude.com/v1/oauth/token',
             );
+            expect(
+              request.headers['accept'],
+              'application/json, text/plain, */*',
+            );
+            expect(request.headers['content-type'], 'application/json');
+            expect(request.headers.containsKey('anthropic-beta'), isFalse);
+            expect(request.headers['user-agent'], 'axios/1.15.2');
             expect(jsonDecode(request.body), {
               'grant_type': 'refresh_token',
               'client_id': OAuthProvider.claude.clientId,
               'refresh_token': 'refresh',
+              'scope':
+                  'user:profile user:inference user:sessions:claude_code '
+                  'user:mcp_servers user:file_upload user:plugins',
             });
             return response(tokenResponse(access: 'sk-ant-oat-new'));
           }),
