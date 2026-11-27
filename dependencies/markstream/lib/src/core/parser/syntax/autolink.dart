@@ -3,7 +3,7 @@ final _email = RegExp(
   r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$",
 );
 final _bare = RegExp(
-  r'''(?:https?://|www\.)[^\s<>]+|[A-Za-z0-9.+_-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}''',
+  r"(?:https?://|www\.)[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+|[A-Za-z0-9.+_-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}",
   caseSensitive: false,
 );
 
@@ -40,29 +40,38 @@ readAngleAutolink(String text, int start) {
   final match = _bare.matchAsPrefix(text, start);
   if (match == null) return null;
   var end = match.end;
-  while (end > start && '?!.,:*_~\"\'。！，；'.contains(text[end - 1])) end--;
-  final balances = <int, int>{41: 0, 93: 0, 125: 0};
+  final balances = <int, int>{41: 0, 93: 0};
   for (var i = start; i < end; i++) {
     final c = text.codeUnitAt(i);
-    if (c == 40 || c == 91 || c == 123) {
-      final closer = c == 40 ? 41 : c + 2;
+    if (c == 40 || c == 91) {
+      final closer = c == 40 ? 41 : 93;
       balances[closer] = balances[closer]! + 1;
     } else if (balances.containsKey(c)) {
       balances[c] = balances[c]! - 1;
     }
   }
-  while (end > start && (balances[text.codeUnitAt(end - 1)] ?? 0) < 0) {
-    final closer = text.codeUnitAt(--end);
-    balances[closer] = balances[closer]! + 1;
+  while (true) {
+    final prevEnd = end;
+    while (end > start && "?!.,:*_~'".contains(text[end - 1])) end--;
+    while (end > start && (balances[text.codeUnitAt(end - 1)] ?? 0) < 0) {
+      final closer = text.codeUnitAt(--end);
+      balances[closer] = balances[closer]! + 1;
+    }
+    if (end == prevEnd) break;
   }
   final label = text.substring(start, end);
-  if (label.toLowerCase() == 'http://' ||
-      label.toLowerCase() == 'https://' ||
-      label.toLowerCase() == 'www.')
+  final lower = label.toLowerCase();
+  if (lower == 'http://' ||
+      lower == 'https://' ||
+      lower == 'www.' ||
+      (!lower.startsWith('http://') &&
+          !lower.startsWith('https://') &&
+          !lower.startsWith('www.') &&
+          !label.contains('@')))
     return null;
   return (
     end: end,
-    destination: label.toLowerCase().startsWith('www.')
+    destination: lower.startsWith('www.')
         ? 'http://$label'
         : label.contains('://')
         ? label
