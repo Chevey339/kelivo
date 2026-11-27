@@ -240,6 +240,7 @@ void main() {
         'MaruCode',
         '砂糖酒馆',
         'Vercel',
+        'Atlas Cloud',
         'fal',
       ];
       await repository.replaceSnapshot(
