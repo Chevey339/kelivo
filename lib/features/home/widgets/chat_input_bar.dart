@@ -2432,18 +2432,20 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
       if (!mounted || submitSerial != _submitSerial) return;
       if (accepted) {
-        if (_draftReplacementRevision != submittedDraftRevision) return;
-        widget.mediaController?.sharedDraftAction.value = null;
-        _discardImageState(submittedImageIds);
-        setState(() {});
-        // Collapse once the cleared text is laid out, so the animation lands
-        // on the empty field's height. A rejected send keeps the editor open
-        // for the restored draft.
+        // Collapse once the resulting draft is laid out, so the animation
+        // lands on its height. A rejected send keeps the editor open for the
+        // restored draft. Exit from edit mode restores the pre-edit draft
+        // before this future resolves, so the revision check below must not
+        // skip collapsing on that path.
         if (_isExpanded) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _setExpanded(false);
           });
         }
+        if (_draftReplacementRevision != submittedDraftRevision) return;
+        widget.mediaController?.sharedDraftAction.value = null;
+        _discardImageState(submittedImageIds);
+        setState(() {});
         // Keep focus on desktop so user can continue typing
         try {
           if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
