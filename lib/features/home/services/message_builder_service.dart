@@ -53,6 +53,7 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import 'ocr_service.dart';
 import 'assistant_tool_history.dart';
 import '../../../core/services/api/providers/openai/responses_history.dart';
+import '../../../core/services/api/providers/openai/deepseek_server_tool_history.dart';
 
 void _removeGoogleToolSignatures(Map<String, dynamic> message) {
   void removeFromMetadata(Map<String, dynamic> target) {
@@ -387,6 +388,7 @@ class MessageBuilderService {
     ResponsesReplayScope? responsesScope,
     ({String providerId, String modelId})? claudeSource,
     String? googleProviderId,
+    String? deepSeekChatProviderId,
   }) {
     final source = collapseVersions(messages, versionSelections);
 
@@ -597,6 +599,15 @@ class MessageBuilderService {
                 'content': '\n\n',
                 'tool_calls': calls,
               };
+              if (deepSeekChatProviderId != null &&
+                  m.providerId == deepSeekChatProviderId) {
+                final history = _providerArtifact(
+                  m,
+                  deepSeekServerToolArtifactKind,
+                );
+                if (history != null)
+                  assistantToolMessage[deepSeekServerToolHistoryKey] = history;
+              }
               final turn = omitClaudeSignatures
                   ? null
                   : _providerArtifact(m, claudeTurnArtifactKind);
@@ -709,6 +720,12 @@ class MessageBuilderService {
         if (documentRefs.isNotEmpty) {
           message[multimodalInternalDocumentPathsKey] = documentRefs;
         }
+      }
+      if (role == 'assistant' &&
+          deepSeekChatProviderId != null &&
+          m.providerId == deepSeekChatProviderId) {
+        final history = _providerArtifact(m, deepSeekServerToolArtifactKind);
+        if (history != null) message[deepSeekServerToolHistoryKey] = history;
       }
       if (assistantReasoningContent?.isNotEmpty == true) {
         message['reasoning_content'] = assistantReasoningContent;

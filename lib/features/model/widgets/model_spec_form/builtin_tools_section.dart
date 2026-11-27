@@ -41,6 +41,7 @@ class ModelBuiltInToolTiles {
   static List<ModelBuiltInToolTile> forConfig({
     required ProviderConfig cfg,
     required AppLocalizations l10n,
+    String upstreamModelId = '',
   }) {
     final kind = ProviderConfig.classify(
       cfg.id,
@@ -124,6 +125,13 @@ class ModelBuiltInToolTiles {
             desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
             available: responses,
           ),
+          if (BuiltInToolsHelper.supportsDeepSeekReadLink(cfg, upstreamModelId))
+            ModelBuiltInToolTile(
+              name: BuiltInToolNames.readUrl,
+              title: l10n.modelDetailSheetDeepSeekReadUrlTool,
+              desc: l10n.modelDetailSheetDeepSeekReadUrlToolDescription,
+              available: true,
+            ),
         ];
     }
   }
@@ -139,10 +147,14 @@ class BuiltinToolsSection extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final cfg = settings.getProviderConfig(controller.providerId);
     final l10n = AppLocalizations.of(context)!;
-    final tiles = ModelBuiltInToolTiles.forConfig(cfg: cfg, l10n: l10n);
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
+        final tiles = ModelBuiltInToolTiles.forConfig(
+          cfg: cfg,
+          l10n: l10n,
+          upstreamModelId: controller.spec.upstreamId,
+        );
         if (tiles.isEmpty || controller.spec.type != ModelType.chat) {
           return const SizedBox.shrink();
         }

@@ -4021,6 +4021,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '이미지 생성 도구를 활성화합니다';
 
   @override
+  String get modelDetailSheetDeepSeekReadUrlTool => '링크 읽기';
+
+  @override
+  String get modelDetailSheetDeepSeekReadUrlToolDescription =>
+      'DeepSeek 서버 측 도구로 모델이 메시지의 링크를 읽도록 합니다';
+
+  @override
   String get modelDetailSheetCancelButton => '취소';
 
   @override

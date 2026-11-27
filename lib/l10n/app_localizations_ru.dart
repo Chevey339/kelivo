@@ -4179,6 +4179,13 @@ class AppLocalizationsRu extends AppLocalizations {
       'Включить инструмент генерации изображений';
 
   @override
+  String get modelDetailSheetDeepSeekReadUrlTool => 'Чтение ссылки';
+
+  @override
+  String get modelDetailSheetDeepSeekReadUrlToolDescription =>
+      'Позволяет модели читать ссылки в вашем сообщении с помощью серверного инструмента DeepSeek';
+
+  @override
   String get modelDetailSheetCancelButton => 'Отмена';
 
   @override

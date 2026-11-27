@@ -32,6 +32,7 @@ import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
 import 'chat_completions_api.dart';
 import 'chat_completions_decoder.dart';
+import 'deepseek_server_tool_history.dart';
 import 'openai_request_shaping.dart';
 import 'reasoning_details_replay.dart';
 import 'responses_api.dart';
@@ -168,6 +169,7 @@ Stream<StreamChunk> sendOpenAIStream(
       const <Map<String, dynamic>>[];
   String responsesInstructions = '';
   List<dynamic>? responsesIncludeParam;
+  final deepSeekRecorder = DeepSeekServerToolRecorder(config, upstreamModelId);
   final responsesRecorder = ResponsesTurnRecorder(
     responsesReplayScope(config, modelId),
   );
@@ -479,6 +481,7 @@ Stream<StreamChunk> sendOpenAIStream(
           messages: messages,
           requestBody: body,
           firstObj: lastObj,
+          deepSeekRecorder: deepSeekRecorder,
           initialCalls: firstCalls,
           onToolCall: effectiveOnToolCall,
           userImagePaths: userImagePaths,
@@ -496,6 +499,10 @@ Stream<StreamChunk> sendOpenAIStream(
         (firstChoice['message'] as Map?)?.cast<String, dynamic>(),
       );
       final firstMessage = openaiFirstChoiceMessage(lastObj);
+      final artifact = deepSeekRecorder.record(
+        firstMessage?[deepSeekServerToolCallsField],
+      );
+      if (artifact != null) yield artifact;
       final ids = StreamChunkIds('finish');
       for (final chunk in ChatCompletionsStreamDecoder(
         sourceId: 'finish',
@@ -769,6 +776,12 @@ Stream<StreamChunk> sendOpenAIStream(
       );
     }
   }
+  final shouldContinueChat =
+      chatDecoder != null && effectiveOnToolCall != null && toolAcc.isNotEmpty;
+  if (!shouldContinueChat) {
+    final artifact = deepSeekRecorder.record(chatDecoder?.serverToolCalls);
+    if (artifact != null) yield artifact;
+  }
   if (chatDecoder != null &&
       effectiveOnToolCall != null &&
       toolAcc.isNotEmpty) {
@@ -784,6 +797,8 @@ Stream<StreamChunk> sendOpenAIStream(
       firstAssistantContent: assistantContentBuffer,
       firstReasoning: reasoningBuffer,
       firstReasoningDetails: chatDecoder.reasoningDetails,
+      firstServerToolCalls: chatDecoder.serverToolCalls,
+      deepSeekRecorder: deepSeekRecorder,
       onToolCall: effectiveOnToolCall,
       userImagePaths: userImagePaths,
       canImageInput: canImageInput,

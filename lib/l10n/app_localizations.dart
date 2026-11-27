@@ -7489,6 +7489,18 @@ abstract class AppLocalizations {
   /// **'Enable image generation tool'**
   String get modelDetailSheetOpenaiImageGenerationToolDescription;
 
+  /// Title of the Read Link built-in tool tile shown for DeepSeek providers.
+  ///
+  /// In en, this message translates to:
+  /// **'Read Link'**
+  String get modelDetailSheetDeepSeekReadUrlTool;
+
+  /// Description for the DeepSeek read link tool tile that reads links from the user message.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the model read links in your message with the DeepSeek server-side tool'**
+  String get modelDetailSheetDeepSeekReadUrlToolDescription;
+
   /// Secondary button label to cancel and dismiss the model spec edit dialog.
   ///
   /// In en, this message translates to:

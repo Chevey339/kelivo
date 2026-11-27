@@ -4122,6 +4122,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enable image generation tool';
 
   @override
+  String get modelDetailSheetDeepSeekReadUrlTool => 'Read Link';
+
+  @override
+  String get modelDetailSheetDeepSeekReadUrlToolDescription =>
+      'Let the model read links in your message with the DeepSeek server-side tool';
+
+  @override
   String get modelDetailSheetCancelButton => 'Cancel';
 
   @override

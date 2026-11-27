@@ -1228,6 +1228,8 @@
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "Kod yorumlayıcı aracını etkinleştir (kapsayıcı otomatik, bellek sınırı 4g)",
   "modelDetailSheetOpenaiImageGenerationTool": "Görsel Oluşturma",
   "modelDetailSheetOpenaiImageGenerationToolDescription": "Görsel oluşturma aracını etkinleştir",
+  "modelDetailSheetDeepSeekReadUrlTool": "Bağlantıyı Oku",
+  "modelDetailSheetDeepSeekReadUrlToolDescription": "DeepSeek sunucu tarafı aracıyla modelin mesajınızdaki bağlantıları okumasına izin verin",
   "modelDetailSheetCancelButton": "İptal",
   "modelDetailSheetAddButton": "Ekle",
   "modelDetailSheetConfirmButton": "Onayla",

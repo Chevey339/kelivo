@@ -1228,6 +1228,8 @@
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "4e5ff25f1f2f6d5b2cbb538e0ef03a7f6e9daeabe526489e0cb65b1db875894c",
   "modelDetailSheetOpenaiImageGenerationTool": "ca9949f5c93bc16eef6438eda9cf7d962392376ce8b16afecb2cc2b81332d7d6",
   "modelDetailSheetOpenaiImageGenerationToolDescription": "981eb5f5381e6445204d30af8a6f5cc5c89a9ab0ea905d93c0de4128d338b026",
+  "modelDetailSheetDeepSeekReadUrlTool": "3fec7f2e51ac9acf20354e7908edab095831a6ba6afd37458a18208638368dc5",
+  "modelDetailSheetDeepSeekReadUrlToolDescription": "03dd466cb1b4206b5cfc42521490f4e46ceb81ff278c7d7db2bf1056ef1d595e",
   "modelDetailSheetCancelButton": "5a45d55c960160382822efc8c45456307292747acd68372afd88b43184eafcc1",
   "modelDetailSheetAddButton": "42f2967ed40e4676d2fed13c27a1cff2576d4b0e3d87422d6e8b9a31df7dfd1f",
   "modelDetailSheetConfirmButton": "2aea40ec1fb2c6b224348d88ae12e8e74f7a29a2f9fc362890f0990570bd287a",

@@ -28,6 +28,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
 
   TokenUsage? get usage => _round?.asSnapshot() ?? initialUsage;
 
+  List<dynamic>? serverToolCalls;
   String? finishReason;
   int approxCompletionChars = 0;
   String reasoningEcho = '';
@@ -110,6 +111,12 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
         finishReason = fr is String ? fr : null;
         final message = c0['message'];
         final delta = c0['delta'];
+        final serverCalls =
+            (delta is Map ? delta['server_tool_calls'] : null) ??
+            (message is Map ? message['server_tool_calls'] : null);
+        if (serverCalls is List && serverCalls.isNotEmpty) {
+          serverToolCalls = serverCalls;
+        }
         if (delta is Map) {
           final deltaContent = _extractDeltaText(delta);
           if (deltaContent.isNotEmpty) {

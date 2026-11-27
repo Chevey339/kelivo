@@ -625,7 +625,7 @@ void main() {
               cfg: chatConfig,
               modelId: modelId,
             ),
-            isFalse,
+            modelId != 'deepseek-v4-pro',
             reason: modelId,
           );
         }
