@@ -283,24 +283,56 @@ void main() {
       expect(payload.body, isEmpty);
     });
 
-    test('Grok Responses builder sends web and X search tools', () {
-      final grok = _cfg(
-        id: 'Grok',
-        baseUrl: 'https://api.x.ai/v1',
+    group('Responses adds X search only for Grok providers', () {
+      const modelId = 'gpt-4o';
+      final relay = _cfg(
+        id: 'OpenAI',
+        baseUrl: 'https://relay.example/v1',
         kind: ProviderKind.openai,
         useResponseApi: true,
-        modelId: 'grok-4.7',
+        modelId: modelId,
       );
-      final payload = BuiltInToolsHelper.buildResponsesTools(
-        cfg: grok,
-        modelId: 'grok-4.7',
-        upstreamModelId: 'grok-4.7',
-      );
-      expect(payload.tools, [
-        {'type': 'web_search'},
-        {'type': 'x_search'},
-      ]);
-      expect(payload.body, isEmpty);
+
+      for (final (cfg, xSearch) in [
+        for (final host in [
+          'x.ai',
+          'api.x.ai',
+          'US.API.X.AI.',
+          'grok.com',
+          'cli-chat-proxy.grok.com',
+        ])
+          (relay.copyWith(baseUrl: 'https://$host/v1'), true),
+        for (final host in [
+          'abcx.ai',
+          'x.ai.example',
+          'demo.ngrok.app',
+          'notgrok.com',
+          'grok.com.example',
+        ])
+          (relay.copyWith(baseUrl: 'https://$host/v1'), false),
+        (relay.copyWith(id: 'Grok'), true),
+        (relay.copyWith(oauthProvider: OAuthProvider.grok), true),
+        (relay.copyWith(id: 'OpenAI - Grok'), false),
+        (relay.copyWith(id: 'OpenAI - MaxAI'), false),
+        (relay.copyWith(name: 'Grok'), false),
+        (relay.copyWith(name: 'MaxAI'), false),
+      ]) {
+        test(
+          '${cfg.baseUrl} / ${cfg.id} / ${cfg.name} / ${cfg.oauthProvider}',
+          () {
+            final payload = BuiltInToolsHelper.buildResponsesTools(
+              cfg: cfg,
+              modelId: modelId,
+              upstreamModelId: modelId,
+            );
+            expect(payload.tools, [
+              {'type': 'web_search'},
+              if (xSearch) {'type': 'x_search'},
+            ]);
+            expect(payload.body, isEmpty);
+          },
+        );
+      }
     });
 
     test('Chat builder preserves provider-specific search formats', () {

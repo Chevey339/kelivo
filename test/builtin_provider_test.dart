@@ -15,6 +15,23 @@ import 'package:Kelivo/core/services/model_spec/model_spec_resolver.dart';
 import 'package:Kelivo/features/provider/widgets/share_provider_sheet.dart';
 
 void main() {
+  test('only exact Grok or xAI keys default to the xAI endpoint', () {
+    for (final key in ['Grok', 'xAI', 'x.ai']) {
+      expect(ProviderConfig.defaultsFor(key).baseUrl, 'https://api.x.ai/v1');
+    }
+    for (final key in [
+      'OpenAI - MaxAI',
+      'OpenAI - ngrok',
+      'OpenAI - abcx.ai',
+    ]) {
+      expect(
+        ProviderConfig.defaultsFor(key).baseUrl,
+        'https://api.openai.com/v1',
+        reason: key,
+      );
+    }
+  });
+
   test('KelivoIN defaults expose the requested models and capabilities', () {
     final config = ProviderConfig.defaultsFor('KelivoIN');
     expect(config.baseUrl, 'https://api.psycheas.top/v1');

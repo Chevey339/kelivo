@@ -215,16 +215,17 @@ abstract class BuiltInToolsHelper {
 
   static bool isGrokProvider(ProviderConfig? cfg) {
     if (cfg == null) return false;
-    if (cfg.oauthProvider == OAuthProvider.grok) return true;
-    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
-    final providerId = cfg.id.toLowerCase();
-    final providerName = cfg.name.toLowerCase();
-    return host.contains('x.ai') ||
-        host.contains('grok') ||
-        providerId.contains('grok') ||
-        providerId.contains('xai') ||
-        providerName.contains('grok') ||
-        providerName.contains('xai');
+    if (cfg.oauthProvider == OAuthProvider.grok || cfg.id == 'Grok') {
+      return true;
+    }
+    final hostname = Uri.tryParse(cfg.baseUrl)?.host ?? '';
+    final host = hostname.endsWith('.')
+        ? hostname.substring(0, hostname.length - 1)
+        : hostname;
+    return host == 'x.ai' ||
+        host.endsWith('.x.ai') ||
+        host == 'grok.com' ||
+        host.endsWith('.grok.com');
   }
 
   static bool isOpenRouterProvider(ProviderConfig? cfg) {

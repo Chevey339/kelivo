@@ -7655,8 +7655,8 @@ class ProviderConfig {
       return 'https://api.moonshot.cn/v1';
     }
     if (k.contains('silicon')) return 'https://api.siliconflow.cn/v1';
-    if (k.contains('grok') || k.contains('x.ai') || k.contains('xai')) {
-      return 'https://api.x.ai/v1';
+    if (k == 'grok' || k == 'x.ai' || k == 'xai') {
+      return OAuthProvider.grok.baseUrl;
     }
     if (k.contains('deepseek')) return 'https://api.deepseek.com/v1';
     if (RegExp(r'zhipu|智谱|glm').hasMatch(k)) {
