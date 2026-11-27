@@ -9,6 +9,7 @@ import 'package:re_editor/re_editor.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/chat_input_data.dart';
+import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
@@ -40,6 +41,8 @@ void main() {
     ChatInputSubmissionResult sendResult = ChatInputSubmissionResult.rejected,
     bool showBar = true,
     List<ChatInputData>? submissions,
+    ChatInputBarController? mediaController,
+    Future<ChatInputSubmissionResult> Function(ChatInputData data)? onSend,
   }) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     await settings.loaded;
@@ -72,9 +75,11 @@ void main() {
                           key: barKey,
                           controller: controller,
                           focusNode: focusNode,
+                          mediaController: mediaController,
                           onExpandedChanged: expandedEvents.add,
                           onSend: (data) async {
                             submissions?.add(data);
+                            if (onSend != null) return onSend(data);
                             return sendResult;
                           },
                         )
@@ -471,6 +476,37 @@ void main() {
     expect(barHeight(tester), lessThan(bodyHeight / 2));
     expect(events, [true, false]);
   });
+
+  testWidgets(
+    'an accepted edit-send collapses when the host restores the previous draft',
+    (tester) async {
+      final controller = TextEditingController(text: 'line\n' * 6);
+      addTearDown(controller.dispose);
+      final media = ChatInputBarController();
+      final events = await pumpBar(
+        tester,
+        controller,
+        mediaController: media,
+        onSend: (_) async {
+          // Exiting edit mode restores the pre-edit draft before the accepted
+          // send future resolves.
+          controller.value = const TextEditingValue(text: 'previous draft');
+          media.restoreDraft(const ComposerDraftInput(text: 'previous draft'));
+          return ChatInputSubmissionResult.sent;
+        },
+      );
+      await tester.tap(find.byTooltip('Expand'));
+      await tester.pumpAndSettle();
+      expect(barHeight(tester), bodyHeight);
+
+      await tester.tap(find.byIcon(Lucide.ArrowUp));
+      await tester.pumpAndSettle();
+
+      expect(controller.text, 'previous draft');
+      expect(barHeight(tester), lessThan(bodyHeight / 2));
+      expect(events, [true, false]);
+    },
+  );
 
   testWidgets('removing an expanded bar reports that expansion ended', (
     tester,
