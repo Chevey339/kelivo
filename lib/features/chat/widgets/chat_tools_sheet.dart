@@ -237,16 +237,22 @@ class _ToolsGroup extends StatelessWidget {
     required this.onToggle,
     required this.children,
     this.summary,
+    this.summaryLiveRegion = false,
     this.isFirst = false,
   });
 
   /// Matches `ToolsSheetRow`: horizontal padding 12, 20px icon, 10px gap.
   static const double _rowPadding = 12;
+
+  /// Indents expanded child tiles so their outer edges align with the
+  /// header's chevron and summary, restoring parent-child hierarchy.
+  static const double childInset = _rowPadding;
   static const double _iconColumn = 20;
   static const double _iconGap = 10;
 
   final String title;
   final String? summary;
+  final bool summaryLiveRegion;
   final bool expanded;
   final VoidCallback onToggle;
   final List<Widget> children;
@@ -256,6 +262,18 @@ class _ToolsGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final summaryText = summary;
+    final summaryWidget = summaryText != null && summaryText.isNotEmpty
+        ? Text(
+            summaryText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 13,
+              color: cs.onSurface.withValues(alpha: 0.5),
+            ),
+          )
+        : null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -308,19 +326,12 @@ class _ToolsGroup extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (summaryText != null && summaryText.isNotEmpty)
+                    if (summaryWidget != null)
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 160),
-                        child: Text(
-                          summaryText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: cs.onSurface.withValues(alpha: 0.5),
-                          ),
-                        ),
+                        child: summaryLiveRegion
+                            ? Semantics(liveRegion: true, child: summaryWidget)
+                            : summaryWidget,
                       ),
                   ],
                 ),
@@ -332,16 +343,24 @@ class _ToolsGroup extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
-          child: expanded
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var i = 0; i < children.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 8),
-                      children[i],
+          child: expanded && children.isNotEmpty
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    childInset,
+                    4,
+                    childInset,
+                    0,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < children.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 8),
+                        children[i],
+                      ],
                     ],
-                  ],
+                  ),
                 )
               : const SizedBox(width: double.infinity, height: 0),
         ),
@@ -534,125 +553,128 @@ class _McpGroup extends StatelessWidget {
             summary: conversationScoped
                 ? '${inherited ? l10n.mcpSelectionInherited : l10n.mcpSelectionCustom} · $selectedCount/${servers.length}'
                 : '$selectedCount/${servers.length}',
+            summaryLiveRegion: conversationScoped,
             expanded: expanded,
             onToggle: onToggle,
             children: const [],
           ),
         ),
-        if (expanded && conversationScoped)
-          SliverToBoxAdapter(
-            child: Padding(
-              // Align this secondary line with the section and server labels.
-              padding: const EdgeInsets.only(left: 42, right: 6),
-              child: OverflowBar(
-                alignment: MainAxisAlignment.spaceBetween,
-                spacing: 8,
-                overflowAlignment: OverflowBarAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        inherited
-                            ? l10n.mcpSelectionInherited
-                            : l10n.mcpSelectionCustom,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Wrap(
-                    alignment: WrapAlignment.end,
-                    children: [
-                      if (!inherited)
-                        IosTextButton(
-                          key: const ValueKey('chat-tools-mcp-inherit'),
-                          label: l10n.mcpInheritAssistant,
-                          fontSize: 12,
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          onPressed: () => unawaited(setIds(null)),
-                        ),
-                      IosTextButton(
-                        key: const ValueKey('chat-tools-mcp-clear'),
-                        label: l10n.mcpAssistantSheetClearAll,
-                        fontSize: 12,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.6),
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        onPressed: !inherited && selected.isEmpty
-                            ? null
-                            : () => unawaited(setIds(const [])),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
         if (expanded)
-          SliverList.builder(
-            addRepaintBoundaries: false,
-            itemCount: rows.length,
-            itemBuilder: (context, index) {
-              final row = rows[index];
-              final server = row.server;
-              if (server == null) {
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                  child: Text(
-                    row.title!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: .5),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              _ToolsGroup.childInset,
+              4,
+              _ToolsGroup.childInset,
+              0,
+            ),
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                if (conversationScoped)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      // Align button labels with the indented row switches/counts.
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          children: [
+                            if (!inherited)
+                              IosTextButton(
+                                key: const ValueKey('chat-tools-mcp-inherit'),
+                                label: l10n.mcpInheritAssistant,
+                                fontSize: 12,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                onPressed: () => unawaited(setIds(null)),
+                              ),
+                            IosTextButton(
+                              key: const ValueKey('chat-tools-mcp-clear'),
+                              label: l10n.mcpAssistantSheetClearAll,
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                              ),
+                              onPressed: !inherited && selected.isEmpty
+                                  ? null
+                                  : () => unawaited(setIds(const [])),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                );
-              }
-              return Padding(
-                padding: EdgeInsets.only(
-                  top: index == 0 || rows[index - 1].server == null ? 0 : 8,
+                SliverList.builder(
+                  addRepaintBoundaries: false,
+                  itemCount: rows.length,
+                  itemBuilder: (context, index) {
+                    final row = rows[index];
+                    final server = row.server;
+                    if (server == null) {
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                        child: Text(
+                          row.title!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: .5),
+                          ),
+                        ),
+                      );
+                    }
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        top: index == 0 || rows[index - 1].server == null
+                            ? 0
+                            : 8,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ToolsSheetRow(
+                            key: ChatToolsSheet.mcpServerKey(server.id),
+                            leading: McpServerAvatar(
+                              server: server,
+                              size: 20,
+                              radius: 7,
+                              showBackground: false,
+                              status:
+                                  mcp.statusFor(server.id) ==
+                                      McpStatus.connected
+                                  ? null
+                                  : mcp.statusFor(server.id),
+                            ),
+                            label: server.name,
+                            selected: selected.contains(server.id),
+                            detail:
+                                '${server.tools.where((tool) => tool.enabled).length}/${server.tools.length}',
+                            onTap: () => unawaited(
+                              setSelected(
+                                server.id,
+                                !selected.contains(server.id),
+                              ),
+                            ),
+                            trailing: IosSwitch(
+                              value: selected.contains(server.id),
+                              semanticLabel: server.name,
+                              onChanged: (value) =>
+                                  unawaited(setSelected(server.id, value)),
+                            ),
+                          ),
+                          McpToolConnectionStatus(serverId: server.id),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ToolsSheetRow(
-                      key: ChatToolsSheet.mcpServerKey(server.id),
-                      leading: McpServerAvatar(
-                        server: server,
-                        size: 20,
-                        radius: 7,
-                        showBackground: false,
-                        status: mcp.statusFor(server.id) == McpStatus.connected
-                            ? null
-                            : mcp.statusFor(server.id),
-                      ),
-                      label: server.name,
-                      selected: selected.contains(server.id),
-                      detail:
-                          '${server.tools.where((tool) => tool.enabled).length}/${server.tools.length}',
-                      onTap: () => unawaited(
-                        setSelected(server.id, !selected.contains(server.id)),
-                      ),
-                      trailing: IosSwitch(
-                        value: selected.contains(server.id),
-                        semanticLabel: server.name,
-                        onChanged: (value) =>
-                            unawaited(setSelected(server.id, value)),
-                      ),
-                    ),
-                    McpToolConnectionStatus(serverId: server.id),
-                  ],
-                ),
-              );
-            },
+              ],
+            ),
           ),
       ],
     );
