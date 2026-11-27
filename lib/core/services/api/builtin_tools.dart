@@ -216,10 +216,14 @@ abstract class BuiltInToolsHelper {
   static bool isGrokProvider(ProviderConfig? cfg) {
     if (cfg == null) return false;
     if (cfg.oauthProvider == OAuthProvider.grok) return true;
-    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
+    final hostname = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
+    final host = hostname.endsWith('.')
+        ? hostname.substring(0, hostname.length - 1)
+        : hostname;
     final providerId = cfg.id.toLowerCase();
     final providerName = cfg.name.toLowerCase();
-    return host.contains('x.ai') ||
+    return host == 'x.ai' ||
+        host.endsWith('.x.ai') ||
         host.contains('grok') ||
         providerId.contains('grok') ||
         providerId.contains('xai') ||
