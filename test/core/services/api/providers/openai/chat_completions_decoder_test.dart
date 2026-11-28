@@ -27,6 +27,23 @@ Map<String, dynamic> _choice({
 }
 
 void main() {
+  test('streams a refusal as the reply text', () {
+    final decoder = ChatCompletionsStreamDecoder();
+    final first = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{'role': 'assistant', 'refusal': "I can't "},
+        ),
+      ),
+    );
+    final second = decoder.accept(
+      _event(_choice(delta: <String, dynamic>{'refusal': 'help with that.'})),
+    );
+
+    expect(first.chunks.whereType<TextDelta>().single.text, "I can't ");
+    expect(second.chunks.whereType<TextDelta>().single.text, 'help with that.');
+    expect(decoder.assistantContent, "I can't help with that.");
+  });
   test('a tool-only message with null content preserves its reasoning', () {
     final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
     final result = decoder.accept(
