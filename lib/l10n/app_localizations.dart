@@ -30270,6 +30270,48 @@ abstract class AppLocalizations {
   /// **'Enter 1–3650 days.'**
   String get storageAttachmentRetentionInvalidDays;
 
+  /// Button in Storage Space image details for explicitly deleting one image referenced by chats.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete local image'**
+  String get storageAttachmentDeleteLocalImage;
+
+  /// Confirmation for deleting a single local chat image. The affected chat names appear below this message.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this image from this device? The chats listed below will keep their messages, but the image will no longer be available to view or send.'**
+  String get storageAttachmentDeleteLocalImageConfirm;
+
+  /// Storage Space notice when a confirmed image cannot be removed, for example because a draft, appearance setting or active reply needs it.
+  ///
+  /// In en, this message translates to:
+  /// **'The image was kept. Its usage changed or it is still needed by another feature.'**
+  String get storageAttachmentImageRetained;
+
+  /// Placeholder shown in a chat at the position of a local image the user explicitly deleted in Storage Space.
+  ///
+  /// In en, this message translates to:
+  /// **'Image deleted'**
+  String get storageAttachmentImageDeleted;
+
+  /// Hint on the Storage Space Images page. Explains the separate bulk cleanup and individual action available through a photo’s chat label.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean unused removes unreferenced images. To delete a chat image in use, tap its chat names.'**
+  String get storageAttachmentImagesCleanupHint;
+
+  /// Storage Space notification after the original was removed but a conversation copy could not be cleaned. Cleanup is retried during attachment maintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Image deleted. Kelivo will retry cleaning up its conversation copies.'**
+  String get storageAttachmentImageCopiesPending;
+
+  /// Storage Space notice when an active compressed chat context retains the image and would otherwise keep sending its stored pixels.
+  ///
+  /// In en, this message translates to:
+  /// **'This image is protected because a compressed chat context may still send a saved copy.'**
+  String get storageAttachmentImageFrozen;
+
   /// Title of the information dialog opened by tapping an attachment status label. Shows its chats or cleanup status; this is not the automatic-cleanup settings dialog.
   ///
   /// In en, this message translates to:

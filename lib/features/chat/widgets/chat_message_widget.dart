@@ -2554,12 +2554,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final l10n = AppLocalizations.of(context)!;
     final roleKey = alignEnd ? 'user' : 'assistant';
 
-    Widget unavailableImagePlaceholder() => Container(
+    Widget unavailableImagePlaceholder({bool deleted = false}) => Container(
       width: 112,
       height: 112,
       color: cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.06),
       alignment: Alignment.center,
-      child: Icon(Lucide.ImageOff, color: cs.onSurface.withValues(alpha: 0.45)),
+      child: deleted
+          ? Text(
+              l10n.storageAttachmentImageDeleted,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          : Icon(Lucide.ImageOff, color: cs.onSurface.withValues(alpha: 0.45)),
     );
 
     final viewablePaths = <String>[];
@@ -2677,7 +2683,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: provider == null
-                  ? unavailableImagePlaceholder()
+                  ? unavailableImagePlaceholder(
+                      deleted: part == ImagePart.deleted,
+                    )
                   : Hero(
                       tag: heroTag,
                       createRectTween: ImageViewerPage.flightRect,
@@ -3452,7 +3460,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       parts: timelineProjection.fromParts
           ? [
               for (final part in widget.message.parts)
-                if (part is FilePart) part,
+                if (part is FilePart || part == ImagePart.deleted) part,
             ]
           : [
               for (final part in widget.message.parts)

@@ -1529,32 +1529,7 @@ class StreamController {
       _reasoning[messageId] = rd;
     }
 
-    // Restore tool events
-    try {
-      final events = dedupeToolEvents(getToolEventsFromDb(messageId));
-      if (events.isNotEmpty) {
-        _toolParts[messageId] = ToolPartSnapshot(
-          events
-              .map(
-                (e) => ToolUIPart(
-                  id: (e['id'] ?? '').toString(),
-                  toolName: (e['name'] ?? '').toString(),
-                  arguments:
-                      (e['arguments'] as Map?)?.cast<String, dynamic>() ??
-                      const <String, dynamic>{},
-                  content: (e['content']?.toString().isNotEmpty == true)
-                      ? e['content'].toString()
-                      : null,
-                  metadata: e['metadata'] is Map
-                      ? Map<String, dynamic>.from(e['metadata'] as Map)
-                      : null,
-                  loading: !(e['content']?.toString().isNotEmpty == true),
-                ),
-              )
-              .toList(),
-        );
-      }
-    } catch (_) {}
+    restoreToolParts(messageId, getToolEventsFromDb);
 
     // Restore reasoning segments (single JSON decode shared by all views)
     final payload = _decodedReasoningPayloadFor(
@@ -1593,6 +1568,38 @@ class StreamController {
         segments[i].expanded = expanded.segments[i];
       }
     }
+  }
+
+  /// Rebuild a finished tool card without resetting reasoning expansion or scroll state.
+  void restoreToolParts(
+    String messageId,
+    List<Map<String, dynamic>> Function(String) readEvents,
+  ) {
+    try {
+      final events = dedupeToolEvents(readEvents(messageId));
+      if (events.isNotEmpty) {
+        _toolParts[messageId] = ToolPartSnapshot(
+          events
+              .map(
+                (e) => ToolUIPart(
+                  id: (e['id'] ?? '').toString(),
+                  toolName: (e['name'] ?? '').toString(),
+                  arguments:
+                      (e['arguments'] as Map?)?.cast<String, dynamic>() ??
+                      const <String, dynamic>{},
+                  content: (e['content']?.toString().isNotEmpty == true)
+                      ? e['content'].toString()
+                      : null,
+                  metadata: e['metadata'] is Map
+                      ? Map<String, dynamic>.from(e['metadata'] as Map)
+                      : null,
+                  loading: !(e['content']?.toString().isNotEmpty == true),
+                ),
+              )
+              .toList(),
+        );
+      }
+    } catch (_) {}
   }
 
   _DecodedReasoningPayload _decodedReasoningPayloadFor(

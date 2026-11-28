@@ -367,6 +367,7 @@ class RequestImageContext {
                   identity: ContextImageIdentity(message.id, 'tool:$call', i),
                   partOrdinal: ordinal,
                   uri: uris[i],
+                  unavailable: uris[i] == ImagePart.deleted.uri,
                   source: ContextImageSource.tool,
                   label: '$name · ${i + 1}',
                   toolCallId: call,
@@ -1225,11 +1226,7 @@ class RequestImageContext {
         retained.add(item);
         continue;
       }
-      final field =
-          item['type'] == 'function_call_output' ||
-              item['type'] == 'custom_tool_call_output'
-          ? 'output'
-          : 'content';
+      final field = nativeCompactionPartsField(item);
       final parts = item[field];
       if (parts is! List) {
         retained.add(item);

@@ -8,6 +8,12 @@ const nativeCompactionMessageKey = '_kelivo_native_compaction';
 const nativeUserSourcesKey = '_kelivo_native_user_sources';
 const nativeCompactionWireKey = '_kelivo_native_compaction_item';
 
+/// Responses stores image parts of tool results in a different wire field.
+String nativeCompactionPartsField(Map item) => switch (item['type']) {
+  'function_call_output' || 'custom_tool_call_output' => 'output',
+  _ => 'content',
+};
+
 enum NativeCompactionProtocol { compact, codex }
 
 enum NativeUserRetention { auto, none }

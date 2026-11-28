@@ -16751,6 +16751,32 @@ class AppLocalizationsKo extends AppLocalizations {
   String get storageAttachmentRetentionInvalidDays => '1–3650일 사이로 입력하세요.';
 
   @override
+  String get storageAttachmentDeleteLocalImage => '로컬 이미지 삭제';
+
+  @override
+  String get storageAttachmentDeleteLocalImageConfirm =>
+      '이 기기에서 이 이미지를 삭제할까요? 아래에 나열된 대화는 메시지를 유지하지만, 이미지는 더 이상 보거나 보낼 수 없습니다.';
+
+  @override
+  String get storageAttachmentImageRetained =>
+      '이미지가 유지되었습니다. 사용 상태가 변경되었거나 다른 기능에서 여전히 필요로 합니다.';
+
+  @override
+  String get storageAttachmentImageDeleted => '이미지가 삭제됨';
+
+  @override
+  String get storageAttachmentImagesCleanupHint =>
+      '사용하지 않는 항목 정리는 참조되지 않는 이미지를 삭제합니다. 사용 중인 채팅 이미지를 삭제하려면 해당 이미지의 대화 이름을 탭하세요.';
+
+  @override
+  String get storageAttachmentImageCopiesPending =>
+      '이미지가 삭제되었습니다. Kelivo가 대화 사본 정리를 다시 시도합니다.';
+
+  @override
+  String get storageAttachmentImageFrozen =>
+      '압축된 대화 컨텍스트가 저장된 사본을 계속 전송할 수 있으므로 이 이미지는 보호됩니다.';
+
+  @override
   String get storageAttachmentDetailsTitle => '파일 정보';
 
   @override

@@ -17383,6 +17383,32 @@ class AppLocalizationsTr extends AppLocalizations {
   String get storageAttachmentRetentionInvalidDays => '1–3650 gün girin.';
 
   @override
+  String get storageAttachmentDeleteLocalImage => 'Yerel görseli sil';
+
+  @override
+  String get storageAttachmentDeleteLocalImageConfirm =>
+      'Bu görsel bu cihazdan silinsin mi? Aşağıda listelenen sohbetler mesajlarını koruyacak, ancak görsel artık görüntülenemeyecek veya gönderilemeyecek.';
+
+  @override
+  String get storageAttachmentImageRetained =>
+      'Görsel korundu. Kullanımı değişti veya başka bir özellik tarafından hâlâ gerekli.';
+
+  @override
+  String get storageAttachmentImageDeleted => 'Görsel silindi';
+
+  @override
+  String get storageAttachmentImagesCleanupHint =>
+      'Kullanılmayanları temizle, referans verilmeyen görselleri siler. Kullanımdaki bir sohbet görselini silmek için sohbet adlarına dokunun.';
+
+  @override
+  String get storageAttachmentImageCopiesPending =>
+      'Görsel silindi. Kelivo sohbet kopyalarını temizlemeyi yeniden deneyecek.';
+
+  @override
+  String get storageAttachmentImageFrozen =>
+      'Sıkıştırılmış sohbet bağlamı kaydedilmiş bir kopyayı hâlâ gönderebileceği için bu görsel korunuyor.';
+
+  @override
   String get storageAttachmentDetailsTitle => 'Dosya bilgisi';
 
   @override

@@ -22453,6 +22453,34 @@
   "@storageAttachmentRetentionInvalidDays": {
     "description": "Inline error below the delayed attachment cleanup number field. Only shown when the value is empty, zero, or above the maximum. Immediate cleanup has its own option."
   },
+  "storageAttachmentDeleteLocalImage": "Delete local image",
+  "@storageAttachmentDeleteLocalImage": {
+    "description": "Button in Storage Space image details for explicitly deleting one image referenced by chats."
+  },
+  "storageAttachmentDeleteLocalImageConfirm": "Delete this image from this device? The chats listed below will keep their messages, but the image will no longer be available to view or send.",
+  "@storageAttachmentDeleteLocalImageConfirm": {
+    "description": "Confirmation for deleting a single local chat image. The affected chat names appear below this message."
+  },
+  "storageAttachmentImageRetained": "The image was kept. Its usage changed or it is still needed by another feature.",
+  "@storageAttachmentImageRetained": {
+    "description": "Storage Space notice when a confirmed image cannot be removed, for example because a draft, appearance setting or active reply needs it."
+  },
+  "storageAttachmentImageDeleted": "Image deleted",
+  "@storageAttachmentImageDeleted": {
+    "description": "Placeholder shown in a chat at the position of a local image the user explicitly deleted in Storage Space."
+  },
+  "storageAttachmentImagesCleanupHint": "Clean unused removes unreferenced images. To delete a chat image in use, tap its chat names.",
+  "@storageAttachmentImagesCleanupHint": {
+    "description": "Hint on the Storage Space Images page. Explains the separate bulk cleanup and individual action available through a photo’s chat label."
+  },
+  "storageAttachmentImageCopiesPending": "Image deleted. Kelivo will retry cleaning up its conversation copies.",
+  "@storageAttachmentImageCopiesPending": {
+    "description": "Storage Space notification after the original was removed but a conversation copy could not be cleaned. Cleanup is retried during attachment maintenance."
+  },
+  "storageAttachmentImageFrozen": "This image is protected because a compressed chat context may still send a saved copy.",
+  "@storageAttachmentImageFrozen": {
+    "description": "Storage Space notice when an active compressed chat context retains the image and would otherwise keep sending its stored pixels."
+  },
   "storageAttachmentDetailsTitle": "File info",
   "@storageAttachmentDetailsTitle": {
     "description": "Title of the information dialog opened by tapping an attachment status label. Shows its chats or cleanup status; this is not the automatic-cleanup settings dialog."

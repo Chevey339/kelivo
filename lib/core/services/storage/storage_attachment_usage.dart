@@ -3,20 +3,30 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
+import 'package:markstream/markstream_core.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../database/app_database.dart';
-import '../../database/chat_database_repository.dart' show assetLocalPaths;
+import '../../database/chat_database_repository.dart'
+    show assetLocalPaths, ChatStorageMetaKeys;
 import '../workspace/workspace_file_coordinator.dart';
+import '../workspace/workspace_session_sync.dart'
+    show deleteSessionAttachmentCopies;
 import '../workspace/file_link_resolver.dart';
 import 'attachment_file_lock.dart';
 import '../../models/avatar_config.dart';
+import '../../models/message_part.dart';
+import '../../models/context_operation.dart';
+import '../../models/native_compaction.dart';
 import '../../utils/chat_image_result.dart';
 import '../../models/mcp_presentation.dart';
 import '../../../shared/markdown/markdown_image_sources.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/kelivo_file_uri.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+
+part 'storage_chat_image_removal.dart';
 
 enum StorageImageKind { chat, tool, avatar }
 

@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'dart:convert';
 
 import "../../../support/business_test_harness.dart";
@@ -70,6 +71,33 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+
+  for (final role in ['user', 'assistant']) {
+    testWidgets('deleted $role image has a non-interactive placeholder', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness(
+          ChatMessageWidget(
+            showUserAvatar: false,
+            useAssistantAvatar: false,
+            message: ChatMessage(
+              id: 'removed',
+              role: role,
+              conversationId: 'chat',
+              parts: const [TextPart('Keep'), ImagePart.deleted],
+            ),
+          ),
+        ),
+      );
+      final label = find.text('Image deleted');
+      expect(label, findsOneWidget);
+      final tile = tester.widget<IosCardPress>(
+        find.ancestor(of: label, matching: find.byType(IosCardPress)).first,
+      );
+      expect(tile.onTap, isNull);
+    });
+  }
 
   group('parseMcpImagePathsForTesting', () {
     test('extracts markdown images and cleans text', () {

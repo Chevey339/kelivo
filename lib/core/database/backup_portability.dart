@@ -5,6 +5,7 @@ import '../models/backup_scope.dart';
 import 'backup_content_filter.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
+import 'chat_database_repository.dart' show ChatStorageMetaKeys;
 import 'media_repository.dart';
 
 /// Device state stays in SQLite at runtime, but must not travel in a backup.
@@ -107,6 +108,13 @@ final class BackupPortability {
     // Erase removed payloads from SQLite cells as well as its logical rows.
     await database.customStatement('PRAGMA secure_delete = ON;');
     await database.transaction(() async {
+      await database.customStatement(
+        'DELETE FROM chat_storage_meta_rows WHERE key IN (?,?)',
+        [
+          ChatStorageMetaKeys.pendingImageRemoval,
+          ChatStorageMetaKeys.pendingImageCopies,
+        ],
+      );
       if (!scope.includes(BackupCategory.creations)) {
         await MediaRepository(database).clear();
       } else {

@@ -103,6 +103,11 @@ class StorageFileEntry {
   /// Null until the reference scan has confirmed the file's status.
   final bool? isInUse;
   bool get canDelete => isInUse == false;
+  bool get canRemoveChatImage =>
+      isInUse == true &&
+      conversations.isNotEmpty &&
+      (imageKind == StorageImageKind.chat ||
+          imageKind == StorageImageKind.tool);
   final Map<String, String> conversations;
   final DateTime? pendingDeletionAt;
   const StorageFileEntry({
@@ -1084,6 +1089,43 @@ abstract final class StorageUsageService {
     );
     return images ? inspected.images : inspected.files;
   }
+
+  /// The user confirmed this particular image and the chats displayed for it.
+  /// Automatic cleanup and bulk selection only ever use [deleteUploadFiles].
+  static Future<ChatImageRemoval> removeChatImage(
+    StorageFileEntry entry, {
+    required String deletedLabel,
+  }) => AttachmentFileLock.synchronized(() async {
+    if (!entry.canRemoveChatImage || !_isImageExt(entry.path)) {
+      return ChatImageRemoval.retained;
+    }
+    final root = (await AppDirectories.getContentDirectory()).path;
+    final db = p.join(
+      (await AppDirectories.getAppDataDirectory()).path,
+      AppDatabase.databaseFileName,
+    );
+    final transient = AttachmentFileLock.captureTransient();
+    final result = await Isolate.run(
+      () => removeStoredChatImage(
+        root: root,
+        databasePath: db,
+        path: entry.path,
+        bytes: entry.bytes,
+        modifiedAt: entry.modifiedAt,
+        conversations: entry.conversations.keys.toSet(),
+        transient: transient,
+        deletedLabel: deletedLabel,
+      ),
+    );
+    if (result.deleted && !await cleanRemovedChatImageCopies(root, db)) {
+      return ChatImageRemoval(
+        true,
+        result.changedRevisions,
+        copiesPending: true,
+      );
+    }
+    return result;
+  });
 
   static Future<int> deleteUploadFiles(
     Iterable<String> paths, {

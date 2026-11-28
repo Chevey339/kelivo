@@ -147,6 +147,11 @@ class ChatService extends ChangeNotifier {
   bool _assetCleanupClosing = false;
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
+  final _removedImageRevisions = StreamController<Set<String>>.broadcast(
+    sync: true,
+  );
+  Stream<Set<String>> get removedImageRevisions =>
+      _removedImageRevisions.stream;
   final _genUiSnapshotReaders = <GenUiSnapshotReader>{};
 
   void Function() registerGenUiSnapshotReader(GenUiSnapshotReader reader) {
@@ -638,6 +643,7 @@ class ChatService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _removedImageRevisions.close();
     _contextCompression?.removeListener(notifyListeners);
     _contextCompression?.dispose();
     // A final save can still finish (or report a storage error) after this
@@ -2541,6 +2547,14 @@ class ChatService extends ChangeNotifier {
 
   Future<void> _backfillAssetReferences(Directory appDataDir) async {
     final targetRoot = p.normalize(appDataDir.absolute.path);
+    final maintenance = await _repo.readAssetMaintenanceState(
+      version: _assetReferenceBackfillVersion,
+      targetRoot: targetRoot,
+    );
+    final includeLegacyCandidates = maintenance.backfill;
+    if (maintenance.pendingImageRemoval) {
+      await recoverStoredChatImageRemoval(targetRoot);
+    }
     final copies = await AttachmentFileLock.synchronized(
       () => _repo.mediaRepository.adoptChatOriginals(
         prepare: (candidates) =>
@@ -2548,10 +2562,6 @@ class ChatService extends ChangeNotifier {
         identicalReferences: (candidates) =>
             compute(_identicalCreationCopies, (targetRoot, candidates)),
       ),
-    );
-    final includeLegacyCandidates = await _repo.needsAssetReferenceBackfill(
-      version: _assetReferenceBackfillVersion,
-      targetRoot: targetRoot,
     );
     if (copies.isEmpty &&
         !includeLegacyCandidates &&
@@ -4016,6 +4026,37 @@ class ChatService extends ChangeNotifier {
     await loadContextOperations(message.conversationId, refresh: true);
     notifyListeners();
     return true;
+  }
+
+  /// Refresh only resident history after a storage worker changed photo parts.
+  /// Other revisions will be read from SQLite when their window is opened.
+  Future<void> refreshRemovedChatImage(
+    Iterable<String> owners,
+    Set<String> revisions,
+  ) async {
+    if (!_initialized || revisions.isEmpty) return;
+    final cached = <String, ChatMessage>{};
+    for (final id in owners) {
+      _bumpContextRevision(id);
+      for (final message in _messagesCache[id] ?? const <ChatMessage>[]) {
+        if (revisions.contains(message.id)) cached[message.id] = message;
+      }
+    }
+    for (final id in revisions) {
+      _toolEventsCache.remove(id);
+    }
+    if (cached.isNotEmpty) {
+      for (final message in await _repo.getMessagesByIds(
+        cached.keys.toList(),
+      )) {
+        if (identical(_cachedMessage(message.id), cached[message.id])) {
+          _replaceCachedMessage(message);
+        }
+      }
+    }
+    if (!_initialized || _removedImageRevisions.isClosed) return;
+    _removedImageRevisions.add(revisions);
+    notifyListeners();
   }
 
   /// Update message content during streaming without triggering notifyListeners.

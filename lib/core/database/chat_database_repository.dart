@@ -2001,26 +2001,38 @@ class ChatDatabaseRepository {
     return !SandboxPathResolver.localFileExists(nextUri);
   }
 
-  Future<bool> needsAssetReferenceBackfill({
+  Future<({bool backfill, bool pendingImageRemoval})>
+  readAssetMaintenanceState({
     required int version,
     required String targetRoot,
   }) async {
-    final row =
+    final rows =
         await (_db.select(_db.chatStorageMetaRows)..where(
-              (table) => table.key.equals(
+              (table) => table.key.isIn([
                 ChatStorageMetaKeys.assetReferenceBackfillVersion,
-              ),
+                ChatStorageMetaKeys.pendingImageRemoval,
+                ChatStorageMetaKeys.pendingImageCopies,
+              ]),
             ))
-            .getSingleOrNull();
-    if (row == null) return true;
-    try {
-      final value = jsonDecode(row.value);
-      return value is! Map<String, dynamic> ||
-          value['version'] != version ||
-          value['targetRoot'] != targetRoot;
-    } on FormatException {
-      return true;
+            .get();
+    var backfill = true;
+    var pendingImageRemoval = false;
+    for (final row in rows) {
+      if (row.key != ChatStorageMetaKeys.assetReferenceBackfillVersion) {
+        pendingImageRemoval = true;
+        continue;
+      }
+      try {
+        final value = jsonDecode(row.value);
+        backfill =
+            value is! Map ||
+            value['version'] != version ||
+            value['targetRoot'] != targetRoot;
+      } on FormatException {
+        // An invalid receipt requires a fresh backfill.
+      }
     }
+    return (backfill: backfill, pendingImageRemoval: pendingImageRemoval);
   }
 
   Future<void> markAssetReferenceBackfillComplete({
@@ -10069,6 +10081,8 @@ class ChatStorageMetaKeys {
   static const hiveMigrationComplete = 'hive_migration_complete_v1';
   static const databaseIdentity = 'database_identity_v1';
   static const sandboxPathVersion = 'sandbox_path_migration_version';
+  static const pendingImageCopies = 'pending_chat_image_copies_v1';
+  static const pendingImageRemoval = 'pending_chat_image_removal_v1';
   static const assetReferenceBackfillVersion =
       'asset_reference_backfill_version';
 }

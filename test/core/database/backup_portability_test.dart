@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/database/chat_database_repository.dart'
+    show ChatStorageMetaKeys;
 import 'dart:convert';
 
 import 'package:drift/native.dart';
@@ -133,7 +135,24 @@ void main() {
           ],
         );
       }
+      final receipts = [
+        ChatStorageMetaKeys.pendingImageRemoval,
+        ChatStorageMetaKeys.pendingImageCopies,
+      ];
+      for (final key in receipts) {
+        await database.customStatement(
+          'INSERT INTO chat_storage_meta_rows(key,value) VALUES (?,?)',
+          [key, 'device-local'],
+        );
+      }
       await BackupPortability.sanitizeDatabase(database);
+      expect(
+        (await database.select(database.chatStorageMetaRows).get()).map(
+          (row) => row.key,
+        ),
+        isNot(anyElement(isIn(receipts))),
+      );
+
       expect(await store.get('workspace', 'linked'), isNull);
       expect(await store.get('externalMounts', 'global'), isNull);
       expect(

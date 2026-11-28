@@ -159,6 +159,9 @@ class HomeViewModel extends ChangeNotifier {
     _chatService.contextCompression.estimateCandidate =
         _estimateCompressedContext;
     _chatService.contextCompression.addListener(_onCompressionChanged);
+    _removedImageSubscription = _chatService.removedImageRevisions.listen(
+      _refreshRemovedImage,
+    );
     _chatService.contextCompression.onContextChangeFinished = (id, applied) {
       if (!applied && _queuedInputs.containsKey(id)) {
         if (_pausedQueuedInputs.add(id)) {
@@ -292,8 +295,50 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  late final StreamSubscription<Set<String>> _removedImageSubscription;
+  bool _disposed = false;
+
+  Future<void> _refreshRemovedImage(Set<String> changed) async {
+    final visible = {
+      for (final message in _chatController.messages)
+        if (changed.contains(message.id)) message.id: message,
+    };
+    if (visible.isEmpty) return;
+    try {
+      final loaded = await _chatService.loadMessagesByIds(
+        visible.keys.toList(),
+      );
+      if (_disposed) return;
+      final updated = {for (final message in loaded) message.id: message};
+      var replaced = false;
+      for (final (index, old) in _chatController.messages.indexed) {
+        final next = updated[old.id];
+        if (next == null || !identical(visible[old.id], old)) continue;
+        _chatController.messages[index] = next;
+        if (next.role == 'assistant') {
+          _streamController.restoreToolParts(
+            next.id,
+            (_) => _chatService.getToolEventsForMessage(next),
+          );
+        }
+        replaced = true;
+      }
+      if (replaced) {
+        _chatController.invalidateCache();
+        notifyListeners();
+      }
+    } catch (error) {
+      FlutterLogger.log(
+        'Could not refresh deleted image: ${error.runtimeType}',
+        tag: 'StorageAttachments',
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _disposed = true;
+    _removedImageSubscription.cancel();
     _chatService.contextCompression.removeListener(_onCompressionChanged);
     _chatService.contextCompression.isConversationBusy = null;
     _chatService.contextCompression.isInputPaused = null;

@@ -58,6 +58,52 @@ Widget _storagePage(StorageImagesFixture fixture, {ChatService? chat}) =>
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  testWidgets(
+    'a used chat photo requires explicit confirmation showing its chats',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+      addTearDown(fixture.dispose);
+      final file = (await tester.runAsync(() async {
+        final photo = await fixture.file(
+          'upload/photo.png',
+          img.encodePng(img.Image(width: 2, height: 2)),
+        );
+        await fixture.message([ImagePart(uri: photo.path)]);
+        return photo;
+      }))!;
+      await tester.pumpWidget(_storagePage(fixture));
+      await _until(tester, () => find.text('图片').evaluate().isNotEmpty);
+      await tester.tap(find.text('图片').last);
+      final details = find.text('对话：Images');
+      await _until(tester, () => details.evaluate().isNotEmpty);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<IosTileButton>(find.widgetWithText(IosTileButton, '清理未使用'))
+            .enabled,
+        isFalse,
+      );
+      await tester.tap(details);
+      await tester.pumpAndSettle();
+      expect(find.text('Images'), findsOneWidget);
+      await tester.tap(find.widgetWithText(IosTileButton, '取消'));
+      await tester.pumpAndSettle();
+      expect(file.existsSync(), isTrue);
+      await tester.tap(details);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(IosTileButton, '删除本地图片'));
+      await _until(tester, () => find.text('已删除 1 个项目').evaluate().isNotEmpty);
+      expect(file.existsSync(), isFalse);
+      AppSnackBarManager().dismissAll();
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
   for (final desktop in [false, true]) {
     testWidgets(
       'file metadata is browsable while the database is busy, desktop=$desktop',

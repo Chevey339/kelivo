@@ -71,6 +71,42 @@ void main() {
   }
 
   test(
+    'refreshing a deleted tool image preserves the restored reasoning state',
+    () {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      final message = buildAssistantMessage(
+        controller,
+        reasoningText: 'reasoning',
+      );
+      restore(controller, message);
+      final segments = controller.getReasoningSegments(message.id)!;
+      final expanded = segments.single.expanded;
+      controller.restoreToolParts(
+        message.id,
+        (_) => [
+          {
+            'id': 'tool',
+            'name': 'view_image',
+            'content': 'Image deleted',
+            'metadata': {
+              'mcpResult': {
+                'imageUris': ['kelivo:deleted-image'],
+              },
+            },
+          },
+        ],
+      );
+      expect(
+        controller.getToolParts(message.id)!.single.content,
+        'Image deleted',
+      );
+      expect(controller.getReasoningSegments(message.id), same(segments));
+      expect(segments.single.expanded, expanded);
+    },
+  );
+
+  test(
     'paging releases payloads and restores expansion choices without clearing active runs',
     () {
       final controller = buildController();

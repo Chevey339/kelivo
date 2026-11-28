@@ -17279,6 +17279,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageAttachmentRetentionInvalidDays => 'Enter 1–3650 days.';
 
   @override
+  String get storageAttachmentDeleteLocalImage => 'Delete local image';
+
+  @override
+  String get storageAttachmentDeleteLocalImageConfirm =>
+      'Delete this image from this device? The chats listed below will keep their messages, but the image will no longer be available to view or send.';
+
+  @override
+  String get storageAttachmentImageRetained =>
+      'The image was kept. Its usage changed or it is still needed by another feature.';
+
+  @override
+  String get storageAttachmentImageDeleted => 'Image deleted';
+
+  @override
+  String get storageAttachmentImagesCleanupHint =>
+      'Clean unused removes unreferenced images. To delete a chat image in use, tap its chat names.';
+
+  @override
+  String get storageAttachmentImageCopiesPending =>
+      'Image deleted. Kelivo will retry cleaning up its conversation copies.';
+
+  @override
+  String get storageAttachmentImageFrozen =>
+      'This image is protected because a compressed chat context may still send a saved copy.';
+
+  @override
   String get storageAttachmentDetailsTitle => 'File info';
 
   @override

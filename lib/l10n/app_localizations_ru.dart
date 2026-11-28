@@ -17575,6 +17575,33 @@ class AppLocalizationsRu extends AppLocalizations {
       'Введите от 1 до 3650 дней.';
 
   @override
+  String get storageAttachmentDeleteLocalImage =>
+      'Удалить локальное изображение';
+
+  @override
+  String get storageAttachmentDeleteLocalImageConfirm =>
+      'Удалить это изображение с данного устройства? В перечисленных ниже чатах сообщения сохранятся, но изображение больше нельзя будет просмотреть или отправить.';
+
+  @override
+  String get storageAttachmentImageRetained =>
+      'Изображение сохранено. Его использование изменилось, или оно всё ещё нужно другой функции.';
+
+  @override
+  String get storageAttachmentImageDeleted => 'Изображение удалено';
+
+  @override
+  String get storageAttachmentImagesCleanupHint =>
+      '«Очистить неиспользуемые» удаляет изображения без ссылок. Чтобы удалить используемое изображение из чата, нажмите на названия чатов под ним.';
+
+  @override
+  String get storageAttachmentImageCopiesPending =>
+      'Изображение удалено. Kelivo повторит попытку очистки его копий в чате.';
+
+  @override
+  String get storageAttachmentImageFrozen =>
+      'Это изображение защищено, поскольку сжатый контекст чата может по-прежнему отправлять сохранённую копию.';
+
+  @override
   String get storageAttachmentDetailsTitle => 'Информация о файле';
 
   @override

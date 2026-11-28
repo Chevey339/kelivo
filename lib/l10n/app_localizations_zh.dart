@@ -16353,6 +16353,29 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageAttachmentRetentionInvalidDays => '请输入 1–3650 天。';
 
   @override
+  String get storageAttachmentDeleteLocalImage => '删除本地图片';
+
+  @override
+  String get storageAttachmentDeleteLocalImageConfirm =>
+      '从此设备删除这张图片？下列对话会保留聊天记录，图片将无法再查看或发送。';
+
+  @override
+  String get storageAttachmentImageRetained => '已保留图片。它的使用情况已变化，或仍有其他功能需要它。';
+
+  @override
+  String get storageAttachmentImageDeleted => '图片已删除';
+
+  @override
+  String get storageAttachmentImagesCleanupHint =>
+      '「清理未使用」会删除闲置图片。要删除聊天中仍在使用的图片，请点图片下方的对话名。';
+
+  @override
+  String get storageAttachmentImageCopiesPending => '图片已删除，Kelivo 稍后会重试清理会话副本。';
+
+  @override
+  String get storageAttachmentImageFrozen => '压缩后的对话可能继续发送已保存的图片副本，因此这张图片受到保护。';
+
+  @override
   String get storageAttachmentDetailsTitle => '文件信息';
 
   @override
@@ -34210,6 +34233,29 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageAttachmentRetentionInvalidDays => '请输入 1–3650 天。';
+
+  @override
+  String get storageAttachmentDeleteLocalImage => '删除本地图片';
+
+  @override
+  String get storageAttachmentDeleteLocalImageConfirm =>
+      '从此设备删除这张图片？下列对话会保留聊天记录，图片将无法再查看或发送。';
+
+  @override
+  String get storageAttachmentImageRetained => '已保留图片。它的使用情况已变化，或仍有其他功能需要它。';
+
+  @override
+  String get storageAttachmentImageDeleted => '图片已删除';
+
+  @override
+  String get storageAttachmentImagesCleanupHint =>
+      '「清理未使用」会删除闲置图片。要删除聊天中仍在使用的图片，请点图片下方的对话名。';
+
+  @override
+  String get storageAttachmentImageCopiesPending => '图片已删除，Kelivo 稍后会重试清理会话副本。';
+
+  @override
+  String get storageAttachmentImageFrozen => '压缩后的对话可能继续发送已保存的图片副本，因此这张图片受到保护。';
 
   @override
   String get storageAttachmentDetailsTitle => '文件信息';
@@ -52092,6 +52138,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageAttachmentRetentionInvalidDays => '請輸入 1–3650 天。';
+
+  @override
+  String get storageAttachmentDeleteLocalImage => '刪除本機圖片';
+
+  @override
+  String get storageAttachmentDeleteLocalImageConfirm =>
+      '要從此裝置刪除這張圖片嗎？下方列出的對話會保留訊息，但圖片將無法再檢視或傳送。';
+
+  @override
+  String get storageAttachmentImageRetained => '已保留圖片。其使用情況已變更，或仍有其他功能需要使用它。';
+
+  @override
+  String get storageAttachmentImageDeleted => '圖片已刪除';
+
+  @override
+  String get storageAttachmentImagesCleanupHint =>
+      '「清理未使用」會刪除未被引用的圖片。若要刪除聊天中仍在使用的圖片，請點選圖片下方的對話名稱。';
+
+  @override
+  String get storageAttachmentImageCopiesPending => '圖片已刪除，Kelivo 稍後會重試清理會話副本。';
+
+  @override
+  String get storageAttachmentImageFrozen =>
+      '由於壓縮後的對話仍可能傳送已儲存的圖片副本，因此這張圖片受到保護。';
 
   @override
   String get storageAttachmentDetailsTitle => '檔案資訊';

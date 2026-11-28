@@ -230,6 +230,13 @@ final class AssistantRoundEndPart extends MessagePart {
 }
 
 final class ImagePart extends MessagePart {
+  /// A deliberately removed local photo has no file or creation to resolve,
+  /// even if an import later writes another file with the original name.
+  static const deleted = ImagePart(
+    uri: 'kelivo:deleted-image',
+    unavailable: true,
+  );
+
   const ImagePart({
     required this.uri,
     this.mime,
