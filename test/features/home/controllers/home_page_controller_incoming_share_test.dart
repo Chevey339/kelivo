@@ -92,8 +92,16 @@ class _Media extends ChatInputBarController {
       );
 
   @override
-  void restoreDraft(ComposerDraftInput input, {bool resetHistory = true}) {
-    super.restoreDraft(input, resetHistory: resetHistory);
+  void restoreDraft(
+    ComposerDraftInput input, {
+    bool resetHistory = true,
+    DraftSubmission? completedEdit,
+  }) {
+    super.restoreDraft(
+      input,
+      resetHistory: resetHistory,
+      completedEdit: completedEdit,
+    );
     images
       ..clear()
       ..addAll(input.images.map((image) => image.path));

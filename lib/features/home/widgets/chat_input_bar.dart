@@ -180,12 +180,20 @@ class ChatInputBarController {
       _pendingDraft?.copyWith(text: text) ??
       ComposerDraftInput(text: text);
   ComposerDraftInput? _pendingDraft;
-  void restoreDraft(ComposerDraftInput input, {bool resetHistory = true}) {
+  void restoreDraft(
+    ComposerDraftInput input, {
+    bool resetHistory = true,
+    DraftSubmission? completedEdit,
+  }) {
     if (resetHistory) _localInputEpoch++;
     if (_state == null) {
       _pendingDraft = input;
     } else {
-      _state!._restoreDraft(input, resetHistory: resetHistory);
+      _state!._restoreDraft(
+        input,
+        resetHistory: resetHistory,
+        completedEdit: completedEdit,
+      );
     }
   }
 
@@ -956,6 +964,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   UiContextAttachment? _uiContext;
   bool _isSubmitting = false;
   int _submitSerial = 0;
+  int? _expandedSubmissionDraftRevision;
+  String? _editSubmissionId;
   final Set<String> _missingDocumentPaths = {};
 
   bool get _composerLocked =>
@@ -1427,7 +1437,12 @@ class _ChatInputBarState extends State<ChatInputBar>
     uiContext: _uiContext,
   );
 
-  void _restoreDraft(ComposerDraftInput input, {bool resetHistory = true}) {
+  void _restoreDraft(
+    ComposerDraftInput input, {
+    bool resetHistory = true,
+    DraftSubmission? completedEdit,
+  }) {
+    final previousRevision = _draftReplacementRevision;
     if (_controller case final QuoteEditingController quotes) {
       quotes.restore(
         TextEditingValue(
@@ -1521,6 +1536,9 @@ class _ChatInputBarState extends State<ChatInputBar>
       _syncDocumentChecks(reset: resetHistory);
     });
     _pumpImageProcessingQueue();
+    if (completedEdit != null && completedEdit.id == _editSubmissionId) {
+      _collapseSubmittedDraftAfterLayout(previousRevision);
+    }
   }
 
   void _clearDraft() {
@@ -1751,6 +1769,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   void _setExpanded(bool expanded) {
     if (expanded == _isExpanded) return;
+    _expandedSubmissionDraftRevision = null;
     // The field keeps focus across the toggle, so a context menu would stay
     // open while the text under it jumps.
     ContextMenuController.removeAny();
@@ -2341,6 +2360,10 @@ class _ChatInputBarState extends State<ChatInputBar>
     final submittedDraft = _snapshotDraft(submittedText);
     final submittedDraftRevision = _draftReplacementRevision;
     final submitSerial = ++_submitSerial;
+    _expandedSubmissionDraftRevision = _isExpanded
+        ? submittedDraftRevision
+        : null;
+    _editSubmissionId = null;
     _isSubmitting = true;
     final beginSubmission = widget.mediaController?.onBeginSubmission;
     Future<DraftSubmission?>? pendingSubmission;
@@ -2397,6 +2420,10 @@ class _ChatInputBarState extends State<ChatInputBar>
       final ChatInputSubmissionResult result;
       try {
         final draftSubmission = await pendingSubmission;
+        if (submitSerial == _submitSerial &&
+            draftSubmission?.editMessageId != null) {
+          _editSubmissionId = draftSubmission!.id;
+        }
         result =
             await send?.call(
               ChatInputData(
@@ -2436,13 +2463,10 @@ class _ChatInputBarState extends State<ChatInputBar>
         widget.mediaController?.sharedDraftAction.value = null;
         _discardImageState(submittedImageIds);
         setState(() {});
-        // Collapse once the cleared text is laid out, so the animation lands
-        // on the empty field's height. A rejected send keeps the editor open
-        // for the restored draft.
-        if (_isExpanded) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _setExpanded(false);
-          });
+        // A persistent message edit can stay active with newer input. Only
+        // restoring its compose draft above confirms that the edit ended.
+        if (_editSubmissionId == null) {
+          _collapseSubmittedDraftAfterLayout(submittedDraftRevision);
         }
         // Keep focus on desktop so user can continue typing
         try {
@@ -2458,6 +2482,22 @@ class _ChatInputBarState extends State<ChatInputBar>
         _isSubmitting = false;
       }
     }
+  }
+
+  // Measure the resulting draft after layout. A new send, draft replacement,
+  // or manual toggle before that frame owns its own expansion.
+  void _collapseSubmittedDraftAfterLayout(int submittedRevision) {
+    if (_expandedSubmissionDraftRevision != submittedRevision) return;
+    final layoutRevision = _draftReplacementRevision;
+    final serial = _submitSerial;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          _submitSerial == serial &&
+          _draftReplacementRevision == layoutRevision &&
+          _expandedSubmissionDraftRevision == submittedRevision) {
+        _setExpanded(false);
+      }
+    });
   }
 
   /// Puts a rejected submission back into the composer: text first, then the

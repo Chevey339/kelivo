@@ -612,6 +612,7 @@ class HomePageController extends ChangeNotifier {
   void _applyComposerValue(
     ComposerDraftInput input, {
     bool resetHistory = true,
+    DraftSubmission? completedEdit,
   }) {
     final wasApplying = _applyingComposer;
     _applyingComposer = true;
@@ -628,7 +629,11 @@ class HomePageController extends ChangeNotifier {
               : input.selectionExtent.clamp(0, input.text.length),
         ),
       );
-      _mediaController.restoreDraft(input, resetHistory: resetHistory);
+      _mediaController.restoreDraft(
+        input,
+        resetHistory: resetHistory,
+        completedEdit: completedEdit,
+      );
       if (_inputController case final MessageEditingController document) {
         document.resumeInput();
       }
@@ -1693,22 +1698,22 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
+  bool _canFinishSubmittedEdit(DraftSubmission submission) {
+    final draft = _composerDrafts?.peek(submission.conversationId);
+    return draft != null &&
+        draft.submissionId == null &&
+        draft.editMessageId == submission.editMessageId &&
+        draft.edit?.isEmpty == true;
+  }
+
   Future<void> _finishComposerSubmission(DraftSubmission submission) async {
     final drafts = _composerDrafts!;
-    // The widget still owns the live edit during persistence. Release an empty
-    // edit only when its UI can be updated in the same synchronous step.
     await drafts.finishSubmission(submission, preserveEdit: true);
-    final draft = drafts.peek(submission.conversationId);
-    if (draft == null ||
-        draft.submissionId != null ||
-        draft.editMessageId != submission.editMessageId ||
-        draft.edit?.isEmpty != true) {
-      return;
-    }
+    if (!_canFinishSubmittedEdit(submission)) return;
     if (!_composerDisposed &&
         _composerOwner == submission.conversationId &&
         _userMessageEditState?.messageId == submission.editMessageId) {
-      _exitUserMessageEdit(clearDraft: false);
+      _exitUserMessageEdit(clearDraft: false, completedEdit: submission);
     } else {
       drafts.endEdit(submission.conversationId);
     }
@@ -2765,7 +2770,10 @@ class HomePageController extends ChangeNotifier {
     });
   }
 
-  void _exitUserMessageEdit({required bool clearDraft}) {
+  void _exitUserMessageEdit({
+    required bool clearDraft,
+    DraftSubmission? completedEdit,
+  }) {
     if (_userMessageEditState == null) return;
     final draining = _drainComposerInput();
     if (draining != null) {
@@ -2773,11 +2781,20 @@ class HomePageController extends ChangeNotifier {
       final message = _userMessageEditState;
       unawaited(
         draining.then((_) {
-          if (!_composerDisposed &&
-              serial == _composerSwitch &&
-              identical(message, _userMessageEditState)) {
-            _exitUserMessageEdit(clearDraft: clearDraft);
+          if (_composerDisposed ||
+              serial != _composerSwitch ||
+              !identical(message, _userMessageEditState)) {
+            return;
           }
+          // Native input accepted after sending may have filled the edit.
+          if (completedEdit != null &&
+              !_canFinishSubmittedEdit(completedEdit)) {
+            return;
+          }
+          _exitUserMessageEdit(
+            clearDraft: clearDraft,
+            completedEdit: completedEdit,
+          );
         }),
       );
       return;
@@ -2788,7 +2805,10 @@ class HomePageController extends ChangeNotifier {
         owner != null &&
         !_chatService.isTemporaryConversation(owner)) {
       _composerDrafts!.endEdit(owner);
-      _applyComposerValue(_composerDrafts!.peek(owner)!.compose);
+      _applyComposerValue(
+        _composerDrafts!.peek(owner)!.compose,
+        completedEdit: completedEdit,
+      );
       notifyListeners();
       return;
     }

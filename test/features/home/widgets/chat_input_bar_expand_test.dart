@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../support/business_test_harness.dart';
 import '../../../support/android_selection_menu_mock.dart';
 
@@ -9,6 +11,7 @@ import 'package:re_editor/re_editor.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/chat_input_data.dart';
+import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
@@ -40,6 +43,8 @@ void main() {
     ChatInputSubmissionResult sendResult = ChatInputSubmissionResult.rejected,
     bool showBar = true,
     List<ChatInputData>? submissions,
+    ChatInputBarController? mediaController,
+    Future<ChatInputSubmissionResult> Function(ChatInputData data)? onSend,
   }) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     await settings.loaded;
@@ -72,9 +77,11 @@ void main() {
                           key: barKey,
                           controller: controller,
                           focusNode: focusNode,
+                          mediaController: mediaController,
                           onExpandedChanged: expandedEvents.add,
                           onSend: (data) async {
                             submissions?.add(data);
+                            if (onSend != null) return onSend(data);
                             return sendResult;
                           },
                         )
@@ -470,6 +477,134 @@ void main() {
     await tester.pumpAndSettle();
     expect(barHeight(tester), lessThan(bodyHeight / 2));
     expect(events, [true, false]);
+  });
+
+  testWidgets(
+    'an accepted edit-send collapses when the host restores the previous draft',
+    (tester) async {
+      final controller = TextEditingController(text: 'line\n' * 6);
+      addTearDown(controller.dispose);
+      const edit = DraftSubmission(
+        id: 'send',
+        conversationId: 'chat',
+        editMessageId: 'message',
+      );
+      final media = ChatInputBarController()
+        ..onBeginSubmission = (_) async => edit;
+      final events = await pumpBar(
+        tester,
+        controller,
+        mediaController: media,
+        onSend: (data) async {
+          // Exiting edit mode restores the pre-edit draft before the accepted
+          // send future resolves.
+          controller.value = const TextEditingValue(text: 'previous draft');
+          media.restoreDraft(
+            const ComposerDraftInput(text: 'previous draft'),
+            completedEdit: data.draftSubmission,
+          );
+          return ChatInputSubmissionResult.sent;
+        },
+      );
+      await tester.tap(find.byTooltip('Expand'));
+      await tester.pumpAndSettle();
+      expect(barHeight(tester), bodyHeight);
+
+      await tester.tap(find.byIcon(Lucide.ArrowUp));
+      await tester.pumpAndSettle();
+
+      expect(controller.text, 'previous draft');
+      expect(barHeight(tester), lessThan(bodyHeight / 2));
+      expect(events, [true, false]);
+    },
+  );
+
+  testWidgets('a late send leaves a newer message edit expanded', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: 'ordinary send');
+    addTearDown(controller.dispose);
+    final media = ChatInputBarController();
+    final accepted = Completer<ChatInputSubmissionResult>();
+    final events = await pumpBar(
+      tester,
+      controller,
+      mediaController: media,
+      onSend: (_) => accepted.future,
+    );
+    await tester.tap(find.byIcon(Lucide.ArrowUp));
+    await tester.pump();
+    expect(controller.text, isEmpty);
+
+    final otherMessage = 'other message\n' * 6;
+    controller.text = otherMessage;
+    media.restoreDraft(ComposerDraftInput(text: otherMessage));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Expand'));
+    await tester.pumpAndSettle();
+    accepted.complete(ChatInputSubmissionResult.sent);
+    await tester.idle();
+    await tester.enterText(find.byType(TextField), '${otherMessage}continued');
+    await tester.pumpAndSettle();
+
+    expect(controller.text, '${otherMessage}continued');
+    expect(barHeight(tester), bodyHeight);
+    expect(events, [true]);
+  });
+
+  testWidgets('a manually reopened editor survives its earlier send', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: 'line\n' * 6);
+    addTearDown(controller.dispose);
+    final accepted = Completer<ChatInputSubmissionResult>();
+    final events = await pumpBar(
+      tester,
+      controller,
+      onSend: (_) => accepted.future,
+    );
+    await tester.tap(find.byTooltip('Expand'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Lucide.ArrowUp));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Collapse'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'new line\n' * 6);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Expand'));
+    await tester.pumpAndSettle();
+    accepted.complete(ChatInputSubmissionResult.sent);
+    await tester.pumpAndSettle();
+    expect(barHeight(tester), bodyHeight);
+    expect(events, [true, false, true]);
+  });
+
+  testWidgets('replacing a draft before the collapse frame keeps it expanded', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: 'line\n' * 6);
+    addTearDown(controller.dispose);
+    final media = ChatInputBarController();
+    final accepted = Completer<ChatInputSubmissionResult>();
+    final events = await pumpBar(
+      tester,
+      controller,
+      mediaController: media,
+      onSend: (_) => accepted.future,
+    );
+    await tester.tap(find.byTooltip('Expand'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Lucide.ArrowUp));
+    await tester.pump();
+    accepted.complete(ChatInputSubmissionResult.sent);
+    await tester.idle();
+
+    controller.text = 'next draft';
+    media.restoreDraft(const ComposerDraftInput(text: 'next draft'));
+    await tester.pumpAndSettle();
+    expect(controller.text, 'next draft');
+    expect(barHeight(tester), bodyHeight);
+    expect(events, [true]);
   });
 
   testWidgets('removing an expanded bar reports that expansion ended', (

@@ -28,6 +28,8 @@ import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
 import '../../../support/gated_xfile.dart';
+import '../../../support/native_message_input_harness.dart';
+import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
@@ -615,6 +617,7 @@ void main() {
     WidgetTester tester, {
     bool withSuggestions = false,
     bool withComposer = false,
+    bool nativeInput = false,
     List<dynamic>? storedAssistants,
     BusinessPreferences? assistantPreferences,
     bool withInstructionInjections = false,
@@ -707,6 +710,7 @@ void main() {
           home: _ControllerHarness(
             onCreated: (value) => controller = value,
             withComposer: withComposer,
+            nativeInput: nativeInput,
             onSend: (input) =>
                 sendZone.run(() => controller!.sendMessage(input)),
           ),
@@ -3861,7 +3865,11 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
           await controller.startUserMessageEdit(original);
         });
         await tester.pumpAndSettle();
-        await tester.enterText(find.byType(EditableText), 'submitted edit');
+        const submittedText = 'first line\nsecond line\nsubmitted edit';
+        await tester.enterText(find.byType(EditableText), submittedText);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Expand'));
+        await tester.pumpAndSettle();
         service.versionSaveHold = Completer<void>();
         service.holdAfterVersionSave = afterCommit;
         if (laterInput == 'cleared') {
@@ -3922,7 +3930,7 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
                 .where((m) => m.role == 'user' && m.version == 1)
                 .single
                 .content,
-            'submitted edit',
+            submittedText,
           );
         });
         await tester.pumpAndSettle();
@@ -3932,8 +3940,10 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
         if (laterInput == 'none' || laterInput == 'cleared') {
           expect(controller.isUserMessageEditActive, isFalse);
           expect(state._inputController.text, 'ordinary draft');
+          expect(find.byTooltip('Collapse'), findsNothing);
         } else {
           expect(controller.userMessageEditState?.messageId, original.id);
+          expect(find.byTooltip('Collapse'), findsOneWidget);
           if (laterInput == 'text') {
             expect(state._inputController.text, 'typed after submit');
             expect(draft.edit!.text, 'typed after submit');
@@ -3957,6 +3967,79 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
       },
     );
   }
+
+  testWidgets(
+    'edit completion preserves native input delivered during retirement',
+    (tester) async {
+      final native = NativeMessageInputHarness(tester);
+      addTearDown(native.dispose);
+      final controller = await pumpHarness(
+        tester,
+        withComposer: true,
+        nativeInput: true,
+      );
+      final state = tester.state<_ControllerHarnessState>(
+        find.byType(_ControllerHarness),
+      );
+      final document = state._inputController as MessageEditingController;
+      late Conversation conversation;
+      late ChatMessage original;
+      await tester.runAsync(() async {
+        conversation = await service.createConversation(title: 'Native edit');
+        original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'long line\n' * 300,
+        );
+        await controller.debugViewModel.switchConversation(conversation.id);
+        await waitFor(
+          () => state._mediaController.draftOwnerId == conversation.id,
+          'composer',
+        );
+        document.text = 'ordinary draft';
+        await controller.startUserMessageEdit(original);
+      });
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Expand'));
+      await tester.pumpAndSettle();
+      expect(document.hasNativeInput, isTrue);
+      await document.performCommand('submit');
+      expect(document.text, isEmpty);
+      native.holdDelivery = true;
+      await native.commit('later input');
+      await waitForWidget(
+        tester,
+        () =>
+            service.versionSaveEntered &&
+            !service.composerDrafts!.submitting.contains(conversation.id) &&
+            document.isDraining,
+        'committed edit awaiting native input',
+      );
+      await native.release();
+      await waitForWidget(
+        tester,
+        () => !document.isDraining,
+        'native input drain',
+      );
+      await tester.pumpAndSettle();
+
+      final draft = service.composerDrafts!.peek(conversation.id)!;
+      expect(controller.userMessageEditState?.messageId, original.id);
+      expect(document.text, 'later input');
+      expect(draft.edit?.text, document.text);
+      expect(draft.compose.text, 'ordinary draft');
+      expect(find.byTooltip('Collapse'), findsOneWidget);
+      await waitForWidget(
+        tester,
+        () =>
+            streamRequestCount == 1 &&
+            !controller.chatController.isConversationLoading(conversation.id),
+        'regeneration completion',
+      );
+      await tester.pumpWidget(const SizedBox());
+      await finishWidget(tester, service.composerDrafts!.flush());
+    },
+  );
 
   testWidgets(
     'find reads presented text and reasoning before the streaming checkpoint',
@@ -6569,11 +6652,13 @@ class _ControllerHarness extends StatefulWidget {
   const _ControllerHarness({
     required this.onCreated,
     this.withComposer = false,
+    this.nativeInput = false,
     this.onSend,
   });
 
   final ValueChanged<HomePageController> onCreated;
   final bool withComposer;
+  final bool nativeInput;
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
 
   @override
@@ -6585,7 +6670,9 @@ class _ControllerHarnessState extends State<_ControllerHarness>
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _inputBarKey = GlobalKey();
   final _inputFocus = FocusNode();
-  final _inputController = TextEditingController();
+  late final TextEditingController _inputController = widget.nativeInput
+      ? MessageEditingController(nativeInputEnabled: true)
+      : TextEditingController();
   final _mediaController = ChatInputBarController();
   final _scrollController = ChatAutoFollowScrollController();
   late final HomePageController _controller;
