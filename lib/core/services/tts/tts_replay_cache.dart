@@ -21,6 +21,8 @@ class TtsReplayCache {
       ..remove('enabled');
     // HTTP Speech still produces the audio stored under the original key.
     if (service is OpenAiTtsOptions) settings['kind'] = 'openai';
+    // Earlier Gemini cache files lost the source format and PCM sample rate.
+    if (service is GeminiTtsOptions) settings['audioDecoderVersion'] = 2;
     return compute(_hashSettings, settings);
   }
 

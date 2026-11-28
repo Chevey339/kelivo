@@ -2360,7 +2360,7 @@ String _defaultBaseUrl(NetworkTtsKind k) {
     case NetworkTtsKind.deepseek:
       return DeepSeekTtsOptions.defaultBaseUrl;
     case NetworkTtsKind.gemini:
-      return 'https://generativelanguage.googleapis.com/v1beta';
+      return GeminiTtsOptions.defaultBaseUrl;
     case NetworkTtsKind.azure:
       return '';
     case NetworkTtsKind.minimax:
@@ -2391,7 +2391,7 @@ String _defaultModel(NetworkTtsKind k) {
     case NetworkTtsKind.openai:
       return OpenAiTtsOptions.defaultModel;
     case NetworkTtsKind.gemini:
-      return 'gemini-3.1-flash-tts-preview';
+      return GeminiTtsOptions.defaultModel;
     case NetworkTtsKind.deepseek:
     case NetworkTtsKind.azure:
       return '';

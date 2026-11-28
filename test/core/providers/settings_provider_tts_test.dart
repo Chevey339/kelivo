@@ -95,6 +95,76 @@ void main() {
     },
   );
 
+  test('migrates only retired official Gemini voices across reloads', () async {
+    const endpoint = 'https://generativelanguage.googleapis.com/v1beta';
+    const retired = [
+      'gemini-3.1-flash-tts-preview',
+      'gemini-2.5-flash-preview-tts',
+      'gemini-2.5-pro-preview-tts',
+    ];
+    const saved = {
+      'kind': 'gemini',
+      'enabled': false,
+      'name': 'My reader',
+      'voiceName': 'Puck',
+      'apiKey': 'saved-key',
+      'extra': 'preserve on write-back',
+    };
+    final official = [
+      for (final (i, model) in retired.indexed)
+        {
+          ...saved,
+          'id': model,
+          if (i == 1) 'baseUrl': endpoint,
+          if (i == 2)
+            'baseUrl': 'https://GENERATIVELANGUAGE.GOOGLEAPIS.COM:443/v1beta/',
+          'model': model,
+        },
+    ];
+    final other = [
+      for (final url in [
+        'https://gateway.example/v1beta',
+        'https://generativelanguage.googleapis.com.example/v1beta',
+        'https://generativelanguage.googleapis.com:8443/v1beta',
+        'https://generativelanguage.googleapis.com/proxy/v1beta',
+        '$endpoint?tenant=custom',
+      ])
+        {...saved, 'id': url, 'baseUrl': url, 'model': retired.first},
+      {...saved, 'id': 'gateway-default', 'baseUrl': 'https://gateway.example'},
+      {
+        ...saved,
+        'id': 'explicit',
+        'baseUrl': endpoint,
+        'model': 'gemini-3.8-flash-tts',
+      },
+      {'id': 'other-kind', 'kind': 'openai', 'model': 'tts-1', 'extra': true},
+    ];
+    final harness = await createBusinessTestHarness(
+      initial: {
+        'tts_services_v1': jsonEncode([...official, ...other]),
+        'tts_selected_service_id_v1': retired.last,
+      },
+    );
+    for (var load = 0; load < 2; load++) {
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      expect(settings.selectedTtsServiceId, retired.last);
+      final selected = settings.selectedTtsService as GeminiTtsOptions;
+      expect(selected.model, 'gemini-3.8-flash-lite-tts');
+      expect(selected.voiceName, 'Puck');
+      expect(selected.enabled, isFalse);
+      final gateway = settings.ttsServices.singleWhere(
+        (s) => s.id == 'gateway-default',
+      );
+      expect((gateway as GeminiTtsOptions).model, retired.first);
+      expect(jsonDecode(harness.preferences.getString('tts_services_v1')!), [
+        for (final row in official)
+          {...row, 'model': 'gemini-3.8-flash-lite-tts'},
+        ...other,
+      ]);
+    }
+  });
+
   test('persists generated UUIDs for legacy TTS rows across reloads', () async {
     final harness = await createBusinessTestHarness(
       initial: {

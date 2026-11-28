@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/models/mobile_background_settings.dart';
@@ -1067,6 +1068,77 @@ void main() {
       ),
     );
   }
+
+  test(
+    'Gemini replay replaces audio cached with the old PCM decoder',
+    () async {
+      var requests = 0;
+      final (provider, loopback) = await networkPlayer((request) async {
+        await request.drain<void>();
+        requests++;
+        request.response.write(
+          jsonEncode({
+            'candidates': [
+              {
+                'content': {
+                  'parts': [
+                    {
+                      'inlineData': {
+                        'mimeType': 'audio/L16;rate=16000',
+                        'data': base64Encode([1, 2, 3, 4]),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+      const text = 'Cached Gemini narration';
+      final oldSettings = {
+        'kind': 'gemini',
+        'apiKey': 'saved-key',
+        'baseUrl': loopback.baseUrl,
+        'model': 'gemini-3.1-flash-tts-preview',
+        'voiceName': 'Puck',
+      };
+      final service = TtsServiceOptions.fromJson({
+        ...oldSettings,
+        'enabled': true,
+      });
+      final oldKey = sha256.convert(utf8.encode(jsonEncode(oldSettings)));
+      final oldEntry = sha256.convert(utf8.encode('$oldKey:$text'));
+      final cached = File(
+        '${harness.directory.path}/tts_replay/$oldEntry/audio.wav',
+      );
+      await cached.create(recursive: true);
+      // Four PCM bytes previously cached under a 24 kHz WAV header.
+      await cached.writeAsBytes(
+        base64Decode(
+          'UklGRigAAABXQVZFZm10IBAAAAABAAEAwF0AAIC7AAACABAAZGF0YQQAAAABAgME',
+        ),
+      );
+      for (var replay = 0; replay < 2; replay++) {
+        final playback = provider.speakWithNetworkService(service, text);
+        await _waitUntil(
+          () => provider.playbackState.status == TtsPlaybackStatus.playing,
+        );
+        await _emitAudioEvent(audioPlayerEventChannel!, {
+          'event': 'audio.onComplete',
+        });
+        await playback;
+        expect(requests, 1);
+        final exported = (await provider.synthesizeAllAndCollect())!;
+        expect(exported.$2, 'wav');
+        expect(
+          ByteData.sublistView(exported.$1).getUint32(24, Endian.little),
+          16000,
+        );
+      }
+    },
+  );
 
   test('the last chat speed survives restart for both TTS engines', () async {
     await session.preferences.setDouble('tts_speech_rate_v1', 0.6);

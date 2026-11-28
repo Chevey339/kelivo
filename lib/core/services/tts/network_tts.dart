@@ -136,17 +136,18 @@ abstract class TtsServiceOptions {
               .toString(),
         );
       case 'gemini':
+        final baseUrl = (json['baseUrl'] ?? GeminiTtsOptions.defaultBaseUrl)
+            .toString();
+        // A gateway profile without a model previously used the 3.1 preview.
+        final model = (json['model'] ?? GeminiTtsOptions._previousDefaultModel)
+            .toString();
         return GeminiTtsOptions(
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'Gemini TTS' : name,
           apiKey: (json['apiKey'] ?? '').toString(),
-          baseUrl:
-              (json['baseUrl'] ??
-                      'https://generativelanguage.googleapis.com/v1beta')
-                  .toString(),
-          // New configs default to 3.1; existing persisted model strings are kept.
-          model: (json['model'] ?? 'gemini-3.1-flash-tts-preview').toString(),
+          baseUrl: baseUrl,
+          model: model,
           voiceName: (json['voiceName'] ?? 'Kore').toString(),
         );
       case 'azure':
@@ -333,10 +334,13 @@ abstract class TtsServiceOptions {
   }
 }
 
-bool _isRetiringOpenAiSpeechService(String baseUrl, String model) {
+bool _matchesTtsEndpoint(String baseUrl, String officialBaseUrl) {
   final endpoint = Uri.tryParse(baseUrl.trim())?.toString();
-  if (endpoint != OpenAiTtsOptions.defaultBaseUrl &&
-      endpoint != '${OpenAiTtsOptions.defaultBaseUrl}/') {
+  return endpoint == officialBaseUrl || endpoint == '$officialBaseUrl/';
+}
+
+bool _isRetiringOpenAiSpeechService(String baseUrl, String model) {
+  if (!_matchesTtsEndpoint(baseUrl, OpenAiTtsOptions.defaultBaseUrl)) {
     return false;
   }
   return const {
@@ -464,6 +468,16 @@ class DeepSeekTtsOptions extends TtsServiceOptions {
 }
 
 class GeminiTtsOptions extends TtsServiceOptions {
+  static const defaultBaseUrl =
+      'https://generativelanguage.googleapis.com/v1beta';
+  static const defaultModel = 'gemini-3.8-flash-lite-tts';
+  static const _previousDefaultModel = 'gemini-3.1-flash-tts-preview';
+  static const _retiredModels = {
+    _previousDefaultModel,
+    'gemini-2.5-flash-preview-tts',
+    'gemini-2.5-pro-preview-tts',
+  };
+
   final String apiKey;
   final String baseUrl;
   final String model;
@@ -474,9 +488,14 @@ class GeminiTtsOptions extends TtsServiceOptions {
     required super.name,
     required this.apiKey,
     required this.baseUrl,
-    required this.model,
+    required String model,
     required this.voiceName,
-  }) : super(kind: NetworkTtsKind.gemini);
+  }) : model =
+           _retiredModels.contains(model) &&
+               _matchesTtsEndpoint(baseUrl, defaultBaseUrl)
+           ? defaultModel
+           : model,
+       super(kind: NetworkTtsKind.gemini);
 
   @override
   Map<String, dynamic> toJson() => {
@@ -1430,10 +1449,59 @@ class NetworkTtsService {
     if (inline == null) throw Exception('Gemini TTS: no inlineData');
     final dataB64 = (inline['data'] ?? '').toString();
     if (dataB64.isEmpty) throw Exception('Gemini TTS: empty audio data');
-    final pcm = base64Decode(dataB64);
-    // Convert PCM (24kHz 16-bit mono) to WAV
-    final wav = _pcmToWav(Uint8List.fromList(pcm), sampleRate: 24000);
-    return NetworkTtsResult(bytes: wav, mime: 'audio/wav', sampleRate: 24000);
+    final bytes = base64Decode(dataB64);
+    final mime = (inline['mimeType'] as String?)?.trim() ?? '';
+    final type = mime.isEmpty ? ContentType.binary : ContentType.parse(mime);
+    if (_hasWavHeader(ByteData.sublistView(bytes)) ||
+        const {
+          'audio/wav',
+          'audio/wave',
+          'audio/x-wav',
+        }.contains(type.mimeType)) {
+      final wav = _parseWav(bytes);
+      if (wav.formatData.length < 16 ||
+          wav.audioData.every((part) => part.isEmpty)) {
+        throw const FormatException('Invalid Gemini WAV audio.');
+      }
+      final rate = ByteData.sublistView(
+        wav.formatData,
+      ).getUint32(4, Endian.little);
+      if (rate == 0) {
+        throw const FormatException('Invalid Gemini WAV sample rate.');
+      }
+      return NetworkTtsResult(
+        bytes: bytes,
+        mime: 'audio/wav',
+        sampleRate: rate,
+      );
+    }
+    if (!const {
+      'audio/l16',
+      'audio/pcm',
+      'audio/pcm16',
+      'audio/x-pcm',
+      'application/octet-stream',
+    }.contains(type.mimeType)) {
+      throw FormatException(
+        'Unsupported Gemini audio format: ${type.mimeType}',
+      );
+    }
+    final rate = int.parse(type.parameters['rate'] ?? '24000');
+    final channels = int.parse(type.parameters['channels'] ?? '1');
+    final blockAlign = channels * 2;
+    if (channels <= 0 ||
+        channels > 0x7fff ||
+        rate <= 0 ||
+        rate > 0xffffffff ~/ blockAlign ||
+        bytes.isEmpty ||
+        bytes.length % blockAlign != 0) {
+      throw const FormatException('Invalid Gemini 16-bit PCM audio.');
+    }
+    return NetworkTtsResult(
+      bytes: _pcmToWav(bytes, sampleRate: rate, channels: channels),
+      mime: 'audio/wav',
+      sampleRate: rate,
+    );
   }
 
   static Future<NetworkTtsResult> _azureSpeech(
@@ -2695,6 +2763,11 @@ const int _waveFourCc = 0x45564157;
 const int _fmtFourCc = 0x20746d66;
 const int _dataFourCc = 0x61746164;
 
+bool _hasWavHeader(ByteData view) =>
+    view.lengthInBytes >= 12 &&
+    view.getUint32(0, Endian.little) == _riffFourCc &&
+    view.getUint32(8, Endian.little) == _waveFourCc;
+
 ({Uint8List formatData, List<Uint8List> audioData}) _parseWav(
   Uint8List bytes, {
   bool allowStreamingLengths = false,
@@ -2703,8 +2776,7 @@ const int _dataFourCc = 0x61746164;
     throw const FormatException('WAV file is too short.');
   }
   final view = ByteData.sublistView(bytes);
-  if (view.getUint32(0, Endian.little) != _riffFourCc ||
-      view.getUint32(8, Endian.little) != _waveFourCc) {
+  if (!_hasWavHeader(view)) {
     throw const FormatException('Invalid RIFF/WAVE header.');
   }
 
@@ -2744,7 +2816,7 @@ const int _dataFourCc = 0x61746164;
       throw const FormatException('Truncated WAV chunk data.');
     }
 
-    final data = Uint8List.fromList(bytes.sublist(dataStart, dataEnd));
+    final data = Uint8List.sublistView(bytes, dataStart, dataEnd);
     if (id == _fmtFourCc) {
       if (formatData != null && !_sameBytes(formatData, data)) {
         throw const FormatException('WAV contains conflicting fmt chunks.');

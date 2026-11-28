@@ -11,6 +11,28 @@ import 'package:http/testing.dart';
 
 void main() {
   group('TtsServiceOptions', () {
+    test('Gemini uses the effective model for testing and saving edits', () {
+      const old = 'gemini-2.5-flash-preview-tts';
+      for (final (url, expected) in [
+        ('https://gateway.example/v1beta', old),
+        (
+          'https://generativelanguage.googleapis.com/v1beta',
+          'gemini-3.8-flash-lite-tts',
+        ),
+      ]) {
+        final options = GeminiTtsOptions(
+          enabled: true,
+          name: 'My reader',
+          apiKey: 'saved-key',
+          baseUrl: url,
+          model: old,
+          voiceName: 'Puck',
+        );
+        expect(options.model, expected);
+        expect(options.toJson()['model'], expected);
+      }
+    });
+
     test('DeepSeek restores its defaults and round-trips custom settings', () {
       final defaults =
           TtsServiceOptions.fromJson({'kind': 'deepseek'})
@@ -223,10 +245,7 @@ void main() {
         'kind': 'gemini',
         'enabled': true,
       });
-      expect(
-        (gemini as GeminiTtsOptions).model,
-        'gemini-3.1-flash-tts-preview',
-      );
+      expect((gemini as GeminiTtsOptions).model, 'gemini-3.8-flash-lite-tts');
 
       final azure = TtsServiceOptions.fromJson({
         'kind': 'azure',
@@ -416,6 +435,59 @@ void main() {
   });
 
   group('NetworkTtsService', () {
+    test('Gemini preserves a complete WAV including its metadata', () async {
+      final wav = _buildWav([
+        ('JUNK', [1, 2, 3]),
+        ('fmt ', _pcmFormat(16000)),
+        ('data', [4, 5, 6, 7]),
+      ]);
+      for (final mime in ['audio/wav', null, 'application/octet-stream']) {
+        final result = await _synthesizeGeminiAudio(wav, mime);
+        expect(result.bytes, wav);
+        expect(result.mime, 'audio/wav');
+        expect(result.sampleRate, 16000);
+      }
+    });
+
+    test('Gemini wraps only the PCM samples at the advertised rate', () async {
+      final samples = [...ascii.encode('RIFF'), 1, 2, 3, 4, 5, 6, 7, 8];
+      for (final (mime, rate) in [
+        ('audio/L16;codec=pcm;rate=16000', 16000),
+        ('audio/pcm; rate="22050"', 22050),
+        ('audio/L16', 24000),
+        (null, 24000),
+      ]) {
+        final result = await _synthesizeGeminiAudio(samples, mime);
+        expect(result.mime, 'audio/wav');
+        expect(result.sampleRate, rate);
+        expect(_riffChunkData(result.bytes, 'fmt '), _pcmFormat(rate));
+        expect(_riffChunkData(result.bytes, 'data'), samples);
+      }
+      final stereo = await _synthesizeGeminiAudio(
+        samples,
+        'audio/L16;rate=16000;channels=2',
+      );
+      final format = ByteData.sublistView(_riffChunkData(stereo.bytes, 'fmt '));
+      expect(format.getUint16(2, Endian.little), 2);
+      expect(format.getUint32(8, Endian.little), 64000);
+      expect(_riffChunkData(stereo.bytes, 'data'), samples);
+    });
+
+    test('Gemini rejects malformed WAV and incomplete PCM', () async {
+      for (final (mime, bytes) in [
+        ('audio/wav', [1, 2, 3, 4]),
+        ('audio/L16', [1, 2, 3]),
+        ('audio/L16;rate=0', [1, 2]),
+        ('audio/L16;channels=2', [1, 2]),
+        ('audio/mulaw', [1, 2]),
+      ]) {
+        await expectLater(
+          _synthesizeGeminiAudio(bytes, mime),
+          throwsFormatException,
+        );
+      }
+    });
+
     test(
       'DeepSeek sends the selected voice and returns a playable WAV',
       () async {
@@ -2219,6 +2291,49 @@ Future<HttpServer> _bindServer(
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   server.listen(handler);
   return server;
+}
+
+Future<NetworkTtsResult> _synthesizeGeminiAudio(List<int> bytes, String? mime) {
+  final client = MockClient((request) async {
+    expect(
+      request.url.path,
+      '/v1beta/models/gemini-3.8-flash-lite-tts:generateContent',
+    );
+    final body = jsonDecode(request.body);
+    expect(body['generationConfig']['speechConfig']['voiceConfig'], {
+      'prebuiltVoiceConfig': {'voiceName': 'Puck'},
+    });
+    return http.Response(
+      jsonEncode({
+        'candidates': [
+          {
+            'content': {
+              'parts': [
+                {
+                  'inlineData': {
+                    if (mime != null) 'mimeType': mime,
+                    'data': base64Encode(bytes),
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+      200,
+    );
+  });
+  addTearDown(client.close);
+  return NetworkTtsService.synthesize(
+    options: TtsServiceOptions.fromJson({
+      'kind': 'gemini',
+      'apiKey': 'test-key',
+      'model': 'gemini-3.8-flash-lite-tts',
+      'voiceName': 'Puck',
+    }),
+    text: '你好。',
+    client: client,
+  );
 }
 
 Future<NetworkTtsResult> _synthesizeQwenAudio(

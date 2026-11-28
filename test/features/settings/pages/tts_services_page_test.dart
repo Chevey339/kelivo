@@ -23,6 +23,9 @@ void main() {
   const ttsChannel = MethodChannel('flutter_tts');
   const audioGlobalChannel = MethodChannel('xyz.luan/audioplayers.global');
   const audioChannel = MethodChannel('xyz.luan/audioplayers');
+  final geminiModelField = find.byWidgetPredicate(
+    (w) => w is TextField && w.controller?.text == 'gemini-3.8-flash-lite-tts',
+  );
 
   setUp(() {
     SharedPreferences.setMockInitialValues(const {});
@@ -176,6 +179,10 @@ void main() {
     await tester.tap(find.byTooltip('Add'));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Gemini'));
+    await tester.pumpAndSettle();
+    expect(geminiModelField, findsOneWidget);
+
     await tester.tap(find.text('MiniMax'));
     await tester.pumpAndSettle();
     expect(find.text('Auto match'), findsOneWidget);
@@ -318,7 +325,10 @@ void main() {
     expect(find.text('API Base URL'), findsOneWidget);
     expect(find.text('Style / voice description'), findsNothing);
 
-    await selectProvider('OpenAI Compatible', 'Fish Audio');
+    await selectProvider('OpenAI Compatible', 'Gemini');
+    expect(geminiModelField, findsOneWidget);
+
+    await selectProvider('Gemini', 'Fish Audio');
     expect(find.text('Temperature'), findsOneWidget);
     expect(find.text('Top P'), findsOneWidget);
     expect(find.text('Latency'), findsOneWidget);

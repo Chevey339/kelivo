@@ -1556,38 +1556,36 @@ class SettingsProvider extends ChangeNotifier {
     AutoRetryConfig.current = _autoRetry;
 
     // load network TTS services
+    String? migratedTtsServices;
     try {
       final ttsStr = prefs.getString(_ttsServicesKey) ?? '';
       if (ttsStr.isNotEmpty) {
-        final list = jsonDecode(ttsStr) as List;
-        var generatedMissingIds = false;
-        _ttsServices = [
-          for (final value in list)
-            TtsServiceOptions.fromJson(() {
-              final map = value is Map<String, dynamic>
-                  ? value
-                  : Map<String, dynamic>.from(value as Map);
-              if ((map['id'] ?? '').toString().trim().isEmpty) {
-                generatedMissingIds = true;
-              }
-              return map;
-            }()),
-        ];
-        // Legacy rows had no stable identifier. Persist generated IDs before
-        // migrating the selected index so the UUID remains valid next launch.
-        if (generatedMissingIds) {
-          await prefs.setString(
-            _ttsServicesKey,
-            jsonEncode(
-              _ttsServices.map((service) => service.toJson()).toList(),
-            ),
-          );
-        }
+        final rows = (jsonDecode(ttsStr) as List).cast<Map<String, dynamic>>();
+        var changed = false;
+        _ttsServices = rows.map((row) {
+          final service = TtsServiceOptions.fromJson(row);
+          if (row['id']?.toString() != service.id) {
+            row['id'] = service.id;
+            changed = true;
+          }
+          if (service is GeminiTtsOptions &&
+              row['model'] is String &&
+              row['model'] != service.model) {
+            row['model'] = service.model;
+            changed = true;
+          }
+          return service;
+        }).toList();
+        // Patch the stored rows so custom fields and other services survive.
+        if (changed) migratedTtsServices = jsonEncode(rows);
       } else {
         _ttsServices = const <TtsServiceOptions>[];
       }
     } catch (_) {
       _ttsServices = const <TtsServiceOptions>[];
+    }
+    if (migratedTtsServices != null) {
+      await prefs.setString(_ttsServicesKey, migratedTtsServices);
     }
     final storedTtsId = prefs.getString(_ttsSelectedServiceIdKey);
     if (storedTtsId != null) {
