@@ -1915,7 +1915,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
 
   void _pauseDetachedViews() {
     for (final entry in _engines.entries) {
-      if (!_hasVisibleView(entry.key)) {
+      if (!_previewForeground || !_hasVisibleView(entry.key)) {
         unawaited(entry.value.setVisible(false).catchError((Object _) {}));
       }
     }

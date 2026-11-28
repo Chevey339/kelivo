@@ -113,6 +113,8 @@ class NativeBrowserEngine implements BrowserEngine {
   WebViewEnvironment? _environment;
   InAppWebViewController? _controller;
   bool _disposed = false;
+  bool get _isWindows =>
+      Platform.isWindows || defaultTargetPlatform == TargetPlatform.windows;
   Future<void> _dialogBridgeReady = Future<void>.value();
   Future<void> _storageBridgeReady = Future<void>.value();
   bool _storageBridgeInstalled = false;
@@ -1990,6 +1992,12 @@ class NativeBrowserEngine implements BrowserEngine {
     if (_disposed) return;
     if (Platform.isAndroid) {
       await _controller?.pause();
+    } else if (_isWindows) {
+      if (isAgentActive()) {
+        await _controller?.pauseAllMediaPlayback();
+      } else {
+        await _controller?.pause();
+      }
     } else if (Platform.isIOS || Platform.isMacOS) {
       await _controller?.pauseAllMediaPlayback();
     }
@@ -1998,7 +2006,7 @@ class NativeBrowserEngine implements BrowserEngine {
   @override
   Future<void> resume() async {
     if (_disposed) return;
-    if (Platform.isAndroid) await _controller?.resume();
+    if (Platform.isAndroid || _isWindows) await _controller?.resume();
   }
 
   @override
