@@ -2,6 +2,7 @@ import 'package:Kelivo/utils/utf16_safe_cut.dart';
 import '../models/carried_original.dart';
 import '../models/attachment_retention.dart';
 import 'compression_repository.dart';
+import 'conversation_session_copy.dart';
 import 'extension_entity_store.dart';
 import '../models/compression_config.dart';
 import '../models/image_context.dart';
@@ -5305,9 +5306,30 @@ ORDER BY m.message_order DESC LIMIT 20
         await putConversation(conversation);
       });
 
-  Future<Conversation?> duplicateConversation(String sourceId) async {
+  Future<Conversation?> _copyConversation(
+    String sourceId,
+    Future<Conversation?> Function(String targetId) copyRows,
+  ) async {
     await genUiStates.flush();
-    return _writeTransaction(() async {
+    final targetId = const Uuid().v4();
+    final files = await ConversationSessionCopy.locate(
+      _databaseFile,
+      sourceId,
+      targetId,
+    );
+    Future<Conversation?> write() => _writeTransaction(() async {
+      final copied = await copyRows(targetId);
+      if (copied != null) {
+        await files?.copyReferencedFiles(_db);
+        await _sealGenUiSearch(copied.messageIds);
+      }
+      return copied;
+    });
+    return files == null ? write() : files.protect(write);
+  }
+
+  Future<Conversation?> duplicateConversation(String sourceId) {
+    return _copyConversation(sourceId, (targetId) async {
       await readContextOperations(sourceId);
       final sourceRow = await (_db.select(
         _db.conversationRows,
@@ -5320,7 +5342,6 @@ ORDER BY m.message_order DESC LIMIT 20
                 ..orderBy([(row) => OrderingTerm.asc(row.messageOrder)]))
               .get();
       const uuid = Uuid();
-      final targetId = uuid.v4();
       final messageIdMap = {
         for (final message in sourceMessages) message.id: uuid.v4(),
       };
@@ -5483,7 +5504,6 @@ ORDER BY m.message_order DESC LIMIT 20
       messageIdMap: messageIdMap,
       targetConversationId: targetConversationId,
     );
-    await _sealGenUiSearch(messageIdMap.values);
     await _db.customStatement(
       'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
       'SELECT revision_id FROM message_asset_rows WHERE conversation_id = ? '
@@ -5501,9 +5521,8 @@ ORDER BY m.message_order DESC LIMIT 20
     required String targetRevisionId,
     String? assistantId,
     bool preserveVersions = true,
-  }) async {
-    await genUiStates.flush();
-    return _writeTransaction(() async {
+  }) {
+    return _copyConversation(sourceId, (targetId) async {
       await readContextOperations(sourceId);
       final sourceRow = await (_db.select(
         _db.conversationRows,
@@ -5563,7 +5582,6 @@ ORDER BY m.message_order DESC LIMIT 20
         }
       }
       const uuid = Uuid();
-      final targetId = uuid.v4();
       final messageIdMap = {for (final message in kept) message.id: uuid.v4()};
       final groupIdMap = <String, String>{};
       for (final message in kept) {

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
@@ -11,6 +12,44 @@ import '../../../utils/kelivo_file_uri.dart';
 import 'workspace_tool_context.dart';
 import '../storage/storage_attachment_usage.dart';
 import 'workspace_file_coordinator.dart';
+
+const sessionAttachmentIndexName = '.attachment-index.json';
+
+/// Keep the original upload-to-filename mapping for inherited attachment
+/// copies, so the next sync reuses their names in the new session.
+Future<void> copySessionAttachmentIndex(Directory source, Directory target) =>
+    Isolate.run(() {
+      final attachments = Directory(p.join(target.path, 'attachments'));
+      final index = File(p.join(source.path, sessionAttachmentIndexName));
+      if (!attachments.existsSync() ||
+          FileSystemEntity.typeSync(index.path, followLinks: false) !=
+              FileSystemEntityType.file) {
+        return;
+      }
+      final Object? records;
+      try {
+        records = jsonDecode(index.readAsStringSync());
+      } on FormatException {
+        return;
+      }
+      if (records is! Map<String, dynamic>) return;
+      records.removeWhere((_, record) {
+        final name = record is Map ? record['name'] : null;
+        return name is! String ||
+            name != _safeName(name) ||
+            p.basename(name) != name ||
+            FileSystemEntity.typeSync(
+                  p.join(attachments.path, name),
+                  followLinks: false,
+                ) !=
+                FileSystemEntityType.file;
+      });
+      if (records.isNotEmpty) {
+        File(
+          p.join(target.path, sessionAttachmentIndexName),
+        ).writeAsStringSync(jsonEncode(records));
+      }
+    });
 
 class AttachmentInfo {
   const AttachmentInfo({
@@ -68,7 +107,7 @@ Future<void> deleteSessionAttachmentCopies(
         FileSystemEntityType.directory) {
       continue;
     }
-    final indexFile = File(p.join(session.path, '.attachment-index.json'));
+    final indexFile = File(p.join(session.path, sessionAttachmentIndexName));
     if (!await indexFile.exists()) continue;
     final Map<String, dynamic> index;
     try {
@@ -126,7 +165,9 @@ Future<List<AttachmentInfo>> _syncAttachments(
   await attachmentsDir.create(recursive: true);
   // Keep identity outside the visible attachments directory. Equal filename
   // and size do not imply equal content; the original URI owns its saved name.
-  final indexFile = File(p.join(ctx.sessionDir.path, '.attachment-index.json'));
+  final indexFile = File(
+    p.join(ctx.sessionDir.path, sessionAttachmentIndexName),
+  );
   final index = await indexFile.exists()
       ? Map<String, dynamic>.from(
           jsonDecode(await indexFile.readAsString()) as Map,

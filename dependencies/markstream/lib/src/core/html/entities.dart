@@ -1,4 +1,5 @@
 import '../ast/nodes.dart';
+import '../ast/source_span.dart';
 import '../parser/mapped_text.dart';
 import 'named_entities.dart';
 
@@ -31,7 +32,21 @@ String decodeEntities(String text) => text.replaceAllMapped(
   _entity,
   (match) => readEntity(text, match.start)?.text ?? match[0]!,
 );
-String decodeMarkdownString(String text, {bool entities = true}) {
+String decodeMarkdownString(String text, {bool entities = true}) =>
+    _decodeMarkdownString(text, entities: entities);
+
+/// Decoded Markdown escapes and entities with their original UTF-16 ranges.
+MappedText decodeMappedMarkdownString(String text) {
+  final fragments = <TextNode>[];
+  _decodeMarkdownString(text, entities: true, fragments: fragments);
+  return MappedText(fragments);
+}
+
+String _decodeMarkdownString(
+  String text, {
+  required bool entities,
+  List<TextNode>? fragments,
+}) {
   final result = StringBuffer();
   var run = 0;
   var i = 0;
@@ -43,15 +58,27 @@ String decodeMarkdownString(String text, {bool entities = true}) {
         ? readEntity(text, i)
         : null;
     if (escape != null || entity != null) {
-      result.write(text.substring(run, i));
-      result.write(escape != null ? escape[1] : entity!.text);
-      i = escape?.end ?? entity!.end;
+      final plain = text.substring(run, i);
+      final replacement = escape != null ? escape[1]! : entity!.text;
+      final end = escape?.end ?? entity!.end;
+      result
+        ..write(plain)
+        ..write(replacement);
+      if (fragments != null) {
+        if (i > run)
+          fragments.add(TextNode(span: SourceSpan(run, i), text: plain));
+        fragments.add(TextNode(span: SourceSpan(i, end), text: replacement));
+      }
+      i = end;
       run = i;
     } else {
       i++;
     }
   }
-  result.write(text.substring(run));
+  final tail = text.substring(run);
+  result.write(tail);
+  if (tail.isNotEmpty)
+    fragments?.add(TextNode(span: SourceSpan(run, text.length), text: tail));
   return result.toString();
 }
 

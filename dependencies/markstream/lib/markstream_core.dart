@@ -3,6 +3,8 @@ library;
 
 export 'src/core/ast/nodes.dart';
 export 'src/core/ast/source_span.dart';
+export 'src/core/html/entities.dart' show decodeMappedMarkdownString;
+export 'src/core/parser/mapped_text.dart' show MappedText;
 export 'src/core/ast/visitor.dart';
 
 export 'src/core/parser/block_parser.dart';
