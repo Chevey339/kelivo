@@ -224,6 +224,30 @@ void main() {
     expect(find.byType(ContextUsageRing), findsNothing);
   });
 
+  testWidgets('compact desktop windows can open context usage', (tester) async {
+    final providers = await createProviders();
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+
+    var opened = false;
+    await pumpBar(
+      tester,
+      settings: providers.settings,
+      assistants: providers.assistants,
+      usage: providers.usage,
+      controller: controller,
+      focusNode: focusNode,
+      surfaceSize: const Size(700, 800),
+      onOpenContextUsage: () => opened = true,
+    );
+    final ring = find.byType(ContextUsageRing);
+    expect(ring, findsOneWidget);
+    await tester.tap(ring);
+    expect(opened, isTrue);
+  }, variant: TargetPlatformVariant.desktop());
+
   testWidgets('context usage stays accessible while the composer is queued', (
     tester,
   ) async {

@@ -8,7 +8,6 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/conversation.dart';
-import 'package:Kelivo/core/models/image_context.dart';
 import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -98,13 +97,6 @@ class _FakeChatService extends ChatService {
     );
     notifyListeners();
   }
-}
-
-class _TemporaryImageChat extends _FakeChatService {
-  _TemporaryImageChat(super.conversation);
-
-  @override
-  bool isTemporaryConversation(String? id) => true;
 }
 
 class _FakeMcpProvider extends McpProvider {
@@ -200,7 +192,6 @@ void main() {
     WidgetTester tester, {
     List<McpServerConfig> servers = const [],
     Conversation? conversation,
-    _FakeChatService? chat,
     bool desktop = false,
   }) async {
     mcp.fakeServers = servers;
@@ -214,8 +205,8 @@ void main() {
         providers: [
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
           ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
-          ChangeNotifierProvider<ChatService>.value(
-            value: chat ?? _FakeChatService(conversation),
+          ChangeNotifierProvider<ChatService>(
+            create: (_) => _FakeChatService(conversation),
           ),
           ChangeNotifierProvider<WorkspaceRuntimeProvider>(
             create: (_) => WorkspaceRuntimeProvider(),
@@ -267,67 +258,27 @@ void main() {
   }
 
   for (final desktop in [false, true]) {
-    testWidgets(
-      'image viewer stays in the local tool group and syncs, desktop=$desktop',
-      (tester) async {
-        final conversation = Conversation(id: 'images', title: 'Images');
-        final chat = _TemporaryImageChat(conversation);
-        addTearDown(chat.dispose);
-        final l10n = await pumpSheet(
-          tester,
-          conversation: conversation,
-          chat: chat,
-          desktop: desktop,
-        );
-        await tester.pumpAndSettle();
-        final row = find.byKey(
-          ValueKey(
-            desktop ? 'desktop-tools-view-image' : 'chat-tools-view-image',
-          ),
-        );
-        if (!desktop) {
-          expect(
-            row,
-            findsNothing,
-            reason: 'image viewing must follow the existing folded local tools',
-          );
-          await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
-          await tester.pumpAndSettle();
-          await tester.scrollUntilVisible(
-            row,
-            250,
-            scrollable: find.byType(Scrollable).first,
-          );
-          expect(
-            find.ancestor(
-              of: row,
-              matching: find.byKey(ChatToolsSheet.localGroupKey),
-            ),
-            findsOneWidget,
-          );
-        } else {
-          await tester.scrollUntilVisible(
-            row,
-            250,
-            scrollable: find.byType(Scrollable).first,
-          );
-        }
-        expect(row, findsOneWidget);
-        await tester.tap(row);
-        await tester.pumpAndSettle();
-        expect((await chat.imageContextSettings('images')).allowRecall, isTrue);
-        await chat.setImageContextSettings(
-          'images',
-          const ImageContextSettings(automatic: false, pinned: {'pinned'}),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(row);
-        await tester.pumpAndSettle();
-        expect((await chat.imageContextSettings('images')).allowRecall, isTrue);
-        expect((await chat.imageContextSettings('images')).automatic, isFalse);
-        expect((await chat.imageContextSettings('images')).pinned, {'pinned'});
-      },
-    );
+    testWidgets('local tools omit the image recall switch, desktop=$desktop', (
+      tester,
+    ) async {
+      final l10n = await pumpSheet(
+        tester,
+        conversation: Conversation(id: 'images', title: 'Images'),
+        desktop: desktop,
+      );
+      if (!desktop) {
+        await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
+      }
+      await tester.pumpAndSettle();
+      final lastTool = localToolTitle(l10n, availableLocalToolIds().last);
+      await tester.scrollUntilVisible(
+        find.text(lastTool),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text(l10n.workspaceToolTitleViewImage), findsNothing);
+      expect(find.text(l10n.imageContextAllowRecall), findsNothing);
+    });
 
     testWidgets(
       desktop
@@ -550,7 +501,7 @@ void main() {
 
     expect(find.byKey(ChatToolsSheet.localGroupKey), findsOneWidget);
     expect(
-      find.text('0/${availableLocalToolIds().length + 1}'),
+      find.text('0/${availableLocalToolIds().length}'),
       findsOneWidget,
       reason: 'the folded header still reports how many tools are on',
     );
@@ -566,7 +517,7 @@ void main() {
     tester,
   ) async {
     final l10n = await pumpSheet(tester);
-    final count = '0/${availableLocalToolIds().length + 1}';
+    final count = '0/${availableLocalToolIds().length}';
     expect(find.text(count), findsOneWidget);
 
     await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
@@ -637,7 +588,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final enabledCount = '1/${availableLocalToolIds().length + 1}';
+    final enabledCount = '1/${availableLocalToolIds().length}';
     expect(
       find.text(enabledCount),
       findsOneWidget,

@@ -14,7 +14,6 @@ import '../core/models/conversation.dart';
 import '../core/models/conversation_mcp_settings.dart';
 import '../core/services/chat/chat_service.dart';
 import '../features/chat/utils/ensure_conversation.dart';
-import '../features/chat/widgets/image_recall_control.dart';
 import '../features/home/services/local_tool_labels.dart';
 import '../features/home/services/local_tools_service.dart';
 import '../features/home/services/local_tool_toggle.dart';
@@ -325,23 +324,6 @@ class _ToolsContent extends StatelessWidget {
           ),
         );
       }
-      rows.add(
-        (context) => ImageRecallControl(
-          assistantId: assistantId,
-          conversationId: conversationId,
-          builder: (enabled, onChanged) => _RowItem(
-            key: const ValueKey('desktop-tools-view-image'),
-            leading: Icon(
-              Lucide.Image,
-              size: 16,
-              color: enabled ? cs.primary : cs.onSurface,
-            ),
-            label: l10n.workspaceToolTitleViewImage,
-            selected: enabled,
-            onTap: onChanged == null ? null : () => onChanged(!enabled),
-          ),
-        ),
-      );
     }
 
     if (groups.isNotEmpty || (supportsModelTools && conversationScoped)) {

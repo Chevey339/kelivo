@@ -18817,7 +18817,7 @@ abstract class AppLocalizations {
   /// **'Read file'**
   String get workspaceToolTitleReadFile;
 
-  /// Title for the view_image tool card and the image viewing entry in mobile and desktop chat tool menus.
+  /// Action label for view_image in the workspace tool list and on its tool calls in chat.
   ///
   /// In en, this message translates to:
   /// **'View image'**
@@ -28572,7 +28572,7 @@ abstract class AppLocalizations {
   /// **'Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.'**
   String get recoveryCopiesNeedUpdate;
 
-  /// Label for the conversation image recall switch in the image context panel and mobile/desktop chat tool menus. Controls the historical-image capability of view_image.
+  /// Switch in the Image Context panel that lets the model retrieve historical images from this conversation using view_image.
   ///
   /// In en, this message translates to:
   /// **'Allow the model to recall images'**

@@ -17316,7 +17316,7 @@
     "description": "Title for the read_file tool card."
   },
   "@workspaceToolTitleViewImage": {
-    "description": "Title for the view_image tool card and the image viewing entry in mobile and desktop chat tool menus."
+    "description": "Action label for view_image in the workspace tool list and on its tool calls in chat."
   },
   "@workspaceToolTitleWriteFile": {
     "description": "Title for the write_file tool card."
@@ -21678,7 +21678,7 @@
     "description": "Message on the restore failure screen warning some copies come from a newer Kelivo version and require an app update; copies kept."
   },
   "@imageContextAllowRecall": {
-    "description": "Label for the conversation image recall switch in the image context panel and mobile/desktop chat tool menus. Controls the historical-image capability of view_image."
+    "description": "Switch in the Image Context panel that lets the model retrieve historical images from this conversation using view_image."
   },
   "@imageContextAllowRecallDescription": {
     "description": "Description under the conversation image recall switch. Explains that view_image can retrieve historical chat images; disabling this does not disable direct vision on message attachments, automatic image management, or separately controlled workspace file access. Keep the tool name view_image unchanged."

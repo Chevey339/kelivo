@@ -4558,6 +4558,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     final bool isMobileLayout =
         MediaQuery.sizeOf(context).width < AppBreakpoints.tablet;
     final isDesktop = PlatformUtils.isDesktopTarget;
+    final showContextUsage =
+        (isDesktop || !isMobileLayout) &&
+        (widget.conversationId?.isNotEmpty ?? false);
     final editorFontSize = isDesktop ? 14 * settings.chatFontScale : 15.0;
     final expandedLayout = _expandedLayout;
     if (!expandedLayout) _scheduleExpandCheck();
@@ -5116,11 +5119,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     ),
                                                     const SizedBox(width: 8),
                                                   ],
-                                                  if (!isMobileLayout &&
-                                                      (widget
-                                                              .conversationId
-                                                              ?.isNotEmpty ??
-                                                          false))
+                                                  if (showContextUsage)
                                                     _ContextUsageInputControl(
                                                       onTap: widget
                                                           .onOpenContextUsage,
