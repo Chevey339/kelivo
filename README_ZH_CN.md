@@ -25,7 +25,7 @@
 
 [官网](https://kelivo.psycheas.top) · [使用手册](https://kelivo.psycheas.top/guide) · [下载](#-下载) · [反馈问题](https://github.com/Chevey339/kelivo/issues)
 
-[English](README.md) · **简体中文**
+[English](README.md) · **简体中文** · [Türkçe](README_TR.md)
 
 </div>
 
