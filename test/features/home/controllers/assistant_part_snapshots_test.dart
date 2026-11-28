@@ -96,4 +96,38 @@ void main() {
     );
     expect(transforms - before, 1);
   });
+
+  test(
+    'reuses the visible prefix only when it matches the transformed part',
+    () {
+      final snapshots = AssistantPartSnapshots();
+      final full = List.filled(128, 'original ').join();
+      final visible = full.substring(0, 64);
+      final source = MessagePartSnapshotBuilder().update([
+        const ReasoningPart('plan'),
+        TextPart(full),
+      ]);
+
+      final shared = snapshots
+          .update(source, transform: (text) => text, visibleText: visible)
+          .whereType<TextPart>()
+          .single
+          .text;
+      expect(identical(shared, visible), isTrue);
+
+      final rewritten = AssistantPartSnapshots()
+          .update(
+            source,
+            transform: (text) => text.replaceAll('original', 'modified'),
+            visibleText: visible,
+          )
+          .whereType<TextPart>()
+          .single
+          .text;
+      expect(
+        rewritten,
+        full.replaceAll('original', 'modified').substring(0, 64),
+      );
+    },
+  );
 }

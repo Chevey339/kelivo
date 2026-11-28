@@ -5,10 +5,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:re_highlight/re_highlight.dart';
-import 'package:re_highlight/languages/all.dart';
 import 'package:markstream/markstream.dart';
 import 'package:Kelivo/shared/cache/byte_lru_cache.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+
+import 'lazy_highlight.dart';
 
 // Cache syntax trees, not styled spans, so changing the theme does not reparse.
 final _nodes = ByteLruCache<String, DataNode>(
@@ -29,7 +30,7 @@ final _nodes = ByteLruCache<String, DataNode>(
   },
 );
 final _pending = <String, Future<DataNode>>{};
-final _parser = Highlight()..registerLanguages(builtinAllLanguages);
+final _parser = LazyHighlight();
 @visibleForTesting
 int debugHighlightParseCount = 0;
 @visibleForTesting
@@ -153,11 +154,10 @@ FutureOr<DataNode> _parseCached(String source, String language, String key) {
 
 DataNode _parseCode((String, String) input) {
   final (source, language) = input;
-  if (_parser.getLanguage(language) == null) {
-    return DataNode(children: [source]);
-  }
+  final result = _parser.highlight(code: source, language: language);
+  if (result == null) return DataNode(children: [source]);
   final tree = _SyntaxTree();
-  _parser.highlight(code: source, language: language).render(tree);
+  result.render(tree);
   return tree.root!;
 }
 

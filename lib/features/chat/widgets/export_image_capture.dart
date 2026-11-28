@@ -124,6 +124,7 @@ Future<ProcessedExportImage> captureExportWidget(
     ),
   );
   Overlay.of(context).insert(entry);
+  late final ExportImageProcessingRequest request;
   try {
     // Retain the existing initial asset settling window; subsequent slices use
     // the same mounted images and only wait for their updated viewport to paint.
@@ -187,21 +188,31 @@ Future<ProcessedExportImage> captureExportWidget(
         );
       }
     }
-    onProgress?.call(const ExportImageProgress(ExportImageStage.processing));
-    return await compute(
-      processExportImage,
-      ExportImageProcessingRequest(
-        singlePngBytes: single,
-        outputWidth: (size.width * pixelRatio).ceil(),
-        outputHeight: (size.height * pixelRatio).ceil(),
-        slices: slices,
-        preparePreview: true,
-      ),
-      debugLabel: 'export-image-png-processing',
+    request = ExportImageProcessingRequest(
+      singlePngBytes: single,
+      outputWidth: (size.width * pixelRatio).ceil(),
+      outputHeight: (size.height * pixelRatio).ceil(),
+      slices: slices,
+      preparePreview: true,
     );
   } finally {
     entry.remove();
     entry.dispose();
     viewport.dispose();
   }
+  // Let the removed overlay unmount before encoding. A hidden window may
+  // stop delivering frames after the last slice is already captured.
+  final binding = WidgetsBinding.instance;
+  if (binding.framesEnabled) {
+    await binding.endOfFrame.timeout(
+      const Duration(milliseconds: 100),
+      onTimeout: () {},
+    );
+  }
+  onProgress?.call(const ExportImageProgress(ExportImageStage.processing));
+  return compute(
+    processExportImage,
+    request,
+    debugLabel: 'export-image-png-processing',
+  );
 }

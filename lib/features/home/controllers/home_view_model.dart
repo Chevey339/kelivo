@@ -456,8 +456,15 @@ class HomeViewModel extends ChangeNotifier {
   void _onContentUpdated(String messageId, String content, int totalTokens) {
     final index = messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
+      final message = messages[index];
+      final sameText =
+          message.parts.whereType<TextPart>().singleOrNull?.text == content;
+      if (sameText && message.totalTokens == totalTokens) return;
       _chatController.replaceMessageSnapshot(
-        messages[index].copyWith(content: content, totalTokens: totalTokens),
+        message.copyWith(
+          content: sameText ? null : content,
+          totalTokens: totalTokens,
+        ),
       );
       // NOTE: Do NOT call notifyListeners() here!
       // Streaming content updates are now handled by StreamingContentNotifier

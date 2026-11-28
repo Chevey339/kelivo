@@ -2,12 +2,14 @@ import 'dart:collection';
 
 typedef CacheByteSize<K, V> = int Function(K key, V value);
 
-/// Least-recently-used cache bounded by decoded memory, not entry count.
+/// Least-recently-used cache bounded by bytes and optionally entry count.
 final class ByteLruCache<K, V> {
-  ByteLruCache({required this.maxBytes, required this.sizeOf})
-    : assert(maxBytes > 0);
+  ByteLruCache({required this.maxBytes, required this.sizeOf, this.maxEntries})
+    : assert(maxBytes > 0),
+      assert(maxEntries == null || maxEntries > 0);
 
   final int maxBytes;
+  final int? maxEntries;
   final CacheByteSize<K, V> sizeOf;
   final LinkedHashMap<K, _ByteLruEntry<V>> _entries = LinkedHashMap();
   int _bytes = 0;
@@ -34,7 +36,9 @@ final class ByteLruCache<K, V> {
     }
     _entries[key] = _ByteLruEntry(value, bytes);
     _bytes += bytes;
-    while (_bytes > maxBytes && _entries.isNotEmpty) {
+    while ((_bytes > maxBytes ||
+            (maxEntries != null && _entries.length > maxEntries!)) &&
+        _entries.isNotEmpty) {
       final oldestKey = _entries.keys.first;
       final removed = _entries.remove(oldestKey)!;
       _bytes -= removed.bytes;

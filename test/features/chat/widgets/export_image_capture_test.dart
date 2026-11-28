@@ -22,6 +22,25 @@ class _PendingHighlighter implements CodeHighlighter {
   }) => result.future;
 }
 
+class _CaptureLifetime extends StatefulWidget {
+  const _CaptureLifetime({required this.onDispose, required this.child});
+  final VoidCallback onDispose;
+  final Widget child;
+  @override
+  State<_CaptureLifetime> createState() => _CaptureLifetimeState();
+}
+
+class _CaptureLifetimeState extends State<_CaptureLifetime> {
+  @override
+  void dispose() {
+    widget.onDispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 void main() {
   testWidgets(
     'image export waits for its code syntax before capturing pixels',
@@ -129,6 +148,58 @@ void main() {
   );
 
   testWidgets(
+    'capture releases content after empty layout or capture failure',
+    (tester) async {
+      late BuildContext context;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (value) {
+              context = value;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      for (final empty in [true, false]) {
+        var disposed = false;
+        var done = false;
+        Object? failure;
+        unawaited(
+          captureExportWidget(
+                context,
+                _CaptureLifetime(
+                  onDispose: () => disposed = true,
+                  child: SizedBox(height: empty ? 0 : 32),
+                ),
+                theme: ThemeData(),
+                width: 64,
+                onProgress: (state) {
+                  if (state.stage == ExportImageStage.capturing) {
+                    throw StateError('capture failure');
+                  }
+                },
+              )
+              .then<void>(
+                (_) {},
+                onError: (Object error) {
+                  failure = error;
+                },
+              )
+              .whenComplete(() => done = true),
+        );
+        for (var i = 0; i < 400 && !done; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        await tester.pump();
+        expect(done, isTrue);
+        expect(failure, isStateError);
+        expect(disposed, isTrue);
+      }
+    },
+  );
+
+  testWidgets(
     'long export mounts content once and keeps 3x pixels across seams',
     (tester) async {
       late BuildContext context;
@@ -144,48 +215,58 @@ void main() {
         ),
       );
       final states = <ExportImageProgress>[];
+      var captureDisposed = false;
+      bool? disposedBeforeProcessing;
       ProcessedExportImage? result;
       Object? failure;
       var done = false;
       unawaited(
         captureExportWidget(
               context,
-              Builder(
-                builder: (_) {
-                  builds++;
-                  return const SizedBox(
-                    width: 64,
-                    height: 5200,
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          height: 8,
-                          child: ColoredBox(
-                            color: Colors.red,
-                            child: SizedBox.expand(),
+              _CaptureLifetime(
+                onDispose: () => captureDisposed = true,
+                child: Builder(
+                  builder: (_) {
+                    builds++;
+                    return const SizedBox(
+                      width: 64,
+                      height: 5200,
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: 8,
+                            child: ColoredBox(
+                              color: Colors.red,
+                              child: SizedBox.expand(),
+                            ),
                           ),
-                        ),
-                        Expanded(
-                          child: ColoredBox(
-                            color: Colors.green,
-                            child: SizedBox.expand(),
+                          Expanded(
+                            child: ColoredBox(
+                              color: Colors.green,
+                              child: SizedBox.expand(),
+                            ),
                           ),
-                        ),
-                        SizedBox(
-                          height: 8,
-                          child: ColoredBox(
-                            color: Colors.blue,
-                            child: SizedBox.expand(),
+                          SizedBox(
+                            height: 8,
+                            child: ColoredBox(
+                              color: Colors.blue,
+                              child: SizedBox.expand(),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
               theme: ThemeData(),
               width: 64,
-              onProgress: states.add,
+              onProgress: (state) {
+                if (state.stage == ExportImageStage.processing) {
+                  disposedBeforeProcessing = captureDisposed;
+                }
+                states.add(state);
+              },
             )
             .then((r) {
               result = r;
@@ -204,6 +285,7 @@ void main() {
         );
       }
       expect(failure, isNull);
+      expect(disposedBeforeProcessing, isTrue);
       expect(done, isTrue);
       expect(builds, 1);
       final image = img.decodePng(result!.pngBytes)!;

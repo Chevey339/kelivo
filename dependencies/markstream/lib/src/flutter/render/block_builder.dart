@@ -9,6 +9,8 @@ import '../../core/serialize/to_plain_text.dart';
 import '../extensions/registry.dart';
 import '../selection/document_selection.dart';
 import '../selection/selection_controller.dart';
+import '../selection/stable_selection_container.dart';
+import '../performance_limits.dart';
 import '../interfaces/renderers.dart';
 import '../theme/markstream_theme.dart';
 import 'inline_builder.dart';
@@ -171,13 +173,30 @@ class MarkstreamRenderer {
     }
     final content = inlineContent(context, nodes, style, streaming: streaming);
     final direction = proseDirection(nodes);
+    final plainCell =
+        owner is TableCellNode &&
+        owner.span.length <= PerformanceLimits.streamingNativeCharacters &&
+        !MediaQuery.boldTextOf(context) &&
+        nodes.every(
+          (node) =>
+              node is TextNode && extensions.inlineBuilderFor(node) == null,
+        );
+    final text = Text.rich(
+      content.span,
+      style: style,
+      textDirection: direction,
+    );
+    final cellDelegate = trackSelection && plainCell
+        ? SelectionContainer.maybeOf(context)
+        : null;
     final child = directionalBlock(
       context,
       direction,
-      StreamingText(
-        streaming: streaming,
-        text: Text.rich(content.span, style: style, textDirection: direction),
-      ),
+      // Match StreamingText's native paragraph paint boundary so scrolling
+      // or repainting the table can reuse each cell's recorded glyphs.
+      plainCell
+          ? RepaintBoundary(child: text)
+          : StreamingText(streaming: streaming, text: text),
       align: align,
     );
     return !trackSelection
@@ -185,6 +204,9 @@ class MarkstreamRenderer {
         : MarkstreamSelectionFragment(
             node: owner,
             segments: content.segments,
+            selectionDelegate: cellDelegate is StableSelectionDelegate
+                ? cellDelegate
+                : null,
             child: child,
           );
   }
@@ -197,11 +219,19 @@ class MarkstreamRenderer {
     TextStyle? firstStyle,
     TextStyle? style,
     int listDepth = 0,
+    bool tightWidth = false,
   }) {
     final visible = nodes
         .where((node) => node is! ReferenceDefinitionNode)
         .toList();
     return proseColumn(
+      // An Expanded list body already has a tight width. Keep the same
+      // Column and keyed children if the item grows or the direction changes.
+      crossAxisAlignment: !tightWidth
+          ? null
+          : ProseWidthScope.isDirectional(context)
+          ? CrossAxisAlignment.stretch
+          : CrossAxisAlignment.start,
       children: [
         for (var i = 0; i < visible.length; i++)
           Padding(
@@ -493,6 +523,7 @@ class MarkstreamRenderer {
                           builder: (context) => children(
                             context,
                             node.children[i].children,
+                            tightWidth: true,
                             streaming:
                                 streaming && i == node.children.length - 1,
                             spacing: node.tight ? 0 : theme.blockSpacing,

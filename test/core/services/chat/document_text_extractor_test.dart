@@ -22,6 +22,70 @@ void main() {
   Matcher failure(AttachmentProblem reason) =>
       isA<AttachmentReadError>().having((e) => e.problem, 'reason', reason);
 
+  DocumentAttachment attachment(File file) => DocumentAttachment(
+    path: file.path,
+    fileName: file.uri.pathSegments.last,
+    mime: 'text/plain',
+  );
+
+  test(
+    'completed document results are evicted by bytes in LRU order',
+    () async {
+      final cache = DocumentExtractionCache(maxBytes: 12);
+      final a = File('${directory.path}/a.txt')..writeAsStringSync('aaa');
+      final b = File('${directory.path}/b.txt')..writeAsStringSync('bbb');
+      final c = File('${directory.path}/c.txt')..writeAsStringSync('ccc');
+      final first = await cache.read(attachment(a));
+      final second = await cache.read(attachment(b));
+      expect(await cache.read(attachment(a)), same(first));
+      await cache.read(attachment(c));
+      expect(await cache.read(attachment(a)), same(first));
+      final reloaded = await cache.read(attachment(b));
+      expect(reloaded.text, second.text);
+      expect(reloaded, isNot(same(second)));
+    },
+  );
+
+  test(
+    'oversized results reach callers without displacing cached results',
+    () async {
+      final cache = DocumentExtractionCache(maxBytes: 8);
+      final small = File('${directory.path}/small.txt')
+        ..writeAsStringSync('ok');
+      final large = File('${directory.path}/large.txt')
+        ..writeAsStringSync('complete document');
+      final kept = await cache.read(attachment(small));
+      final result = await cache.read(attachment(large));
+      expect(result.text, 'complete document');
+      expect(result.truncated, isFalse);
+      expect(await cache.read(attachment(small)), same(kept));
+      expect(await cache.read(attachment(large)), isNot(same(result)));
+    },
+  );
+
+  test(
+    'empty results and concurrent reads are reusable; failures are retried',
+    () async {
+      final cache = DocumentExtractionCache(maxBytes: 8);
+      final empty = File('${directory.path}/empty.txt')..writeAsStringSync('');
+      final results = await Future.wait([
+        cache.read(attachment(empty)),
+        cache.read(attachment(empty)),
+      ]);
+      expect(results.first.text, isEmpty);
+      expect(results.last, same(results.first));
+      expect(await cache.read(attachment(empty)), same(results.first));
+      final invalid = File('${directory.path}/invalid.txt')
+        ..writeAsBytesSync([0x50, 0x4b, 3, 4]);
+      await expectLater(
+        cache.read(attachment(invalid)),
+        throwsA(failure(AttachmentProblem.notText)),
+      );
+      invalid.writeAsStringSync('fixed');
+      expect((await cache.read(attachment(invalid))).text, 'fixed');
+    },
+  );
+
   test('fixed byte samples select UTF, GB2312/GB18030 and CP950', () {
     for (final (bytes, expected) in <(List<int>, String)>[
       ([], ''), ([32, 10, 9], ' \n\t'),

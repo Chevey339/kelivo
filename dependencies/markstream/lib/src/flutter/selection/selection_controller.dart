@@ -255,10 +255,10 @@ class DocumentSelectionBinding {
   final projections = <SelectionProjectionRegistration>{};
   final preparers = <_SourceRangePreparerState>{};
   void changed() => controller.changed();
-  List<_MarkstreamSelectionFragmentState> get _ordered =>
-      fragments.toList()..sort(
-        (a, b) => a.widget.node.span.start.compareTo(b.widget.node.span.start),
-      );
+  List<_MarkstreamSelectionFragmentState> get _ordered => fragments.toList()
+    ..sort(
+      (a, b) => a.widget.node.span.start.compareTo(b.widget.node.span.start),
+    );
   TextIndex get textIndex => TextIndex.fromSegments(
     _ordered.expand((fragment) => fragment.widget.segments),
   );
@@ -382,12 +382,16 @@ class MarkstreamSelectionFragment extends StatefulWidget {
     required this.child,
     this.rangeRect,
     this.prepareRange,
+    this.selectionDelegate,
   });
   final MarkdownNode node;
   final List<TextSegment> segments;
   final Widget child;
   final Rect? Function(TextRange)? rangeRect;
   final bool Function(TextRange)? prepareRange;
+
+  /// Delegate of an enclosing container covering exactly this fragment.
+  final StableSelectionDelegate? selectionDelegate;
   @override
   State<MarkstreamSelectionFragment> createState() =>
       _MarkstreamSelectionFragmentState();
@@ -395,13 +399,14 @@ class MarkstreamSelectionFragment extends StatefulWidget {
 
 class _MarkstreamSelectionFragmentState
     extends State<MarkstreamSelectionFragment> {
-  final _delegate = StableSelectionDelegate();
+  late StableSelectionDelegate _delegate;
   bool _registered = false;
   DocumentSelectionBinding? _binding;
   late TextIndex _index;
   @override
   void initState() {
     super.initState();
+    _delegate = widget.selectionDelegate ?? StableSelectionDelegate();
     _index = TextIndex.fromSegments(widget.segments);
     _delegate.addListener(_changed);
   }
@@ -423,6 +428,16 @@ class _MarkstreamSelectionFragmentState
   @override
   void didUpdateWidget(MarkstreamSelectionFragment oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectionDelegate != widget.selectionDelegate) {
+      _delegate.removeListener(_changed);
+      if (oldWidget.selectionDelegate == null) {
+        final retired = _delegate;
+        // The old container must unmount before its delegate is disposed.
+        WidgetsBinding.instance.addPostFrameCallback((_) => retired.dispose());
+      }
+      _delegate = widget.selectionDelegate ?? StableSelectionDelegate();
+      _delegate.addListener(_changed);
+    }
     if (oldWidget.segments != widget.segments)
       _index = TextIndex.fromSegments(widget.segments);
     _changed();
@@ -459,7 +474,7 @@ class _MarkstreamSelectionFragmentState
     // This delegate already owns the exact range and emits selection changes.
     // A second SelectionListener container would rebuild all selected line
     // geometry and walk the same ranges again on every handle movement.
-    return _registered
+    return _registered && widget.selectionDelegate == null
         ? SelectionContainer(delegate: _delegate, child: widget.child)
         : widget.child;
   }
@@ -468,7 +483,8 @@ class _MarkstreamSelectionFragmentState
   void dispose() {
     _binding?.fragments.remove(this);
     _changed();
-    _delegate.dispose();
+    _delegate.removeListener(_changed);
+    if (widget.selectionDelegate == null) _delegate.dispose();
     super.dispose();
   }
 }

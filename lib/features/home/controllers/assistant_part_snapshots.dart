@@ -102,7 +102,9 @@ class AssistantPartSnapshots {
         remaining -= part.text.length;
       } else {
         (clippedParts ??= List<MessagePart>.of(_transformed))[index] = TextPart(
-          part.text.substring(0, remaining),
+          remaining == visibleText.length && part.text.startsWith(visibleText)
+              ? visibleText
+              : part.text.substring(0, remaining),
         );
         clipped.add(index);
         remaining = 0;

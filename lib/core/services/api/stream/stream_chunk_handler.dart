@@ -34,6 +34,19 @@ class StreamChunkHandler {
   final _partSnapshots = MessagePartSnapshotBuilder(arrivalOrdered: true);
   final _changedParts = <int>{};
 
+  StreamTextBuffer? _arrivalText;
+  int? _arrivalTextIndex;
+
+  /// Chat streaming seeds this view to collect text in arrival order when
+  /// multiple part IDs interleave. Parts-only consumers skip the aggregate.
+  String get arrivalText => _arrivalText?.value ?? '';
+  bool get hasArrivalText => _arrivalText?.isEmpty == false;
+
+  set arrivalText(String text) {
+    _arrivalText = StreamTextBuffer(text);
+    _arrivalTextIndex = null;
+  }
+
   void _addPart(MessagePart part) {
     _changedParts.add(_parts.length);
     _parts.add(part);
@@ -190,8 +203,13 @@ class StreamChunkHandler {
     } catch (_) {}
   }
 
-  void handle(StreamChunk chunk) {
-    if (finished) return;
+  void handle(StreamChunk chunk, {bool captureArrivalText = true}) {
+    if (finished) {
+      if (captureArrivalText && chunk is TextDelta) {
+        _arrivalText?.add(chunk.text);
+      }
+      return;
+    }
     _snapshot = null;
     switch (chunk) {
       case TextStart(:final id):
@@ -199,7 +217,7 @@ class StreamChunkHandler {
       case TextDelta(:final id, :final text):
         if (text.isEmpty) return;
         final index = _ensureText(id);
-        _textBuffers.putIfAbsent(index, StreamTextBuffer.new).add(text);
+        _appendText(index, text, captureArrivalText: captureArrivalText);
       case TextEnd(:final id):
         _endText(_textIndex.remove(id));
       case ReasoningStart(:final id):
@@ -383,6 +401,27 @@ class StreamChunkHandler {
         _imageMime.clear();
         _imageBuffers.clear();
     }
+  }
+
+  void _appendText(int index, String text, {required bool captureArrivalText}) {
+    final buffer = _textBuffers.putIfAbsent(index, StreamTextBuffer.new);
+    final arrival = _arrivalText;
+    if (arrival != null) {
+      if (_arrivalTextIndex == index) {
+        if (!captureArrivalText) arrivalText = arrival.value;
+      } else if (captureArrivalText) {
+        // A single text block and the arrival-order text can share a buffer.
+        // Interleaved text IDs or seeded text need their own aggregate.
+        if (arrival.isEmpty && buffer.isEmpty) {
+          _arrivalText = buffer;
+          _arrivalTextIndex = index;
+        } else {
+          if (_arrivalTextIndex != null) arrivalText = arrival.value;
+          _arrivalText!.add(text);
+        }
+      }
+    }
+    buffer.add(text);
   }
 
   int _ensureText(String id) {

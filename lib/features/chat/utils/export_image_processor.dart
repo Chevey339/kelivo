@@ -89,6 +89,15 @@ ProcessedExportImage processExportImage(ExportImageProcessingRequest request) {
       }
       if (nextY != image.height) tiles.clear();
     }
+    if (tiles.isEmpty && trimmed.height <= 4096) {
+      tiles.add(
+        ExportImageTile(
+          bytes: png,
+          width: trimmed.width,
+          height: trimmed.height,
+        ),
+      );
+    }
     if (tiles.isEmpty) {
       for (var y = 0; y < trimmed.height; y += 4096) {
         final tile = image_lib.copyCrop(

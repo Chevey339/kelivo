@@ -94,6 +94,43 @@ void main() {
     expect(decoded.getPixel(0, 0).toList(), [40000, 50000, 60000, 65535]);
     final preview = img.decodePng(result.preview!.tiles.single.bytes)!;
     expect(preview.toUint8List(), decoded.toUint8List());
+    expect(result.preview!.tiles.single.bytes, same(result.pngBytes));
+    final expected = img.encodePng(
+      img.copyCrop(image, x: 4, y: 5, width: 4, height: 5),
+    );
+    expect(result.pngBytes, orderedEquals(expected));
+  });
+
+  test('a stitched one-tile preview reuses unchanged exported PNG bytes', () {
+    final source = png(img.Format.uint8, [
+      [12, 34, 56, 255],
+    ]);
+    final request = ExportImageProcessingRequest(
+      outputWidth: 1,
+      outputHeight: 2,
+      slices: [(bytes: source, y: 0), (bytes: source, y: 1)],
+      preparePreview: true,
+    );
+    final result = processExportImage(request);
+    final expected = img.Image(width: 1, height: 2, numChannels: 4);
+    expected.setPixelRgba(0, 0, 12, 34, 56, 255);
+    expected.setPixelRgba(0, 1, 12, 34, 56, 255);
+    expect(result.pngBytes, orderedEquals(img.encodePng(expected)));
+    // Native slice previews still reuse their original capture buffers.
+    expect(
+      result.preview!.tiles.map((tile) => tile.bytes),
+      everyElement(same(source)),
+    );
+    final overlapping = processExportImage(
+      ExportImageProcessingRequest(
+        outputWidth: 1,
+        outputHeight: 2,
+        slices: [(bytes: result.pngBytes, y: 0), (bytes: source, y: 1)],
+        preparePreview: true,
+      ),
+    );
+    expect(overlapping.pngBytes, orderedEquals(result.pngBytes));
+    expect(overlapping.preview!.tiles.single.bytes, same(overlapping.pngBytes));
   });
 
   test('clipped slices use row strides without resampling or seam loss', () {

@@ -57,6 +57,15 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
     final pinned = filtered.where((c) => c.isPinned).toList();
     final others = filtered.where((c) => !c.isPinned).toList();
 
+    final firstUnpinned = pinned.isEmpty ? 0 : pinned.length + 2;
+    // The sliver requests indices for mounted rows when search or pinning
+    // reorders them. Keep their dismiss gestures attached to the conversation.
+    late final rowIndices = <Key, int>{
+      for (final (i, c) in pinned.indexed) ValueKey('history-${c.id}'): i + 1,
+      for (final (i, c) in others.indexed)
+        ValueKey('history-${c.id}'): firstUnpinned + i,
+    };
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -220,28 +229,40 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                         ),
                       ),
                     )
-                  : ListView(
-                      children: [
-                        if (pinned.isNotEmpty) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-                            child: Text(
-                              l10n.chatHistoryPagePinnedSection,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: AppFontWeights.semibold,
-                                color: cs.primary,
+                  : ListView.builder(
+                      itemCount: firstUnpinned + others.length + 1,
+                      findChildIndexCallback: (key) => rowIndices[key],
+                      itemBuilder: (_, index) {
+                        if (pinned.isNotEmpty) {
+                          if (index == 0) {
+                            return Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                              child: Text(
+                                l10n.chatHistoryPagePinnedSection,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: AppFontWeights.semibold,
+                                  color: cs.primary,
+                                ),
                               ),
-                            ),
-                          ),
-                          for (final c in pinned)
-                            _buildConversationTile(context, c),
-                          const SizedBox(height: 8),
-                        ],
-                        for (final c in others)
-                          _buildConversationTile(context, c),
-                        const SizedBox(height: 8),
-                      ],
+                            );
+                          }
+                          if (index <= pinned.length) {
+                            return _buildConversationTile(
+                              context,
+                              pinned[index - 1],
+                            );
+                          }
+                        }
+                        final offset = index - firstUnpinned;
+                        if (offset >= 0 && offset < others.length) {
+                          return _buildConversationTile(
+                            context,
+                            others[offset],
+                          );
+                        }
+                        return const SizedBox(height: 8);
+                      },
                     ),
             ),
           ],

@@ -5,6 +5,22 @@ import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('optional entry limit also bounds zero-sized entries', () {
+    final cache = ByteLruCache<String, int>(
+      maxBytes: 100,
+      maxEntries: 2,
+      sizeOf: (_, _) => 0,
+    );
+    cache.put('a', 1);
+    cache.put('b', 2);
+    cache.get('a');
+    cache.put('c', 3);
+    expect(cache.length, 2);
+    expect(cache.get('b'), isNull);
+    expect(cache.get('a'), 1);
+    expect(cache.bytes, 0);
+  });
+
   test('byte LRU promotes reads and evicts by decoded size', () {
     final cache = ByteLruCache<String, String>(
       maxBytes: 10,

@@ -2989,7 +2989,7 @@ class ChatActions {
     if (chunk is Usage) {
       _historyContexts[state.messageId]?.recordUsage(chunk.usage);
     }
-    state.partsHandler.handle(chunk);
+    state.handleChunk(chunk);
     switch (chunk) {
       case RetryPending() || RetryAttemptStart():
         break;
@@ -3158,8 +3158,6 @@ class ChatActions {
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
-
-    _recordContent(state, chunkContent);
 
     // End reasoning when content starts
     if (state.ctx.streamOutput && chunkContent.isNotEmpty) {
@@ -3659,11 +3657,5 @@ class ChatActions {
     }
     // Ensure any inline data URLs get converted even if the user navigates away mid-stream
     onScheduleImageSanitize?.call(streaming.id, latestContent, immediate: true);
-  }
-
-  void _recordContent(stream_ctrl.StreamingState state, String chunkContent) {
-    if (chunkContent.isNotEmpty) {
-      state.appendContent(chunkContent);
-    }
   }
 }

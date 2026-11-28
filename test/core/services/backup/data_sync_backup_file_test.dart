@@ -8,6 +8,8 @@ import 'dart:isolate';
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
@@ -58,6 +60,18 @@ const _withoutAssets = WebDavConfig(
     },
   ),
 );
+
+class _ClosingClient extends MockClient {
+  _ClosingClient(super.handler);
+
+  bool closed = false;
+
+  @override
+  void close() {
+    closed = true;
+    super.close();
+  }
+}
 
 const _withoutChatsOrAssets = WebDavConfig(
   scope: BackupScope(
@@ -639,6 +653,49 @@ void main() {
         expect(out.listSync().map((entity) => entity.path), [dest.path]);
       },
     );
+
+    for (final delete in [false, true]) {
+      for (final status in [200, 204, 500, null]) {
+        test(
+          'WebDAV ${delete ? 'delete' : 'test'} closes client for $status',
+          () async {
+            final chat = ChatService();
+            addTearDown(chat.dispose);
+            final sync = DataSync(
+              businessRepository: businessRepository,
+              chatService: chat,
+            );
+            final client = _ClosingClient((request) async {
+              expect(request.method, delete ? 'DELETE' : 'PROPFIND');
+              if (status == null) throw http.ClientException('offline');
+              return http.Response('', status);
+            });
+            final result = http.runWithClient(
+              () => delete
+                  ? sync.deleteWebDavBackupFile(
+                      const WebDavConfig(),
+                      BackupFileItem(
+                        href: Uri.parse('https://example.com/backup.zip'),
+                        displayName: 'backup.zip',
+                        size: 0,
+                        lastModified: null,
+                      ),
+                    )
+                  : sync.testWebdav(
+                      const WebDavConfig(url: 'https://example.com'),
+                    ),
+              () => client,
+            );
+            if (status == null || status >= 300) {
+              await expectLater(result, throwsException);
+            } else {
+              await result;
+            }
+            expect(client.closed, isTrue);
+          },
+        );
+      }
+    }
 
     test(
       'database export strips device state from both archive payloads',

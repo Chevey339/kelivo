@@ -1723,12 +1723,12 @@ class _StreamingToolIndex {
 /// State object for streaming message generation.
 class StreamingState {
   StreamingState(this.ctx, {this.responsesTurnPrefix, this.claudeTurnPrefix})
-    : _content = StreamTextBuffer(ctx.assistantMessage.content),
-      totalTokens = ctx.assistantMessage.totalTokens ?? 0,
+    : totalTokens = ctx.assistantMessage.totalTokens ?? 0,
       firstResponseMs = ctx.assistantMessage.firstResponseMs,
       firstTokenMs = ctx.assistantMessage.firstTokenMs,
       _previousUsage = ctx.assistantMessage.tokenUsage,
-      partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
+      partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts)
+        ..arrivalText = ctx.assistantMessage.content;
 
   final GenerationContext ctx;
   final _toolIndex = _StreamingToolIndex();
@@ -1736,11 +1736,13 @@ class StreamingState {
   /// Immutable native history already owned by this message before resuming.
   final String? responsesTurnPrefix;
   final String? claudeTurnPrefix;
-  final StreamTextBuffer _content;
-  String get fullContentRaw => _content.value;
-  set fullContentRaw(String text) => _content.value = text;
-  bool get hasContent => !_content.isEmpty;
-  void appendContent(String delta) => _content.add(delta);
+  String get fullContentRaw => partsHandler.arrivalText;
+  set fullContentRaw(String text) => partsHandler.arrivalText = text;
+  bool get hasContent => partsHandler.hasArrivalText;
+
+  void handleChunk(StreamChunk chunk) =>
+      partsHandler.handle(chunk, captureArrivalText: !finishHandled);
+
   int totalTokens;
   TokenUsage? usage;
   final TokenUsage _previousUsage;

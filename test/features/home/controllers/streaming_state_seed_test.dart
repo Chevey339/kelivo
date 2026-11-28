@@ -305,6 +305,60 @@ void main() {
     expect((state.partsHandler.parts[0] as TextPart).text, 'before');
   });
 
+  test('a single streaming text block shares its arrival snapshot', () {
+    final state = buildState(const []);
+    state.handleChunk(const TextDelta(id: 'a', text: 'first chunk'));
+    final first = state.partsHandler.parts.single as TextPart;
+    expect(identical(first.text, state.fullContentRaw), isTrue);
+
+    state.handleChunk(const TextDelta(id: 'a', text: ', second chunk'));
+    final raw = state.fullContentRaw;
+    expect(raw, 'first chunk, second chunk');
+    expect(
+      identical((state.partsHandler.parts.single as TextPart).text, raw),
+      isTrue,
+    );
+    expect(first.text, 'first chunk');
+
+    state.handleChunk(const TextEnd('a'));
+    expect(identical(state.fullContentRaw, raw), isTrue);
+    state.handleChunk(const TextDelta(id: 'a', text: ', next block'));
+    expect(state.fullContentRaw, 'first chunk, second chunk, next block');
+    expect(
+      state.partsHandler.parts.whereType<TextPart>().map((part) => part.text),
+      ['first chunk, second chunk', ', next block'],
+    );
+  });
+
+  test('interleaved blocks preserve arrival order independently of parts', () {
+    final state = buildState(const []);
+    for (final chunk in const [
+      TextDelta(id: 'a', text: 'one'),
+      ReasoningDelta(id: 'r', text: 'why'),
+      TextDelta(id: 'b', text: ' two'),
+      TextDelta(id: 'a', text: ' three'),
+      Finish(),
+    ]) {
+      state.handleChunk(chunk);
+    }
+    expect(state.fullContentRaw, 'one two three');
+    expect(state.partsHandler.parts, const [
+      TextPart('one three'),
+      ReasoningPart('why'),
+      TextPart(' two'),
+    ]);
+  });
+
+  test('continued output stays separate from seeded text parts', () {
+    final state = buildState(const [TextPart('before')]);
+    state.handleChunk(const TextDelta(id: 'a', text: 'after'));
+    expect(state.fullContentRaw, 'beforeafter');
+    expect(state.partsHandler.parts, const [
+      TextPart('before'),
+      TextPart('after'),
+    ]);
+  });
+
   test('non-stream handleResult keeps seeded parts and joins all text', () {
     final state = buildState(const [TextPart('before'), ReasoningPart('plan')]);
     state.partsHandler.handleResult(

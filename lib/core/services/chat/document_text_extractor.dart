@@ -12,6 +12,7 @@ import '../../models/chat_input_data.dart';
 import '../../utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/unicode_sanitizer.dart';
+import '../../../shared/cache/byte_lru_cache.dart';
 import 'text_file_decoder.dart';
 
 export 'text_file_decoder.dart'
@@ -122,15 +123,18 @@ typedef _Version = ({String path, String mime, DateTime modified, int size});
 /// cache hit: a restored draft or a replaced/deleted file must be rechecked.
 /// Cache the complete result (including truncation), never a localized notice.
 class DocumentExtractionCache {
-  final _entries = <_Version, Future<DocumentText>>{};
+  DocumentExtractionCache({int maxBytes = 8 * 1024 * 1024})
+    : _completed = ByteLruCache(
+        maxBytes: maxBytes,
+        maxEntries: 32,
+        sizeOf: (_, value) => value.text.length * 2,
+      );
+
+  final _pending = <_Version, Future<DocumentText>>{};
+  final ByteLruCache<_Version, DocumentText> _completed;
 
   _Version _version(File file, String mime, FileStat stat) =>
       (path: file.path, mime: mime, modified: stat.modified, size: stat.size);
-
-  void _remember(_Version key, Future<DocumentText> result) {
-    _entries[key] = result;
-    if (_entries.length > 32) _entries.remove(_entries.keys.first);
-  }
 
   /// Publication copies a private draft to a new path. Transfer the verified
   /// result only when its actual source is unchanged across the copy.
@@ -142,17 +146,18 @@ class DocumentExtractionCache {
   ) async {
     final mime = resolveDocumentAttachmentMime(doc);
     final sourceVersion = _version(source, mime, beforeCopy);
-    final cached = _entries[sourceVersion];
-    if (cached == null) return;
+    final completed = _completed.get(sourceVersion);
+    final pending = _pending[sourceVersion];
+    if (completed == null && pending == null) return;
     try {
-      await cached;
+      final cached = completed ?? await pending!;
       final after = await source.stat();
       final published = await destination.stat();
       if (after.type == FileSystemEntityType.file &&
           _version(source, mime, after) == sourceVersion &&
           published.type == FileSystemEntityType.file &&
           published.size == beforeCopy.size) {
-        _remember(_version(destination, mime, published), cached);
+        _completed.put(_version(destination, mime, published), cached);
       }
     } on AttachmentReadError {
       // Never copy failures: the published file gets its own preflight.
@@ -178,15 +183,20 @@ class DocumentExtractionCache {
       throw AttachmentReadError(AttachmentProblem.missing, file.fileName);
     }
     final key = _version(source, mime, stat);
-    final result =
-        _entries.remove(key) ??
-        DocumentTextExtractor.extractResolved(path: path, mime: mime);
-    _remember(key, result);
+    final completed = _completed.get(key);
+    if (completed != null) return completed;
+    final result = _pending.putIfAbsent(
+      key,
+      () => DocumentTextExtractor.extractResolved(path: path, mime: mime),
+    );
     try {
-      return await result;
+      final completed = await result;
+      if (identical(_pending[key], result)) _completed.put(key, completed);
+      return completed;
     } on AttachmentReadError catch (e) {
-      if (identical(_entries[key], result)) _entries.remove(key);
       throw AttachmentReadError(e.problem, file.fileName);
+    } finally {
+      if (identical(_pending[key], result)) _pending.remove(key);
     }
   }
 }

@@ -44,13 +44,18 @@ class ProseWidthScope extends InheritedWidget {
       enabled != oldWidget.enabled;
 }
 
-Widget proseColumn({required List<Widget> children, double spacing = 0}) {
+Widget proseColumn({
+  required List<Widget> children,
+  double spacing = 0,
+  CrossAxisAlignment? crossAxisAlignment,
+}) {
   Widget column(CrossAxisAlignment alignment) => Column(
     spacing: spacing,
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: alignment,
     children: children,
   );
+  if (crossAxisAlignment != null) return column(crossAxisAlignment);
   return LayoutBuilder(
     builder: (context, constraints) => column(
       constraints.hasTightWidth && ProseWidthScope.isDirectional(context)

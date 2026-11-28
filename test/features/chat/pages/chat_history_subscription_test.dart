@@ -30,6 +30,128 @@ class _Chat extends ChatService {
 }
 
 void main() {
+  for (final pinnedCount in [0, 2, 4]) {
+    testWidgets(
+      'mobile history preserves rows with $pinnedCount pinned chats',
+      (tester) async {
+        final chat = _Chat()
+          ..ready = true
+          ..conversations = [
+            for (var i = 0; i < 4; i++)
+              Conversation(
+                id: '$i',
+                title: 'Chat $i',
+                isPinned: i < pinnedCount,
+              ),
+          ];
+        addTearDown(chat.dispose);
+        await tester.pumpWidget(
+          ChangeNotifierProvider<ChatService>.value(
+            value: chat,
+            child: MaterialApp(
+              theme: ThemeData(platform: TargetPlatform.android),
+              locale: const Locale('en'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const ChatHistoryPage(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final list = tester.widget<ListView>(find.byType(ListView));
+        final delegate = list.childrenDelegate as SliverChildBuilderDelegate;
+        expect(delegate.childCount, 4 + (pinnedCount > 0 ? 3 : 1));
+        final context = tester.element(find.byType(ListView));
+        var index = 0;
+        if (pinnedCount > 0) {
+          final header = delegate.builder(context, index++)! as Padding;
+          expect(header.padding, const EdgeInsets.fromLTRB(4, 4, 4, 8));
+        }
+        for (var i = 0; i < 4; i++) {
+          if (pinnedCount > 0 && i == pinnedCount) {
+            expect((delegate.builder(context, index++)! as SizedBox).height, 8);
+          }
+          final row = delegate.builder(context, index++)! as Dismissible;
+          expect(row.key, ValueKey('history-$i'));
+          expect(row.direction, DismissDirection.endToStart);
+          expect(row.onDismissed, isNotNull);
+        }
+        if (pinnedCount == 4) {
+          expect((delegate.builder(context, index++)! as SizedBox).height, 8);
+        }
+        expect((delegate.builder(context, index)! as SizedBox).height, 8);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets('pinning retains the state of an existing history row', (
+    tester,
+  ) async {
+    final chat = _Chat()
+      ..ready = true
+      ..conversations = [
+        Conversation(id: 'one', title: 'First'),
+        Conversation(id: 'two', title: 'Second'),
+      ];
+    addTearDown(chat.dispose);
+    await tester.pumpWidget(
+      ChangeNotifierProvider<ChatService>.value(
+        value: chat,
+        child: MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const ChatHistoryPage(),
+        ),
+      ),
+    );
+    final row = find.byKey(const ValueKey('history-one'));
+    final state = tester.state(row);
+    chat.conversations = [
+      chat.conversations.first,
+      Conversation(id: 'two', title: 'Second', isPinned: true),
+    ];
+    chat.publish(changed: true);
+    await tester.pumpAndSettle();
+    expect(tester.state(row), same(state));
+  });
+
+  testWidgets(
+    'mobile history builds distant conversations only after scrolling',
+    (tester) async {
+      final chat = _Chat()
+        ..ready = true
+        ..conversations = [
+          for (var i = 0; i < 200; i++)
+            Conversation(id: '$i', title: 'Chat $i'),
+        ];
+      addTearDown(chat.dispose);
+      await tester.pumpWidget(
+        ChangeNotifierProvider<ChatService>.value(
+          value: chat,
+          child: const MaterialApp(
+            locale: Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: ChatHistoryPage(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Chat 0'), findsOneWidget);
+      expect(find.text('Chat 199'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('Chat 199'),
+        500,
+        maxScrolls: 100,
+      );
+      expect(find.text('Chat 199'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   for (final desktop in [false, true]) {
     testWidgets(
       '${desktop ? 'desktop' : 'mobile'} history observes list changes only',

@@ -670,10 +670,15 @@ class DataSync {
         '    <d:displayname/>\n'
         '  </d:prop>\n'
         '</d:propfind>';
-    final res = await http.Client().send(req).then(http.Response.fromStream);
-    if (res.statusCode != 207 &&
-        (res.statusCode < 200 || res.statusCode >= 300)) {
-      throw Exception('WebDAV test failed: ${res.statusCode}');
+    final client = http.Client();
+    try {
+      final res = await client.send(req).then(http.Response.fromStream);
+      if (res.statusCode != 207 &&
+          (res.statusCode < 200 || res.statusCode >= 300)) {
+        throw Exception('WebDAV test failed: ${res.statusCode}');
+      }
+    } finally {
+      client.close();
     }
   }
 
@@ -2260,9 +2265,14 @@ class DataSync {
   ) async {
     final req = http.Request('DELETE', item.href);
     req.headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)});
-    final res = await http.Client().send(req).then(http.Response.fromStream);
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('Delete failed: ${res.statusCode}');
+    final client = http.Client();
+    try {
+      final res = await client.send(req).then(http.Response.fromStream);
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('Delete failed: ${res.statusCode}');
+      }
+    } finally {
+      client.close();
     }
   }
 
