@@ -1039,6 +1039,7 @@ class HomePageController extends ChangeNotifier {
       _resetMessageJump();
       _restoreMessageUiState();
       _scrollCtrl.positionAtBottomOnOpen();
+      _clearActiveConversationNotification();
     };
     _viewModel.onConversationIdle = () {
       if (!_homeAppVisible) _releaseInactiveMessageCaches();
@@ -1211,8 +1212,24 @@ class HomePageController extends ChangeNotifier {
     final pendingConversationId =
         NotificationService.takePendingConversationId();
     if (pendingConversationId != null) {
-      _handleNotificationConversationTap(pendingConversationId);
+      _pendingNotificationConversationId = pendingConversationId;
     }
+  }
+
+  bool get _isHomeConversationVisible =>
+      _context.mounted &&
+      _homeAppVisible &&
+      _homeRouteVisible &&
+      _homePresentationVisible;
+
+  void _clearNotificationIfVisible(String? conversationId) {
+    if (!_isHomeConversationVisible) return;
+    if (conversationId == null || conversationId.trim().isEmpty) return;
+    unawaited(NotificationService.cancelChatCompleted(conversationId));
+  }
+
+  void _clearActiveConversationNotification() {
+    _clearNotificationIfVisible(currentConversation?.id);
   }
 
   String? _visibleBackgroundConversation() =>
@@ -1240,6 +1257,8 @@ class HomePageController extends ChangeNotifier {
       return;
     }
     _openingNotificationConversation = true;
+    var switched = false;
+    var skippedMissing = false;
     try {
       while (_pendingNotificationConversationId != null &&
           _homeRouteVisible &&
@@ -1248,6 +1267,7 @@ class HomePageController extends ChangeNotifier {
         _pendingNotificationConversationId = null;
         if (_chatService.getConversation(conversationId) == null) {
           NotificationService.takePendingComposerText(conversationId);
+          skippedMissing = true;
           continue;
         }
         if (!_context.mounted || !_homeRouteVisible) {
@@ -1256,6 +1276,7 @@ class HomePageController extends ChangeNotifier {
         }
         onRevealConversation?.call();
         await switchConversationAnimated(conversationId);
+        switched = true;
         if (currentConversation?.id == conversationId) {
           final composerText = NotificationService.takePendingComposerText(
             conversationId,
@@ -1278,6 +1299,8 @@ class HomePageController extends ChangeNotifier {
       _openingNotificationConversation = false;
       if (_pendingNotificationConversationId != null && _context.mounted) {
         unawaited(_openPendingNotificationConversation());
+      } else if (skippedMissing && !switched) {
+        _clearActiveConversationNotification();
       }
     }
   }
@@ -1527,6 +1550,10 @@ class HomePageController extends ChangeNotifier {
           await Future.wait([restoreAssistant, loadWindow]);
           _restoreMessageUiState();
           _scrollCtrl.positionAtBottomOnOpen();
+          if (_pendingNotificationConversationId == null &&
+              currentConversation?.id == recent.id) {
+            _clearNotificationIfVisible(recent.id);
+          }
           notifyListeners();
           _scheduleStartupWarmup();
         } else {
@@ -1857,6 +1884,7 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> toggleTemporaryConversation() async {
     await _viewModel.toggleTemporaryConversation();
+    _clearActiveConversationNotification();
   }
 
   Future<void> cancelQueuedMessage() async {
@@ -2045,6 +2073,7 @@ class HomePageController extends ChangeNotifier {
         unawaited(_forwardConvoFade());
       }
       _appendPendingBrowserTaskDraft(id);
+      _clearNotificationIfVisible(id);
       return;
     }
     _spotlightFade.reset();
@@ -2205,6 +2234,9 @@ class HomePageController extends ChangeNotifier {
     if (currentConversation?.id != null &&
         currentConversation!.id != previousId) {
       _clearSelectionState();
+    }
+    if (_pendingNotificationConversationId == null) {
+      _clearNotificationIfVisible(conversation.id);
     }
     notifyListeners();
     _scrollToBottomSoon(animate: false);
@@ -4345,11 +4377,19 @@ class HomePageController extends ChangeNotifier {
     if (state == AppLifecycleState.resumed) {
       if (_startupWarmupDeferred) _scheduleStartupWarmup();
       ScreenWakelock.reassert();
+      if (_pendingNotificationConversationId == null &&
+          !_openingNotificationConversation) {
+        _clearActiveConversationNotification();
+      }
     }
   }
 
   void onDidPopNext() {
     _homeRouteVisible = true;
+    if (_pendingNotificationConversationId == null &&
+        !_openingNotificationConversation) {
+      _clearActiveConversationNotification();
+    }
     unawaited(_openPendingNotificationConversation());
     if (isDesktopPlatform) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -4373,8 +4413,15 @@ class HomePageController extends ChangeNotifier {
   }
 
   void onHomeVisibilityChanged(bool visible) {
+    final wasVisible = _homePresentationVisible;
     _homePresentationVisible = visible;
     _streamController.setPresentationEnabled(visible && _homeAppVisible);
+    if (visible &&
+        !wasVisible &&
+        _pendingNotificationConversationId == null &&
+        !_openingNotificationConversation) {
+      _clearActiveConversationNotification();
+    }
   }
 
   // ============================================================================
