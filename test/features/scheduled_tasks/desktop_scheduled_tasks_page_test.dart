@@ -20,6 +20,7 @@ import 'package:Kelivo/core/services/scheduled_task_store.dart';
 import 'package:Kelivo/core/services/notification_service.dart';
 import 'package:Kelivo/core/services/scheduled_tasks_service.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
+import 'package:Kelivo/desktop/desktop_settings_navigation_bus.dart';
 import 'package:Kelivo/desktop/setting/scheduled_tasks_pane.dart';
 import 'package:Kelivo/features/home/widgets/assistant_avatar.dart';
 import 'package:Kelivo/features/scheduled_tasks/pages/scheduled_task_editor_page.dart';
@@ -527,6 +528,43 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'a provider link from another tab preserves the open task editor',
+    (tester) async {
+      await pumpApp(tester, menu: true);
+      final tasks = find.text('Scheduled tasks');
+      await tester.ensureVisible(tasks);
+      await tap(tester, tasks);
+      await tap(tester, find.byKey(const ValueKey('scheduled-tasks-action')));
+      final editor = tester.state(find.byType(ScheduledTaskEditorPage));
+      final prompt = find.descendant(
+        of: find.byKey(const ValueKey('scheduled-task-prompt')),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(prompt, 'Keep this unsaved prompt');
+      DesktopSettingsNavigationBus.instance.openProviders(
+        providerKey: 'OpenAI',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find
+            .byKey(const ValueKey('desktop-provider-settings-OpenAI'))
+            .hitTestable(),
+        findsOneWidget,
+      );
+      expect(editor.mounted, isTrue);
+      await tester.tap(find.byTooltip('Close').hitTestable());
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(ScheduledTaskEditorPage)), same(editor));
+      expect(
+        tester.widget<TextField>(prompt).controller!.text,
+        'Keep this unsaved prompt',
+      );
+      await tester.pumpWidget(const SizedBox());
+    },
+    variant: TargetPlatformVariant({TargetPlatform.windows}),
+  );
 
   testWidgets('desktop settings has a scheduled tasks menu entry', (
     tester,

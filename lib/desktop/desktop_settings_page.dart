@@ -123,10 +123,7 @@ part 'setting/display_pane.dart';
 /// Desktop settings layout: left menu + vertical divider + right content.
 /// For now, only the left menu and the Display Settings content are implemented.
 class DesktopSettingsPage extends StatefulWidget {
-  const DesktopSettingsPage({super.key, this.initialProviderKey});
-
-  // Optional: when provided, jump to Providers tab and preselect this provider
-  final String? initialProviderKey;
+  const DesktopSettingsPage({super.key});
 
   @override
   State<DesktopSettingsPage> createState() => _DesktopSettingsPageState();
@@ -161,8 +158,21 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   SettingsSearchItem? _searchTarget;
   int _searchNavigation = 0;
   bool _showTopicPosition = false;
-  bool _selectFal = false;
+  String? _providerKey;
+  int _providerNavigation = 0;
+  GlobalKey<NavigatorState>? _tasksNavigatorKey;
   bool _showDetail = false;
+
+  void _selectMenuItem(_SettingsMenuItem item, {String? providerKey}) {
+    if (_selected != item) {
+      _tasksNavigatorKey = item == _SettingsMenuItem.scheduledTasks
+          ? GlobalKey<NavigatorState>()
+          : null;
+    }
+    _selected = item;
+    _showDetail = true;
+    _providerKey = providerKey;
+  }
 
   Future<void> _openSearch() async {
     final item = await showDesktopSettingsSearch(context);
@@ -204,8 +214,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       ),
     };
     setState(() {
-      _showDetail = true;
-      _selected = menu;
+      _selectMenuItem(menu);
       _searchTarget = item;
       _showTopicPosition = false;
       _searchNavigation++;
@@ -220,29 +229,27 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialProviderKey != null) {
-      // Deep link into Providers tab when a provider is specified
-      _showDetail = true;
-      _selected = _SettingsMenuItem.providers;
-    }
     _settingsNavSub = DesktopSettingsNavigationBus.instance.listenForPane((
       target,
     ) {
+      final providerKey = target.providerKey;
+      // A link from chat can arrive while settings still holds an unsaved task.
+      if (providerKey != null &&
+          _tasksNavigatorKey?.currentState?.canPop() == true) {
+        _showDesktopProviderDialog(context, providerKey);
+        return;
+      }
       setState(() {
-        _showDetail = true;
-        _selected = switch (target) {
-          DesktopSettingsNavigationTarget.topicPosition =>
-            _SettingsMenuItem.display,
-          DesktopSettingsNavigationTarget.backup => _SettingsMenuItem.backup,
-          DesktopSettingsNavigationTarget.mcp => _SettingsMenuItem.mcp,
-          DesktopSettingsNavigationTarget.providers ||
-          DesktopSettingsNavigationTarget.fal => _SettingsMenuItem.providers,
-          DesktopSettingsNavigationTarget.defaultModel =>
-            _SettingsMenuItem.defaultModel,
+        final menu = switch (target.pane) {
+          DesktopSettingsPane.topicPosition => _SettingsMenuItem.display,
+          DesktopSettingsPane.backup => _SettingsMenuItem.backup,
+          DesktopSettingsPane.mcp => _SettingsMenuItem.mcp,
+          DesktopSettingsPane.providers => _SettingsMenuItem.providers,
+          DesktopSettingsPane.defaultModel => _SettingsMenuItem.defaultModel,
         };
-        _showTopicPosition =
-            target == DesktopSettingsNavigationTarget.topicPosition;
-        _selectFal = target == DesktopSettingsNavigationTarget.fal;
+        _selectMenuItem(menu, providerKey: providerKey);
+        if (menu == _SettingsMenuItem.providers) _providerNavigation++;
+        _showTopicPosition = target.pane == DesktopSettingsPane.topicPosition;
         _searchNavigation++;
       });
     });
@@ -296,8 +303,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                 selected: _selected,
                 onSearch: _openSearch,
                 onSelect: (it) => setState(() {
-                  _showDetail = true;
-                  _selected = it;
+                  _selectMenuItem(it);
                   _searchTarget = null;
                 }),
               ),
@@ -328,13 +334,9 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                       );
                     case _SettingsMenuItem.providers:
                       return _DesktopProvidersBody(
-                        key: ValueKey((
-                          'providers',
-                          _selectFal ? _searchNavigation : 0,
-                        )),
-                        initialSelectedKey: _selectFal
-                            ? 'fal'
-                            : widget.initialProviderKey,
+                        key: const ValueKey('providers'),
+                        providerKey: _providerKey,
+                        navigationRevision: _providerNavigation,
                       );
                     case _SettingsMenuItem.defaultModel:
                       return const DesktopDefaultModelPane(
@@ -365,8 +367,9 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                     case _SettingsMenuItem.backup:
                       return const DesktopBackupPane(key: ValueKey('backup'));
                     case _SettingsMenuItem.scheduledTasks:
-                      return const DesktopScheduledTasksPane(
-                        key: ValueKey('scheduledTasks'),
+                      return DesktopScheduledTasksPane(
+                        key: const ValueKey('scheduledTasks'),
+                        navigatorKey: _tasksNavigatorKey,
                       );
                     case _SettingsMenuItem.hotkeys:
                       return const DesktopHotkeysPane(key: ValueKey('hotkeys'));

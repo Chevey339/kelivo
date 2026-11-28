@@ -7,6 +7,10 @@ import "support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
+import 'package:Kelivo/desktop/desktop_settings_navigation_bus.dart';
+import 'package:Kelivo/features/model/widgets/model_select_sheet.dart';
+import 'package:Kelivo/features/settings/widgets/settings_search_entry.dart';
+import 'package:Kelivo/features/settings/widgets/settings_search_view.dart';
 import 'package:Kelivo/desktop/widgets/desktop_form_dialog.dart';
 import 'package:Kelivo/desktop/widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/features/provider/widgets/provider_custom_request_editor.dart';
@@ -48,7 +52,6 @@ ProviderConfig _providerConfig(String id) {
 
 Widget _harness(
   SettingsProvider settings, {
-  required String initialProviderKey,
   TextScaler textScaler = TextScaler.noScaling,
   Widget? body,
 }) {
@@ -67,10 +70,7 @@ Widget _harness(
       ),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(
-        body:
-            body ?? DesktopSettingsPage(initialProviderKey: initialProviderKey),
-      ),
+      home: Scaffold(body: body ?? const DesktopSettingsPage()),
     ),
   );
 }
@@ -98,20 +98,191 @@ Future<void> _pumpProviderSettings(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
+  if (body == null) {
+    DesktopSettingsNavigationBus.instance.openProviders(
+      providerKey: initialProviderKey,
+    );
+  }
   await tester.pumpWidget(
-    _harness(
-      settings,
-      initialProviderKey: initialProviderKey,
-      textScaler: textScaler,
-      body: body,
-    ),
+    _harness(settings, textScaler: textScaler, body: body),
   );
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
 }
 
+Future<void> _tapProviderGear(
+  WidgetTester tester,
+  BuildContext source,
+  String providerKey,
+) async {
+  final l10n = AppLocalizations.of(source)!;
+  final selection = showModelSelector(source);
+  await tester.pumpAndSettle();
+  final search = find.byWidgetPredicate(
+    (w) =>
+        w is TextField &&
+        w.decoration?.hintText == l10n.modelSelectSheetSearchHint,
+  );
+  await tester.enterText(search, providerKey);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byTooltip(l10n.settingsPageTitle).hitTestable());
+  await tester.pumpAndSettle();
+  expect(await selection, isNull);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'model picker opens the chosen provider on the existing desktop route',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await _pumpProviderSettings(tester, settings, width: 480);
+      final source = tester.element(find.byType(DesktopSettingsPage));
+      final route = ModalRoute.of(source)!;
+      final l10n = AppLocalizations.of(source)!;
+      final keyField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.controller?.text == 'test-key',
+      );
+      for (final key in ['ProviderB', 'ProviderA']) {
+        await tester.tap(
+          find.byTooltip(l10n.providerDetailPageShowTooltip).hitTestable(),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(keyField).obscureText, isFalse);
+        await _tapProviderGear(tester, source, key);
+        final detail = find.byType(DesktopProviderDetailPane);
+        expect(
+          tester.widget<DesktopProviderDetailPane>(detail).providerKey,
+          key,
+        );
+        expect(ModalRoute.of(tester.element(detail)), same(route));
+        expect(route.isCurrent, isTrue);
+        expect(tester.widget<TextField>(keyField).obscureText, isTrue);
+      }
+    },
+    variant: TargetPlatformVariant({TargetPlatform.windows}),
+  );
+
+  testWidgets(
+    'other providers opens the list after a fal link in a narrow window',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await _pumpProviderSettings(
+        tester,
+        settings,
+        initialProviderKey: 'fal',
+        width: 480,
+      );
+      final detail = find.byType(DesktopProviderDetailPane);
+      expect(
+        tester.widget<DesktopProviderDetailPane>(detail).providerKey,
+        'fal',
+      );
+      DesktopSettingsNavigationBus.instance.openProviders();
+      await tester.pumpAndSettle();
+      expect(detail, findsNothing);
+      expect(find.text('ProviderB').hitTestable(), findsOneWidget);
+    },
+    variant: TargetPlatformVariant({TargetPlatform.windows}),
+  );
+
+  testWidgets(
+    'settings search preserves a manual provider selection after a deep link',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await settings.setProviderConfig(
+        'ProviderC',
+        _providerConfig('ProviderC'),
+      );
+      await settings.setProvidersOrder(['ProviderA', 'ProviderB', 'ProviderC']);
+      await _pumpProviderSettings(
+        tester,
+        settings,
+        initialProviderKey: 'ProviderB',
+      );
+      await tester.tap(find.text('ProviderC').first);
+      await tester.pumpAndSettle();
+      await settings.removeProviderConfig('ProviderB');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(SettingsSearchEntry));
+      await tester.pumpAndSettle();
+      final search = find.byType(SettingsSearchView);
+      await tester.enterText(
+        find.descendant(of: search, matching: find.byType(TextField)),
+        'providers',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: search,
+          matching: find.byKey(const ValueKey('providers')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      String selectedProvider() => tester
+          .widget<DesktopProviderDetailPane>(
+            find.byType(DesktopProviderDetailPane),
+          )
+          .providerKey;
+      expect(selectedProvider(), 'ProviderC');
+      await settings.removeProviderConfig('ProviderC');
+      await tester.pumpAndSettle();
+      expect(selectedProvider(), 'ProviderA');
+    },
+    variant: TargetPlatformVariant({TargetPlatform.windows}),
+  );
+
+  testWidgets(
+    'provider settings opened over an editor return to its unsaved draft',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await _pumpProviderSettings(tester, settings);
+      final source = tester.element(find.byType(DesktopSettingsPage));
+      final draft = TextEditingController();
+      addTearDown(draft.dispose);
+      final editor = showDialog<void>(
+        context: source,
+        builder: (_) => Dialog(child: TextField(controller: draft)),
+      );
+      await tester.pumpAndSettle();
+      final field = find.byWidgetPredicate(
+        (w) => w is TextField && w.controller == draft,
+      );
+      await tester.enterText(field, 'unsaved task');
+      final editorContext = tester.element(field);
+      await _tapProviderGear(tester, editorContext, 'ProviderB');
+      expect(
+        find
+            .byKey(const ValueKey('desktop-provider-settings-ProviderB'))
+            .hitTestable(),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byTooltip(AppLocalizations.of(source)!.commonClose).hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      expect(ModalRoute.of(editorContext)!.isCurrent, isTrue);
+      expect(draft.text, 'unsaved task');
+      Navigator.of(editorContext).pop();
+      await tester.pumpAndSettle();
+      await editor;
+      expect(
+        tester
+            .widget<DesktopProviderDetailPane>(
+              find.byType(DesktopProviderDetailPane),
+            )
+            .providerKey,
+        'ProviderA',
+      );
+    },
+    variant: TargetPlatformVariant({TargetPlatform.windows}),
+  );
 
   testWidgets(
     'global balance defaults are reachable by keyboard from the provider list',

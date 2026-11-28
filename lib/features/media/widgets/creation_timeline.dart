@@ -498,12 +498,9 @@ class CreationEmptyState extends StatelessWidget {
 
   void _provider(BuildContext context, {bool fal = false}) {
     if (desktop) {
-      final navigation = DesktopSettingsNavigationBus.instance;
-      if (fal) {
-        navigation.openFal();
-      } else {
-        navigation.openProviders();
-      }
+      DesktopSettingsNavigationBus.instance.openProviders(
+        providerKey: fal ? 'fal' : null,
+      );
       return;
     }
     final page = fal

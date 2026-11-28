@@ -2,9 +2,51 @@ part of '../desktop_settings_page.dart';
 
 // ===== Providers (Desktop right content) =====
 
+void openDesktopProviderSettings(BuildContext context, String providerKey) {
+  final route = ModalRoute.of(context);
+  if (route != null &&
+      route.isFirst &&
+      route.isCurrent &&
+      route.navigator == Navigator.of(context, rootNavigator: true)) {
+    DesktopSettingsNavigationBus.instance.openProviders(
+      providerKey: providerKey,
+    );
+    return;
+  }
+
+  _showDesktopProviderDialog(context, providerKey);
+}
+
+// Keep an open editor and its unsaved changes underneath the provider details.
+void _showDesktopProviderDialog(BuildContext context, String providerKey) {
+  unawaited(
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => DesktopFormDialog(
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 800),
+        child: Column(
+          children: [
+            DesktopFormDialogHeader(
+              title: AppLocalizations.of(ctx)!.settingsPageProviders,
+              closeTooltip: AppLocalizations.of(ctx)!.commonClose,
+              onClose: () => Navigator.of(ctx).pop(),
+            ),
+            Expanded(child: _DesktopProvidersBody(providerKey: providerKey)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _DesktopProvidersBody extends StatefulWidget {
-  const _DesktopProvidersBody({super.key, this.initialSelectedKey});
-  final String? initialSelectedKey;
+  const _DesktopProvidersBody({
+    super.key,
+    this.providerKey,
+    this.navigationRevision = 0,
+  });
+  final String? providerKey;
+  final int navigationRevision;
   @override
   State<_DesktopProvidersBody> createState() => _DesktopProvidersBodyState();
 }
@@ -15,7 +57,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   static const Duration _groupReorderCollapseDelay = Duration(milliseconds: 32);
 
   String? _selectedKey;
-  final GlobalKey<_DesktopProviderDetailPaneState> _detailKey =
+  GlobalKey<_DesktopProviderDetailPaneState> _detailKey =
       GlobalKey<_DesktopProviderDetailPaneState>();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -30,8 +72,33 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   @override
   void initState() {
     super.initState();
-    _showDetail = widget.initialSelectedKey != null;
+    _selectedKey = widget.providerKey;
+    _showDetail = _selectedKey != null;
     unawaited(ModelCatalogService.instance.ensureLoaded());
+  }
+
+  @override
+  void didUpdateWidget(covariant _DesktopProvidersBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.navigationRevision == widget.navigationRevision) return;
+    final key = widget.providerKey;
+    if (key != null) _resetDetailFor(key);
+    _showDetail = key != null;
+    _searchQuery = '';
+    _searchController.clear();
+  }
+
+  void _resetDetailFor(String? providerKey) {
+    _selectedKey = providerKey;
+    // Revealed credentials, filters and in-flight controls belong to this provider.
+    _detailKey = GlobalKey<_DesktopProviderDetailPaneState>();
+  }
+
+  void _openProvider(String providerKey) {
+    setState(() {
+      if (_selectedKey != providerKey) _resetDetailFor(providerKey);
+      _showDetail = true;
+    });
   }
 
   @override
@@ -209,7 +276,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   Widget _buildDesktopProviderRow({
     required ({String name, String key}) item,
     required SettingsProvider settings,
-    required List<({String name, String key})> ordered,
     required Set<String> baseKeys,
     required ColorScheme colorScheme,
   }) {
@@ -228,24 +294,15 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
           (cfg.oauthCredentials == null || cfg.oauthCredentials!.requiresLogin),
       selected: selected,
       background: bg,
-      onTap: () => setState(() {
-        _selectedKey = item.key;
-        _showDetail = true;
-      }),
+      onTap: () => _openProvider(item.key),
       onEdit: () {
-        setState(() {
-          _selectedKey = item.key;
-          _showDetail = true;
-        });
+        _openProvider(item.key);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _detailKey.currentState?._showProviderSettingsDialog(context);
         });
       },
       onShare: () {
-        setState(() {
-          _selectedKey = item.key;
-          _showDetail = true;
-        });
+        _openProvider(item.key);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _showShareDialog(
             item.key,
@@ -296,12 +353,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                 );
               } catch (_) {}
               await settings.removeProviderConfig(item.key);
-              if (!mounted) return;
-              setState(() {
-                if (_selectedKey == item.key) {
-                  _selectedKey = ordered.isNotEmpty ? ordered.first.key : null;
-                }
-              });
             },
     );
   }
@@ -374,9 +425,9 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
           )
         : const <_DesktopProviderGroupingRowVM>[];
 
-    _selectedKey ??=
-        (widget.initialSelectedKey ??
-        (ordered.isNotEmpty ? ordered.first.key : null));
+    if (!baseKeys.contains(_selectedKey) && !cfgs.containsKey(_selectedKey)) {
+      _resetDetailFor(ordered.firstOrNull?.key);
+    }
     final selectedKey = _selectedKey;
     final selectedName = cfgs[selectedKey]?.name;
     final rightPane = selectedKey == null
@@ -465,10 +516,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                             if (!mounted || keys == null || keys.isEmpty) {
                               return;
                             }
-                            setState(() {
-                              _selectedKey = keys.first;
-                              _showDetail = true;
-                            });
+                            _openProvider(keys.first);
                           },
                         ),
                       ),
@@ -691,7 +739,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                                 ? _buildDesktopProviderRow(
                                                     item: row.item,
                                                     settings: settings,
-                                                    ordered: ordered,
                                                     baseKeys: baseKeys,
                                                     colorScheme: cs,
                                                   )
@@ -701,7 +748,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                                         _buildDesktopProviderRow(
                                                           item: row.item,
                                                           settings: settings,
-                                                          ordered: ordered,
                                                           baseKeys: baseKeys,
                                                           colorScheme: cs,
                                                         ),
@@ -744,7 +790,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                               final row = _buildDesktopProviderRow(
                                 item: item,
                                 settings: settings,
-                                ordered: ordered,
                                 baseKeys: baseKeys,
                                 colorScheme: cs,
                               );
@@ -774,10 +819,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                       );
                       if (!mounted) return;
                       if (created != null && created.isNotEmpty) {
-                        setState(() {
-                          _selectedKey = created;
-                          _showDetail = true;
-                        });
+                        _openProvider(created);
                       }
                     },
                   ),

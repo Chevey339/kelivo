@@ -32,22 +32,15 @@ import '../theme/surface_ladder.dart';
 /// Desktop home screen: left compact rail + main content.
 /// Phase 1 focuses on structure and platform-appropriate interactions/hover.
 class DesktopHomePage extends StatefulWidget {
-  const DesktopHomePage({
-    super.key,
-    this.initialTab = DesktopTab.chat,
-    this.initialProviderKey,
-  });
-
-  final DesktopTab initialTab;
-  final String? initialProviderKey;
+  const DesktopHomePage({super.key});
 
   @override
   State<DesktopHomePage> createState() => _DesktopHomePageState();
 }
 
 class _DesktopHomePageState extends State<DesktopHomePage> {
-  late DesktopTab _activeTab;
-  final _visitedTabs = <DesktopTab>{};
+  DesktopTab _activeTab = DesktopTab.chat;
+  final _visitedTabs = <DesktopTab>{DesktopTab.chat};
   bool _customizeSidebarOpen = false;
   bool _navigationOpen = false;
   bool _globalSearchActive = false;
@@ -61,8 +54,6 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   @override
   void initState() {
     super.initState();
-    _activeTab = widget.initialTab;
-    _visitedTabs.add(_activeTab);
     _conversationOpenSub = NotificationService.conversationTaps.listen((_) {
       if (!mounted) return;
       setState(() {
@@ -72,11 +63,9 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
     });
     // 初始进入时如果就是聊天页，则聚焦聊天输入框
-    if (_activeTab == DesktopTab.chat) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ChatActionBus.instance.fire(ChatAction.focusInput);
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ChatActionBus.instance.fire(ChatAction.focusInput);
+    });
     // Listen to global hotkey actions affecting the main tabs/window
     _hotkeySub = HotkeyEventBus.instance.stream.listen((action) async {
       switch (action) {
@@ -278,9 +267,8 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
         embedded: true,
         active: _activeTab == tab,
       ),
-      DesktopTab.settings => DesktopSettingsPage(
-        key: const ValueKey('settings_page'),
-        initialProviderKey: widget.initialProviderKey,
+      DesktopTab.settings => const DesktopSettingsPage(
+        key: ValueKey('settings_page'),
       ),
     };
   }

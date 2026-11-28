@@ -21,8 +21,8 @@ import '../../home/widgets/model_icon.dart';
 import '../../../utils/provider_grouping_logic.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
-import '../../../desktop/desktop_home_page.dart' show DesktopHomePage;
-import '../../../desktop/desktop_tab.dart' show DesktopTab;
+import '../../../desktop/desktop_settings_page.dart'
+    show openDesktopProviderSettings;
 import '../../home/controllers/home_page_controller.dart';
 import '../../home/utils/model_display_helper.dart';
 import '../../provider/widgets/provider_avatar.dart';
@@ -1746,6 +1746,10 @@ Future<ModelSelection?> _showDesktopModelSelector(
     barrierLabel: 'model-select-desktop',
     barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) => _DesktopModelSelectDialogBody(
+      onOpenProvider: (providerKey) {
+        Navigator.of(ctx).pop();
+        if (context.mounted) openDesktopProviderSettings(context, providerKey);
+      },
       limitProviderKey: limitProviderKey,
       creationSlot: creationSlot,
       initialProviderKey: initialProviderKey,
@@ -1768,6 +1772,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
 
 class _DesktopModelSelectDialogBody extends StatefulWidget {
   const _DesktopModelSelectDialogBody({
+    required this.onOpenProvider,
     this.limitProviderKey,
     this.creationSlot,
     this.initialProviderKey,
@@ -1775,6 +1780,7 @@ class _DesktopModelSelectDialogBody extends StatefulWidget {
     this.allowInherit = false,
     this.inheritLabel,
   });
+  final ValueChanged<String> onOpenProvider;
   final String? limitProviderKey;
   final CreationModelSlot? creationSlot;
   final String? initialProviderKey;
@@ -2450,34 +2456,7 @@ class _DesktopModelSelectDialogBodyState
                 icon: Lucide.Settings2,
                 size: 16,
                 color: cs.onSurface.withValues(alpha: 0.8),
-                onTap: () async {
-                  final nav = Navigator.of(context);
-                  // Close model dialog first
-                  nav.pop();
-                  // Then navigate to DesktopHomePage with Settings tab open and provider preselected
-                  Future.microtask(() {
-                    nav.push(
-                      PageRouteBuilder(
-                        pageBuilder: (_, __, ___) => DesktopHomePage(
-                          initialTab: DesktopTab.settings,
-                          initialProviderKey: providerKey,
-                        ),
-                        transitionDuration: const Duration(milliseconds: 220),
-                        reverseTransitionDuration: const Duration(
-                          milliseconds: 200,
-                        ),
-                        transitionsBuilder: (ctx, anim, sec, child) {
-                          final curved = CurvedAnimation(
-                            parent: anim,
-                            curve: Curves.easeOutCubic,
-                            reverseCurve: Curves.easeInCubic,
-                          );
-                          return FadeTransition(opacity: curved, child: child);
-                        },
-                      ),
-                    );
-                  });
-                },
+                onTap: () => widget.onOpenProvider(providerKey),
               ),
             ),
         ],

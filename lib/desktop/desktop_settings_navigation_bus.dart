@@ -1,13 +1,11 @@
 import 'dart:async';
 
-enum DesktopSettingsNavigationTarget {
-  backup,
-  mcp,
-  topicPosition,
-  providers,
-  fal,
-  defaultModel,
-}
+enum DesktopSettingsPane { backup, mcp, topicPosition, providers, defaultModel }
+
+typedef DesktopSettingsNavigationTarget = ({
+  DesktopSettingsPane pane,
+  String? providerKey,
+});
 
 class DesktopSettingsNavigationBus {
   DesktopSettingsNavigationBus._();
@@ -36,17 +34,16 @@ class DesktopSettingsNavigationBus {
     return subscription;
   }
 
-  void _open(DesktopSettingsNavigationTarget target) {
+  void _open(DesktopSettingsPane pane, {String? providerKey}) {
+    final target = (pane: pane, providerKey: providerKey);
     _pending = target;
     _controller.add(target);
   }
 
-  void openTopicPosition() =>
-      _open(DesktopSettingsNavigationTarget.topicPosition);
-  void openBackup() => _open(DesktopSettingsNavigationTarget.backup);
-  void openMcp() => _open(DesktopSettingsNavigationTarget.mcp);
-  void openProviders() => _open(DesktopSettingsNavigationTarget.providers);
-  void openFal() => _open(DesktopSettingsNavigationTarget.fal);
-  void openDefaultModel() =>
-      _open(DesktopSettingsNavigationTarget.defaultModel);
+  void openTopicPosition() => _open(DesktopSettingsPane.topicPosition);
+  void openBackup() => _open(DesktopSettingsPane.backup);
+  void openMcp() => _open(DesktopSettingsPane.mcp);
+  void openProviders({String? providerKey}) =>
+      _open(DesktopSettingsPane.providers, providerKey: providerKey);
+  void openDefaultModel() => _open(DesktopSettingsPane.defaultModel);
 }
