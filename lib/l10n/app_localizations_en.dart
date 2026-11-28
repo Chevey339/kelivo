@@ -736,6 +736,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpWorkspaceBindingLabel => 'Bind workspace (optional)';
 
   @override
+  String get mcpFollowConversationWorkspace => 'Follow conversation workspace';
+
+  @override
+  String mcpFollowConversationWorkspaceHint(int limit) {
+    return 'Mount this chat’s workspace at /workspace. An unbound chat starts without a workspace mount. Up to $limit processes are shared across servers in this mode. Idle processes close automatically.';
+  }
+
+  @override
+  String get mcpStatusOnDemand => 'Starts on demand';
+
+  @override
   String get mcpWorkspaceBindingHint =>
       'The server can access this workspace at /workspace. Leave Working Directory empty to start there. The binding stays fixed when you switch chats.';
 

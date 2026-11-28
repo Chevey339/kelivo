@@ -7,6 +7,7 @@ import '../../../theme/design_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../theme/app_font_weights.dart';
+import 'mcp_server_avatar.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 Future<void> showConversationMcpSheet(
@@ -36,9 +37,7 @@ class _ConversationMcpSheet extends StatelessWidget {
     final chat = context.watch<ChatService>();
 
     final selected = chat.getConversationMcpServers(conversationId).toSet();
-    final servers = mcp.servers
-        .where((s) => mcp.statusFor(s.id) == McpStatus.connected)
-        .toList();
+    final servers = mcp.servers.where(mcp.canSelectServer).toList();
 
     Widget tag(String text) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -149,7 +148,15 @@ class _ConversationMcpSheet extends StatelessWidget {
                         controller: controller,
                         itemBuilder: (context, index) {
                           final s = servers[index];
-                          final tools = s.tools;
+                          final scope = s.scopeFor(
+                            chat.getConversation(conversationId),
+                          );
+                          final status = scope == null
+                              ? mcp.statusFor(s.id)
+                              : mcp.statusForScope(scope);
+                          final tools = scope == null
+                              ? s.declaredTools
+                              : mcp.cachedWorkspaceTools(scope);
                           final enabledTools = tools
                               .where((t) => t.enabled)
                               .length;
@@ -247,14 +254,22 @@ class _ConversationMcpSheet extends StatelessWidget {
                                               runSpacing: 6,
                                               children: [
                                                 tag(
-                                                  l10n.mcpConversationSheetConnected,
+                                                  status == McpStatus.connected
+                                                      ? l10n.mcpConversationSheetConnected
+                                                      : mcpStatusLabel(
+                                                          l10n,
+                                                          status,
+                                                        ),
                                                 ),
-                                                tag(
-                                                  l10n.mcpConversationSheetToolsCount(
-                                                    enabledTools,
-                                                    tools.length,
+                                                if (scope == null ||
+                                                    status ==
+                                                        McpStatus.connected)
+                                                  tag(
+                                                    l10n.mcpConversationSheetToolsCount(
+                                                      enabledTools,
+                                                      tools.length,
+                                                    ),
                                                   ),
-                                                ),
                                                 tag(
                                                   s.transport ==
                                                           McpTransportType

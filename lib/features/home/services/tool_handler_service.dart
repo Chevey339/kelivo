@@ -265,17 +265,31 @@ class ToolHandlerService {
   // Tool Definitions Builder
   // ============================================================================
 
-  McpToolRouteSnapshot captureMcpToolRoutes(
+  Future<McpToolRouteSnapshot> captureMcpToolRoutes(
     Assistant? assistant, {
     String? conversationId,
-  }) {
-    return contextProvider.read<McpToolService>().captureRoutesForAssistant(
-      contextProvider.read<McpProvider>(),
-      contextProvider.read<AssistantProvider>(),
+    bool discoverWorkspaceTools = false,
+  }) async {
+    final service = contextProvider.read<McpToolService>();
+    final provider = contextProvider.read<McpProvider>();
+    final assistants = contextProvider.read<AssistantProvider>();
+    final conversation = conversationId == null
+        ? null
+        : contextProvider.read<ChatService>().getConversation(conversationId);
+    if (discoverWorkspaceTools) {
+      return service.prepareRoutesForAssistant(
+        provider,
+        assistants,
+        assistantId: assistant?.id,
+        conversation: conversation,
+        reservedNames: BuiltInToolNames.all,
+      );
+    }
+    return service.captureRoutesForAssistant(
+      provider,
+      assistants,
       assistantId: assistant?.id,
-      conversation: conversationId == null
-          ? null
-          : contextProvider.read<ChatService>().getConversation(conversationId),
+      conversation: conversation,
       reservedNames: BuiltInToolNames.all,
     );
   }
@@ -590,27 +604,34 @@ class ToolHandlerService {
         }
       }
 
-      checkEnabled();
-      await permission.authorize(
-        needed: toolSvc.toolNeedsApprovalForAssistant(
-          mcp,
-          assistantProvider,
-          assistantId: assistant?.id,
-          conversation: conversationId == null
-              ? null
-              : permissionChat?.getConversation(conversationId),
-          toolName: name,
-          routeSnapshot: routes,
-          reservedNames: BuiltInToolNames.all,
-        ),
-        arguments: args,
+      bool needsApproval() => toolSvc.toolNeedsApprovalForAssistant(
+        mcp,
+        assistantProvider,
+        assistantId: assistant?.id,
+        conversation: conversationId == null
+            ? null
+            : permissionChat?.getConversation(conversationId),
+        toolName: name,
+        routeSnapshot: routes,
+        reservedNames: BuiltInToolNames.all,
       );
       checkEnabled();
+      final needed = needsApproval();
+      await permission.authorize(needed: needed, arguments: args);
+      checkEnabled();
+      if (!needed && needsApproval()) {
+        await permission.authorize(needed: true, arguments: args);
+        checkEnabled();
+      }
       return toolSvc.callToolForAssistant(
         mcp,
         assistantProvider,
         assistantId: assistant?.id,
         conversation: conversationId == null
+            ? null
+            : permissionChat?.getConversation(conversationId),
+        checkPermission: permission.checkAuthorized,
+        readConversation: () => conversationId == null
             ? null
             : permissionChat?.getConversation(conversationId),
         toolName: name,

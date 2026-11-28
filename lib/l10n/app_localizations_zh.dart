@@ -707,6 +707,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpWorkspaceBindingLabel => '绑定工作区（可选）';
 
   @override
+  String get mcpFollowConversationWorkspace => '跟随对话工作区';
+
+  @override
+  String mcpFollowConversationWorkspaceHint(int limit) {
+    return '将此对话的工作区挂载到 /workspace。未绑定工作区的对话不挂载目录。所有跟随模式的服务最多共用 $limit 个进程，空闲进程会自动关闭。';
+  }
+
+  @override
+  String get mcpStatusOnDemand => '按需启动';
+
+  @override
   String get mcpWorkspaceBindingHint =>
       '服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。';
 
@@ -18640,6 +18651,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpWorkspaceBindingLabel => '绑定工作区（可选）';
 
   @override
+  String get mcpFollowConversationWorkspace => '跟随对话工作区';
+
+  @override
+  String mcpFollowConversationWorkspaceHint(int limit) {
+    return '将此对话的工作区挂载到 /workspace。未绑定工作区的对话不挂载目录。所有跟随模式的服务最多共用 $limit 个进程，空闲进程会自动关闭。';
+  }
+
+  @override
+  String get mcpStatusOnDemand => '按需启动';
+
+  @override
   String get mcpWorkspaceBindingHint =>
       '服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。';
 
@@ -36571,6 +36593,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpWorkspaceBindingLabel => '綁定工作區（可選）';
+
+  @override
+  String get mcpFollowConversationWorkspace => '跟隨對話工作區';
+
+  @override
+  String mcpFollowConversationWorkspaceHint(int limit) {
+    return '將此對話的工作區掛載到 /workspace。未綁定工作區的對話不會掛載目錄。此模式下，所有跟隨模式的伺服器最多共用 $limit 個程序，閒置程序會自動關閉。';
+  }
+
+  @override
+  String get mcpStatusOnDemand => '按需啟動';
 
   @override
   String get mcpWorkspaceBindingHint =>

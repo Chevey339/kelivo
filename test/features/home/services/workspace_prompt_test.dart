@@ -79,6 +79,7 @@ class _PackedGenerationService extends MessageGenerationService {
     Set<String> imageFilteredRevisions = const {},
     String? requiredAttachmentMessageId,
     bool syncWorkspaceAttachments = true,
+    bool discoverWorkspaceTools = false,
     bool persistWorldBookActivation = true,
     void Function(int before, int after)? onWorldBookActivationPersisted,
   }) async => packed;

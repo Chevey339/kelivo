@@ -721,6 +721,17 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mcpWorkspaceBindingLabel => '작업 공간 바인딩 (선택 사항)';
 
   @override
+  String get mcpFollowConversationWorkspace => '대화 작업 공간 따르기';
+
+  @override
+  String mcpFollowConversationWorkspaceHint(int limit) {
+    return '이 채팅의 작업 공간을 /workspace에 마운트합니다. 작업 공간이 연결되지 않은 채팅은 작업 공간 마운트 없이 시작됩니다. 이 모드에서는 서버 전체에서 최대 $limit개의 프로세스가 공유됩니다. 유휴 프로세스는 자동으로 종료됩니다.';
+  }
+
+  @override
+  String get mcpStatusOnDemand => '필요 시 시작';
+
+  @override
   String get mcpWorkspaceBindingHint =>
       '서버는 /workspace에서 이 작업 공간에 접근할 수 있습니다. 작업 디렉터리를 비워 두면 해당 디렉터리에서 시작합니다. 채팅을 전환해도 바인딩은 유지됩니다.';
 

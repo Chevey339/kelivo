@@ -14,9 +14,13 @@ class McpWorkspaceBindingField extends StatelessWidget {
     super.key,
     required this.workspaceId,
     required this.onChanged,
+    required this.followConversation,
+    required this.onFollowChanged,
   });
 
   final String? workspaceId;
+  final bool followConversation;
+  final ValueChanged<bool> onFollowChanged;
   final ValueChanged<String?> onChanged;
 
   @override
@@ -24,7 +28,9 @@ class McpWorkspaceBindingField extends StatelessWidget {
     final supported = context
         .watch<McpProvider>()
         .supportsStdioWorkspaceBinding;
-    if (!supported && workspaceId == null) return const SizedBox.shrink();
+    if (!supported && workspaceId == null && !followConversation) {
+      return const SizedBox.shrink();
+    }
     final workspaces = context.watch<WorkspaceProvider?>();
     final workspace = workspaceId == null
         ? null
@@ -35,43 +41,55 @@ class McpWorkspaceBindingField extends StatelessWidget {
       children: [
         SectionCard(
           children: [
-            IosNavRow(
-              key: const ValueKey('mcp-workspace-binding'),
-              icon: Lucide.FolderCode,
-              label: l10n.mcpWorkspaceBindingLabel,
-              subtitle:
-                  workspace?.name ??
-                  (workspaceId == null
-                      ? l10n.workspaceEntryNone
-                      : l10n.workspaceFilesMissingWorkspace),
-              onTap: !supported
-                  ? null
-                  : () async {
-                      await workspaces!.loaded;
-                      if (!context.mounted) return;
-                      final chosen = await pickWorkspaceForConversation(
-                        context,
-                        selectedId: workspaceId,
-                      );
-                      if (context.mounted && chosen != null) {
-                        onChanged(chosen.id);
-                      }
-                    },
-            ),
-            if (workspaceId != null)
+            if (!followConversation)
+              IosNavRow(
+                key: const ValueKey('mcp-workspace-binding'),
+                icon: Lucide.FolderCode,
+                label: l10n.mcpWorkspaceBindingLabel,
+                subtitle:
+                    workspace?.name ??
+                    (workspaceId == null
+                        ? l10n.workspaceEntryNone
+                        : l10n.workspaceFilesMissingWorkspace),
+                onTap: !supported
+                    ? null
+                    : () async {
+                        await workspaces!.loaded;
+                        if (!context.mounted) return;
+                        final chosen = await pickWorkspaceForConversation(
+                          context,
+                          selectedId: workspaceId,
+                        );
+                        if (context.mounted && chosen != null) {
+                          onChanged(chosen.id);
+                        }
+                      },
+              ),
+            if (!followConversation && workspaceId != null)
               IosNavRow(
                 key: const ValueKey('mcp-workspace-unbind'),
                 icon: Lucide.Unlink,
                 label: l10n.workspaceEntryUnbind,
                 onTap: () => onChanged(null),
               ),
+            if (supported || followConversation)
+              IosSwitchRow(
+                key: const ValueKey('mcp-follow-workspace'),
+                label: l10n.mcpFollowConversationWorkspace,
+                value: followConversation,
+                onChanged: onFollowChanged,
+              ),
           ],
         ),
         const SizedBox(height: 8),
         Text(
-          supported
-              ? l10n.mcpWorkspaceBindingHint
-              : l10n.mcpWorkspaceBindingMobileOnly,
+          !supported
+              ? l10n.mcpWorkspaceBindingMobileOnly
+              : followConversation
+              ? l10n.mcpFollowConversationWorkspaceHint(
+                  McpProvider.workspaceProcessLimit,
+                )
+              : l10n.mcpWorkspaceBindingHint,
           style: TextStyle(
             fontSize: 12,
             color: Theme.of(context).colorScheme.onSurfaceVariant,

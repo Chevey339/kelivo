@@ -447,13 +447,26 @@ class ChatInputSection extends StatelessWidget {
     final servers = mcp.servers.where(
       (s) => s.enabled && selected.contains(s.id),
     );
+    final targetWorkspace =
+        conversationId != null &&
+            servers.any((s) => s.followConversationWorkspace)
+        ? context.select<ChatService?, String?>(
+            (chat) =>
+                chat
+                        ?.getConversation(conversationId!)
+                        ?.extras[WorkspaceBinding.keyId]
+                    as String?,
+          )
+        : null;
     return (
       active:
           workspaceBound ||
           (a?.localToolIds.isNotEmpty ?? false) ||
           servers.isNotEmpty,
       connectionIssue: servers.any(
-        (s) => switch (mcp.statusFor(s.id)) {
+        (s) => switch (s.followConversationWorkspace && conversationId != null
+            ? mcp.statusForScope((serverId: s.id, workspaceId: targetWorkspace))
+            : mcp.statusFor(s.id)) {
           McpStatus.idle ||
           McpStatus.error ||
           McpStatus.needsAuthorization => true,

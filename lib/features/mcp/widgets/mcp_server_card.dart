@@ -54,15 +54,7 @@ class McpServerCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final statusText = !server.enabled
         ? l10n.mcpPageStatusDisabled
-        : switch (status) {
-            McpStatus.connected => l10n.mcpPageStatusConnected,
-            McpStatus.connecting => l10n.mcpPageStatusConnecting,
-            McpStatus.authorizing => l10n.mcpPageStatusAuthorizing,
-            McpStatus.needsAuthorization =>
-              l10n.mcpPageStatusAuthorizationRequired,
-            McpStatus.error => l10n.mcpPageStatusFailed,
-            McpStatus.idle => l10n.mcpPageStatusDisconnected,
-          };
+        : mcpStatusLabel(l10n, status);
     final transport = switch (server.transport) {
       McpTransportType.sse => l10n.mcpTransportTagSse,
       McpTransportType.http => l10n.mcpTransportTagHttp,

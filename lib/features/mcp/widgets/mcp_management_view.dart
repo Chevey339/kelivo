@@ -372,8 +372,8 @@ class _McpManagementViewState extends State<McpManagementView> {
     final mcp = context.read<McpProvider>();
     final message = mcp.errorFor(server.id);
     Future<void> reconnect(BuildContext ctx) async {
-      await mcp.reconnect(server.id);
-      if (mcp.isConnected(server.id) && ctx.mounted) Navigator.of(ctx).pop();
+      final recovered = await mcp.reconnect(server.id);
+      if (recovered && ctx.mounted) Navigator.of(ctx).pop();
     }
 
     if (widget.desktop) {

@@ -84,6 +84,13 @@ Future<Map<String, Object?>> runScheduledTask(
     cancellation.check();
     final server = mcp.getById(id);
     if (server == null || !server.enabled) continue;
+    if (server.followConversationWorkspace) {
+      await mcp.discoverWorkspaceTools((
+        serverId: id,
+        workspaceId: workspaceId,
+      ), refresh: true);
+      continue;
+    }
     await mcp.connect(id);
     cancellation.check();
     // connect() starts tool discovery without waiting for the cached snapshot.

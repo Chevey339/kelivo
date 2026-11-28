@@ -190,6 +190,7 @@ class MessageGenerationService {
     Set<String> imageFilteredRevisions = const {},
     String? requiredAttachmentMessageId,
     bool syncWorkspaceAttachments = true,
+    bool discoverWorkspaceTools = false,
     bool persistWorldBookActivation = true,
     void Function(int before, int after)? onWorldBookActivationPersisted,
   }) async {
@@ -382,9 +383,12 @@ class MessageGenerationService {
       afterNewSection: addedWorkspace || addedSkills,
     );
 
-    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
+    final mcpRouteSnapshot = await generationController.captureMcpToolRoutes(
       assistant,
       conversationId: currentConversation?.id,
+      discoverWorkspaceTools:
+          discoverWorkspaceTools &&
+          ModelSpecResolver.instance.spec(cfg, modelId).supportsTool,
     );
     final toolDefs = generationController.buildToolDefinitions(
       settings,
@@ -761,6 +765,7 @@ class MessageGenerationService {
     final requestMessages = excludedAttachments.messages;
     final packed = await assembleUnprocessedRequestContext(
       messages: requestMessages,
+      discoverWorkspaceTools: true,
       imageFilteredRevisions: excludedAttachments.affectedRevisions,
       versionSelections: versionSelections,
       currentConversation: currentConversation,

@@ -19,34 +19,39 @@ class McpToolConnectionStatus extends StatelessWidget {
     super.key,
     required this.serverId,
     this.desktop = false,
+    this.scope,
   });
 
   final String serverId;
   final bool desktop;
+  final McpWorkspaceScope? scope;
 
   @override
   Widget build(BuildContext context) {
     final mcp = context.watch<McpProvider>();
     final server = mcp.getById(serverId);
-    final status = mcp.statusFor(serverId);
-    if (server == null || status == McpStatus.connected) {
+    final target = scope;
+    final status = target == null
+        ? mcp.statusFor(serverId)
+        : mcp.statusForScope(target);
+    if (server == null ||
+        status == McpStatus.connected ||
+        status == McpStatus.onDemand) {
       return const SizedBox.shrink();
     }
     final l10n = AppLocalizations.of(context)!;
     final busy =
         status == McpStatus.connecting || status == McpStatus.authorizing;
-    final label = switch (status) {
-      McpStatus.idle => l10n.mcpPageStatusDisconnected,
-      McpStatus.connecting => l10n.mcpPageStatusConnecting,
-      McpStatus.authorizing => l10n.mcpPageStatusAuthorizing,
-      McpStatus.needsAuthorization => l10n.mcpPageStatusAuthorizationRequired,
-      _ => l10n.mcpPageStatusFailed,
-    };
-    final error = mcp.errorFor(serverId);
+    final label = mcpStatusLabel(l10n, status);
+    final error = target == null
+        ? mcp.errorFor(serverId)
+        : mcp.errorForScope(target);
     Future<void> recover() async {
       try {
         if (status == McpStatus.needsAuthorization) {
           await mcp.authorize(serverId);
+        } else if (target != null) {
+          await mcp.retryScope(target);
         } else {
           await mcp.reconnect(serverId);
         }

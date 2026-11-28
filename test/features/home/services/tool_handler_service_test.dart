@@ -582,7 +582,7 @@ void main() {
               tools: [McpToolConfig(enabled: true, name: bare)],
             ),
           );
-          final routes = service.captureMcpToolRoutes(assistant);
+          final routes = await service.captureMcpToolRoutes(assistant);
           final definitions = service.buildToolDefinitions(
             settings,
             assistant,
@@ -699,7 +699,7 @@ void main() {
           final service = ToolHandlerService(
             contextProvider: tester.element(find.byType(SizedBox)),
           );
-          final snapshot = service.captureMcpToolRoutes(
+          final snapshot = await service.captureMcpToolRoutes(
             assistants.getById(assistantId),
             conversationId: 'conv-1',
           );

@@ -13,9 +13,7 @@ class _McpTab extends StatelessWidget {
     final assistant = ap.getById(assistantId)!;
 
     final selected = assistant.mcpServerIds.toSet();
-    final servers = mcp.servers
-        .where((server) => mcp.statusFor(server.id) == McpStatus.connected)
-        .toList();
+    final servers = mcp.servers.where(mcp.canSelectServer).toList();
 
     Future<void> updateSelected(Set<String> ids) {
       return context.read<AssistantProvider>().updateAssistant(

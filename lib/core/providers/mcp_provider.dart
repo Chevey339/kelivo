@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:collection/collection.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../database/business_preferences.dart';
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
@@ -12,10 +13,14 @@ import '../services/mcp/workspace_stdio_command.dart';
 import '../services/workspace/workspace_runtime.dart';
 import '../models/environment_state.dart';
 import '../models/workspace.dart';
+import '../models/conversation.dart';
+import '../models/workspace_binding.dart';
 import '../models/mcp_presentation.dart';
 import 'environment_provider.dart';
 import 'workspace_provider.dart';
 import 'package:uuid/uuid.dart';
+
+part 'mcp_workspace_pool.dart';
 
 /// Transport type: SSE, Streamable HTTP, and STDIO (host desktop or mobile workspace environment).
 enum McpTransportType { sse, http, stdio, inmemory }
@@ -23,6 +28,7 @@ enum McpTransportType { sse, http, stdio, inmemory }
 /// Connection status for an MCP server.
 enum McpStatus {
   idle,
+  onDemand,
   connecting,
   connected,
   needsAuthorization,
@@ -34,12 +40,14 @@ class _DetachedConnection {
   const _DetachedConnection({
     this.activeConnect,
     this.activeAuthorization,
+    this.workspaceCleanup,
     this.client,
     this.initializingTransport,
   });
 
   final Future<bool>? activeConnect;
   final Future<bool>? activeAuthorization;
+  final Future<void>? workspaceCleanup;
   final mcp.Client? client;
   final mcp.ClientTransport? initializingTransport;
 }
@@ -182,6 +190,19 @@ class McpServerConfig {
   final Map<String, String> env;
   final String? workingDirectory;
   final String? workspaceId;
+  final bool followConversationWorkspace;
+  final bool toolPreferencesOnly;
+  List<McpToolConfig> get declaredTools =>
+      toolPreferencesOnly ? const [] : tools;
+
+  McpWorkspaceScope? scopeFor(Conversation? conversation) {
+    if (!followConversationWorkspace || conversation == null) return null;
+    final binding = WorkspaceBinding.fromExtras(conversation.extras);
+    return (
+      serverId: id,
+      workspaceId: binding.isBound ? binding.workspaceId : null,
+    );
+  }
 
   McpServerConfig({
     required this.id,
@@ -198,8 +219,18 @@ class McpServerConfig {
     this.args = const [],
     this.env = const {},
     this.workingDirectory,
-    this.workspaceId,
-  });
+    String? workspaceId,
+    bool followConversationWorkspace = false,
+    bool toolPreferencesOnly = false,
+  }) : toolPreferencesOnly =
+           toolPreferencesOnly ||
+           (transport == McpTransportType.stdio && followConversationWorkspace),
+       followConversationWorkspace =
+           transport == McpTransportType.stdio && followConversationWorkspace,
+       workspaceId =
+           transport == McpTransportType.stdio && !followConversationWorkspace
+           ? workspaceId
+           : null;
 
   McpServerConfig copyWith({
     String? id,
@@ -220,6 +251,8 @@ class McpServerConfig {
     bool clearWorkingDirectory = false,
     String? workspaceId,
     bool clearWorkspace = false,
+    bool? followConversationWorkspace,
+    bool? toolPreferencesOnly,
     bool clearOAuth = false,
     bool clearOAuthClient = false,
   }) => McpServerConfig(
@@ -229,6 +262,7 @@ class McpServerConfig {
     transport: transport ?? this.transport,
     url: url ?? this.url,
     tools: tools ?? this.tools,
+    toolPreferencesOnly: toolPreferencesOnly ?? this.toolPreferencesOnly,
     headers: headers ?? this.headers,
     oauth: clearOAuth ? null : (oauth ?? this.oauth),
     oauthClient: clearOAuthClient ? null : (oauthClient ?? this.oauthClient),
@@ -241,8 +275,22 @@ class McpServerConfig {
     workingDirectory: clearWorkingDirectory
         ? null
         : (workingDirectory ?? this.workingDirectory),
+    followConversationWorkspace:
+        followConversationWorkspace ?? this.followConversationWorkspace,
     workspaceId: clearWorkspace ? null : (workspaceId ?? this.workspaceId),
   );
+
+  /// Tool names share switches across workspaces, while each instance owns its schemas.
+  List<McpToolConfig> withToolPreferences(List<McpToolConfig> catalog) {
+    final preferences = {for (final tool in tools) tool.name: tool};
+    return [
+      for (final tool in catalog)
+        tool.copyWith(
+          enabled: preferences[tool.name]?.enabled ?? true,
+          needsApproval: preferences[tool.name]?.needsApproval ?? false,
+        ),
+    ];
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -253,6 +301,8 @@ class McpServerConfig {
         transport != McpTransportType.inmemory)
       'url': url,
     'tools': tools.map((e) => e.toJson()).toList(),
+    if (toolPreferencesOnly && !followConversationWorkspace)
+      'toolPreferencesOnly': true,
     if (transport != McpTransportType.stdio &&
         transport != McpTransportType.inmemory)
       'headers': headers,
@@ -270,6 +320,7 @@ class McpServerConfig {
     if (transport == McpTransportType.stdio) 'env': env,
     if (transport == McpTransportType.stdio && workingDirectory != null)
       'workingDirectory': workingDirectory,
+    if (followConversationWorkspace) 'workspaceBinding': 'followConversation',
     if (transport == McpTransportType.stdio && workspaceId != null)
       'workspaceId': workspaceId,
   };
@@ -299,6 +350,7 @@ class McpServerConfig {
         name: json['name'] as String? ?? '',
         transport: McpTransportType.stdio,
         tools: tools,
+        toolPreferencesOnly: json['toolPreferencesOnly'] == true,
         command: (json['command'] as String?)?.trim(),
         args: argsAny is List
             ? argsAny.map((e) => e.toString()).toList()
@@ -307,6 +359,8 @@ class McpServerConfig {
             ? envAny.map((k, v) => MapEntry(k.toString(), v.toString()))
             : const <String, String>{},
         workingDirectory: (json['workingDirectory'] as String?)?.trim(),
+        followConversationWorkspace:
+            json['workspaceBinding'] == 'followConversation',
         workspaceId: (json['workspaceId'] as String?)?.trim(),
       );
     } else if (t == McpTransportType.inmemory) {
@@ -316,6 +370,7 @@ class McpServerConfig {
         name: json['name'] as String? ?? '',
         transport: McpTransportType.inmemory,
         tools: tools,
+        toolPreferencesOnly: json['toolPreferencesOnly'] == true,
       );
     } else {
       final url = json['url'] as String? ?? '';
@@ -333,6 +388,7 @@ class McpServerConfig {
         transport: t,
         url: url,
         tools: tools,
+        toolPreferencesOnly: json['toolPreferencesOnly'] == true,
         headers:
             ((json['headers'] as Map?)?.map(
               (k, v) => MapEntry(k.toString(), v.toString()),
@@ -358,6 +414,10 @@ class McpServerConfig {
 }
 
 class McpProvider extends ChangeNotifier {
+  static const workspaceProcessLimit = 3;
+  final Duration workspaceIdleTimeout;
+  late final _workspacePool = _WorkspaceMcpPool(this);
+
   static const String _prefsKey = 'mcp_servers_v1';
   static const String _prefsTimeoutKey = 'mcp_request_timeout_ms_v1';
   static const Duration _backgroundSessionRecoveryWindow = Duration(
@@ -391,6 +451,15 @@ class McpProvider extends ChangeNotifier {
 
   void _onWorkspacesChanged() {
     if (_disposed || !supportsStdioWorkspaceBinding) return;
+    for (final entry in _workspacePool.entries.values.toList()) {
+      final previous = entry.workspace;
+      if (previous == null || entry.closing != null) continue;
+      final current = workspaces!.byId(previous.id);
+      if (current?.kind != previous.kind ||
+          current?.hostPath != previous.hostPath) {
+        unawaited(_workspacePool.close(entry));
+      }
+    }
     for (final server in _servers) {
       if (server.transport != McpTransportType.stdio ||
           server.workspaceId == null) {
@@ -444,6 +513,7 @@ class McpProvider extends ChangeNotifier {
   McpProvider({
     required this.preferences,
     DateTime Function()? now,
+    this.workspaceIdleTimeout = const Duration(minutes: 5),
     McpOAuthService? oauthService,
     this.workspaceRuntime,
     this.environment,
@@ -464,12 +534,97 @@ class McpProvider extends ChangeNotifier {
       (s) => s.transport != McpTransportType.stdio || supportsStdio,
     ),
   );
-  McpStatus statusFor(String id) => _connections[id]?.status ?? McpStatus.idle;
-  String? errorFor(String id) => _connections[id]?.error;
+
+  /// Invalidates published routes when the server or the directory behind a
+  /// linked workspace changes. Renaming the workspace preserves its identity.
+  Object? workspaceConfigurationFor(McpWorkspaceScope scope) {
+    final state = _connections[scope.serverId];
+    final id = scope.workspaceId;
+    final workspace = id == null ? null : workspaces?.byId(id);
+    return state == null
+        ? null
+        : (state, state.generation, workspace?.kind, workspace?.hostPath);
+  }
+
+  McpStatus statusFor(String id) {
+    final server = getById(id);
+    if (server?.followConversationWorkspace == true &&
+        server!.enabled &&
+        supportsStdioWorkspaceBinding &&
+        supportsStdio &&
+        _connections[id]?.manuallyDisconnected != true) {
+      final states = _workspacePool.forServer(id).map((entry) => entry.status);
+      for (final status in [
+        McpStatus.error,
+        McpStatus.connecting,
+        McpStatus.connected,
+      ]) {
+        if (states.contains(status)) return status;
+      }
+      return McpStatus.onDemand;
+    }
+    return _connections[id]?.status ?? McpStatus.idle;
+  }
+
+  McpStatus statusForScope(McpWorkspaceScope scope) {
+    if (!supportsStdioWorkspaceBinding ||
+        !supportsStdio ||
+        getById(scope.serverId)?.enabled != true ||
+        _connections[scope.serverId]?.manuallyDisconnected == true) {
+      return statusFor(scope.serverId);
+    }
+    final entry = _workspacePool.entries[scope];
+    return entry == null || entry.closing != null
+        ? McpStatus.onDemand
+        : entry.status;
+  }
+
+  String? errorForScope(McpWorkspaceScope scope) =>
+      supportsStdioWorkspaceBinding
+      ? _workspacePool.entries[scope]?.error
+      : errorFor(scope.serverId);
+
+  Future<bool> retryScope(McpWorkspaceScope scope) async {
+    final server = _connections[scope.serverId];
+    if (server == null) return false;
+    _resetConnectionRetry(server);
+    final entry = _workspacePool.entries[scope];
+    if (entry != null) _resetConnectionRetry(entry);
+    try {
+      await discoverWorkspaceTools(scope, refresh: true);
+      return true;
+    } on StateError {
+      return false;
+    }
+  }
+
+  bool canSelectServer(McpServerConfig server) =>
+      statusFor(server.id) == McpStatus.connected ||
+      (server.enabled &&
+          server.followConversationWorkspace &&
+          supportsStdioWorkspaceBinding &&
+          supportsStdio);
+
+  String? errorFor(String id) =>
+      _workspacePool
+          .forServer(id)
+          .map((state) => state.error)
+          .whereType<String>()
+          .firstOrNull ??
+      _connections[id]?.error;
   McpOAuthStage? oauthStageFor(String id) =>
       _connections[id]?.authorizationSession?.stage;
   bool get hasAnyEnabled => _servers.any((s) => s.enabled);
   bool isConnected(String id) {
+    if (getById(id)?.followConversationWorkspace == true) {
+      return _workspacePool
+          .forServer(id)
+          .any(
+            (state) =>
+                state.client?.isConnected == true &&
+                state.status == McpStatus.connected,
+          );
+    }
     final state = _connections[id];
     return state?.client?.isConnected == true &&
         state?.status == McpStatus.connected;
@@ -639,6 +794,8 @@ class McpProvider extends ChangeNotifier {
             if (s.transport == McpTransportType.stdio &&
                 (s.workingDirectory ?? '').isNotEmpty)
               'workingDirectory': s.workingDirectory,
+            if (s.followConversationWorkspace)
+              'workspaceBinding': 'followConversation',
             if (s.transport == McpTransportType.stdio && s.workspaceId != null)
               'workspaceId': s.workspaceId,
           },
@@ -721,6 +878,8 @@ class McpProvider extends ChangeNotifier {
                     : const <String>[],
                 env: env,
                 workingDirectory: (wd != null && wd.isNotEmpty) ? wd : null,
+                followConversationWorkspace:
+                    cfg['workspaceBinding'] == 'followConversation',
                 workspaceId: (cfg['workspaceId'] as String?)?.trim(),
               ),
             );
@@ -950,6 +1109,7 @@ class McpProvider extends ChangeNotifier {
     Map<String, String> env = const <String, String>{},
     String? workingDirectory,
     String? workspaceId,
+    bool followConversationWorkspace = false,
   }) async {
     final id = const Uuid().v4();
     final cfg = McpServerConfig(
@@ -969,6 +1129,7 @@ class McpProvider extends ChangeNotifier {
           ? workingDirectory!.trim()
           : null,
       workspaceId: workspaceId,
+      followConversationWorkspace: followConversationWorkspace,
     );
     await _serializeServerMutation(() async {
       final next = <McpServerConfig>[..._servers, cfg];
@@ -1034,7 +1195,10 @@ class McpProvider extends ChangeNotifier {
             );
       final next = List<McpServerConfig>.of(_servers)
         ..[idx] = preserveLatestTools
-            ? effectiveUpdated.copyWith(tools: previous.tools)
+            ? effectiveUpdated.copyWith(
+                tools: previous.tools,
+                toolPreferencesOnly: previous.toolPreferencesOnly,
+              )
             : effectiveUpdated;
       await _persistServers(next);
       _servers = next;
@@ -1671,6 +1835,16 @@ class McpProvider extends ChangeNotifier {
     if (server == null || !server.enabled || _disposed) {
       return Future<bool>.value(false);
     }
+    if (server.followConversationWorkspace) {
+      if (!supportsStdioWorkspaceBinding) {
+        final state = _connections[id];
+        state?.status = McpStatus.error;
+        state?.error =
+            'Following a conversation workspace requires the mobile Linux environment.';
+        _notify();
+      }
+      return Future<bool>.value(false);
+    }
     if (server.transport == McpTransportType.stdio && !supportsStdio) {
       return Future<bool>.value(false);
     }
@@ -1736,7 +1910,9 @@ class McpProvider extends ChangeNotifier {
         });
     state.connectFuture = future;
     return future.then((connected) {
-      if (connected && !_disposed) unawaited(refreshTools(id));
+      if (connected && !_disposed && state is! _WorkspaceConnection) {
+        unawaited(refreshTools(id));
+      }
       return connected;
     });
   }
@@ -1788,10 +1964,13 @@ class McpProvider extends ChangeNotifier {
         final config = await environment!.loadExecutionConfig(
           overrides: server.env,
         );
-        final mounts = await _stdioWorkspaceMounts(server, state);
+        final workspaceId = state is _WorkspaceConnection
+            ? state.scope.workspaceId
+            : server.workspaceId;
+        final mounts = await _stdioWorkspaceMounts(workspaceId, state);
         final cwd =
             server.workingDirectory ??
-            (server.workspaceId == null ? '/root' : '/workspace');
+            (workspaceId == null ? '/root' : '/workspace');
         await requireWorkspaceStdioCommand(
           runtime: runtime,
           command: server.command ?? '',
@@ -1813,6 +1992,7 @@ class McpProvider extends ChangeNotifier {
           isCancelled: () => _disposed || state.generation != generation,
         );
         workspaceTransport = transport;
+        if (state is _WorkspaceConnection) state.transport = transport;
         if (_disposed || state.generation != generation) {
           transport.close();
           await transport.onClose;
@@ -2217,6 +2397,7 @@ class McpProvider extends ChangeNotifier {
         return;
       }
       state.client = null;
+      if (state is _WorkspaceConnection) state.tools = null;
       state.refreshDirty = false;
       final failed = workspaceTransport?.failed == true;
       state.status = McpStatus.error;
@@ -2252,7 +2433,15 @@ class McpProvider extends ChangeNotifier {
           !identical(state.client, client)) {
         return;
       }
-      unawaited(refreshTools(id));
+      if (state is _WorkspaceConnection) {
+        // A server notification refreshes its catalog, but does not extend
+        // the lifetime of a process that no conversation is using.
+        unawaited(
+          _refreshConnectedTools(id, state).whenComplete(_workspacePool.signal),
+        );
+      } else {
+        unawaited(refreshTools(id));
+      }
     });
   }
 
@@ -2314,7 +2503,10 @@ class McpProvider extends ChangeNotifier {
     _requestTimeout = duration;
     _notify();
     if (reconnectActive) {
-      for (final state in _connections.values) {
+      for (final state in [
+        ..._connections.values,
+        ..._workspacePool.entries.values,
+      ]) {
         state.client?.setRequestTimeout(duration);
       }
     }
@@ -2327,7 +2519,16 @@ class McpProvider extends ChangeNotifier {
   }
 
   _DetachedConnection _detachConnection(String id) {
-    final state = _connections.putIfAbsent(id, _ServerConnection.new);
+    return _detachState(
+      _connections.putIfAbsent(id, _ServerConnection.new),
+      workspaceCleanup: _workspacePool.closeServer(id),
+    );
+  }
+
+  _DetachedConnection _detachState(
+    _ServerConnection state, {
+    Future<void>? workspaceCleanup,
+  }) {
     state.generation++;
     state.reconnectFuture = null;
     final active = state.connectFuture;
@@ -2352,6 +2553,7 @@ class McpProvider extends ChangeNotifier {
     _notify();
 
     return _DetachedConnection(
+      workspaceCleanup: workspaceCleanup,
       activeConnect: active,
       activeAuthorization: activeAuthorization,
       client: client,
@@ -2369,6 +2571,7 @@ class McpProvider extends ChangeNotifier {
       // The connecting attempt already owns the transport error. Cleanup must
       // still finish when that transport failed before cancellation.
     }
+    await detached.workspaceCleanup;
     await detached.activeAuthorization;
     final active = detached.activeConnect;
     if (active != null) {
@@ -2400,6 +2603,11 @@ class McpProvider extends ChangeNotifier {
         (() async {
           await _finishDisconnect(detached, terminateSession: true);
           if (_disposed || state.generation != generation) return false;
+          if (getById(id)?.followConversationWorkspace == true &&
+              supportsStdioWorkspaceBinding) {
+            _notify();
+            return true;
+          }
           if (!await _connect(id)) return false;
           await _awaitHttpSessionSettlement(id);
           return isConnected(id);
@@ -2474,24 +2682,13 @@ class McpProvider extends ChangeNotifier {
     );
   }
 
-  McpToolConfig? _toolConfig(String serverId, String toolName) {
-    final idx = _servers.indexWhere((e) => e.id == serverId);
-    if (idx < 0) return null;
-    final s = _servers[idx];
-    for (final t in s.tools) {
-      if (t.name == toolName) return t;
-    }
-    return null;
-  }
-
   Map<String, dynamic> _normalizeArgsForTool(
-    String serverId,
+    McpToolConfig? tool,
     String toolName,
     Map<String, dynamic> args,
   ) {
     try {
-      final cfg = _toolConfig(serverId, toolName);
-      final schema = cfg?.schema;
+      final schema = tool?.schema;
       if (schema == null || schema.isEmpty) return args;
       final cloned = jsonDecode(jsonEncode(args)) as Map<String, dynamic>;
       var normalized = _normalizeBySchema(cloned, schema, propertyName: null);
@@ -2762,7 +2959,18 @@ class McpProvider extends ChangeNotifier {
 
   /// Returns whether discovery completed successfully and updated the cache.
   /// A successful discovery may return an empty tool list.
-  Future<bool> refreshTools(String id) {
+  Future<bool> refreshTools(String id) async {
+    if (getById(id)?.followConversationWorkspace == true) {
+      final scopes = _workspacePool.forServer(id).map((s) => s.scope).toList();
+      try {
+        await Future.wait(
+          scopes.map((s) => discoverWorkspaceTools(s, refresh: true)),
+        );
+        return scopes.isNotEmpty;
+      } catch (_) {
+        return false;
+      }
+    }
     final state = _connections[id];
     if (state == null || _disposed) return Future<bool>.value(false);
     if (state.client == null) {
@@ -2770,6 +2978,10 @@ class McpProvider extends ChangeNotifier {
         id,
       ).then((connected) => connected ? refreshTools(id) : false);
     }
+    return _refreshConnectedTools(id, state);
+  }
+
+  Future<bool> _refreshConnectedTools(String id, _ServerConnection state) {
     state.refreshDirty = true;
     final active = state.refreshFuture;
     if (active != null) return active;
@@ -2779,8 +2991,8 @@ class McpProvider extends ChangeNotifier {
     return future.whenComplete(() {
       if (!identical(state.refreshFuture, future)) return;
       state.refreshFuture = null;
-      if (state.refreshDirty && !_disposed) {
-        unawaited(refreshTools(id));
+      if (state.refreshDirty && !_disposed && state.client != null) {
+        unawaited(_refreshConnectedTools(id, state));
       }
     });
   }
@@ -2802,9 +3014,18 @@ class McpProvider extends ChangeNotifier {
         state.refreshDirty = true;
         continue;
       }
-      if (outcome != _ToolRefreshOutcome.success) return false;
+      if (outcome != _ToolRefreshOutcome.success) {
+        if (state is _WorkspaceConnection &&
+            identical(state.client, failedClient)) {
+          state.tools = null;
+          _notify();
+        }
+        return false;
+      }
     }
-    return !_disposed && isConnected(id);
+    return !_disposed &&
+        state.client?.isConnected == true &&
+        state.status == McpStatus.connected;
   }
 
   Future<_ToolRefreshOutcome> _refreshToolsOnce(
@@ -2962,11 +3183,119 @@ class McpProvider extends ChangeNotifier {
           ),
         );
       }
+      var savedTools = merged;
+      if (state is _WorkspaceConnection) {
+        state.tools = List.unmodifiable(merged);
+        // Settings own the switches for each known name. Schemas belong to the instance.
+        final added = [
+          for (final tool in merged)
+            if (!existing.containsKey(tool.name))
+              McpToolConfig(name: tool.name, enabled: true),
+        ];
+        if (added.isEmpty) return;
+        savedTools = [...existing.values, ...added];
+      }
       final next = List<McpServerConfig>.of(_servers)
-        ..[index] = _servers[index].copyWith(tools: merged);
+        ..[index] = _servers[index].copyWith(
+          tools: savedTools,
+          toolPreferencesOnly: state is _WorkspaceConnection,
+        );
       await _persistServers(next);
       _servers = next;
     });
+  }
+
+  List<McpToolConfig> _workspaceTools(_WorkspaceConnection state) =>
+      getById(
+        state.scope.serverId,
+      )?.withToolPreferences(state.tools ?? const []) ??
+      const [];
+
+  List<McpToolConfig> cachedWorkspaceTools(McpWorkspaceScope scope) {
+    final state = _workspacePool.entries[scope];
+    if (state == null || state.closing != null) return const [];
+    return _workspaceTools(state);
+  }
+
+  Future<void> _prepareWorkspaceConnection(
+    _WorkspaceConnection state, {
+    bool refresh = false,
+  }) async {
+    final id = state.scope.serverId;
+    final server = getById(id)!;
+    if (state.client?.isConnected != true) {
+      state.tools = null;
+      final active = state.connectFuture;
+      if (active == null &&
+          (state.automaticConnectStopped ||
+              (state.connectRetryAt?.isAfter(_now()) ?? false))) {
+        throw StateError(state.error ?? 'Workspace MCP server is unavailable.');
+      }
+      if (!await (active ?? _beginConnect(id, server, state))) {
+        throw StateError(state.error ?? 'Workspace MCP connection closed.');
+      }
+    }
+    if (state.closing != null || state.client == null) {
+      throw StateError('Workspace MCP connection closed.');
+    }
+    final active = state.refreshFuture;
+    if (refresh || active != null || state.tools == null) {
+      if (!await (active ?? _refreshConnectedTools(id, state))) {
+        state.tools = null;
+        throw StateError(state.error ?? 'Workspace MCP tool discovery failed.');
+      }
+    }
+    if (state.closing != null || state.client == null || state.tools == null) {
+      throw StateError('Workspace MCP connection closed.');
+    }
+  }
+
+  Future<List<McpToolConfig>> discoverWorkspaceTools(
+    McpWorkspaceScope scope, {
+    bool refresh = false,
+  }) => _workspacePool.use(scope, (state) async {
+    await _prepareWorkspaceConnection(state, refresh: refresh);
+    return _workspaceTools(state);
+  });
+
+  Future<mcp.CallToolResult?> callWorkspaceTool(
+    McpWorkspaceScope scope,
+    McpToolConfig published,
+    Map<String, dynamic> args, {
+    required bool Function() isAllowed,
+  }) async {
+    try {
+      return await _workspacePool.use(scope, (state) async {
+        if (!isAllowed()) return _toolError('Workspace MCP selection changed.');
+        await _prepareWorkspaceConnection(state);
+        final current = _workspaceTools(
+          state,
+        ).where((t) => t.name == published.name).firstOrNull;
+        if (!isAllowed() ||
+            state.closing != null ||
+            current == null ||
+            !current.enabled ||
+            (current.needsApproval && !published.needsApproval) ||
+            !const DeepCollectionEquality().equals(
+              current.schema,
+              published.schema,
+            )) {
+          return _toolError('Workspace MCP tool changed. Start a new request.');
+        }
+        final normalized = _normalizeArgsForTool(current, current.name, args);
+        // A transport failure may follow successful execution. Never replay this call.
+        try {
+          return await state.client!.callTool(current.name, normalized);
+        } on mcp.McpError catch (error) {
+          if (error.code != null) return _toolError(error.toString());
+          return _toolError('Workspace MCP tool result is unknown: $error');
+        } catch (error) {
+          return _toolError('Workspace MCP tool result is unknown: $error');
+        }
+      });
+    } on StateError catch (error) {
+      return _toolError(error.toString());
+    }
   }
 
   Future<void> ensureConnected(String id) async {
@@ -2986,6 +3315,11 @@ class McpProvider extends ChangeNotifier {
     String toolName,
     Map<String, dynamic> args,
   ) async {
+    if (getById(serverId)?.followConversationWorkspace == true) {
+      return _toolError(
+        'This MCP server requires a conversation workspace context.',
+      );
+    }
     await ensureConnected(serverId);
     final state = _connections[serverId];
     if (state == null) return null;
@@ -3000,7 +3334,10 @@ class McpProvider extends ChangeNotifier {
       );
     }
     final scopeOperation = _scopeOperationForTool(toolName);
-    final normalized = _normalizeArgsForTool(serverId, toolName, args);
+    final tool = getById(
+      serverId,
+    )?.tools.where((tool) => tool.name == toolName).firstOrNull;
+    final normalized = _normalizeArgsForTool(tool, toolName, args);
     try {
       final result = await client.callTool(toolName, normalized);
       _finishScopeUpgrade(state, scopeOperation);
@@ -3226,7 +3563,7 @@ class McpProvider extends ChangeNotifier {
     final tools = <McpToolConfig>[];
     for (final s in servers.where((s) => serverIds.contains(s.id))) {
       if (!s.enabled) continue;
-      tools.addAll(s.tools.where((t) => t.enabled));
+      tools.addAll(s.declaredTools.where((t) => t.enabled));
     }
     return tools;
   }
@@ -3238,6 +3575,9 @@ class McpProvider extends ChangeNotifier {
     workspaceRuntime?.removeListener(_onEnvironmentChanged);
     environment?.removeListener(_onEnvironmentChanged);
     workspaces?.removeListener(_onWorkspacesChanged);
+    for (final entry in _workspacePool.entries.values.toList()) {
+      unawaited(_workspacePool.close(entry));
+    }
     for (final state in _connections.values) {
       state.generation++;
       state.initializingTransport?.close();
@@ -3253,10 +3593,9 @@ class McpProvider extends ChangeNotifier {
   }
 
   Future<List<Mount>> _stdioWorkspaceMounts(
-    McpServerConfig server,
+    String? workspaceId,
     _ServerConnection state,
   ) async {
-    final workspaceId = server.workspaceId;
     if (workspaceId == null) return const [];
     final provider = workspaces!;
     await provider.loaded;

@@ -126,10 +126,11 @@ class _Generation extends Fake implements GenerationController {
   @override
   Map<String, dynamic>? buildCustomBody(Assistant? assistant) => null;
   @override
-  McpToolRouteSnapshot captureMcpToolRoutes(
+  Future<McpToolRouteSnapshot> captureMcpToolRoutes(
     Assistant? assistant, {
     String? conversationId,
-  }) => _Routes();
+    bool discoverWorkspaceTools = false,
+  }) async => _Routes();
   @override
   List<Map<String, dynamic>> buildToolDefinitions(
     SettingsProvider settings,

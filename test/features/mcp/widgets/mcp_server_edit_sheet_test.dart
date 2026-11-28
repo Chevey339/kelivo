@@ -287,6 +287,43 @@ void main() {
     );
   }
 
+  testWidgets(
+    'following is opt-in, persists after reopening and exposes the process limit',
+    (tester) async {
+      final provider = await _openEditor(
+        tester,
+        [],
+        withWorkspaces: true,
+        workspaceId: 'scripts',
+      );
+      final follow = find.byKey(const ValueKey('mcp-follow-workspace'));
+      await tester.ensureVisible(follow);
+      expect(provider.getById('guest')!.followConversationWorkspace, isFalse);
+      await tester.tap(follow);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('mcp-workspace-binding')), findsNothing);
+      expect(find.textContaining('Up to 3 processes'), findsOneWidget);
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(provider.getById('guest')!.followConversationWorkspace, isTrue);
+      expect(provider.getById('guest')!.workspaceId, isNull);
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(follow);
+      await tester.tap(follow);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('mcp-workspace-binding')),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(provider.getById('guest')!.followConversationWorkspace, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
   testWidgets('a deleted binding remains visible and can be cleared', (
     tester,
   ) async {

@@ -6,6 +6,14 @@ import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/models/environment_variable.dart';
 import 'package:Kelivo/core/models/workspace.dart';
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
+import 'package:Kelivo/core/services/conversation_tool_permissions.dart';
+import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/core/services/mcp/mcp_config_import.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
@@ -22,7 +30,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
-    group('fixed workspace binding on ${platform.name}', () {
+    group('workspace stdio on ${platform.name}', () {
       late BusinessTestHarness harness;
       late EnvironmentProvider environment;
       late WorkspaceProvider workspaces;
@@ -71,7 +79,11 @@ void main() {
         await files.delete(recursive: true);
       });
 
-      Future<void> configure(String? workspaceId, {String? cwd}) async {
+      Future<void> configure(
+        String? workspaceId, {
+        String? cwd,
+        bool follow = false,
+      }) async {
         await provider.replaceAllFromJson(
           jsonEncode({
             'mcpServers': {
@@ -79,12 +91,455 @@ void main() {
                 'command': 'python3',
                 'args': ['./mcp_server.py'],
                 if (workspaceId != null) 'workspaceId': workspaceId,
+                if (follow) 'workspaceBinding': 'followConversation',
                 if (cwd != null) 'workingDirectory': cwd,
               },
             },
           }),
         );
       }
+
+      Future<(AssistantProvider, String)> selectServers(
+        List<String> ids,
+      ) async {
+        final assistants = AssistantProvider(preferences: harness.preferences);
+        addTearDown(assistants.dispose);
+        await assistants.loaded;
+        final id = await assistants.addAssistant(name: 'Selected');
+        await assistants.updateAssistant(
+          assistants.getById(id)!.copyWith(mcpServerIds: ids),
+        );
+        return (assistants, id);
+      }
+
+      test(
+        'a background list notification invalidates failed discovery without extending idle lifetime',
+        () async {
+          await configure(null, follow: true);
+          const scope = (serverId: 'guest', workspaceId: null);
+          runtime.toolsByRoot[''] = [_tool('old')];
+          var idleTimers = 0;
+          await runZoned(
+            () async {
+              expect(
+                (await provider.discoverWorkspaceTools(scope)).single.name,
+                'old',
+              );
+              final request = runtime.requests.single;
+              final prior = idleTimers;
+              runtime.failedLists.add(request.command);
+              runtime.notifyListChanged(request.runId);
+              await _waitFor(
+                () =>
+                    provider.statusForScope(scope) == McpStatus.error &&
+                    provider.cachedWorkspaceTools(scope).isEmpty,
+              );
+              expect(idleTimers, prior);
+              runtime.failedLists.clear();
+              runtime.toolsByRoot[''] = [_tool('new')];
+              expect(
+                (await provider.discoverWorkspaceTools(scope)).single.name,
+                'new',
+              );
+            },
+            zoneSpecification: ZoneSpecification(
+              createTimer: (self, parent, zone, duration, callback) {
+                if (duration == provider.workspaceIdleTimeout) idleTimers++;
+                return parent.createTimer(zone, duration, callback);
+              },
+            ),
+          );
+        },
+      );
+
+      test(
+        'a changed server cannot adopt a discovered catalog while another server is still starting',
+        () async {
+          await provider.replaceAllFromJson(
+            jsonEncode({
+              'mcpServers': {
+                for (final name in ['first', 'delayed'])
+                  name: {
+                    'command': name,
+                    'workspaceBinding': 'followConversation',
+                  },
+              },
+            }),
+          );
+          final (assistants, id) = await selectServers(['first', 'delayed']);
+          final service = McpToolService();
+          addTearDown(service.dispose);
+          final chat = Conversation(title: 'Chat', assistantId: id);
+          runtime.toolsByCommand["exec 'first'"] = [_tool('from_first')];
+          runtime.toolsByCommand["exec 'delayed'"] = [_tool('from_delayed')];
+          final gate = Completer<void>();
+          runtime.listGates["exec 'delayed'"] = gate;
+          final pending = service.prepareRoutesForAssistant(
+            provider,
+            assistants,
+            assistantId: id,
+            conversation: chat,
+          );
+          await _waitFor(
+            () =>
+                provider.getById('first')!.tools.isNotEmpty &&
+                runtime.listCount.containsKey("exec 'delayed'"),
+          );
+          await provider.updateServerMetadata(
+            provider.getById('first')!.copyWith(command: 'replacement'),
+          );
+          gate.complete();
+          final routes = await pending;
+          expect(routes.containsExposedName('from_delayed'), isTrue);
+          expect(routes.containsExposedName('from_first'), isFalse);
+        },
+      );
+
+      for (final cancel in [true, false]) {
+        test(
+          'pending dispatch rechecks generation cancellation and full access (cancel=$cancel)',
+          () async {
+            await configure(null, follow: true);
+            final (assistants, id) = await selectServers(['guest']);
+            final service = McpToolService();
+            addTearDown(service.dispose);
+            final chat = Conversation(title: 'Target', assistantId: id);
+            runtime.toolsByRoot[''] = [_tool('echo')];
+            final routes = await service.prepareRoutesForAssistant(
+              provider,
+              assistants,
+              assistantId: id,
+              conversation: chat,
+            );
+            await provider.setToolNeedsApproval('guest', 'echo', true);
+            final gate = Completer<void>();
+            final launch = runtime.requests.single;
+            runtime.listGates[launch.command] = gate;
+            runtime.notifyListChanged(launch.runId);
+            await _waitFor(() => runtime.listCount[launch.command] == 2);
+            var mode = ToolPermissionMode.fullAccess;
+            final permission = ToolCallPermission(
+              toolName: 'echo',
+              toolCallId: 'id',
+              readState: () => ToolPermissionState(mode: mode),
+            );
+            await permission.authorize(needed: true, arguments: {});
+            final entered = Completer<void>();
+            final cancelled = Completer<void>();
+            final token = ToolCallCancellation(
+              isCancelled: () => cancelled.isCompleted,
+              cancelled: cancelled.future,
+            );
+            final call = token.run(
+              () => service.callToolForAssistant(
+                provider,
+                assistants,
+                conversation: chat,
+                assistantId: id,
+                toolName: 'echo',
+                routeSnapshot: routes,
+                checkPermission: () {
+                  permission.checkAuthorized();
+                  if (!entered.isCompleted) entered.complete();
+                },
+              ),
+            );
+            await entered.future.timeout(const Duration(seconds: 2));
+            if (cancel) {
+              cancelled.complete();
+            } else {
+              mode = ToolPermissionMode.requestApproval;
+            }
+            gate.complete();
+            if (cancel) {
+              expect((await call).markdown, contains('tool_call_cancelled'));
+            } else {
+              await expectLater(call, throwsA(isA<ToolPermissionException>()));
+            }
+            expect(runtime.argumentsByRun, isEmpty);
+          },
+        );
+      }
+
+      test(
+        'switching to fixed waits for its own catalog and keeps tool preferences',
+        () async {
+          final a = await workspaces.create(name: 'A');
+          final b = await workspaces.create(name: 'B');
+          runtime.toolsByRoot[await workspaces.hostRootFor(a)] = [
+            _tool('alpha'),
+          ];
+          runtime.toolsByRoot[await workspaces.hostRootFor(b)] = [
+            _tool('beta'),
+          ];
+          await configure(null, follow: true);
+          for (final workspace in [a, b]) {
+            await provider.discoverWorkspaceTools((
+              serverId: 'guest',
+              workspaceId: workspace.id,
+            ));
+          }
+          await provider.setToolNeedsApproval('guest', 'alpha', true);
+          final gate = Completer<void>();
+          runtime.listGates[runtime.requests.first.command] = gate;
+          await provider.updateServerMetadata(
+            provider
+                .getById('guest')!
+                .copyWith(
+                  followConversationWorkspace: false,
+                  workspaceId: a.id,
+                ),
+          );
+          await _waitFor(() => runtime.requests.length == 3);
+          expect(provider.getEnabledToolsForServers({'guest'}), isEmpty);
+          expect(
+            McpServerConfig.fromJson(
+              provider.getById('guest')!.toJson(),
+            ).declaredTools,
+            isEmpty,
+          );
+          gate.complete();
+          await _waitFor(
+            () => provider.getEnabledToolsForServers({'guest'}).isNotEmpty,
+          );
+          final only = provider.getEnabledToolsForServers({'guest'}).single;
+          expect(only.name, 'alpha');
+          expect(only.needsApproval, isTrue);
+        },
+      );
+
+      test(
+        'following routes use the selected chat for discovery, approval and dispatch',
+        () async {
+          final a = await workspaces.create(name: 'A');
+          final b = await workspaces.create(name: 'B');
+          final rootA = await workspaces.hostRootFor(a);
+          final rootB = await workspaces.hostRootFor(b);
+          runtime.toolsByRoot[rootA] = [
+            _tool('echo', 'integer'),
+            _tool('only_a'),
+          ];
+          runtime.toolsByRoot[rootB] = [
+            _tool('echo', 'string'),
+            _tool('only_b'),
+          ];
+          runtime.toolsByRoot[''] = [_tool('unbound')];
+          await configure(a.id, follow: true);
+          final server = provider.getById('guest')!;
+          expect(server.workspaceId, isNull);
+          expect(server.followConversationWorkspace, isTrue);
+          expect(provider.canSelectServer(server), isTrue);
+          expect(provider.statusFor('guest'), McpStatus.onDemand);
+          expect(
+            McpServerConfig.fromJson(
+              server.toJson(),
+            ).followConversationWorkspace,
+            isTrue,
+          );
+          final exported = provider.exportServersAsUiJson();
+          expect(
+            parseMcpConfigImport(exported).single.followConversationWorkspace,
+            isTrue,
+          );
+          final assistants = AssistantProvider(
+            preferences: harness.preferences,
+          );
+          final service = McpToolService();
+          addTearDown(assistants.dispose);
+          addTearDown(service.dispose);
+          await assistants.loaded;
+          final id = await assistants.addAssistant(name: 'Shared server');
+          await assistants.updateAssistant(
+            assistants
+                .getById(id)!
+                .copyWith(defaultWorkspaceId: a.id, mcpServerIds: ['guest']),
+          );
+          Conversation chat(Workspace? ws) => Conversation(
+            title: 'Chat',
+            assistantId: id,
+            extras: WorkspaceBinding(workspaceId: ws?.id).applyTo({}),
+          );
+          final chatA = chat(a);
+          final chatB = chat(b);
+          Future<McpToolRouteSnapshot> prepare(Conversation? target) =>
+              service.prepareRoutesForAssistant(
+                provider,
+                assistants,
+                assistantId: id,
+                conversation: target,
+              );
+          expect((await prepare(null)).containsExposedName('echo'), isFalse);
+          expect(runtime.requests, isEmpty);
+          final routes = await Future.wait([
+            prepare(chatA),
+            prepare(chatB),
+            prepare(chatA),
+          ]);
+          expect(runtime.requests, hasLength(2));
+          expect(routes[0].containsExposedName('only_b'), isFalse);
+          expect(routes[1].containsExposedName('only_a'), isFalse);
+          expect(routes[2].containsExposedName('only_a'), isTrue);
+          Future<String> invoke(
+            Conversation target,
+            McpToolRouteSnapshot snapshot,
+          ) => service.callToolTextForAssistant(
+            provider,
+            assistants,
+            assistantId: id,
+            conversation: target,
+            routeSnapshot: snapshot,
+            toolName: 'echo',
+            arguments: {'value': '17'},
+          );
+          final called = await Future.wait([
+            invoke(chatA, routes[0]),
+            invoke(chatB, routes[1]),
+          ]);
+          final first = runtime.requests.singleWhere(
+            (r) => r.mounts.single.host == rootA,
+          );
+          final second = runtime.requests.singleWhere(
+            (r) => r.mounts.single.host == rootB,
+          );
+          expect(called, [first.runId, second.runId]);
+          expect(runtime.argumentsByRun[first.runId]!.single['value'], 17);
+          expect(runtime.argumentsByRun[second.runId]!.single['value'], '17');
+          expect(await invoke(chatB, routes[0]), isEmpty);
+          expect(runtime.argumentsByRun[second.runId], hasLength(1));
+          await provider.setToolNeedsApproval('guest', 'echo', true);
+          for (final (target, snapshot) in [
+            (chatA, routes[0]),
+            (chatB, routes[1]),
+          ]) {
+            expect(
+              service.toolNeedsApprovalForAssistant(
+                provider,
+                assistants,
+                assistantId: id,
+                conversation: target,
+                routeSnapshot: snapshot,
+                toolName: 'echo',
+              ),
+              isTrue,
+            );
+          }
+          await provider.setToolEnabled('guest', 'echo', false);
+          expect(await invoke(chatA, routes[0]), isEmpty);
+          expect(runtime.argumentsByRun[first.runId], hasLength(1));
+          expect(
+            (await prepare(chat(null))).containsExposedName('unbound'),
+            isTrue,
+          );
+          expect(runtime.requests.last.mounts, isEmpty);
+          expect(runtime.requests.last.cwd, '/root');
+          await workspaces.delete(a.id);
+          await _waitFor(() => runtime.cancelledRuns.contains(first.runId));
+          expect(runtime.cancelledRuns, isNot(contains(second.runId)));
+          expect((await prepare(chatA)).containsExposedName('only_a'), isFalse);
+          await expectLater(
+            provider.discoverWorkspaceTools((
+              serverId: 'guest',
+              workspaceId: a.id,
+            )),
+            throwsStateError,
+          );
+          final scopeA = (serverId: 'guest', workspaceId: a.id);
+          final scopeB = (serverId: 'guest', workspaceId: b.id);
+          expect(provider.statusForScope(scopeA), McpStatus.error);
+          expect(provider.statusForScope(scopeB), McpStatus.connected);
+          expect(provider.statusFor('guest'), McpStatus.error);
+          expect(provider.errorForScope(scopeA), contains('not found'));
+          expect(provider.errorForScope(scopeB), isNull);
+          expect(await provider.retryScope(scopeA), isFalse);
+          expect(runtime.cancelledRuns, isNot(contains(second.runId)));
+          expect(runtime.requests, hasLength(3));
+        },
+      );
+
+      test(
+        'process cap waits for in-flight calls and only evicts idle instances',
+        () async {
+          final scopes = <McpWorkspaceScope>[];
+          for (var i = 0; i <= McpProvider.workspaceProcessLimit; i++) {
+            final ws = await workspaces.create(name: 'Project $i');
+            scopes.add((serverId: 'guest', workspaceId: ws.id));
+            runtime.toolsByRoot[await workspaces.hostRootFor(ws)] = [
+              _tool('echo'),
+            ];
+          }
+          await configure(null, follow: true);
+          final active = scopes
+              .take(McpProvider.workspaceProcessLimit)
+              .toList();
+          final catalogs = await Future.wait(
+            active.map(provider.discoverWorkspaceTools),
+          );
+          final gates = <String, Completer<void>>{};
+          for (final launch in runtime.requests) {
+            runtime.callGates[launch.runId] = gates[launch.runId] =
+                Completer<void>();
+          }
+          final calls = [
+            for (var i = 0; i < active.length; i++)
+              provider.callWorkspaceTool(
+                active[i],
+                catalogs[i].single,
+                {},
+                isAllowed: () => true,
+              ),
+          ];
+          await _waitFor(() => runtime.argumentsByRun.length == active.length);
+          final waiting = provider.discoverWorkspaceTools(scopes.last);
+          await Future<void>.delayed(Duration.zero);
+          expect(runtime.requests, hasLength(active.length));
+          expect(runtime.cancelledRuns, isEmpty);
+          final released = gates.keys.first;
+          gates[released]!.complete();
+          expect((await waiting).single.name, 'echo');
+          expect(runtime.cancelledRuns, [released]);
+          for (final gate in gates.values.where((g) => !g.isCompleted)) {
+            gate.complete();
+          }
+          await Future.wait(calls);
+          expect(runtime.requests, hasLength(scopes.length));
+          await provider.disconnect('guest');
+          expect(runtime.cancelledRuns, hasLength(scopes.length));
+          await expectLater(
+            provider.discoverWorkspaceTools(scopes.last),
+            throwsStateError,
+          );
+          await provider.reconnect('guest');
+          expect(provider.statusFor('guest'), McpStatus.onDemand);
+        },
+      );
+
+      test(
+        'an idle process closes and is rediscovered before a captured call',
+        () async {
+          provider.dispose();
+          provider = McpProvider(
+            preferences: harness.preferences,
+            workspaces: workspaces,
+            workspaceRuntime: runtimeProvider,
+            environment: environment,
+            workspaceIdleTimeout: const Duration(milliseconds: 40),
+          );
+          await provider.loaded;
+          await configure(null, follow: true);
+          const scope = (serverId: 'guest', workspaceId: null);
+          runtime.toolsByRoot[''] = [_tool('echo', 'integer')];
+          final tool = (await provider.discoverWorkspaceTools(scope)).single;
+          final original = runtime.requests.single.runId;
+          await _waitFor(() => runtime.cancelledRuns.contains(original));
+          runtime.toolsByRoot[''] = [_tool('echo', 'string')];
+          final result = await provider.callWorkspaceTool(scope, tool, {
+            'value': '17',
+          }, isAllowed: () => true);
+          expect(result?.isError, isTrue);
+          expect(runtime.requests, hasLength(2));
+          expect(runtime.argumentsByRun, isEmpty);
+        },
+      );
 
       test(
         'probe and server share only the selected workspace mount',
@@ -678,6 +1133,16 @@ Future<void> _waitFor(bool Function() predicate) async {
   fail('MCP state did not settle');
 }
 
+Map<String, dynamic> _tool(String name, [String type = 'string']) => {
+  'name': name,
+  'inputSchema': {
+    'type': 'object',
+    'properties': {
+      'value': {'type': type},
+    },
+  },
+};
+
 class _McpRuntime extends FakeWorkspaceRuntime
     implements WorkspaceStdioRuntime {
   _McpRuntime({
@@ -697,6 +1162,30 @@ class _McpRuntime extends FakeWorkspaceRuntime
   final releaseInitialization = Completer<void>();
   final events = <String, StreamController<CommandEvent>>{};
   final probes = <CommandRequest>[];
+  final toolsByRoot = <String, List<Map<String, dynamic>>>{};
+  final argumentsByRun = <String, List<Map<String, dynamic>>>{};
+  final callGates = <String, Completer<void>>{};
+  final listGates = <String, Completer<void>>{};
+  final failedLists = <String>{};
+  final listCount = <String, int>{};
+  final toolsByCommand = <String, List<Map<String, dynamic>>>{};
+
+  void emit(String runId, Map<String, dynamic> message) {
+    final line = jsonEncode(message);
+    events[runId]!.add(
+      CommandOutput(
+        OutputStreamKind.stdout,
+        Uint8List.fromList(utf8.encode('$line\n')),
+      ),
+    );
+  }
+
+  void notifyListChanged(String runId) => emit(runId, {
+    'jsonrpc': '2.0',
+    'method': 'notifications/tools/list_changed',
+    'params': {},
+  });
+
   final cancelledRuns = <String>[];
   bool cancelled = false;
   @override
@@ -737,23 +1226,44 @@ class _McpRuntime extends FakeWorkspaceRuntime
       if (!initializationStarted.isCompleted) initializationStarted.complete();
       if (holdFirstInitialization) await releaseInitialization.future;
     }
+    final launch = requests.firstWhere((r) => r.runId == runId);
+    if (request['method'] == 'tools/list') {
+      listCount.update(launch.command, (count) => count + 1, ifAbsent: () => 1);
+      await listGates[launch.command]?.future;
+      if (failedLists.contains(launch.command)) {
+        emit(runId, {
+          'jsonrpc': '2.0',
+          'id': request['id'],
+          'error': {'code': -32603, 'message': 'Discovery failed'},
+        });
+        return;
+      }
+    }
+    if (request['method'] == 'tools/call') {
+      (argumentsByRun[runId] ??= []).add(
+        Map.from(request['params']['arguments'] as Map),
+      );
+      await callGates[runId]?.future;
+    }
     final result = request['method'] == 'initialize'
         ? {
             'protocolVersion': '2025-03-26',
             'capabilities': {'tools': {}},
             'serverInfo': {'name': 'guest', 'version': '1'},
           }
-        : {'tools': []};
-    events[runId]!.add(
-      CommandOutput(
-        OutputStreamKind.stdout,
-        Uint8List.fromList(
-          utf8.encode(
-            '${jsonEncode({'jsonrpc': '2.0', 'id': request['id'], 'result': result})}\n',
-          ),
-        ),
-      ),
-    );
+        : request['method'] == 'tools/call'
+        ? {
+            'content': [
+              {'type': 'text', 'text': runId},
+            ],
+          }
+        : {
+            'tools':
+                toolsByCommand[launch.command] ??
+                toolsByRoot[launch.mounts.firstOrNull?.host ?? ''] ??
+                [],
+          };
+    emit(runId, {'jsonrpc': '2.0', 'id': request['id'], 'result': result});
   }
 
   void failProcess(String runId) {

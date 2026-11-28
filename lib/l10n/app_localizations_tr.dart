@@ -739,6 +739,18 @@ class AppLocalizationsTr extends AppLocalizations {
   String get mcpWorkspaceBindingLabel => 'Çalışma alanını bağla (isteğe bağlı)';
 
   @override
+  String get mcpFollowConversationWorkspace =>
+      'Sohbet çalışma alanını takip et';
+
+  @override
+  String mcpFollowConversationWorkspaceHint(int limit) {
+    return 'Bu sohbetin çalışma alanını /workspace konumuna bağlar. Bağlanmamış bir sohbet, çalışma alanı bağlaması olmadan başlar. Bu modda sunucular arasında en fazla $limit işlem paylaşılır. Boşta kalan işlemler otomatik olarak kapanır.';
+  }
+
+  @override
+  String get mcpStatusOnDemand => 'İsteğe bağlı başlatılır';
+
+  @override
   String get mcpWorkspaceBindingHint =>
       'Sunucu bu çalışma alanına /workspace üzerinden erişebilir. Çalışma Dizini boş bırakılırsa orada başlar. Sohbetler arasında geçiş yaptığınızda bağlantı sabit kalır.';
 

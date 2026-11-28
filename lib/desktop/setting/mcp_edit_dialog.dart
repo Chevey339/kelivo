@@ -67,6 +67,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   final _argsCtrl = TextEditingController(); // space-separated args
   final _cwdCtrl = TextEditingController();
   String? _workspaceId;
+  bool _followWorkspace = false;
   final List<_HeaderEntry> _env = [];
 
   @override
@@ -101,6 +102,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         _argsCtrl.text = StdioArguments.format(server.args);
         _cwdCtrl.text = server.workingDirectory ?? '';
         _workspaceId = server.workspaceId;
+        _followWorkspace = server.followConversationWorkspace;
         server.env.forEach((k, v) {
           _env.add(
             _HeaderEntry(
@@ -209,6 +211,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             clearWorkingDirectory: clearing,
             workspaceId: _workspaceId,
             clearWorkspace: _workspaceId == null,
+            followConversationWorkspace: _followWorkspace,
           ),
         );
       } else {
@@ -221,6 +224,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           env: env,
           workingDirectory: cwd.isEmpty ? null : cwd,
           workspaceId: _workspaceId,
+          followConversationWorkspace: _followWorkspace,
         );
       }
     } else {
@@ -449,6 +453,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           McpWorkspaceBindingField(
             workspaceId: _workspaceId,
             onChanged: (id) => setState(() => _workspaceId = id),
+            followConversation: _followWorkspace,
+            onFollowChanged: (value) =>
+                setState(() => _followWorkspace = value),
           ),
           _labeledField(
             label: l10n.mcpServerEditSheetStdioCommandLabel,

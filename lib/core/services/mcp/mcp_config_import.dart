@@ -72,6 +72,8 @@ List<McpServerConfig> parseMcpConfigImport(String text) {
         url: stdio ? '' : url as String,
         headers: _strings(config['headers'], name),
         workingDirectory: cwd as String?,
+        followConversationWorkspace:
+            config['workspaceBinding'] == 'followConversation',
         workspaceId: stdio ? workspaceId as String? : null,
       ),
     );

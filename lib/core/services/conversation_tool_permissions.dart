@@ -174,6 +174,18 @@ class ToolCallPermission {
     return state;
   }
 
+  /// Revalidate the grant immediately before dispatch after an asynchronous wait.
+  void checkAuthorized() {
+    final state = check();
+    if (byFullAccess && state.mode != ToolPermissionMode.fullAccess) {
+      byFullAccess = false;
+      throw const ToolPermissionException(
+        'approval_denied',
+        'Full access was revoked',
+      );
+    }
+  }
+
   Future<void> authorize({
     required bool needed,
     required Map<String, dynamic> arguments,

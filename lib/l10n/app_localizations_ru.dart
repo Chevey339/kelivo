@@ -752,6 +752,17 @@ class AppLocalizationsRu extends AppLocalizations {
       'Привязать рабочую область (необязательно)';
 
   @override
+  String get mcpFollowConversationWorkspace => 'Следовать рабочей области чата';
+
+  @override
+  String mcpFollowConversationWorkspaceHint(int limit) {
+    return 'Подключать рабочую область этого чата в /workspace. Чат без привязки запускается без подключённой рабочей области. В этом режиме между серверами совместно используется до $limit процессов. Простаивающие процессы закрываются автоматически.';
+  }
+
+  @override
+  String get mcpStatusOnDemand => 'Запускается по требованию';
+
+  @override
   String get mcpWorkspaceBindingHint =>
       'Сервер может получить доступ к этой рабочей области по пути /workspace. Оставьте рабочий каталог пустым, чтобы запускать сервер оттуда. Привязка не меняется при переключении чатов.';
 

@@ -71,6 +71,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   String? _argsError;
   final _cwdCtrl = TextEditingController();
   String? _workspaceId;
+  bool _followWorkspace = false;
   final List<_HeaderEntry> _env = [];
   final List<_HeaderEntry> _headers = [];
 
@@ -99,6 +100,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       _argsCtrl.text = StdioArguments.format(server.args);
       _cwdCtrl.text = server.workingDirectory ?? '';
       _workspaceId = server.workspaceId;
+      _followWorkspace = server.followConversationWorkspace;
       server.env.forEach(
         (k, v) => _env.add(
           _HeaderEntry(
@@ -278,6 +280,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             McpWorkspaceBindingField(
               workspaceId: _workspaceId,
               onChanged: (id) => setState(() => _workspaceId = id),
+              followConversation: _followWorkspace,
+              onFollowChanged: (value) =>
+                  setState(() => _followWorkspace = value),
             ),
             _inputRow(
               label: l10n.mcpServerEditSheetStdioCommandLabel,
@@ -292,7 +297,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
               label: l10n.mcpServerEditSheetStdioWorkingDirectoryLabel,
               controller: _cwdCtrl,
               literalInput: true,
-              hint: _workspaceId == null ? '/root' : '/workspace',
+              hint: _followWorkspace
+                  ? null
+                  : (_workspaceId == null ? '/root' : '/workspace'),
             ),
             const SizedBox(height: 16),
             Text(l10n.mcpServerEditSheetStdioEnvironmentTitle),
@@ -527,6 +534,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             clearWorkingDirectory: clearing,
             workspaceId: _workspaceId,
             clearWorkspace: _workspaceId == null,
+            followConversationWorkspace: _followWorkspace,
           ),
         );
       } else {
@@ -539,6 +547,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           env: env,
           workingDirectory: cwd.isEmpty ? null : cwd,
           workspaceId: _workspaceId,
+          followConversationWorkspace: _followWorkspace,
         );
       }
       await _savePresentation(mcp, savedId!);

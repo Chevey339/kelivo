@@ -1426,6 +1426,24 @@ abstract class AppLocalizations {
   /// **'Bind workspace (optional)'**
   String get mcpWorkspaceBindingLabel;
 
+  /// Switch in the mobile STDIO MCP server editor. Enables selecting the mounted workspace from each conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow conversation workspace'**
+  String get mcpFollowConversationWorkspace;
+
+  /// Help below the follow-workspace switch in the mobile STDIO MCP editor. Explains unbound chats, the total process limit across following servers, and idle eviction.
+  ///
+  /// In en, this message translates to:
+  /// **'Mount this chat’s workspace at /workspace. An unbound chat starts without a workspace mount. Up to {limit} processes are shared across servers in this mode. Idle processes close automatically.'**
+  String mcpFollowConversationWorkspaceHint(int limit);
+
+  /// Status of an enabled mobile STDIO MCP server waiting for a conversation to start a workspace process.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts on demand'**
+  String get mcpStatusOnDemand;
+
   /// Explanatory hint under the workspace binding field describing /workspace access and fixed binding behavior.
   ///
   /// In en, this message translates to:

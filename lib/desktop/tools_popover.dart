@@ -259,9 +259,9 @@ class _ToolsContent extends StatelessWidget {
     final a = ap.getById(assistantId);
     if (a == null) return const SizedBox.shrink();
     final conversationScoped = a.allowConversationMcp && conversationId != null;
-    final conversation = conversationScoped
-        ? context.select<ChatService, Conversation?>(
-            (chat) => chat.getConversation(conversationId!),
+    final conversation = conversationId != null
+        ? context.select<ChatService?, Conversation?>(
+            (chat) => chat?.getConversation(conversationId!),
           )
         : null;
     final inherited = !ConversationMcpSettings.isOverridden(conversation);
@@ -369,6 +369,13 @@ class _ToolsContent extends StatelessWidget {
       }
       for (final s in group.servers) {
         final isSelected = selected.contains(s.id);
+        final scope = s.scopeFor(conversation);
+        final status = scope == null
+            ? mcp.statusFor(s.id)
+            : mcp.statusForScope(scope);
+        final tools = scope == null
+            ? s.declaredTools
+            : mcp.cachedWorkspaceTools(scope);
         rows.add(
           (context) => _RowItem(
             key: ValueKey('desktop-tools-mcp-${s.id}'),
@@ -377,12 +384,13 @@ class _ToolsContent extends StatelessWidget {
               size: 16,
               radius: 7,
               showBackground: false,
-              status: mcp.statusFor(s.id) == McpStatus.connected
-                  ? null
-                  : mcp.statusFor(s.id),
+              status: status == McpStatus.connected ? null : status,
             ),
-            detail:
-                '${s.tools.where((t) => t.enabled).length}/${s.tools.length}',
+            detail: status == McpStatus.onDemand
+                ? l10n.mcpStatusOnDemand
+                : scope != null && status != McpStatus.connected
+                ? null
+                : '${tools.where((t) => t.enabled).length}/${tools.length}',
             label: s.name,
             selected: isSelected,
             onTap: () async {
@@ -397,9 +405,13 @@ class _ToolsContent extends StatelessWidget {
             },
           ),
         );
-        if (mcp.statusFor(s.id) != McpStatus.connected) {
+        if (status != McpStatus.connected && status != McpStatus.onDemand) {
           rows.add(
-            (context) => McpToolConnectionStatus(serverId: s.id, desktop: true),
+            (context) => McpToolConnectionStatus(
+              serverId: s.id,
+              scope: scope,
+              desktop: true,
+            ),
           );
         }
       }

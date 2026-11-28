@@ -9,6 +9,10 @@ import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/models/workspace.dart';
+import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
+import '../../support/fake_workspace_runtime.dart';
 import 'package:Kelivo/core/models/scheduled_task.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
@@ -178,6 +182,70 @@ void main() {
     });
   }
 
+  testWidgets(
+    'workspace MCP preflight uses the task target, including an explicitly unbound chat',
+    (tester) async {
+      final harness = await mount(tester);
+      await tester.runAsync(() async {
+        harness.server.releaseTools.complete();
+        final a = await harness.workspaces.create(
+          name: 'Default',
+          kind: WorkspaceKind.linked,
+          hostPath: Directory.systemTemp.path,
+        );
+        final b = await harness.workspaces.create(
+          name: 'Target',
+          kind: WorkspaceKind.linked,
+          hostPath: Directory.systemTemp.path,
+        );
+        final server = await harness.mcpProvider.addServer(
+          name: 'Scoped',
+          enabled: true,
+          transport: McpTransportType.stdio,
+          command: 'guest',
+          followConversationWorkspace: true,
+        );
+        await harness.assistants.updateAssistant(
+          harness.assistants
+              .getById('assistant')!
+              .copyWith(defaultWorkspaceId: a.id, mcpServerIds: [server]),
+        );
+        for (final (mode, workspaceId) in [
+          (ScheduledTaskMode.newChat, a.id),
+          (ScheduledTaskMode.followUp, b.id),
+          (ScheduledTaskMode.followUp, null),
+        ]) {
+          harness.chat.existing['target'] = Conversation(
+            id: 'target',
+            title: 'Target',
+            assistantId: 'assistant',
+            extras: WorkspaceBinding(workspaceId: workspaceId).applyTo({}),
+          );
+          final outcome = await harness.run(
+            null,
+            ScheduledTask(
+              id: 'task',
+              name: 'Scheduled',
+              prompt: 'Use tool',
+              assistantId: 'assistant',
+              hour: 8,
+              minute: 0,
+              mode: mode,
+              conversationId: mode == ScheduledTaskMode.newChat
+                  ? null
+                  : 'target',
+            ),
+          );
+          expect(outcome, isA<_RequestCaptured>());
+          expect(harness.mcpProvider.preflights.last, (
+            serverId: server,
+            workspaceId: workspaceId,
+          ));
+        }
+        expect(harness.mcpProvider.preflights, hasLength(3));
+      });
+    },
+  );
   for (final mode in ScheduledTaskMode.values) {
     testWidgets('${mode.name} uses the selected target and task model', (
       tester,
@@ -355,7 +423,7 @@ class _RunnerHarness {
   _RunnerHarness(this.storage, this.server) {
     assistants = AssistantProvider(preferences: storage.preferences);
     settings = SettingsProvider(storage.preferences);
-    mcpProvider = McpProvider(preferences: storage.preferences);
+    mcpProvider = _ScheduledMcpProvider(preferences: storage.preferences);
     workspaces = WorkspaceProvider(
       store: ExtensionEntityStore(storage.database),
     );
@@ -367,7 +435,7 @@ class _RunnerHarness {
   final _DelayedMcpServer server;
   late final AssistantProvider assistants;
   late final SettingsProvider settings;
-  late final McpProvider mcpProvider;
+  late final _ScheduledMcpProvider mcpProvider;
   late final WorkspaceProvider workspaces;
   late final WorldBookProvider books;
   late final _RecordingViewModel viewModel;
@@ -489,6 +557,30 @@ class _RunnerHarness {
     questions.dispose();
     await storage.close();
     await server.close();
+  }
+}
+
+class _ScheduledMcpProvider extends McpProvider {
+  _ScheduledMcpProvider({required super.preferences})
+    : super(
+        workspaceRuntime: WorkspaceRuntimeProvider()
+          ..register(FakeWorkspaceRuntime()),
+      );
+  final preflights = <McpWorkspaceScope>[];
+  @override
+  Future<List<McpToolConfig>> discoverWorkspaceTools(
+    McpWorkspaceScope scope, {
+    bool refresh = false,
+  }) async {
+    expect(refresh, isTrue);
+    preflights.add(scope);
+    return [];
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    workspaceRuntime!.dispose();
   }
 }
 

@@ -103,6 +103,15 @@ class _FakeMcpProvider extends McpProvider {
   _FakeMcpProvider({required super.preferences});
 
   List<McpServerConfig> fakeServers = const <McpServerConfig>[];
+  final workspaceCatalogs = <McpWorkspaceScope, List<McpToolConfig>>{};
+  @override
+  List<McpToolConfig> cachedWorkspaceTools(McpWorkspaceScope scope) =>
+      workspaceCatalogs[scope] ?? const [];
+  @override
+  McpStatus statusForScope(McpWorkspaceScope scope) =>
+      workspaceCatalogs.containsKey(scope)
+      ? McpStatus.connected
+      : McpStatus.onDemand;
 
   @override
   List<McpServerConfig> get servers => fakeServers;
@@ -258,6 +267,56 @@ void main() {
   }
 
   for (final desktop in [false, true]) {
+    testWidgets(
+      'the conversation shows its own MCP tool count and on-demand state, desktop=$desktop',
+      (tester) async {
+        await tester.runAsync(
+          () => uiPreferences.setStringList(
+            'display_chat_tools_expanded_groups_v1',
+            ['mcp'],
+          ),
+        );
+        final shared = _server('shared', 'Workspace service').copyWith(
+          transport: McpTransportType.stdio,
+          followConversationWorkspace: true,
+        );
+        mcp.workspaceCatalogs[(serverId: shared.id, workspaceId: 'A')] = [
+          shared.tools.first,
+        ];
+        final conversation = Conversation(
+          title: 'Target',
+          assistantId: assistantId,
+          extras: const WorkspaceBinding(workspaceId: 'A').applyTo({}),
+        );
+        final l10n = await pumpSheet(
+          tester,
+          desktop: desktop,
+          conversation: conversation,
+          servers: [shared],
+        );
+        final row = find.byKey(
+          desktop
+              ? const ValueKey('desktop-tools-mcp-shared')
+              : ChatToolsSheet.mcpServerKey('shared'),
+        );
+        if (desktop) await tester.scrollUntilVisible(row, 250);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: row, matching: find.text('1/1')),
+          findsOneWidget,
+        );
+        final chat = tester.element(find.byType(Scaffold)).read<ChatService>();
+        await chat.updateConversationExtras(
+          conversation.id,
+          const WorkspaceBinding(workspaceId: 'B').applyTo,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: row, matching: find.text(l10n.mcpStatusOnDemand)),
+          findsOneWidget,
+        );
+      },
+    );
     testWidgets('local tools omit the image recall switch, desktop=$desktop', (
       tester,
     ) async {

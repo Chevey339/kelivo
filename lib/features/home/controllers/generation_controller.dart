@@ -95,13 +95,15 @@ class GenerationController {
   // Tool Definitions Builder (delegated to ToolHandlerService)
   // ============================================================================
 
-  McpToolRouteSnapshot captureMcpToolRoutes(
+  Future<McpToolRouteSnapshot> captureMcpToolRoutes(
     Assistant? assistant, {
     String? conversationId,
+    bool discoverWorkspaceTools = false,
   }) {
     return toolHandlerService.captureMcpToolRoutes(
       assistant,
       conversationId: conversationId,
+      discoverWorkspaceTools: discoverWorkspaceTools,
     );
   }
 

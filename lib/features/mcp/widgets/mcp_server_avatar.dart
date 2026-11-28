@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/mcp_provider.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../core/models/mcp_presentation.dart';
 import '../../../utils/icon_cache.dart';
 import '../../../theme/app_semantic_colors.dart';
@@ -43,6 +44,17 @@ Color mcpReadableColor(
   return onSurface;
 }
 
+String mcpStatusLabel(AppLocalizations l10n, McpStatus status) =>
+    switch (status) {
+      McpStatus.connected => l10n.mcpPageStatusConnected,
+      McpStatus.connecting => l10n.mcpPageStatusConnecting,
+      McpStatus.authorizing => l10n.mcpPageStatusAuthorizing,
+      McpStatus.needsAuthorization => l10n.mcpPageStatusAuthorizationRequired,
+      McpStatus.error => l10n.mcpPageStatusFailed,
+      McpStatus.onDemand => l10n.mcpStatusOnDemand,
+      McpStatus.idle => l10n.mcpPageStatusDisconnected,
+    };
+
 Color mcpStatusColor(BuildContext context, McpStatus status) {
   final cs = Theme.of(context).colorScheme;
   final colors = context.appColors;
@@ -51,7 +63,7 @@ Color mcpStatusColor(BuildContext context, McpStatus status) {
     McpStatus.connecting || McpStatus.authorizing => cs.primary,
     McpStatus.needsAuthorization => colors.warning,
     McpStatus.error => cs.error,
-    McpStatus.idle => cs.onSurface.withValues(alpha: .6),
+    McpStatus.idle || McpStatus.onDemand => cs.onSurface.withValues(alpha: .6),
   };
   return mcpReadableColor(color, colors.surfaceCard, cs.onSurface, minimum: 3);
 }

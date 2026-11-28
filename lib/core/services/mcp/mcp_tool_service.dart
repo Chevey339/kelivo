@@ -10,16 +10,25 @@ import '../../../utils/mcp_structured_image.dart';
 import '../api/tool_call_cancellation.dart';
 import 'mcp_image_snapshot.dart';
 
+typedef _WorkspaceCatalog = ({
+  Object? configuration,
+  List<McpToolConfig> tools,
+});
+
 class _McpToolRoute {
   const _McpToolRoute({
     required this.server,
     required this.tool,
     required this.exposedName,
+    this.scope,
+    this.configuration,
   });
 
   final McpServerConfig server;
   final McpToolConfig tool;
   final String exposedName;
+  final McpWorkspaceScope? scope;
+  final Object? configuration;
 }
 
 class McpToolRouteSnapshot {
@@ -47,7 +56,13 @@ class McpToolService extends ChangeNotifier {
     String conversationId,
   ) {
     final selected = chat.getConversationMcpServers(conversationId).toSet();
-    return _exposedTools(mcpProvider, selected);
+    return _exposedToolsForRoutes(
+      _toolRoutes(
+        mcpProvider,
+        selected,
+        conversation: chat.getConversation(conversationId),
+      ),
+    );
   }
 
   List<McpToolConfig> listAvailableToolsForAssistant(
@@ -68,7 +83,14 @@ class McpToolService extends ChangeNotifier {
       a,
       conversation,
     ).toSet();
-    return _exposedTools(mcpProvider, selected, reservedNames: reservedNames);
+    return _exposedToolsForRoutes(
+      _toolRoutes(
+        mcpProvider,
+        selected,
+        conversation: conversation,
+        reservedNames: reservedNames,
+      ),
+    );
   }
 
   Future<mcp.CallToolResult?> callToolForConversation(
@@ -79,11 +101,26 @@ class McpToolService extends ChangeNotifier {
     Map<String, dynamic> arguments = const {},
   }) async {
     final selected = chat.getConversationMcpServers(conversationId).toSet();
-    if (selected.isEmpty) return null;
-
-    final route = _findRoute(mcpProvider, selected, toolName);
+    final routes = await _prepareRoutes(
+      mcpProvider,
+      selected,
+      chat.getConversation(conversationId),
+    );
+    final route = routes._find(toolName);
     if (route == null) return null;
-    return mcpProvider.callTool(route.server.id, route.tool.name, arguments);
+    return _dispatch(
+      mcpProvider,
+      route,
+      arguments,
+      () =>
+          _currentRouteForIdentity(
+            mcpProvider,
+            chat.getConversationMcpServers(conversationId).toSet(),
+            route,
+            chat.getConversation(conversationId),
+          ) !=
+          null,
+    );
   }
 
   Future<McpToolResult> callFlattenedToolForConversation(
@@ -94,30 +131,27 @@ class McpToolService extends ChangeNotifier {
     Map<String, dynamic> arguments = const {},
   }) async {
     final selected = chat.getConversationMcpServers(conversationId).toSet();
-    final route = _findRoute(mcpProvider, selected, toolName);
-    final res = route == null
-        ? null
-        : await mcpProvider.callTool(
-            route.server.id,
-            route.tool.name,
-            arguments,
-          );
-    if (res == null) {
-      if (route != null) {
-        final errMsg =
-            mcpProvider.errorFor(route.server.id) ??
-            'MCP server is unavailable.';
-        return McpToolResult(
-          markdown: _renderToolErrorForModel(
-            serverName: route.server.name,
-            toolName: toolName,
-            errorMessage: errMsg,
-          ),
-        );
-      }
-      return const McpToolResult();
-    }
-    return _flattenToolResult(res);
+    final routes = await _prepareRoutes(
+      mcpProvider,
+      selected,
+      chat.getConversation(conversationId),
+    );
+    final route = routes._find(toolName);
+    if (route == null) return const McpToolResult();
+    final res = await _dispatch(
+      mcpProvider,
+      route,
+      arguments,
+      () =>
+          _currentRouteForIdentity(
+            mcpProvider,
+            chat.getConversationMcpServers(conversationId).toSet(),
+            route,
+            chat.getConversation(conversationId),
+          ) !=
+          null,
+    );
+    return _renderResult(mcpProvider, route, res);
   }
 
   Future<String> callToolTextForConversation(
@@ -140,55 +174,88 @@ class McpToolService extends ChangeNotifier {
     McpProvider mcpProvider,
     AssistantProvider assistants, {
     Conversation? conversation,
+    Conversation? Function()? readConversation,
+    void Function()? checkPermission,
     required String? assistantId,
     required String toolName,
     Map<String, dynamic> arguments = const {},
     McpToolRouteSnapshot? routeSnapshot,
     Set<String> reservedNames = const {},
   }) async {
-    // Resolve selection again before executing a captured route.
-    final a = (assistantId != null)
-        ? assistants.getById(assistantId)
-        : assistants.currentAssistant;
-    final selected = ConversationMcpSettings.effectiveServerIds(
-      a,
-      conversation,
-    ).toSet();
-    // debugPrint('[MCP/Call/Select] assistant=${assistantId ?? a?.id ?? '(current)'} tool=$toolName selectedServers=${selected.join(',')}');
-    if (selected.isEmpty) return const McpToolResult();
+    Conversation? currentChat() =>
+        readConversation == null ? conversation : readConversation();
+    Set<String> selection(Conversation? chat) =>
+        ConversationMcpSettings.effectiveServerIds(
+          assistantId == null
+              ? assistants.currentAssistant
+              : assistants.getById(assistantId),
+          chat,
+        ).toSet();
+    final chat = currentChat();
+    final selected = selection(chat);
     final routes =
-        routeSnapshot?._routes ??
-        _toolRoutes(mcpProvider, selected, reservedNames: reservedNames);
-    for (final publishedRoute in routes) {
-      final has = publishedRoute.exposedName == toolName;
-      if (has) {
-        final route = _currentRouteForIdentity(
+        routeSnapshot ??
+        await _prepareRoutes(
           mcpProvider,
           selected,
-          publishedRoute,
+          chat,
+          reservedNames: reservedNames,
         );
-        if (route == null) return const McpToolResult();
-        final s = route.server;
-        final res = await mcpProvider.callTool(
-          s.id,
-          route.tool.name,
-          arguments,
-        );
-        if (res == null) {
-          final errMsg =
-              mcpProvider.errorFor(s.id) ?? 'MCP server is unavailable.';
-          return McpToolResult(
-            markdown: _renderToolErrorForModel(
-              serverName: s.name,
-              toolName: toolName,
-              errorMessage: errMsg,
-            ),
-          );
-        }
-        return _flattenToolResult(res);
-      }
+    final published = routes._find(toolName);
+    if (published == null) return const McpToolResult();
+    _McpToolRoute? current() {
+      final latest = currentChat();
+      return _currentRouteForIdentity(
+        mcpProvider,
+        selection(latest),
+        published,
+        latest,
+      );
     }
-    return const McpToolResult();
+
+    final route = current();
+    if (route == null) return const McpToolResult();
+    final result = await _dispatch(mcpProvider, route, arguments, () {
+      ToolCallCancellation.current?.throwIfCancelled();
+      checkPermission?.call();
+      return current() != null;
+    });
+    return _renderResult(mcpProvider, route, result);
+  }
+
+  Future<mcp.CallToolResult?> _dispatch(
+    McpProvider provider,
+    _McpToolRoute route,
+    Map<String, dynamic> args,
+    bool Function() isAllowed,
+  ) {
+    final scope = route.scope;
+    if (scope != null) {
+      return provider.callWorkspaceTool(
+        scope,
+        route.tool,
+        args,
+        isAllowed: isAllowed,
+      );
+    }
+    if (!isAllowed()) return Future.value(null);
+    return provider.callTool(route.server.id, route.tool.name, args);
+  }
+
+  Future<McpToolResult> _renderResult(
+    McpProvider provider,
+    _McpToolRoute route,
+    mcp.CallToolResult? result,
+  ) async {
+    if (result != null) return _flattenToolResult(result);
+    return McpToolResult(
+      markdown: _renderToolErrorForModel(
+        serverName: route.server.name,
+        toolName: route.exposedName,
+        errorMessage:
+            provider.errorFor(route.server.id) ?? 'MCP server is unavailable.',
+      ),
+    );
   }
 
   Future<String> callToolTextForAssistant(
@@ -236,12 +303,14 @@ class McpToolService extends ChangeNotifier {
             selected,
             toolName,
             reservedNames: reservedNames,
+            conversation: conversation,
           );
     if (publishedRoute == null) return false;
     final route = _currentRouteForIdentity(
       mcpProvider,
       selected,
       publishedRoute,
+      conversation,
     );
     return route?.tool.needsApproval ?? true;
   }
@@ -263,7 +332,13 @@ class McpToolService extends ChangeNotifier {
     ).toSet();
     final published = routeSnapshot._find(toolName);
     return published != null &&
-        _currentRouteForIdentity(mcpProvider, selected, published) != null;
+        _currentRouteForIdentity(
+              mcpProvider,
+              selected,
+              published,
+              conversation,
+            ) !=
+            null;
   }
 
   McpToolRouteSnapshot captureRoutesForAssistant(
@@ -281,7 +356,76 @@ class McpToolService extends ChangeNotifier {
       conversation,
     ).toSet();
     return McpToolRouteSnapshot._(
-      _toolRoutes(mcpProvider, selected, reservedNames: reservedNames),
+      _toolRoutes(
+        mcpProvider,
+        selected,
+        conversation: conversation,
+        reservedNames: reservedNames,
+      ),
+    );
+  }
+
+  Future<McpToolRouteSnapshot> prepareRoutesForAssistant(
+    McpProvider provider,
+    AssistantProvider assistants, {
+    required String? assistantId,
+    required Conversation? conversation,
+    Set<String> reservedNames = const {},
+  }) async {
+    await Future.wait([provider.loaded, assistants.loaded]);
+    final assistant = assistantId == null
+        ? assistants.currentAssistant
+        : assistants.getById(assistantId);
+    return _prepareRoutes(
+      provider,
+      ConversationMcpSettings.effectiveServerIds(
+        assistant,
+        conversation,
+      ).toSet(),
+      conversation,
+      reservedNames: reservedNames,
+    );
+  }
+
+  Future<McpToolRouteSnapshot> _prepareRoutes(
+    McpProvider provider,
+    Set<String> selected,
+    Conversation? conversation, {
+    Set<String> reservedNames = const {},
+  }) async {
+    final catalogs = <String, _WorkspaceCatalog>{};
+    if (conversation != null && provider.supportsStdioWorkspaceBinding) {
+      final servers = provider.servers
+          .where(
+            (s) =>
+                s.enabled &&
+                s.followConversationWorkspace &&
+                selected.contains(s.id),
+          )
+          .toList();
+      if (servers.isNotEmpty) await provider.workspaces?.loaded;
+      await Future.wait(
+        servers.map((server) async {
+          final scope = server.scopeFor(conversation)!;
+          final version = provider.workspaceConfigurationFor(scope);
+          try {
+            final tools = await provider.discoverWorkspaceTools(scope);
+            catalogs[server.id] = (configuration: version, tools: tools);
+          } on StateError {
+            // A failed instance has no declarations. Other selected servers
+            // can still serve this chat, and its connection retains the error.
+          }
+        }),
+      );
+    }
+    return McpToolRouteSnapshot._(
+      _toolRoutes(
+        provider,
+        selected,
+        conversation: conversation,
+        catalogs: catalogs,
+        reservedNames: reservedNames,
+      ),
     );
   }
 
@@ -378,16 +522,6 @@ class McpToolService extends ChangeNotifier {
     return last == 0x0A || last == 0x0D;
   }
 
-  List<McpToolConfig> _exposedTools(
-    McpProvider provider,
-    Set<String> selected, {
-    Set<String> reservedNames = const {},
-  }) {
-    return _exposedToolsForRoutes(
-      _toolRoutes(provider, selected, reservedNames: reservedNames),
-    );
-  }
-
   List<McpToolConfig> _exposedToolsForRoutes(Iterable<_McpToolRoute> routes) {
     return [
       for (final route in routes) route.tool.copyWith(name: route.exposedName),
@@ -398,35 +532,45 @@ class McpToolService extends ChangeNotifier {
     McpProvider provider,
     Set<String> selected,
     String exposedName, {
+    Conversation? conversation,
     Set<String> reservedNames = const {},
-  }) {
-    for (final route in _toolRoutes(
-      provider,
-      selected,
-      reservedNames: reservedNames,
-    )) {
-      if (route.exposedName == exposedName) return route;
-    }
-    return null;
-  }
+  }) => _toolRoutes(
+    provider,
+    selected,
+    conversation: conversation,
+    reservedNames: reservedNames,
+  ).where((route) => route.exposedName == exposedName).firstOrNull;
 
   _McpToolRoute? _currentRouteForIdentity(
     McpProvider provider,
     Set<String> selected,
-    _McpToolRoute publishedRoute,
+    _McpToolRoute published,
+    Conversation? conversation,
   ) {
     for (final server in provider.servers) {
-      if (server.id != publishedRoute.server.id ||
+      if (server.id != published.server.id ||
           !server.enabled ||
-          !selected.contains(server.id)) {
+          !selected.contains(server.id) ||
+          server.followConversationWorkspace != (published.scope != null)) {
         continue;
       }
-      for (final tool in server.tools) {
-        if (tool.name == publishedRoute.tool.name && tool.enabled) {
+      final scope = published.scope;
+      if (scope != null &&
+          (server.scopeFor(conversation) != scope ||
+              provider.workspaceConfigurationFor(scope) !=
+                  published.configuration)) {
+        return null;
+      }
+      for (final tool in scope == null ? server.declaredTools : server.tools) {
+        if (tool.name == published.tool.name && tool.enabled) {
           return _McpToolRoute(
             server: server,
-            tool: tool,
-            exposedName: publishedRoute.exposedName,
+            tool: scope == null
+                ? tool
+                : published.tool.copyWith(needsApproval: tool.needsApproval),
+            exposedName: published.exposedName,
+            scope: scope,
+            configuration: published.configuration,
           );
         }
       }
@@ -437,13 +581,39 @@ class McpToolService extends ChangeNotifier {
   List<_McpToolRoute> _toolRoutes(
     McpProvider provider,
     Set<String> selected, {
+    Conversation? conversation,
+    Map<String, _WorkspaceCatalog>? catalogs,
     Set<String> reservedNames = const {},
   }) {
-    final entries = <({McpServerConfig server, McpToolConfig tool})>[];
+    final entries =
+        <
+          ({
+            McpServerConfig server,
+            McpToolConfig tool,
+            McpWorkspaceScope? scope,
+          })
+        >[];
     for (final server in provider.servers) {
       if (!server.enabled || !selected.contains(server.id)) continue;
-      for (final tool in server.tools.where((tool) => tool.enabled)) {
-        entries.add((server: server, tool: tool));
+      McpWorkspaceScope? scope;
+      var tools = server.declaredTools;
+      if (server.followConversationWorkspace) {
+        scope = server.scopeFor(conversation);
+        if (scope == null || !provider.supportsStdioWorkspaceBinding) continue;
+        if (catalogs == null) {
+          tools = provider.cachedWorkspaceTools(scope);
+        } else {
+          final catalog = catalogs[server.id];
+          if (catalog == null ||
+              catalog.configuration !=
+                  provider.workspaceConfigurationFor(scope)) {
+            continue;
+          }
+          tools = server.withToolPreferences(catalog.tools);
+        }
+      }
+      for (final tool in tools.where((tool) => tool.enabled)) {
+        entries.add((server: server, tool: tool, scope: scope));
       }
     }
 
@@ -480,6 +650,10 @@ class McpToolService extends ChangeNotifier {
           server: entry.server,
           tool: entry.tool,
           exposedName: uniqueName,
+          scope: entry.scope,
+          configuration: entry.scope == null
+              ? null
+              : provider.workspaceConfigurationFor(entry.scope!),
         ),
       );
     }

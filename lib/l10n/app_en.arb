@@ -354,6 +354,9 @@
   "mcpServerEditSheetStdioArgumentsLabel": "Arguments",
   "mcpServerEditSheetStdioWorkingDirectoryLabel": "Working Directory (optional)",
   "mcpWorkspaceBindingLabel": "Bind workspace (optional)",
+  "mcpFollowConversationWorkspace": "Follow conversation workspace",
+  "mcpFollowConversationWorkspaceHint": "Mount this chat’s workspace at /workspace. An unbound chat starts without a workspace mount. Up to {limit} processes are shared across servers in this mode. Idle processes close automatically.",
+  "mcpStatusOnDemand": "Starts on demand",
   "mcpWorkspaceBindingHint": "The server can access this workspace at /workspace. Leave Working Directory empty to start there. The binding stays fixed when you switch chats.",
   "mcpWorkspaceBindingMobileOnly": "Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.",
   "mcpServerEditSheetStdioEnvironmentTitle": "Environment",
@@ -9436,6 +9439,21 @@
   },
   "@mcpWorkspaceBindingLabel": {
     "description": "Label for the optional workspace binding field on an MCP server, with folder icon."
+  },
+  "@mcpFollowConversationWorkspace": {
+    "description": "Switch in the mobile STDIO MCP server editor. Enables selecting the mounted workspace from each conversation."
+  },
+  "@mcpFollowConversationWorkspaceHint": {
+    "description": "Help below the follow-workspace switch in the mobile STDIO MCP editor. Explains unbound chats, the total process limit across following servers, and idle eviction.",
+    "placeholders": {
+      "limit": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "@mcpStatusOnDemand": {
+    "description": "Status of an enabled mobile STDIO MCP server waiting for a conversation to start a workspace process."
   },
   "@mcpWorkspaceBindingHint": {
     "description": "Explanatory hint under the workspace binding field describing /workspace access and fixed binding behavior."
