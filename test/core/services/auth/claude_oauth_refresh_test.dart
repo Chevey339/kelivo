@@ -478,6 +478,7 @@ void main() {
               ? response({}, 503)
               : response(tokenResponse(access: 'new'));
         }
+        if (request.url.path == '/api/oauth/profile') return response({}, 403);
         expect(request.url.path, '/api/oauth/usage');
         expect(request.headers['authorization'], 'Bearer sk-ant-oat-access');
         return response({
@@ -489,6 +490,67 @@ void main() {
       expect(service.needsLogin(config.id), isFalse);
       expect((await service.resolve(config)).apiKey, 'new');
       expect(exchanges, 2);
+    },
+  );
+
+  test(
+    'a Claude account refresh updates its seat and tolerates a profile outage',
+    () async {
+      final config = await account();
+      http.Response profile(String type, String tier) => response({
+        'organization': {'organization_type': type, 'rate_limit_tier': tier},
+      });
+      final profiles = [
+        profile('unknown', 'default_claude_max_5x'),
+        profile('claude_team', 'default_claude_max_5x'),
+        response({}, 401),
+        response({}),
+        profile('claude_team', 'default'),
+        profile('claude_max', 'default_claude_max_5x'),
+        profile('claude_max', 'default_claude_max_20x'),
+        profile('unknown', 'default_claude_max_5x'),
+        profile('claude_pro', 'default'),
+        profile('claude_enterprise', 'default'),
+        response({}, 503),
+      ].iterator;
+      var reads = 0;
+      final service = serviceWith((request) async {
+        if (request.url.path == '/api/oauth/usage') {
+          return response({
+            'five_hour': {'utilization': ++reads},
+          });
+        }
+        expect(request.url.path, '/api/oauth/profile');
+        expect(profiles.moveNext(), isTrue);
+        return profiles.current;
+      });
+      for (final plan in [
+        null,
+        'Team 5x',
+        'Team 5x',
+        'Team 5x',
+        'Team',
+        'Max 5x',
+        'Max 20x',
+        null,
+        'Pro',
+        'Enterprise',
+      ]) {
+        final usage = await service.fetchUsage(config);
+        expect(usage.plan, plan);
+        expect(service.cachedUsage(config)?.plan, plan);
+        expect(usage.windows.single.usedPercent, reads);
+        expect(service.needsLogin(config.id), isFalse);
+      }
+      final replacement = config.copyWith(
+        oauthCredentials: ProviderOAuthCredentials.fromJson({
+          ...config.oauthCredentials!.toJson(),
+          'sessionId': 'other-session',
+        }),
+      );
+      await settings.setProviderConfig(config.id, replacement);
+      expect((await service.fetchUsage(replacement)).plan, isNull);
+      expect(profiles.moveNext(), isFalse);
     },
   );
 

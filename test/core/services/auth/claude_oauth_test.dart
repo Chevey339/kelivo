@@ -716,9 +716,25 @@ void main() {
     'Claude usage retries transient and empty responses with OMP headers',
     () async {
       var calls = 0;
+      var profiles = 0;
       final usage = await ClaudeOAuthAdapter().usage(
         OAuthWire(
           MockClient((request) async {
+            if (request.url.path == '/api/oauth/profile') {
+              profiles++;
+              expect(calls, 3);
+              expect(request.url.host, 'api.anthropic.com');
+              expect(
+                request.headers['authorization'],
+                'Bearer sk-ant-oat-access',
+              );
+              return response({
+                'organization': {
+                  'organization_type': 'claude_team',
+                  'rate_limit_tier': 'default_claude_max_5x',
+                },
+              });
+            }
             expect(
               request.url.toString(),
               'https://api.anthropic.com/api/oauth/usage',
@@ -752,6 +768,8 @@ void main() {
         claudeConfig().oauthCredentials!,
       );
       expect(calls, 3);
+      expect(profiles, 1);
+      expect(usage.plan, 'Team 5x');
       expect(usage.windows.single.usedPercent, 42);
     },
   );

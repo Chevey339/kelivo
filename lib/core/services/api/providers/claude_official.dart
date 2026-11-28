@@ -65,9 +65,11 @@ Stream<StreamChunk> sendClaudeStream(
   final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
     config,
   );
+  final officialAnthropic = BuiltInToolsHelper.isOfficialAnthropicEndpoint(
+    config,
+  );
   final replayServerToolBlocks =
-      BuiltInToolsHelper.isOfficialAnthropicEndpoint(config) ||
-      BuiltInToolsHelper.isVercelProvider(config);
+      officialAnthropic || BuiltInToolsHelper.isVercelProvider(config);
 
   // Extract system prompt (Anthropic uses top-level `system`)
   String systemPrompt = '';
@@ -96,6 +98,7 @@ Stream<StreamChunk> sendClaudeStream(
   final history = ClaudeHistory(
     replayServerToolBlocks: replayServerToolBlocks,
     skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+    requiresThinkingSignature: officialAnthropic,
     reasoningReplay: spec.reasoning.replay,
     skipImageParsing: skipImageParsing,
     canImageInput: canImageInput,
@@ -705,7 +708,7 @@ Stream<StreamChunk> sendClaudeStream(
       }
     },
     takeCalls: () => pendingCalls,
-    continueWithoutCalls: () => pauseTurn,
+    continueWithoutCalls: () => pauseTurn && lastAssistantBlocks.isNotEmpty,
     executeAfterRound: !stream,
     emitCalls: !stream,
     onToolCall: onToolCall,

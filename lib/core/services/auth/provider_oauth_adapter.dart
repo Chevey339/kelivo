@@ -445,8 +445,9 @@ abstract class ProviderOAuthAdapter {
 
   Future<ProviderUsageSnapshot> usage(
     OAuthWire wire,
-    ProviderOAuthCredentials credentials,
-  );
+    ProviderOAuthCredentials credentials, {
+    ProviderUsageSnapshot? previous,
+  });
 }
 
 class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
@@ -676,8 +677,9 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
   @override
   Future<ProviderUsageSnapshot> usage(
     OAuthWire wire,
-    ProviderOAuthCredentials credentials,
-  ) async {
+    ProviderOAuthCredentials credentials, {
+    ProviderUsageSnapshot? previous,
+  }) async {
     final data = await get(
       wire,
       'https://chatgpt.com/backend-api/wham/usage',
@@ -871,8 +873,9 @@ class GrokOAuthAdapter extends ProviderOAuthAdapter {
   @override
   Future<ProviderUsageSnapshot> usage(
     OAuthWire wire,
-    ProviderOAuthCredentials credentials,
-  ) async {
+    ProviderOAuthCredentials credentials, {
+    ProviderUsageSnapshot? previous,
+  }) async {
     final data = await get(
       wire,
       'https://cli-chat-proxy.grok.com/v1/billing?format=credits',
@@ -930,8 +933,9 @@ class KimiOAuthAdapter extends ProviderOAuthAdapter {
   @override
   Future<ProviderUsageSnapshot> usage(
     OAuthWire wire,
-    ProviderOAuthCredentials credentials,
-  ) async => parseKimiUsage(
+    ProviderOAuthCredentials credentials, {
+    ProviderUsageSnapshot? previous,
+  }) async => parseKimiUsage(
     await get(wire, '${provider.baseUrl}/usages', credentials),
   );
 }

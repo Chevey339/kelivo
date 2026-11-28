@@ -815,16 +815,19 @@ class ProviderOAuthService extends ChangeNotifier {
   Future<ProviderUsageSnapshot> fetchUsage(ProviderConfig original) async {
     final key = _sessionKey(original);
     if (_usageRequests[key] case final pending?) return pending;
-    final request = _authenticated(
-      original,
-      (wire, config) async => ProviderOAuthAdapter.forProvider(
+    final request = _authenticated(original, (wire, config) async {
+      final adapter = ProviderOAuthAdapter.forProvider(
         config.oauthProvider!,
         codexVersion: config.oauthProvider == OAuthProvider.chatgpt
             ? await _currentCodexVersion()
             : null,
-      ).usage(wire, config.oauthCredentials!),
-      usageProbe: true,
-    );
+      );
+      return adapter.usage(
+        wire,
+        config.oauthCredentials!,
+        previous: _usage[key],
+      );
+    }, usageProbe: true);
     _usageRequests[key] = request;
     try {
       final result = await request;

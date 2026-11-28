@@ -199,6 +199,15 @@ class ProviderUsageSnapshot {
   final bool? limitReached;
   final int? resetCredits;
 
+  ProviderUsageSnapshot withPlan(String plan) => ProviderUsageSnapshot(
+    windows: windows,
+    fetchedAt: fetchedAt,
+    plan: plan,
+    allowed: allowed,
+    limitReached: limitReached,
+    resetCredits: resetCredits,
+  );
+
   bool get hasData =>
       windows.isNotEmpty ||
       allowed != null ||

@@ -204,6 +204,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   final history = ClaudeHistory(
     replayServerToolBlocks: true,
     skipRedactedThinkingBlocks: false,
+    requiresThinkingSignature: true,
     reasoningReplay: spec.reasoning.replay,
     skipImageParsing: skipImageParsing,
     canImageInput: canImageInput,
@@ -516,7 +517,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
       }
     },
     takeCalls: () => pendingCalls,
-    continueWithoutCalls: () => pauseTurn,
+    continueWithoutCalls: () => pauseTurn && lastAssistantBlocks.isNotEmpty,
     executeAfterRound: !stream,
     emitCalls: !stream,
     onToolCall: onToolCall,

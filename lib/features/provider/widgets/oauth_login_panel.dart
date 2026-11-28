@@ -425,7 +425,7 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
                               OAuthProvider.chatgpt => 'Codex',
                               OAuthProvider.grok => 'xAI',
                               OAuthProvider.kimi => 'Kimi Code',
-                              OAuthProvider.claude => 'Pro / Max',
+                              OAuthProvider.claude => 'Claude Code',
                             },
                             style: TextStyle(
                               fontSize: 12,

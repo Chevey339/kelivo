@@ -387,21 +387,23 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
   @override
   Future<ProviderUsageSnapshot> usage(
     OAuthWire wire,
-    ProviderOAuthCredentials credentials,
-  ) async {
+    ProviderOAuthCredentials credentials, {
+    ProviderUsageSnapshot? previous,
+  }) async {
+    final headers = {
+      'Authorization': 'Bearer ${credentials.accessToken}',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Encoding': 'gzip',
+      'Content-Type': 'application/json',
+      'User-Agent': 'claude-cli/$claudeCodeVersion (external, cli)',
+      'anthropic-beta': _claudeAccountBetas.join(','),
+    };
     for (var attempt = 0; ; attempt++) {
       String? retryAfter;
       try {
         final response = await wire.request(
           'https://api.anthropic.com/api/oauth/usage',
-          headers: {
-            'Authorization': 'Bearer ${credentials.accessToken}',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Encoding': 'gzip',
-            'Content-Type': 'application/json',
-            'User-Agent': 'claude-cli/$claudeCodeVersion (external, cli)',
-            'anthropic-beta': _claudeAccountBetas.join(','),
-          },
+          headers: headers,
         );
         if (!response.ok) {
           final retryable =
@@ -413,7 +415,11 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
           retryAfter = response.headers['retry-after'];
         } else {
           final usage = parseClaudeOAuthUsage(response.data);
-          if (usage.hasData || attempt == 2) return usage;
+          if (usage.hasData) {
+            final plan = await _profilePlan(wire, headers, previous?.plan);
+            return plan == null ? usage : usage.withPlan(plan);
+          }
+          if (attempt == 2) return usage;
         }
       } on ProviderOAuthException catch (error) {
         if (attempt == 2 ||
@@ -442,6 +448,42 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
         if (requested != null && requested > delay) delay = requested;
       }
       await Future<void>.delayed(delay);
+    }
+  }
+
+  Future<String?> _profilePlan(
+    OAuthWire wire,
+    Map<String, String> headers,
+    String? previousPlan,
+  ) async {
+    try {
+      final response = await wire.request(
+        'https://api.anthropic.com/api/oauth/profile',
+        headers: headers,
+        timeout: const Duration(seconds: 5),
+      );
+      if (!response.ok) return previousPlan;
+      final organization = oauthMap(response.data['organization']);
+      final type = oauthString(organization['organization_type']);
+      if (type == null) return previousPlan;
+      final plan = switch (type.toLowerCase()) {
+        'claude_team' => 'Team',
+        'claude_max' => 'Max',
+        'claude_pro' => 'Pro',
+        'claude_enterprise' => 'Enterprise',
+        _ => null,
+      };
+      if (plan == null) return null;
+      // Team premium seats share the Max rate-limit tier.
+      final tier =
+          oauthString(organization['rate_limit_tier'])?.toLowerCase() ?? '';
+      final multiplier = RegExp(
+        r'(?:^|_)max_(\d+x)(?:_|$)',
+      ).firstMatch(tier)?.group(1);
+      return multiplier == null ? plan : '$plan $multiplier';
+    } on ProviderOAuthException {
+      // The optional profile must not invalidate a successful quota check.
+      return previousPlan;
     }
   }
 }

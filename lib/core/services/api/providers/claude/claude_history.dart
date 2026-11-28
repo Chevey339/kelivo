@@ -153,6 +153,7 @@ class ClaudeHistory {
   ClaudeHistory({
     required this.replayServerToolBlocks,
     required this.skipRedactedThinkingBlocks,
+    required this.requiresThinkingSignature,
     required this.reasoningReplay,
     required this.nativeInputs,
     this.skipImageParsing = false,
@@ -166,6 +167,7 @@ class ClaudeHistory {
   /// synthesised client pair, exactly as it did before these tools existed.
   final bool replayServerToolBlocks;
   final bool skipRedactedThinkingBlocks;
+  final bool requiresThinkingSignature;
   final ReasoningReplayPolicy reasoningReplay;
   final bool skipImageParsing;
   final bool canImageInput;
@@ -202,22 +204,28 @@ class ClaudeHistory {
   }) {
     return [
       for (final block in blocks)
-        if (_keepBlock((block['type'] ?? '').toString()) &&
-            !(block['type'] == 'text' && block['text'] == ''))
-          if (replayThinking ||
-              (block['type'] != 'thinking' &&
-                  block['type'] != 'redacted_thinking'))
-            block.map((key, value) => MapEntry(key.toString(), value)),
+        if (_keepBlock(block, replayThinking))
+          block.map((key, value) => MapEntry(key.toString(), value)),
     ];
   }
 
-  bool _keepBlock(String type) {
-    if (skipRedactedThinkingBlocks && type == 'redacted_thinking') return false;
-    if (!replayServerToolBlocks &&
-        (type == 'server_tool_use' || type.endsWith('_tool_result'))) {
-      return false;
+  bool _keepBlock(Map block, bool replayThinking) {
+    final type = (block['type'] ?? '').toString();
+    switch (type) {
+      case 'text':
+        return block['text'] != '';
+      case 'thinking':
+        // A truncated block can reach storage before its signature arrives.
+        final signature = block['signature'];
+        return replayThinking &&
+            (!requiresThinkingSignature ||
+                signature is String && signature.trim().isNotEmpty);
+      case 'redacted_thinking':
+        return replayThinking && !skipRedactedThinkingBlocks;
+      default:
+        return replayServerToolBlocks ||
+            (type != 'server_tool_use' && !type.endsWith('_tool_result'));
     }
-    return true;
   }
 
   /// [messages] with the system prompt already taken out.
