@@ -3135,6 +3135,18 @@ class AppLocalizationsRu extends AppLocalizations {
       'Отображать математику LaTeX (встроенную и блочную)';
 
   @override
+  String get displaySettingsPageMathFontTitle => 'Шрифт формул';
+
+  @override
+  String displaySettingsPageMathFontName(String font) {
+    String _temp0 = intl.Intl.selectLogic(font, {
+      'stixTwo': 'STIX Two Math',
+      'other': 'По умолчанию',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get displaySettingsPageUseLegacyInlineCodeStyleTitle =>
       'Старый стиль встроенного кода';
 

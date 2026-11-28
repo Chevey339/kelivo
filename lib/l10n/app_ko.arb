@@ -920,6 +920,8 @@
   "displaySettingsPageEnableDollarLatexSubtitle": "$...$ 안의 내용을 인라인 수식으로 렌더링",
   "displaySettingsPageEnableMathTitle": "수학 공식 렌더링",
   "displaySettingsPageEnableMathSubtitle": "LaTeX 수식 렌더링(인라인 및 블록)",
+  "displaySettingsPageMathFontTitle": "수식 글꼴",
+  "displaySettingsPageMathFontName": "{font, select, stixTwo{STIX Two Math} other{기본}}",
   "displaySettingsPageUseLegacyInlineCodeStyleTitle": "이전 인라인 코드 스타일",
   "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "인라인 코드에 더 밝은 배경, 얇은 테두리, 더 넓은 줄 간격을 사용합니다.",
   "displaySettingsPageUseLegacyCodeBlockStyleTitle": "이전 코드 블록 스타일",

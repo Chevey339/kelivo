@@ -679,6 +679,12 @@ class SettingsSearchIndex {
       (l) => l.displaySettingsPageEnableMathTitle,
     );
     add(
+      'displaySettingsPageMathFontTitle',
+      SettingsSearchDestination.rendering,
+      (l) => l.displaySettingsPageMathFontTitle,
+      keywords: 'STIX Two Math LaTeX',
+    );
+    add(
       'displaySettingsPageUseLegacyInlineCodeStyleTitle',
       SettingsSearchDestination.rendering,
       (l) => l.displaySettingsPageUseLegacyInlineCodeStyleTitle,

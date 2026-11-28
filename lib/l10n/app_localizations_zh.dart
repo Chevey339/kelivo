@@ -2956,6 +2956,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageEnableMathSubtitle => '渲染 LaTeX 数学公式（行内与块级）';
 
   @override
+  String get displaySettingsPageMathFontTitle => '公式字体';
+
+  @override
+  String displaySettingsPageMathFontName(String font) {
+    String _temp0 = intl.Intl.selectLogic(font, {
+      'stixTwo': 'STIX Two Math',
+      'other': '默认',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get displaySettingsPageUseLegacyInlineCodeStyleTitle => '旧版行内代码样式';
 
   @override
@@ -20898,6 +20910,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageEnableMathSubtitle => '渲染 LaTeX 数学公式（行内与块级）';
+
+  @override
+  String get displaySettingsPageMathFontTitle => '公式字体';
+
+  @override
+  String displaySettingsPageMathFontName(String font) {
+    String _temp0 = intl.Intl.selectLogic(font, {
+      'stixTwo': 'STIX Two Math',
+      'other': '默认',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get displaySettingsPageUseLegacyInlineCodeStyleTitle => '旧版行内代码样式';
@@ -38852,6 +38876,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageEnableMathSubtitle => '渲染 LaTeX 數學公式（行內與區塊）';
+
+  @override
+  String get displaySettingsPageMathFontTitle => '數學字型';
+
+  @override
+  String displaySettingsPageMathFontName(String font) {
+    String _temp0 = intl.Intl.selectLogic(font, {
+      'stixTwo': 'STIX Two Math',
+      'other': '預設',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get displaySettingsPageUseLegacyInlineCodeStyleTitle => '舊版行內程式碼樣式';

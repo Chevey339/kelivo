@@ -2228,6 +2228,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.6.0"
+  val_latex:
+    dependency: transitive
+    description:
+      name: val_latex
+      sha256: ff7f4d937d4b84df4d79c3046aaeba85e1c198cc9f9ed2495567213865a5234c
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.4"
+  val_latex_flutter:
+    dependency: "direct main"
+    description:
+      name: val_latex_flutter
+      sha256: "7e80cd9c113e257c3f4ad779adb8a386e33e05ee2946960e3b96317ea6f47089"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.4"
   vector_graphics:
     dependency: transitive
     description:

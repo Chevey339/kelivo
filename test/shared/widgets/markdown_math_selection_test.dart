@@ -11,25 +11,29 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:val_latex_flutter/val_latex_flutter.dart' as stix;
 
 import '../../support/business_test_harness.dart';
 import '../../support/markdown_render_helpers.dart';
 
-Widget _harness(Widget child, ValueChanged<SelectedContent?> onSelection) =>
-    ChangeNotifierProvider(
-      create: (_) => SettingsProvider(createBusinessTestPreferences()),
-      child: MaterialApp(
-        locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: SelectionArea(
-            onSelectionChanged: onSelection,
-            child: Align(alignment: Alignment.topLeft, child: child),
-          ),
-        ),
+Widget _harness(
+  Widget child,
+  ValueChanged<SelectedContent?> onSelection, {
+  SettingsProvider? settings,
+}) => ChangeNotifierProvider(
+  create: (_) => settings ?? SettingsProvider(createBusinessTestPreferences()),
+  child: MaterialApp(
+    locale: const Locale('en'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: Scaffold(
+      body: SelectionArea(
+        onSelectionChanged: onSelection,
+        child: Align(alignment: Alignment.topLeft, child: child),
       ),
-    );
+    ),
+  ),
+);
 
 SelectableRegionState _region(WidgetTester tester) =>
     tester.state<SelectableRegionState>(find.byType(SelectableRegion));
@@ -68,6 +72,89 @@ Future<void> _drag(
 }
 
 void main() {
+  testWidgets('switching chat math fonts preserves all formula sources', (
+    tester,
+  ) async {
+    const source = r'''Before **\(x_i+\text{rate}\)**
+
+\[
+\sum_{i=1}^{n} x_i
+\]
+
+~~~math
+\frac{x}{2}
+~~~
+''';
+    String? selected;
+    final settings = (await tester.runAsync(() async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+      return settings;
+    }))!;
+    await tester.pumpWidget(
+      _harness(
+        const MarkdownWithCodeHighlight(text: source),
+        (content) => selected = content?.plainText,
+        settings: settings,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Math), findsNWidgets(3));
+    _region(tester).selectAll(SelectionChangedCause.keyboard);
+    await tester.pumpAndSettle();
+    final original = selected;
+    expect(original, contains(r'\frac{x}{2}'));
+    _region(tester).clearSelection();
+    await tester.runAsync(() => settings.setChatMathFont(ChatMathFont.stixTwo));
+    await tester.pumpAndSettle();
+    expect(find.byType(Math), findsNothing);
+    final renders = tester.allRenderObjects
+        .whereType<stix.RenderMath>()
+        .toSet();
+    expect(
+      renders.map((render) => render.result!.source.original.trim()),
+      unorderedEquals([
+        r'x_i+\text{rate}',
+        r'\sum_{i=1}^{n} x_i',
+        r'\frac{x}{2}',
+      ]),
+    );
+    expect(renders.map((render) => render.painter).toSet(), hasLength(3));
+    for (final render in renders) {
+      final bold = render.result?.source.original == r'x_i+\text{rate}';
+      expect(render.bold, bold);
+      if (bold) {
+        final word = render.mathLayout.items
+            .whereType<stix.TextItem>()
+            .singleWhere((item) => item.text == 'rate');
+        expect(word.font.bold, isTrue);
+        expect(
+          word.width,
+          closeTo(
+            render.painter.shaper.shape(word.text, word.font).width * word.size,
+            1e-6,
+          ),
+        );
+      }
+      final glyphs = render.mathLayout.items.whereType<stix.GlyphItem>();
+      expect(glyphs, isNotEmpty);
+      expect(
+        glyphs.map((glyph) => glyph.font),
+        everyElement(same(stix.MathFont.stixTwo)),
+      );
+    }
+    _region(tester).selectAll(SelectionChangedCause.keyboard);
+    await tester.pumpAndSettle();
+    expect(selected, original);
+    await tester.runAsync(
+      () => settings.setChatMathFont(ChatMathFont.standard),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Math), findsNWidgets(3));
+    expect(tester.allRenderObjects.whereType<stix.RenderMath>(), isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final source in [r'Before $a+b$ After', r'Before \(a+b\) After']) {
     testWidgets('inline formula joins forward and reverse selection: $source', (
       tester,

@@ -5638,6 +5638,18 @@ abstract class AppLocalizations {
   /// **'Render LaTeX math (inline and block)'**
   String get displaySettingsPageEnableMathSubtitle;
 
+  /// Label for the math font picker in Rendering Settings. This sets the font used to typeset formulas in chat messages.
+  ///
+  /// In en, this message translates to:
+  /// **'Math font'**
+  String get displaySettingsPageMathFontTitle;
+
+  /// Option and current value in the chat math font picker. The font identifier stixTwo shows the proper typeface name STIX Two Math, which must stay in English. The other choice uses the default formula renderer.
+  ///
+  /// In en, this message translates to:
+  /// **'{font, select, stixTwo{STIX Two Math} other{Default}}'**
+  String displaySettingsPageMathFontName(String font);
+
   /// Toggle label in display settings to use the legacy inline code style.
   ///
   /// In en, this message translates to:

@@ -1551,6 +1551,8 @@
   "displaySettingsPageEnableDollarLatexSubtitle": "Render inline math inside $...$",
   "displaySettingsPageEnableMathTitle": "Math Formula Rendering",
   "displaySettingsPageEnableMathSubtitle": "Render LaTeX math (inline and block)",
+  "displaySettingsPageMathFontTitle": "Math font",
+  "displaySettingsPageMathFontName": "{font, select, stixTwo{STIX Two Math} other{Default}}",
   "displaySettingsPageUseLegacyInlineCodeStyleTitle": "Legacy inline code style",
   "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "Use a lighter background, a thin border, and more line spacing for inline code.",
   "displaySettingsPageUseLegacyCodeBlockStyleTitle": "Legacy code block style",
@@ -11329,6 +11331,18 @@
   },
   "@displaySettingsPageEnableMathSubtitle": {
     "description": "Description under the math rendering toggle noting it covers inline and block LaTeX math."
+  },
+  "@displaySettingsPageMathFontTitle": {
+    "description": "Label for the math font picker in Rendering Settings. This sets the font used to typeset formulas in chat messages."
+  },
+  "@displaySettingsPageMathFontName": {
+    "description": "Option and current value in the chat math font picker. The font identifier stixTwo shows the proper typeface name STIX Two Math, which must stay in English. The other choice uses the default formula renderer.",
+    "placeholders": {
+      "font": {
+        "type": "String",
+        "example": "stixTwo"
+      }
+    }
   },
   "@displaySettingsPageUseLegacyInlineCodeStyleTitle": {
     "description": "Toggle label in display settings to use the legacy inline code style."

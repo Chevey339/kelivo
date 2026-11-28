@@ -920,6 +920,8 @@
   "displaySettingsPageEnableDollarLatexSubtitle": "將 $...$ 之間的內容以行內數學公式渲染",
   "displaySettingsPageEnableMathTitle": "啟用數學公式渲染",
   "displaySettingsPageEnableMathSubtitle": "渲染 LaTeX 數學公式（行內與區塊）",
+  "displaySettingsPageMathFontTitle": "數學字型",
+  "displaySettingsPageMathFontName": "{font, select, stixTwo{STIX Two Math} other{預設}}",
   "displaySettingsPageUseLegacyInlineCodeStyleTitle": "舊版行內程式碼樣式",
   "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "為行內程式碼使用較淺的底色、細邊框和更寬鬆的行距。",
   "displaySettingsPageUseLegacyCodeBlockStyleTitle": "舊版程式碼區塊樣式",

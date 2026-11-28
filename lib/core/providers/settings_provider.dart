@@ -91,6 +91,8 @@ enum DesktopMessageNavButtonsMode {
 // Mobile: message navigation buttons visibility mode
 enum MobileMessageNavButtonsMode { always, scroll, never }
 
+enum ChatMathFont { standard, stixTwo }
+
 class SettingsProvider extends ChangeNotifier {
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _providerGroupsKey =
@@ -326,6 +328,7 @@ class SettingsProvider extends ChangeNotifier {
       'display_enable_dollar_latex_v1';
   static const String _displayEnableMathRenderingKey =
       'display_enable_math_rendering_v1';
+  static const String _chatMathFontKey = 'display_chat_math_font_v1';
   static const String _displayUseLegacyInlineCodeStyleKey =
       'display_use_legacy_inline_code_style_v1';
   static const String _displayUseLegacyCodeBlockStyleKey =
@@ -1302,6 +1305,9 @@ class SettingsProvider extends ChangeNotifier {
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
         prefs.getBool(_displayEnableMathRenderingKey) ?? true;
+    _chatMathFont = prefs.get(_chatMathFontKey) == ChatMathFont.stixTwo.name
+        ? ChatMathFont.stixTwo
+        : ChatMathFont.standard;
     _useLegacyInlineCodeStyle =
         prefs.getBool(_displayUseLegacyInlineCodeStyleKey) ?? false;
     _useLegacyCodeBlockStyle =
@@ -5908,6 +5914,15 @@ Requirements:
     await prefs.setBool(_displayEnableMathRenderingKey, v);
   }
 
+  ChatMathFont _chatMathFont = ChatMathFont.standard;
+  ChatMathFont get chatMathFont => _chatMathFont;
+  Future<void> setChatMathFont(ChatMathFont font) async {
+    if (_chatMathFont == font) return;
+    _chatMathFont = font;
+    notifyListeners();
+    await _preferences.setString(_chatMathFontKey, font.name);
+  }
+
   // Display: opt in to the previous inline code appearance.
   bool _useLegacyInlineCodeStyle = false;
   bool get useLegacyInlineCodeStyle => _useLegacyInlineCodeStyle;
@@ -6859,6 +6874,7 @@ Requirements:
     copy._autoScrollEnabled = _autoScrollEnabled;
     copy._enableDollarLatex = _enableDollarLatex;
     copy._enableMathRendering = _enableMathRendering;
+    copy._chatMathFont = _chatMathFont;
     copy._useLegacyInlineCodeStyle = _useLegacyInlineCodeStyle;
     copy._useLegacyCodeBlockStyle = _useLegacyCodeBlockStyle;
     copy._enableUserMarkdown = _enableUserMarkdown;

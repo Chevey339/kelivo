@@ -3087,6 +3087,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Render LaTeX math (inline and block)';
 
   @override
+  String get displaySettingsPageMathFontTitle => 'Math font';
+
+  @override
+  String displaySettingsPageMathFontName(String font) {
+    String _temp0 = intl.Intl.selectLogic(font, {
+      'stixTwo': 'STIX Two Math',
+      'other': 'Default',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get displaySettingsPageUseLegacyInlineCodeStyleTitle =>
       'Legacy inline code style';
 

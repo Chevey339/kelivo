@@ -18,6 +18,7 @@ import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../l10n/app_language.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/option_sheet.dart';
 import '../../../shared/widgets/tip_icon.dart';
 import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1540,6 +1541,34 @@ class RenderingSettingsPage extends StatelessWidget {
                 value: sp.enableMathRendering,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setEnableMathRendering(v),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Type,
+                label: l10n.displaySettingsPageMathFontTitle,
+                detailText: l10n.displaySettingsPageMathFontName(
+                  sp.chatMathFont.name,
+                ),
+                onTap: () async {
+                  final font = await showOptionSheet<ChatMathFont>(
+                    context,
+                    title: l10n.displaySettingsPageMathFontTitle,
+                    selected: sp.chatMathFont,
+                    items: [
+                      for (final font in ChatMathFont.values)
+                        OptionSheetItem(
+                          value: font,
+                          label: l10n.displaySettingsPageMathFontName(
+                            font.name,
+                          ),
+                        ),
+                    ],
+                  );
+                  if (font != null && context.mounted) {
+                    await sp.setChatMathFont(font);
+                  }
+                },
               ),
               _iosDivider(context),
               _iosSwitchRow(

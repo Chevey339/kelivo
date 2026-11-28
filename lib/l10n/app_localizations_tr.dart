@@ -3113,6 +3113,18 @@ class AppLocalizationsTr extends AppLocalizations {
       'LaTeX matematiğini oluştur (satır içi ve blok)';
 
   @override
+  String get displaySettingsPageMathFontTitle => 'Matematik yazı tipi';
+
+  @override
+  String displaySettingsPageMathFontName(String font) {
+    String _temp0 = intl.Intl.selectLogic(font, {
+      'stixTwo': 'STIX Two Math',
+      'other': 'Varsayılan',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get displaySettingsPageUseLegacyInlineCodeStyleTitle =>
       'Eski satır içi kod stili';
 

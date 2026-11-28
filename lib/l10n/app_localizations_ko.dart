@@ -3018,6 +3018,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get displaySettingsPageEnableMathSubtitle => 'LaTeX 수식 렌더링(인라인 및 블록)';
 
   @override
+  String get displaySettingsPageMathFontTitle => '수식 글꼴';
+
+  @override
+  String displaySettingsPageMathFontName(String font) {
+    String _temp0 = intl.Intl.selectLogic(font, {
+      'stixTwo': 'STIX Two Math',
+      'other': '기본',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get displaySettingsPageUseLegacyInlineCodeStyleTitle =>
       '이전 인라인 코드 스타일';
 

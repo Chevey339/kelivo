@@ -920,6 +920,8 @@
   "displaySettingsPageEnableDollarLatexSubtitle": "Отображать содержимое между $...$ как встроенную математическую формулу",
   "displaySettingsPageEnableMathTitle": "Рендеринг математических формул",
   "displaySettingsPageEnableMathSubtitle": "Отображать математику LaTeX (встроенную и блочную)",
+  "displaySettingsPageMathFontTitle": "Шрифт формул",
+  "displaySettingsPageMathFontName": "{font, select, stixTwo{STIX Two Math} other{По умолчанию}}",
   "displaySettingsPageUseLegacyInlineCodeStyleTitle": "Старый стиль встроенного кода",
   "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "Использовать более светлый фон, тонкую рамку и увеличенный межстрочный интервал для встроенного кода.",
   "displaySettingsPageUseLegacyCodeBlockStyleTitle": "Старый стиль блоков кода",

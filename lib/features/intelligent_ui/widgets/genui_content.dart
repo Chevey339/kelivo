@@ -8,6 +8,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:markstream/markstream.dart' as ms;
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/markdown/math_adapter.dart';
+import 'package:Kelivo/shared/markdown/chat_math_formula.dart';
 import 'package:Kelivo/shared/markdown/chat_prose_direction.dart';
 import 'genui_theme.dart';
 import 'genui_clipboard.dart';
@@ -229,8 +230,9 @@ class GenUiFormula extends StatelessWidget {
           final width = constraints.hasBoundedWidth
               ? constraints.maxWidth
               : MediaQuery.sizeOf(context).width;
+          final normalized = normalizeMathTex(tex);
           final formula = Math.tex(
-            normalizeMathTex(tex),
+            normalized,
             mathStyle: MathStyle.display,
             textStyle: theme.body,
             textScaleFactor:
@@ -252,7 +254,12 @@ class GenUiFormula extends StatelessWidget {
                     scrollDirection: Axis.horizontal,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: width),
-                      child: Center(child: formula),
+                      child: Center(
+                        child: ChatMathFormula(
+                          tex: normalized,
+                          defaultMath: formula,
+                        ),
+                      ),
                     ),
                   ),
                 ),

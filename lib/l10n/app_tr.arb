@@ -920,6 +920,8 @@
   "displaySettingsPageEnableDollarLatexSubtitle": "$...$ içindeki satır içi matematiği oluştur",
   "displaySettingsPageEnableMathTitle": "Matematik Formülü Oluşturma",
   "displaySettingsPageEnableMathSubtitle": "LaTeX matematiğini oluştur (satır içi ve blok)",
+  "displaySettingsPageMathFontTitle": "Matematik yazı tipi",
+  "displaySettingsPageMathFontName": "{font, select, stixTwo{STIX Two Math} other{Varsayılan}}",
   "displaySettingsPageUseLegacyInlineCodeStyleTitle": "Eski satır içi kod stili",
   "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "Satır içi kod için daha açık bir arka plan, ince bir kenarlık ve daha fazla satır aralığı kullan.",
   "displaySettingsPageUseLegacyCodeBlockStyleTitle": "Eski kod bloğu stili",

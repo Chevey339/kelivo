@@ -3,6 +3,8 @@ import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_math_fork/tex.dart';
 import 'package:markstream/markstream.dart';
 
+import 'chat_math_formula.dart';
+
 /// The parser retains original LaTeX; repairs belong only to its visual adapter.
 class KelivoMathRenderer implements MathRenderer {
   const KelivoMathRenderer();
@@ -105,11 +107,14 @@ class _ParsedMathRenderer implements MathRenderer {
     required bool displayMode,
   }) => ast == null
       ? Text(normalized, style: style)
-      : Math(
-          ast: ast,
-          mathStyle: displayMode ? MathStyle.display : MathStyle.text,
-          textStyle: style,
-          onErrorFallback: (_) => Text(normalized, style: style),
+      : ChatMathFormula(
+          tex: normalized,
+          defaultMath: Math(
+            ast: ast,
+            mathStyle: displayMode ? MathStyle.display : MathStyle.text,
+            textStyle: style,
+            onErrorFallback: (_) => Text(normalized, style: style),
+          ),
         );
 }
 

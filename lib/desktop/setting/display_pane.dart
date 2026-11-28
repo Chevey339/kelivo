@@ -113,6 +113,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowMathRendering(),
                   _RowDivider(),
+                  _MathFontRow(),
+                  _RowDivider(),
                   _ToggleRowLegacyInlineCodeStyle(),
                   _RowDivider(),
                   _ToggleRowLegacyCodeBlockStyle(),
@@ -2560,6 +2562,30 @@ class _ToggleRowDollarLatex extends StatelessWidget {
       value: sp.enableDollarLatex,
       onChanged: (v) =>
           context.read<SettingsProvider>().setEnableDollarLatex(v),
+    );
+  }
+}
+
+class _MathFontRow extends StatelessWidget {
+  const _MathFontRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    return _LabeledRow(
+      label: l10n.displaySettingsPageMathFontTitle,
+      trailing: DesktopSelectDropdown<ChatMathFont>(
+        value: settings.chatMathFont,
+        options: [
+          for (final font in ChatMathFont.values)
+            DesktopSelectOption(
+              value: font,
+              label: l10n.displaySettingsPageMathFontName(font.name),
+            ),
+        ],
+        onSelected: settings.setChatMathFont,
+      ),
     );
   }
 }
