@@ -538,7 +538,10 @@ final class _InlineSession {
         final mapped = MappedText([node]);
         final result = <InlineNode>[];
         var cursor = 0;
-        for (final link in bareAutolinks(node.text)) {
+        for (final link in bareAutolinks(
+          node.text,
+          cjkBoundaries: options.cjkAutolinkBoundaries,
+        )) {
           result.addAll(mapped.slice(cursor, link.start));
           result.add(
             LinkNode(

@@ -104,6 +104,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(launcher.launched, ['https://example.com/path?a=1']);
   });
+  testWidgets('only the bare URL opens when Chinese prose follows it', (
+    tester,
+  ) async {
+    final previous = UrlLauncherPlatform.instance, launcher = _Launcher();
+    UrlLauncherPlatform.instance = launcher;
+    addTearDown(() => UrlLauncherPlatform.instance = previous);
+    const url = 'https://example.com/document_parsing';
+    await tester.pumpWidget(
+      host(const MarkdownWithCodeHighlight(text: '请读取 $url只告诉我用途。')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tapAt(_labelCenter('只告诉我'));
+    await tester.pumpAndSettle();
+    expect(launcher.launched, isEmpty);
+    await tester.tapAt(_labelCenter('document_parsing'));
+    await tester.pumpAndSettle();
+    expect(launcher.launched, [url]);
+  });
   testWidgets('workspace links stay inside Kelivo in text and table cells', (
     tester,
   ) async {

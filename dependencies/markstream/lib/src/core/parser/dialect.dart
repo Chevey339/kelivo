@@ -14,6 +14,7 @@ final class ParserOptions {
     this.softBreakAsHardBreak = true,
     this.underscoreEmphasis = true,
     this.autolinks = true,
+    this.cjkAutolinkBoundaries = true,
     this.entities = true,
     this.cjkFlankingRelax = true,
     this.alerts = true,
@@ -46,6 +47,7 @@ final class ParserOptions {
       softBreakAsHardBreak = false,
       underscoreEmphasis = true,
       autolinks = false,
+      cjkAutolinkBoundaries = false,
       entities = true,
       cjkFlankingRelax = false,
       alerts = false,
@@ -75,6 +77,7 @@ final class ParserOptions {
       softBreakAsHardBreak = false,
       underscoreEmphasis = true,
       autolinks = true,
+      cjkAutolinkBoundaries = false,
       entities = true,
       cjkFlankingRelax = false,
       alerts = false,
@@ -106,6 +109,9 @@ final class ParserOptions {
   final bool softBreakAsHardBreak;
   final bool underscoreEmphasis;
   final bool autolinks;
+
+  /// Infer the boundary between a bare URL and adjacent East Asian prose.
+  final bool cjkAutolinkBoundaries;
   final bool entities;
   final bool cjkFlankingRelax;
   final bool alerts;
@@ -135,6 +141,7 @@ final class ParserOptions {
     bool? softBreakAsHardBreak,
     bool? underscoreEmphasis,
     bool? autolinks,
+    bool? cjkAutolinkBoundaries,
     bool? entities,
     bool? cjkFlankingRelax,
     bool? alerts,
@@ -163,6 +170,7 @@ final class ParserOptions {
     softBreakAsHardBreak: softBreakAsHardBreak ?? this.softBreakAsHardBreak,
     underscoreEmphasis: underscoreEmphasis ?? this.underscoreEmphasis,
     autolinks: autolinks ?? this.autolinks,
+    cjkAutolinkBoundaries: cjkAutolinkBoundaries ?? this.cjkAutolinkBoundaries,
     entities: entities ?? this.entities,
     cjkFlankingRelax: cjkFlankingRelax ?? this.cjkFlankingRelax,
     alerts: alerts ?? this.alerts,
