@@ -25,7 +25,7 @@ Use every major model in one app, give it a workspace to get real work done, and
 
 [Website](https://kelivo.psycheas.top) · [User Guide](https://kelivo.psycheas.top/guide) · [Download](#-download) · [Report an Issue](https://github.com/Chevey339/kelivo/issues)
 
-**English** · [简体中文](README_ZH_CN.md)
+**English** · [简体中文](README_ZH_CN.md) · [Türkçe](README_TR.md)
 
 </div>
 
