@@ -45,9 +45,27 @@ class SidebarSettingsPage extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            IosSectionHeader(text: l10n.sidebarLayoutTitle),
-            if (currentPreset == null)
-              IosSectionFooter(text: l10n.sidebarPresetCustom),
+            Row(
+              children: [
+                Expanded(
+                  child: IosSectionHeader(
+                    text: l10n.sidebarLayoutTitle,
+                    first: true,
+                  ),
+                ),
+                if (currentPreset == null)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 12),
+                    child: Text(
+                      l10n.sidebarPresetCustom,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             for (final presets in [
               SidebarPreset.values.take(2),
               SidebarPreset.values.skip(2),
@@ -72,11 +90,11 @@ class SidebarSettingsPage extends StatelessWidget {
                 ),
               ),
             IosSectionHeader(text: l10n.sidebarReorderTitle),
-            IosSectionFooter(text: l10n.sidebarReorderHint),
             SectionCard(
               children: [
                 SidebarReorderList<SidebarBlock>(
                   items: layout.visibleOrder.toList(),
+                  itemLabel: (block) => _blockLabel(block, l10n),
                   itemExtent: 52,
                   separator: SidebarBlock.conversations,
                   onMove: (block, target) => settings.setMobileSidebarLayout(
@@ -87,7 +105,10 @@ class SidebarSettingsPage extends StatelessWidget {
                     return Container(
                       height: 52,
                       color: separator ? context.appColors.surfaceFill : null,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsetsDirectional.only(
+                        start: 4,
+                        end: 12,
+                      ),
                       child: Row(
                         children: [
                           handle,
@@ -99,16 +120,13 @@ class SidebarSettingsPage extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(child: Text(_blockLabel(block, l10n))),
                           if (!separator)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: Text(
-                                layout.isBelowConversations(block)
-                                    ? l10n.sidebarBlockBottom
-                                    : l10n.sidebarBlockTop,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: cs.onSurfaceVariant,
-                                ),
+                            Text(
+                              layout.isBelowConversations(block)
+                                  ? l10n.sidebarBlockBottom
+                                  : l10n.sidebarBlockTop,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: cs.onSurfaceVariant,
                               ),
                             ),
                         ],
@@ -118,6 +136,7 @@ class SidebarSettingsPage extends StatelessWidget {
                 ),
               ],
             ),
+            IosSectionFooter(text: l10n.sidebarReorderHint),
             IosSectionHeader(text: l10n.sidebarBlockAssistant),
             SectionCard(
               children: [
@@ -127,16 +146,15 @@ class SidebarSettingsPage extends StatelessWidget {
                   value: settings.keepSidebarOpenOnAssistantTap,
                   onChanged: settings.setKeepSidebarOpenOnAssistantTap,
                 ),
-                const IosRowDivider(),
+                const IosRowDivider(indent: 12),
                 IosSwitchRow(
                   label: l10n.displaySettingsPageNewChatOnAssistantSwitchTitle,
                   value: settings.newChatOnAssistantSwitch,
                   onChanged: settings.setNewChatOnAssistantSwitch,
                 ),
-                const IosRowDivider(),
+                const IosRowDivider(indent: 12),
                 IosSwitchRow(
                   label: l10n.sidebarHideSingleAssistant,
-                  subtitle: l10n.sidebarHideSingleAssistantHint,
                   value: settings.hideSidebarSingleAssistant,
                   onChanged: settings.setHideSidebarSingleAssistant,
                 ),
@@ -163,13 +181,13 @@ class SidebarSettingsPage extends StatelessWidget {
                     ),
                   ),
                 ),
-                const IosRowDivider(),
+                const IosRowDivider(indent: 12),
                 SidebarEntriesEditor(
                   entries: settings.mobileSidebarEntries,
                   mobileStyle: layout.style,
                   onChanged: settings.setMobileSidebarEntries,
                 ),
-                const IosRowDivider(),
+                const IosRowDivider(indent: 12),
                 IosSwitchRow(
                   label: l10n.sidebarShowCustomizeInMore,
                   subtitle: l10n.sidebarShowCustomizeInMoreHint,
@@ -225,17 +243,23 @@ class _PresetCard extends StatelessWidget {
     };
     return Semantics(
       selected: selected,
+      button: true,
       child: IosCardPress(
         focusable: true,
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: selected
-              ? cs.primary
+              ? cs.primary.withValues(alpha: .7)
               : cs.outlineVariant.withValues(alpha: .3),
-          width: selected ? 2 : 1,
+          width: 1,
         ),
-        baseColor: context.appColors.surfaceCard,
+        baseColor: selected
+            ? Color.alphaBlend(
+                cs.primary.withValues(alpha: .045),
+                context.appColors.surfaceCard,
+              )
+            : context.appColors.surfaceCard,
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -213,6 +213,7 @@ Future<ModelSelection?> showModelSelector(
     return await showModalBottomSheet<ModelSelection>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -362,7 +363,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   );
   final Map<String, GlobalKey> _providerTabKeys = <String, GlobalKey>{};
   static const double _initialSize = 0.8;
-  static const double _maxSize = 0.8;
+  static const double _maxSize = 0.94;
   static const double _stickyProviderHeaderHeight = 30;
   static const double _estimatedHeaderExtent = 39;
   static const double _estimatedModelExtent = 79;
@@ -850,9 +851,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-
     return SafeArea(
       top: false,
       child: AnimatedPadding(
@@ -861,31 +859,63 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: DraggableScrollableSheet(
-          controller: _sheetCtrl,
-          expand: false,
-          initialChildSize: _initialSize,
-          maxChildSize: _maxSize,
-          minChildSize: 0.4,
-          builder: (c, controller) {
-            return Column(
-              children: [
-                // Fixed header section with rounded corners
-                Container(
-                  key: const ValueKey('model-selector-header'),
-                  decoration: BoxDecoration(
-                    color: context.overlaySurface,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      // Header drag indicator
-                      Column(
-                        children: [
-                          const SizedBox(height: 8),
-                          Container(
+        child: LayoutBuilder(builder: _buildSheet),
+      ),
+    );
+  }
+
+  Widget _buildSheet(BuildContext context, BoxConstraints viewport) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+
+    // Keep room for search, the provider tabs and a result when the keyboard
+    // shortens the viewport. A compact sheet can be dismissed by its route.
+    final available = viewport.maxHeight;
+    final labelHeight = MediaQuery.textScalerOf(context).scale(16);
+    final minContentHeight = 168 + 2 * labelHeight;
+    final minSize = available > 0
+        ? (minContentHeight / available).clamp(0.4, _maxSize)
+        : _maxSize;
+    final compact = minSize >= _initialSize;
+    final minHeight = (compact ? _maxSize : minSize) * available;
+    final gripHeight = minHeight.clamp(0.0, 32.0);
+    return DraggableScrollableSheet(
+      controller: _sheetCtrl,
+      expand: false,
+      initialChildSize: compact ? _maxSize : _initialSize,
+      maxChildSize: _maxSize,
+      minChildSize: compact ? _maxSize : minSize,
+      shouldCloseOnMinExtent: !compact,
+      builder: (c, controller) {
+        return Column(
+          children: [
+            // Fixed header section with rounded corners
+            Container(
+              key: const ValueKey('model-selector-header'),
+              decoration: BoxDecoration(
+                color: context.overlaySurface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+              ),
+              constraints: BoxConstraints(maxHeight: minHeight),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // The indexed model list owns its scroll position. Give
+                  // the sheet controller its own drag surface in the header.
+                  IgnorePointer(
+                    ignoring: compact,
+                    child: SingleChildScrollView(
+                      controller: controller,
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: ClampingScrollPhysics(),
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: gripHeight,
+                        child: Center(
+                          child: Container(
                             width: 40,
                             height: 4,
                             decoration: BoxDecoration(
@@ -893,135 +923,133 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                               borderRadius: BorderRadius.circular(999),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                        ],
+                        ),
                       ),
-                      // Fixed search field (iOS-like input style)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                        child: TextField(
-                          controller: _search,
-                          enabled: !_isLoading,
-                          onChanged: (_) {
-                            final q = _search.text.trim();
-                            final enteringSearch =
-                                _lastQuery.isEmpty && q.isNotEmpty;
-                            setState(() {});
-                            if (enteringSearch) {
-                              WidgetsBinding.instance.addPostFrameCallback((
-                                _,
-                              ) async {
-                                if (!mounted) return;
-                                await _scrollToFirstSearchGroup();
-                              });
-                            }
-                            _lastQuery = q;
-                          },
-                          // Ensure high-contrast input text in both themes
-                          style: TextStyle(color: cs.onSurface),
-                          cursorColor: cs.primary,
-                          decoration: InputDecoration(
-                            hintText: l10n.modelSelectSheetSearchHint,
-                            prefixIcon: Icon(
-                              Lucide.Search,
-                              size: 18,
-                              color: cs.onSurface.withValues(
-                                alpha: _isLoading ? 0.35 : 0.6,
-                              ),
+                    ),
+                  ),
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: TextField(
+                        controller: _search,
+                        enabled: !_isLoading,
+                        onChanged: (_) {
+                          final q = _search.text.trim();
+                          final enteringSearch =
+                              _lastQuery.isEmpty && q.isNotEmpty;
+                          setState(() {});
+                          if (enteringSearch) {
+                            WidgetsBinding.instance.addPostFrameCallback((
+                              _,
+                            ) async {
+                              if (!mounted) return;
+                              await _scrollToFirstSearchGroup();
+                            });
+                          }
+                          _lastQuery = q;
+                        },
+                        // Ensure high-contrast input text in both themes
+                        style: TextStyle(color: cs.onSurface),
+                        cursorColor: cs.primary,
+                        decoration: InputDecoration(
+                          hintText: l10n.modelSelectSheetSearchHint,
+                          prefixIcon: Icon(
+                            Lucide.Search,
+                            size: 18,
+                            color: cs.onSurface.withValues(
+                              alpha: _isLoading ? 0.35 : 0.6,
                             ),
-                            // Use IconButton for reliable alignment at the far right
-                            suffixIcon:
-                                (widget.limitProviderKey == null &&
-                                    context
-                                        .watch<SettingsProvider>()
-                                        .pinnedModels
-                                        .isNotEmpty)
-                                ? ExcludeSemantics(
-                                    child: IconButton(
-                                      icon: Icon(
-                                        Lucide.Bookmark,
-                                        size: 18,
-                                        color: cs.onSurface.withValues(
-                                          alpha: _isLoading ? 0.35 : 0.7,
-                                        ),
+                          ),
+                          // Use IconButton for reliable alignment at the far right
+                          suffixIcon:
+                              (widget.limitProviderKey == null &&
+                                  context
+                                      .watch<SettingsProvider>()
+                                      .pinnedModels
+                                      .isNotEmpty)
+                              ? ExcludeSemantics(
+                                  child: IconButton(
+                                    icon: Icon(
+                                      Lucide.Bookmark,
+                                      size: 18,
+                                      color: cs.onSurface.withValues(
+                                        alpha: _isLoading ? 0.35 : 0.7,
                                       ),
-                                      onPressed: _isLoading
-                                          ? null
-                                          : _jumpToFavorites,
-                                      splashColor: Colors.transparent,
-                                      highlightColor: Colors.transparent,
-                                      hoverColor: Colors.transparent,
-                                      tooltip:
-                                          l10n.modelSelectSheetFavoritesSection,
                                     ),
-                                  )
-                                : null,
-                            suffixIconConstraints: const BoxConstraints(
-                              minWidth: 40,
-                              minHeight: 40,
+                                    onPressed: _isLoading
+                                        ? null
+                                        : _jumpToFavorites,
+                                    splashColor: Colors.transparent,
+                                    highlightColor: Colors.transparent,
+                                    hoverColor: Colors.transparent,
+                                    tooltip:
+                                        l10n.modelSelectSheetFavoritesSection,
+                                  ),
+                                )
+                              : null,
+                          suffixIconConstraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          filled: true,
+                          fillColor: context.appColors.surfaceFill,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: cs.outlineVariant.withValues(alpha: 0.4),
                             ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: cs.outlineVariant.withValues(alpha: 0.4),
                             ),
-                            filled: true,
-                            fillColor: context.appColors.surfaceFill,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                color: cs.outlineVariant.withValues(alpha: 0.4),
-                              ),
+                          ),
+                          disabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: cs.outlineVariant.withValues(alpha: 0.25),
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                color: cs.outlineVariant.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            disabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                color: cs.outlineVariant.withValues(
-                                  alpha: 0.25,
-                                ),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                color: cs.primary.withValues(alpha: 0.5),
-                              ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: cs.primary.withValues(alpha: 0.5),
                             ),
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                // Scrollable content
-                Expanded(
-                  child: Container(
-                    key: const ValueKey('model-selector-list'),
-                    // Ensure background color continuity
-                    color: context.overlaySurface,
-                    child: _isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : _buildContent(context),
-                  ),
-                ),
-                // Fixed bottom tabs
-                Container(
-                  key: const ValueKey('model-selector-bottom-tabs'),
-                  // Ensure background color continuity
-                  color: context.overlaySurface,
-                  child: _buildBottomTabs(context),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+                ],
+              ),
+            ),
+            // Scrollable content
+            Expanded(
+              child: Container(
+                key: const ValueKey('model-selector-list'),
+                // Ensure background color continuity
+                color: context.overlaySurface,
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildContent(context),
+              ),
+            ),
+            if (minHeight >= minContentHeight - 32)
+              Container(
+                key: const ValueKey('model-selector-bottom-tabs'),
+                // Ensure background color continuity
+                color: context.overlaySurface,
+                child: _buildBottomTabs(context),
+              ),
+          ],
+        );
+      },
     );
   }
 

@@ -109,11 +109,39 @@ void main() {
     expect(dropLine, findsNothing);
     expect(settings.mobileSidebarLayout.order, original);
     await tester.tap(handles.last);
+    await tester.pump();
+    final grip = tester.widget<Container>(
+      find.ancestor(of: handles.last, matching: find.byType(Container)).first,
+    );
+    expect((grip.decoration as BoxDecoration?)?.border, isNull);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
     expect(
       settings.mobileSidebarLayout.isBelowConversations(SidebarBlock.user),
       isFalse,
+    );
+    final userHandle = find.descendant(
+      of: find.byKey(const ValueKey(SidebarBlock.user)),
+      matching: find.byIcon(Lucide.GripVertical),
+    );
+    await tester.ensureVisible(userHandle);
+    await tester.pumpAndSettle();
+    final rowLeft = tester.getCenter(userHandle).dx;
+    final move = await tester.startGesture(tester.getCenter(userHandle));
+    await move.moveBy(const Offset(0, 24));
+    await tester.pump();
+    await move.moveBy(const Offset(0, 36));
+    await tester.pumpAndSettle();
+    expect(tester.getCenter(userHandle).dx, closeTo(rowLeft, .01));
+    final stack = tester.widget<Stack>(
+      find.ancestor(of: dropLine, matching: find.byType(Stack)).first,
+    );
+    expect(stack.children.last.key, const ValueKey('sidebar-drop-indicator'));
+    await move.up();
+    await tester.pumpAndSettle();
+    expect(
+      settings.mobileSidebarLayout.isBelowConversations(SidebarBlock.user),
+      isTrue,
     );
     expect(tester.takeException(), isNull);
   });

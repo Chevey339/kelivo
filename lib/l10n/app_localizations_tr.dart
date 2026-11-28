@@ -5862,7 +5862,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
-      'Asistan seçerken kenar çubuğunu açık tut';
+      'Asistan seçtikten sonra kenar çubuğunu açık tut';
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnTopicTapTitle =>
@@ -17983,7 +17983,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get sidebarLayoutTitle => 'Düzen';
 
   @override
-  String get sidebarPresetCurrent => 'Mevcut düzen';
+  String get sidebarPresetCurrent => 'Klasik';
 
   @override
   String get sidebarPresetNavigation => 'Gezinme listesi';
@@ -17992,17 +17992,17 @@ class AppLocalizationsTr extends AppLocalizations {
   String get sidebarPresetAssistantBottom => 'Asistan altta';
 
   @override
-  String get sidebarPresetAllTop => 'Hepsi üstte';
+  String get sidebarPresetAllTop => 'Üst gezinme';
 
   @override
   String get sidebarPresetCustom => 'Özel düzen';
 
   @override
-  String get sidebarReorderTitle => 'Blokları düzenle';
+  String get sidebarReorderTitle => 'Kenar çubuğu sırası';
 
   @override
   String get sidebarReorderHint =>
-      'Sohbet listesinin üstüne veya altına sürükleyin';
+      'Bir öğeyi sohbet listesinin üstüne veya altına taşımak için tutamacı sürükleyin.';
 
   @override
   String get sidebarReorderHandle => 'Yeniden sırala';
@@ -18029,7 +18029,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get sidebarBlockBottom => 'Alt';
 
   @override
-  String get sidebarDisplayAs => 'Görünüm';
+  String get sidebarDisplayAs => 'Kısayol stili';
 
   @override
   String get sidebarStyleList => 'Liste';
@@ -18078,19 +18078,15 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get sidebarShowCustomizeInMore =>
-      'Daha fazla bölümünde Kenar çubuğunu özelleştir\'i göster';
+      'Kenar çubuğu ayarlarını Diğer\'de göster';
 
   @override
   String get sidebarShowCustomizeInMoreHint =>
-      'Buradan her zaman değiştirebilirsiniz';
+      'Ayrıca Ayarlar › Tercihler › Kenar çubuğu bölümünden de erişilebilir.';
 
   @override
   String get sidebarHideSingleAssistant =>
-      'Yalnızca bir asistan varsa asistan satırını gizle';
-
-  @override
-  String get sidebarHideSingleAssistantHint =>
-      'Asistan satırı varsayılan olarak gösterilir';
+      'Yalnızca bir asistan olduğunda geçiş aracını gizle';
 
   @override
   String get sidebarRestoreDefaults => 'Varsayılanlara geri dön';
@@ -19127,17 +19123,22 @@ class AppLocalizationsTr extends AppLocalizations {
   String get creationCustomCountLabel => 'Özel sayı';
 
   @override
+  String get creationPaymentHint =>
+      'Sağlayıcı bakiyesini ve bu API anahtarı için harcama limitini kontrol edin.';
+
+  @override
   String creationFailureCategory(String kind) {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'network': 'Ağ bağlantısı',
       'rateLimited': 'İstek sınırı',
       'server': 'Sağlayıcı hatası',
       'rejected': 'İstek reddedildi',
-      'login': 'Oturum açma gerekli',
+      'login': 'Oturum açmanız gerekiyor',
       'unavailable': 'Model veya uç nokta kullanılamıyor',
       'parameters': 'Geçersiz parametreler',
       'referenceTooLarge': 'Referans çok büyük',
       'download': 'İndirme başarısız',
+      'paymentRequired': 'Ödeme gerekli',
       'invalidResponse': 'Geçersiz yanıt',
       'other': 'Oluşturma hatası',
     });

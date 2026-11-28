@@ -2919,7 +2919,7 @@
   "@displaySettingsPageEnableImageCropperSubtitle": {
     "description": "Toggle subtitle explaining images can be cropped after selecting from gallery or camera."
   },
-  "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "Keep sidebar open when selecting assistant",
+  "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "Keep the sidebar open after choosing an assistant",
   "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "Keep sidebar open when selecting topic",
   "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "Don't collapse assistant list when closing sidebar",
   "displaySettingsPageShowUpdatesTitle": "Show Updates",
@@ -23198,9 +23198,9 @@
   "@sidebarLayoutTitle": {
     "description": "Heading of the mobile Sidebar settings section that shows four layout presets."
   },
-  "sidebarPresetCurrent": "Current layout",
+  "sidebarPresetCurrent": "Classic",
   "@sidebarPresetCurrent": {
-    "description": "Mobile sidebar layout preset matching the original Kelivo layout with icon entries and the user bar at the bottom."
+    "description": "Name of the classic mobile sidebar preset with icon shortcuts and the user bar at the bottom."
   },
   "sidebarPresetNavigation": "Navigation list",
   "@sidebarPresetNavigation": {
@@ -23210,7 +23210,7 @@
   "@sidebarPresetAssistantBottom": {
     "description": "Mobile sidebar layout preset with the assistant selector below the conversation list."
   },
-  "sidebarPresetAllTop": "All at the top",
+  "sidebarPresetAllTop": "Top navigation",
   "@sidebarPresetAllTop": {
     "description": "Mobile sidebar layout preset placing all fixed blocks above the scrolling conversation list."
   },
@@ -23218,11 +23218,11 @@
   "@sidebarPresetCustom": {
     "description": "Status in Sidebar settings when the custom block order does not match a preset."
   },
-  "sidebarReorderTitle": "Arrange blocks",
+  "sidebarReorderTitle": "Sidebar order",
   "@sidebarReorderTitle": {
     "description": "Heading above the reorderable sidebar blocks."
   },
-  "sidebarReorderHint": "Drag above or below the conversation list",
+  "sidebarReorderHint": "Drag a handle to move an item above or below the conversation list.",
   "@sidebarReorderHint": {
     "description": "Instruction for moving fixed sidebar blocks around the non-draggable conversation list separator."
   },
@@ -23258,9 +23258,9 @@
   "@sidebarBlockBottom": {
     "description": "Position tag for a mobile sidebar block below the conversation list."
   },
-  "sidebarDisplayAs": "Display as",
+  "sidebarDisplayAs": "Shortcut style",
   "@sidebarDisplayAs": {
-    "description": "Label next to the List or Icons segmented control in the mobile Sidebar settings."
+    "description": "Label beside the icon or list style picker for mobile sidebar shortcuts."
   },
   "sidebarStyleList": "List",
   "@sidebarStyleList": {
@@ -23322,21 +23322,17 @@
   "@sidebarHideCustomize": {
     "description": "Long-press action hiding the Customize sidebar shortcut from the More menu."
   },
-  "sidebarShowCustomizeInMore": "Show Customize sidebar in More",
+  "sidebarShowCustomizeInMore": "Show sidebar settings in More",
   "@sidebarShowCustomizeInMore": {
     "description": "Switch controlling the presence of the Customize sidebar shortcut in the mobile sidebar More entries."
   },
-  "sidebarShowCustomizeInMoreHint": "You can always change it here",
+  "sidebarShowCustomizeInMoreHint": "Also available in Settings › Preferences › Sidebar.",
   "@sidebarShowCustomizeInMoreHint": {
-    "description": "Subtitle reassuring users that they can still reach Sidebar settings after hiding the shortcut."
+    "description": "Alternative navigation path to the mobile sidebar settings when its shortcut in More is hidden."
   },
-  "sidebarHideSingleAssistant": "Hide assistant row when there is only one",
+  "sidebarHideSingleAssistant": "Hide the switcher when there is only one assistant",
   "@sidebarHideSingleAssistant": {
     "description": "Switch for hiding the assistant selector when the user has only one assistant."
-  },
-  "sidebarHideSingleAssistantHint": "The assistant row is shown by default",
-  "@sidebarHideSingleAssistantHint": {
-    "description": "Description of the normal behavior for the single-assistant selector."
   },
   "sidebarRestoreDefaults": "Restore defaults",
   "@sidebarRestoreDefaults": {
@@ -24670,9 +24666,13 @@
   "@creationCustomCountLabel": {
     "description": "Label beside the custom output count stepper in the Creation composer."
   },
-  "creationFailureCategory": "{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} unavailable{Model or endpoint unavailable} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} invalidResponse{Invalid response} other{Generation error}}",
+  "creationPaymentHint": "Check the provider balance and the spending limit for this API key.",
+  "@creationPaymentHint": {
+    "description": "Actionable text below a Creation or chat image failure when the provider returns HTTP 402. The HTTP status and provider details remain in the request log."
+  },
+  "creationFailureCategory": "{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} unavailable{Model or endpoint unavailable} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} paymentRequired{Payment required} invalidResponse{Invalid response} other{Generation error}}",
   "@creationFailureCategory": {
-    "description": "Category shown on a failed Creation job and in its request log. The kind is a stable error category. Use unavailable for a missing model or API endpoint.",
+    "description": "Category on a failed Creation job and in its request log. Use paymentRequired for insufficient funds or a spending cap and unavailable for a missing model or API endpoint.",
     "placeholders": {
       "kind": {
         "type": "String"

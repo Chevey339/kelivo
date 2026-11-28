@@ -5667,7 +5667,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
-      '어시스턴트 선택 시 사이드바 유지';
+      '어시스턴트를 선택한 후에도 사이드바를 열어 두기';
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnTopicTapTitle =>
@@ -17330,25 +17330,25 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sidebarLayoutTitle => '레이아웃';
 
   @override
-  String get sidebarPresetCurrent => '현재 레이아웃';
+  String get sidebarPresetCurrent => '클래식';
 
   @override
-  String get sidebarPresetNavigation => '탐색 목록';
+  String get sidebarPresetNavigation => '목록 탐색';
 
   @override
   String get sidebarPresetAssistantBottom => '어시스턴트 하단 배치';
 
   @override
-  String get sidebarPresetAllTop => '모두 상단에';
+  String get sidebarPresetAllTop => '상단 탐색';
 
   @override
   String get sidebarPresetCustom => '사용자 지정 레이아웃';
 
   @override
-  String get sidebarReorderTitle => '블록 정렬';
+  String get sidebarReorderTitle => '사이드바 순서';
 
   @override
-  String get sidebarReorderHint => '대화 목록 위나 아래로 드래그하세요';
+  String get sidebarReorderHint => '핸들을 드래그하여 항목을 대화 목록 위나 아래로 이동하세요.';
 
   @override
   String get sidebarReorderHandle => '순서 변경';
@@ -17375,7 +17375,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sidebarBlockBottom => '하단';
 
   @override
-  String get sidebarDisplayAs => '표시 방식';
+  String get sidebarDisplayAs => '바로가기 스타일';
 
   @override
   String get sidebarStyleList => '목록';
@@ -17423,16 +17423,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sidebarHideCustomize => '더 보기에서 숨기기';
 
   @override
-  String get sidebarShowCustomizeInMore => '더 보기에 사이드바 사용자 지정 표시';
+  String get sidebarShowCustomizeInMore => '「더 보기」에 사이드바 설정 표시';
 
   @override
-  String get sidebarShowCustomizeInMoreHint => '여기서 언제든 변경할 수 있습니다';
+  String get sidebarShowCustomizeInMoreHint =>
+      '「설정 › 환경설정 › 사이드바」에서도 사용할 수 있습니다.';
 
   @override
-  String get sidebarHideSingleAssistant => '어시스턴트가 하나뿐이면 어시스턴트 행 숨기기';
-
-  @override
-  String get sidebarHideSingleAssistantHint => '어시스턴트 행은 기본적으로 표시됩니다';
+  String get sidebarHideSingleAssistant => '어시스턴트가 하나뿐일 때 전환기 숨기기';
 
   @override
   String get sidebarRestoreDefaults => '기본값 복원';
@@ -18429,6 +18427,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationCustomCountLabel => '사용자 지정 개수';
 
   @override
+  String get creationPaymentHint => '공급자 잔액과 이 API 키의 사용 한도를 확인하세요.';
+
+  @override
   String creationFailureCategory(String kind) {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'network': '네트워크 연결',
@@ -18438,8 +18439,9 @@ class AppLocalizationsKo extends AppLocalizations {
       'login': '로그인 필요',
       'unavailable': '모델 또는 엔드포인트 사용 불가',
       'parameters': '잘못된 매개변수',
-      'referenceTooLarge': '참조 이미지 너무 큼',
+      'referenceTooLarge': '참조 이미지가 너무 큼',
       'download': '다운로드 실패',
+      'paymentRequired': '결제 필요',
       'invalidResponse': '잘못된 응답',
       'other': '생성 오류',
     });

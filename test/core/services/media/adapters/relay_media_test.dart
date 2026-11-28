@@ -345,6 +345,70 @@ void main() {
   );
 
   test(
+    'OpenRouter Gemini image requests accept inline results and classify a 402 before parsing pixels',
+    () async {
+      const models = [
+        'google/gemini-2.5-flash-image',
+        'google/gemini-3.1-flash-lite-image',
+      ];
+      for (final model in models) {
+        final provider = videoProvider('https://openrouter.ai/api/v1', model);
+        final adapter = resolver.resolve(
+          provider,
+          MediaMode.image,
+          modelId: model,
+        )!;
+        final request = MediaRequest(
+          modelId: model,
+          mode: MediaMode.image,
+          prompt: 'Poster',
+        );
+        for (final status in [200, 402]) {
+          final client = MockClient((r) async {
+            expect(r.url.path, '/api/v1/images');
+            expect(jsonDecode(r.body), {
+              'model': model,
+              'prompt': 'Poster',
+              'response_format': 'url',
+            });
+            return status == 402
+                ? videoJson({
+                    'error': {'code': 402, 'message': 'Insufficient credits'},
+                  }, 402)
+                : videoJson({
+                    'data': [
+                      {'b64_json': 'BA=='},
+                    ],
+                  });
+          });
+          final output = adapter
+              .generate(videoContext(provider, client), request)
+              .last;
+          if (status == 402) {
+            await expectLater(
+              output,
+              throwsA(
+                isA<MediaFailure>()
+                    .having(
+                      (e) => e.kind,
+                      'kind',
+                      MediaFailureKind.paymentRequired,
+                    )
+                    .having((e) => e.retryable, 'automatic retry', false),
+              ),
+            );
+          } else {
+            expect(
+              ((await output) as MediaOutput).results.single.base64,
+              'BA==',
+            );
+          }
+        }
+      }
+    },
+  );
+
+  test(
     'OpenRouter catalog drives media controls and JSON image edits',
     () async {
       const id = 'example/portrait';

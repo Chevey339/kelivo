@@ -424,6 +424,7 @@ MediaFailure mediaResponseFailure(
   final message = (details['message'] ?? error ?? '').toString();
   final moderation = '$code $message'.toLowerCase();
   final kind = switch (statusCode ?? 0) {
+    402 => MediaFailureKind.paymentRequired,
     _
         when [
           'moderation',

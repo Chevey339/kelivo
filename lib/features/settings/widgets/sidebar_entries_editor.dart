@@ -65,15 +65,16 @@ class SidebarEntriesEditor extends StatelessWidget {
     controlWidth = math.max(126, (controlWidth * 3 + 36).ceilToDouble());
     final controlHeight = math.max(30.0, scaler.scale(12) * 1.2 + 10);
     final textHeight = math.max(
-      40.0,
+      44.0,
       scaler.scale(14) * 1.3 + scaler.scale(11) * 1.3,
     );
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth - 16;
-        final stackControl = width < controlWidth + 138;
+        final stackControl = width < controlWidth + 148;
         return SidebarReorderList<SidebarEntry>(
           items: entries.keys.toList(),
+          itemLabel: (entry) => entry.label(l10n),
           itemExtent:
               (stackControl
                   ? textHeight + 4 + controlHeight
@@ -132,11 +133,18 @@ class SidebarEntriesEditor extends StatelessWidget {
               ),
             );
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsetsDirectional.only(start: 4, end: 12),
               child: stackControl
                   ? Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: [title, const SizedBox(height: 4), control],
+                      children: [
+                        title,
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: control,
+                        ),
+                      ],
                     )
                   : Row(
                       children: [
@@ -160,6 +168,7 @@ class SidebarReorderList<T extends Enum> extends StatefulWidget {
   const SidebarReorderList({
     super.key,
     required this.items,
+    required this.itemLabel,
     required this.itemExtent,
     required this.onMove,
     required this.itemBuilder,
@@ -167,6 +176,7 @@ class SidebarReorderList<T extends Enum> extends StatefulWidget {
   });
 
   final List<T> items;
+  final String Function(T) itemLabel;
   final double itemExtent;
   final void Function(T item, int target) onMove;
   final SidebarReorderItemBuilder<T> itemBuilder;
@@ -185,13 +195,17 @@ class _SidebarReorderListState<T extends Enum>
   void initState() {
     super.initState();
     FocusManager.instance.addEarlyKeyEventHandler(_cancelWithEscape);
+    FocusManager.instance.addHighlightModeListener(_highlightChanged);
   }
 
   @override
   void dispose() {
     FocusManager.instance.removeEarlyKeyEventHandler(_cancelWithEscape);
+    FocusManager.instance.removeHighlightModeListener(_highlightChanged);
     super.dispose();
   }
+
+  void _highlightChanged(FocusHighlightMode mode) => setState(() {});
 
   KeyEventResult _cancelWithEscape(KeyEvent event) {
     final dragged = _dragged;
@@ -242,17 +256,13 @@ class _SidebarReorderListState<T extends Enum>
     Widget row(T item) {
       final index = items.indexOf(item);
       final lifted = _dragged == item;
-      final collapsed = _dragged != null && index > from && !lifted;
-      final position = collapsed ? index - 1 : index;
-      final distance = position < target
-          ? target - position - 1
-          : position - target;
-      final shift = offsetIndicator && !lifted
-          ? (position < target ? -8 : 8) * math.pow(.7, distance).toDouble()
-          : 0.0;
-      final delay = offsetIndicator && !lifted ? 24 * distance : 0;
+      final position = index > from && index <= target
+          ? index - 1
+          : index < from && index >= target
+          ? index + 1
+          : index;
       final handle = item == widget.separator
-          ? const SizedBox(width: 32)
+          ? const SizedBox(width: 40)
           : Focus(
               onKeyEvent: (_, event) {
                 if (event is! KeyDownEvent || _dragged != null) {
@@ -288,8 +298,8 @@ class _SidebarReorderListState<T extends Enum>
                         if (_dragged != item) return;
                         setState(() {
                           _dragOffset = (_dragOffset + details.delta.dy).clamp(
-                            -(index + .5) * extent,
-                            (items.length - index - .5) * extent,
+                            -index * extent,
+                            (items.length - index - 1) * extent,
                           );
                         });
                       },
@@ -302,19 +312,29 @@ class _SidebarReorderListState<T extends Enum>
                       },
                       onVerticalDragCancel: () => _endDrag(item),
                       child: Semantics(
-                        label: l10n.sidebarReorderHandle,
+                        label: widget.itemLabel(item),
+                        hint: l10n.sidebarReorderHandle,
+                        onDecrease: index > 0
+                            ? () => widget.onMove(item, index - 1)
+                            : null,
+                        onIncrease: index + 1 < items.length
+                            ? () => widget.onMove(item, index + 1)
+                            : null,
                         child: MouseRegion(
                           cursor: lifted
                               ? SystemMouseCursors.grabbing
                               : SystemMouseCursors.grab,
                           child: Container(
                             alignment: Alignment.center,
-                            width: 32,
-                            height: 40,
-                            decoration: focus.hasFocus
+                            width: 40,
+                            height: 44,
+                            decoration:
+                                focus.hasFocus &&
+                                    FocusManager.instance.highlightMode ==
+                                        FocusHighlightMode.traditional
                                 ? BoxDecoration(
-                                    border: Border.all(color: cs.primary),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: context.appColors.surfaceFill,
+                                    borderRadius: BorderRadius.circular(10),
                                   )
                                 : null,
                             child: Icon(
@@ -332,30 +352,20 @@ class _SidebarReorderListState<T extends Enum>
             );
       return AnimatedPositioned(
         key: ValueKey(item),
-        top: lifted ? index * extent + _dragOffset : position * extent + shift,
+        top: lifted ? index * extent + _dragOffset : position * extent,
         left: 0,
         right: 0,
         height: extent,
         duration: reduceMotion || lifted
             ? Duration.zero
-            : Duration(milliseconds: 220 + delay),
-        curve: Interval(
-          delay / (220 + delay),
-          1,
-          curve: const Cubic(.32, .72, 0, 1),
-        ),
-        child: Transform.translate(
-          offset: Offset(lifted ? 14 : 0, 0),
-          child: Transform.scale(
-            scale: lifted ? .9 : 1,
-            child: Material(
-              color: lifted
-                  ? context.appColors.surfaceCard
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-              child: widget.itemBuilder(context, item, handle),
-            ),
-          ),
+            : const Duration(milliseconds: 170),
+        curve: Curves.easeOutCubic,
+        child: Material(
+          elevation: lifted ? 2 : 0,
+          shadowColor: cs.shadow.withValues(alpha: .2),
+          color: lifted ? context.appColors.surfaceCard : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          child: widget.itemBuilder(context, item, handle),
         ),
       );
     }
@@ -367,6 +377,7 @@ class _SidebarReorderListState<T extends Enum>
         children: [
           for (final item in items)
             if (item != _dragged) row(item),
+          if (_dragged != null) row(_dragged!),
           if (offsetIndicator)
             Positioned(
               key: const ValueKey('sidebar-drop-indicator'),
@@ -378,7 +389,6 @@ class _SidebarReorderListState<T extends Enum>
                 child: ColoredBox(color: cs.onSurface.withValues(alpha: .15)),
               ),
             ),
-          if (_dragged != null) row(_dragged!),
         ],
       ),
     );

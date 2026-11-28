@@ -197,6 +197,63 @@ Future<void> _dismissModelSelector(WidgetTester tester) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets(
+    'dragging the model sheet header expands above its opening height',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final settings = await _settingsWithOnlyTestProviders(tester);
+      await _pumpModelSelector(tester, settings: settings);
+      await tester.pumpAndSettle();
+      final header = find.byKey(const ValueKey('model-selector-header'));
+      final top = tester.getTopLeft(header).dy;
+      await tester.dragFrom(
+        Offset(tester.getCenter(header).dx, top + 12),
+        const Offset(0, -130),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(header).dy, lessThan(top - 50));
+      Navigator.of(tester.element(header)).pop();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets(
+    'the model sheet can be dragged closed above a landscape keyboard',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(844, 390);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetViewInsets);
+      final settings = await _settingsWithOnlyTestProviders(tester);
+      await _pumpModelSelector(tester, settings: settings);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(TextField));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 174);
+      await tester.pumpAndSettle();
+      final header = find.byKey(const ValueKey('model-selector-header'));
+      final list = find.byKey(const ValueKey('model-selector-list'));
+      final grip = tester.getRect(header).topCenter + const Offset(0, 12);
+      final drag = await tester.startGesture(grip);
+      await drag.moveBy(const Offset(0, 22));
+      await tester.pump();
+      await drag.moveBy(const Offset(0, 55));
+      await tester.pump();
+      expect(tester.getSize(list).height, greaterThan(40));
+      expect(tester.takeException(), isNull);
+      await drag.moveBy(const Offset(0, 220));
+      await drag.up();
+      await tester.pumpAndSettle();
+      expect(header, findsNothing);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
   for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
     testWidgets(
       'image model picker keeps favorites inside its model type on $platform',

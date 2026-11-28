@@ -62,6 +62,7 @@ class _CreationTimelineState extends State<CreationTimeline>
     vsync: this,
     duration: const Duration(milliseconds: 1600),
   );
+  static const _topInset = 12.0;
   final _scroll = ItemScrollController();
   final _positions = ItemPositionsListener.create();
   String? _lastSeenRequest, _pendingSubmission;
@@ -70,6 +71,7 @@ class _CreationTimelineState extends State<CreationTimeline>
   bool get desktop => widget.desktop;
   double _footerHeight = 0;
   bool _followEnd = false;
+  bool _scrolling = false;
 
   @override
   void didChangeDependencies() {
@@ -103,6 +105,8 @@ class _CreationTimelineState extends State<CreationTimeline>
         previous.highlightBatchId != widget.highlightBatchId) {
       _initialPlacement = true;
       _lastSeenRequest = null;
+      _followEnd = false;
+      _scrolling = false;
       _pendingSubmission = null;
     }
   }
@@ -114,10 +118,38 @@ class _CreationTimelineState extends State<CreationTimeline>
     super.dispose();
   }
 
+  void _alignShortHistory() {
+    if (_scrolling) return;
+    final visible = _positions.itemPositions.value;
+    final first = visible.where((item) => item.index == 0).firstOrNull;
+    if (first == null || first.itemLeadingEdge <= 0) return;
+    final height = context.size?.height;
+    if (height == null ||
+        height <= 0 ||
+        first.itemLeadingEdge * height <= _topInset + 1) {
+      return;
+    }
+    final last = context
+        .read<MediaCreationController>()
+        .batchesFor(topicId!)
+        .length;
+    final footer = visible.where((item) => item.index == last).firstOrNull;
+    if (footer == null) return;
+    // An end-aligned placeholder can shrink enough to fit the entire history.
+    // Only then move the anchor to the first row. Reported edges are rounded.
+    final span = (footer.itemTrailingEdge - first.itemLeadingEdge) * height;
+    if (span + _topInset <= height + 1) {
+      _scroll.jumpTo(index: 0);
+    }
+  }
+
   void _placeTimeline() {
     if (!mounted || !_scroll.isAttached || topicId == null) return;
     final submitted = _pendingSubmission;
-    if (!_initialPlacement && submitted == null && !_followEnd) return;
+    if (!_initialPlacement && submitted == null && !_followEnd) {
+      _alignShortHistory();
+      return;
+    }
     final batches = context.read<MediaCreationController>().batchesFor(
       topicId!,
     );
@@ -196,72 +228,89 @@ class _CreationTimelineState extends State<CreationTimeline>
       ignoring: _initialPlacement,
       child: Opacity(
         opacity: _initialPlacement ? 0 : 1,
-        child: ScrollablePositionedList.builder(
-          key: ValueKey(topicId),
-          itemScrollController: _scroll,
-          itemPositionsListener: _positions,
-          padding: EdgeInsets.fromLTRB(
-            desktop ? 32 : 14,
-            12,
-            desktop ? 32 : 14,
-            0,
-          ),
-          itemCount: batches.length + 1,
-          itemBuilder: (context, sourceIndex) {
-            if (sourceIndex == batches.length) {
-              return SizedBox(height: _footerHeight);
-            }
-            final batch = batches[sourceIndex];
-            final showDate =
-                sourceIndex == 0 ||
-                !DateUtils.isSameDay(
-                  batch.createdAt,
-                  batches[sourceIndex - 1].createdAt,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification.depth == 0) {
+              if (notification is ScrollStartNotification) _scrolling = true;
+              if (notification is ScrollEndNotification) {
+                _scrolling = false;
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _placeTimeline(),
                 );
-            final group = Align(
-              key: ValueKey(batch.id),
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 30),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (showDate) _DateDivider(date: batch.createdAt),
-                      _BatchGroup(
-                        batch: batch,
-                        desktop: desktop,
-                        results: _BatchResults(
-                          batch: batch,
-                          items: media.itemsFor(batch.id),
-                          desktop: desktop,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-            if (highlight == batch.id && !reduced) {
-              return AnimatedBuilder(
+              }
+            }
+            return false;
+          },
+          child: ScrollablePositionedList.builder(
+            key: ValueKey(topicId),
+            itemScrollController: _scroll,
+            itemPositionsListener: _positions,
+            padding: EdgeInsets.fromLTRB(
+              desktop ? 32 : 14,
+              _topInset,
+              desktop ? 32 : 14,
+              0,
+            ),
+            itemCount: batches.length + 1,
+            itemBuilder: (context, sourceIndex) {
+              if (sourceIndex == batches.length) {
+                return SizedBox(height: _footerHeight);
+              }
+              final batch = batches[sourceIndex];
+              final showDate =
+                  sourceIndex == 0 ||
+                  !DateUtils.isSameDay(
+                    batch.createdAt,
+                    batches[sourceIndex - 1].createdAt,
+                  );
+              final group = Align(
                 key: ValueKey(batch.id),
-                animation: _highlightFade,
-                child: group,
-                builder: (context, child) => ColoredBox(
-                  color: Theme.of(context).colorScheme.primary.withValues(
-                    alpha: .08 * _highlightFade.value,
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 30),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (showDate) _DateDivider(date: batch.createdAt),
+                        _BatchGroup(
+                          batch: batch,
+                          desktop: desktop,
+                          onPromptCollapsed: () => setState(() {
+                            // Rebuild the indexed list so it measures the shorter row.
+                          }),
+                          results: _BatchResults(
+                            batch: batch,
+                            items: media.itemsFor(batch.id),
+                            desktop: desktop,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: child,
                 ),
               );
-            }
-            return _BatchEntrance(
-              key: ValueKey(batch.id),
-              createdAt: batch.createdAt,
-              child: group,
-            );
-          },
+              if (highlight == batch.id && !reduced) {
+                return AnimatedBuilder(
+                  key: ValueKey(batch.id),
+                  animation: _highlightFade,
+                  child: group,
+                  builder: (context, child) => ColoredBox(
+                    color: Theme.of(context).colorScheme.primary.withValues(
+                      alpha: .08 * _highlightFade.value,
+                    ),
+                    child: child,
+                  ),
+                );
+              }
+              return _BatchEntrance(
+                key: ValueKey(batch.id),
+                createdAt: batch.createdAt,
+                child: group,
+              );
+            },
+          ),
         ),
       ),
     );
@@ -564,10 +613,12 @@ class _BatchGroup extends StatefulWidget {
     required this.batch,
     required this.desktop,
     required this.results,
+    required this.onPromptCollapsed,
   });
   final GenerationBatchRow batch;
   final bool desktop;
   final Widget results;
+  final VoidCallback onPromptCollapsed;
 
   @override
   State<_BatchGroup> createState() => _BatchGroupState();
@@ -601,7 +652,10 @@ class _BatchGroupState extends State<_BatchGroup> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       GestureDetector(
-                        onTap: () => setState(() => _expanded = !_expanded),
+                        onTap: () {
+                          setState(() => _expanded = !_expanded);
+                          if (!_expanded) widget.onPromptCollapsed();
+                        },
                         child: Text(
                           batch.prompt.isEmpty ? batch.modelId : batch.prompt,
                           maxLines: _expanded ? null : 2,
@@ -939,7 +993,7 @@ Future<void> showCreationRequestDetails(
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final media = context.read<MediaCreationController>();
-  final details = _requestDetails(batch);
+  final details = creationRequestDetails(batch);
   const json = JsonEncoder.withIndent('  ');
   final copyText = details.isEmpty
       ? l10n.creationNoRequestDetails
@@ -995,7 +1049,9 @@ Future<void> showCreationRequestDetails(
           _Tag(provider.name),
         ],
       ),
-      Text(details['message']?.toString() ?? l10n.creationNoRequestDetails),
+      Text(
+        creationFailureMessage(l10n, details) ?? l10n.creationNoRequestDetails,
+      ),
       if (details['retries'] case final List retries)
         code(l10n.creationRetryHistory, retries),
       if (details['request'] case final Map request)
@@ -1087,10 +1143,13 @@ Future<void> showCreationRequestDetails(
   );
 }
 
-Map<String, Object?> _requestDetails(GenerationBatchRow batch) {
+Map<String, Object?> creationRequestDetails(GenerationBatchRow batch) {
   try {
     if (jsonDecode(batch.errorJson ?? '{}')
         case final Map<String, dynamic> value) {
+      if (value['statusCode'] == 402 && value['kind'] == 'invalidResponse') {
+        return {...value, 'kind': MediaFailureKind.paymentRequired.name};
+      }
       if (value['kind'] == 'parameters' &&
           const {404, 405}.contains(value['statusCode'])) {
         return {...value, 'kind': MediaFailureKind.unavailable.name};
@@ -1101,6 +1160,18 @@ Map<String, Object?> _requestDetails(GenerationBatchRow batch) {
     // The failure may have no structured details.
   }
   return const {};
+}
+
+String? creationFailureMessage(
+  AppLocalizations l10n,
+  Map<String, Object?> details,
+) {
+  final message = details['message']?.toString();
+  if (details['kind'] != MediaFailureKind.paymentRequired.name) return message;
+  return [
+    if (message != null && message.isNotEmpty) message,
+    l10n.creationPaymentHint,
+  ].join(' · ');
 }
 
 class _Tag extends StatelessWidget {
@@ -1300,7 +1371,7 @@ class _BatchResultsState extends State<_BatchResults> {
 }
 
 String creationRetryLabel(AppLocalizations l10n, GenerationBatchRow batch) =>
-    _requestDetails(batch)['kind'] == MediaFailureKind.download.name
+    creationRequestDetails(batch)['kind'] == MediaFailureKind.download.name
     ? l10n.creationChatRegenerate
     : l10n.creationRetry;
 
@@ -1330,7 +1401,7 @@ class _DownloadFailure extends StatelessWidget {
                 Icon(LucideIcons.cloudOff, color: colors.error, size: 22),
                 const SizedBox(height: 4),
                 Text(
-                  _requestDetails(batch)['kind'] ==
+                  creationRequestDetails(batch)['kind'] ==
                           MediaFailureKind.download.name
                       ? l10n.creationDownloadFailed
                       : l10n.creationPartial,
@@ -1380,10 +1451,10 @@ class _BatchFailure extends StatelessWidget {
     final danger =
         batch.status == GenerationStatus.failed ||
         batch.status == GenerationStatus.partial;
-    final details = _requestDetails(batch);
+    final details = creationRequestDetails(batch);
     final kind = details['kind']?.toString();
     final reason = danger
-        ? details['message']?.toString() ?? l10n.creationNoRequestDetails
+        ? creationFailureMessage(l10n, details) ?? l10n.creationNoRequestDetails
         : batch.status == GenerationStatus.cancelled
         ? l10n.creationCancelledHelp
         : l10n.creationInterruptedHelp;

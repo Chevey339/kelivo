@@ -19,23 +19,168 @@ Future<T?> showCreationPicker<T>(
   bool scroll = true,
   bool darkSheet = false,
 }) {
+  Widget buildPanel(BuildContext context, ColorScheme cs) {
+    final content = builder(context);
+    final section = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (title.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              desktop ? 14 : 20,
+              desktop ? 12 : 4,
+              16,
+              desktop ? 6 : 12,
+            ),
+            child: Text(
+              title,
+              style: TextStyle(
+                color: desktop ? cs.onSurfaceVariant : cs.onSurface,
+                fontSize: desktop ? 12.5 : 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        Flexible(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              desktop ? 8 : 16,
+              4,
+              desktop ? 8 : 16,
+              desktop ? 8 : 16,
+            ),
+            child: scroll
+                ? SingleChildScrollView(primary: false, child: content)
+                : content,
+          ),
+        ),
+      ],
+    );
+    return Material(
+      type: MaterialType.transparency,
+      textStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
+        color: cs.onSurface,
+        fontSize: 13.5,
+        letterSpacing: 0,
+        decoration: TextDecoration.none,
+      ),
+      child: desktop
+          ? section
+          : LayoutBuilder(
+              builder: (context, bounds) {
+                final gripHeight = math.min(26.0, bounds.maxHeight);
+                final available = bounds.maxHeight - gripHeight;
+                final minimum =
+                    180 * MediaQuery.textScalerOf(context).scale(14) / 14;
+                // Keep the search field mounted through keyboard changes. In a short
+                // viewport the section can scroll, while the grip always drags the route.
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: gripHeight,
+                      child: Center(
+                        child: Container(
+                          height: 4,
+                          width: 36,
+                          decoration: BoxDecoration(
+                            color: cs.onSurface.withValues(alpha: .20),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        primary: false,
+                        physics: available < minimum
+                            ? null
+                            : const NeverScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: math.max(available, minimum),
+                          ),
+                          child: section,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+    );
+  }
+
+  if (!desktop) {
+    return showModalBottomSheet<T>(
+      context: anchor,
+      isScrollControlled: true,
+      useSafeArea: true,
+      enableDrag: true,
+      showDragHandle: false,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      barrierColor: Colors.black.withValues(alpha: .32),
+      constraints: const BoxConstraints(maxWidth: double.infinity),
+      sheetAnimationStyle: AnimationStyle(
+        duration: handoffDuration(anchor, 280),
+        reverseDuration: handoffDuration(anchor, 220),
+      ),
+      builder: (context) {
+        final cs = darkSheet
+            ? const ColorScheme.dark(surface: Color(0xff1c1c1e))
+            : Theme.of(context).colorScheme;
+        final surface = darkSheet
+            ? cs.surface
+            : cs.brightness == Brightness.dark
+            ? Color.alphaBlend(cs.onSurface.withValues(alpha: .055), cs.surface)
+            : context.appColors.surfaceCard;
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: LayoutBuilder(
+            builder: (context, bounds) {
+              final height = bounds.maxHeight;
+              final short =
+                  height <
+                  220 * MediaQuery.textScalerOf(context).scale(14) / 14;
+              return Container(
+                width: double.infinity,
+                constraints: BoxConstraints(
+                  maxHeight: short ? height : height * .92,
+                ),
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(26),
+                  ),
+                ),
+                child: SafeArea(top: false, child: buildPanel(context, cs)),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
   final nav = Navigator.of(anchor);
   final box = anchor.findRenderObject()! as RenderBox;
   final overlay = nav.overlay!.context.findRenderObject()! as RenderBox;
   final rect = box.localToGlobal(Offset.zero, ancestor: overlay) & box.size;
   final themes = InheritedTheme.capture(from: anchor, to: nav.context);
-  final duration = handoffDuration(anchor, desktop ? 200 : 420);
   final initialSize = MediaQuery.sizeOf(anchor);
   return nav.push<T>(
     RawDialogRoute<T>(
       barrierDismissible: true,
       barrierLabel: MaterialLocalizations.of(anchor).modalBarrierDismissLabel,
-      barrierColor: desktop
-          ? Colors.transparent
-          : Colors.black.withValues(alpha: .32),
-      transitionDuration: duration,
+      barrierColor: Colors.transparent,
+      transitionDuration: handoffDuration(anchor, 200),
       pageBuilder: (context, animation, _) {
-        if (desktop && MediaQuery.sizeOf(context) != initialSize) {
+        if (MediaQuery.sizeOf(context) != initialSize) {
           final route = ModalRoute.of(context);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (route?.isCurrent == true && nav.mounted) nav.pop();
@@ -47,107 +192,6 @@ Future<T?> showCreationPicker<T>(
             : Theme.of(context).colorScheme;
         final dark = cs.brightness == Brightness.dark;
         final curve = animation.drive(CurveTween(curve: handoffCurve));
-        final media = MediaQuery.of(context);
-        final availableHeight = math.max(
-          0.0,
-          media.size.height - media.viewInsets.bottom - media.padding.top,
-        );
-        final shortSheet =
-            !desktop && availableHeight < 220 * media.textScaler.scale(14) / 14;
-        final content = builder(context);
-        final paddedContent = Padding(
-          padding: EdgeInsets.fromLTRB(
-            desktop ? 8 : 16,
-            4,
-            desktop ? 8 : 16,
-            desktop ? 8 : 16,
-          ),
-          child: scroll && !shortSheet
-              ? SingleChildScrollView(child: content)
-              : content,
-        );
-        final panel = Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!desktop)
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 8, bottom: 9),
-                  height: 4,
-                  width: 36,
-                  decoration: BoxDecoration(
-                    color: cs.onSurface.withValues(alpha: .20),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-            if (title.isNotEmpty)
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  desktop ? 14 : 20,
-                  desktop ? 12 : 4,
-                  16,
-                  desktop ? 6 : 12,
-                ),
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: desktop ? cs.onSurfaceVariant : cs.onSurface,
-                    fontSize: desktop ? 12.5 : 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            if (shortSheet) paddedContent else Flexible(child: paddedContent),
-          ],
-        );
-        final body = Material(
-          type: MaterialType.transparency,
-          textStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-            color: cs.onSurface,
-            fontSize: 13.5,
-            letterSpacing: 0,
-            decoration: TextDecoration.none,
-          ),
-          child: shortSheet ? SingleChildScrollView(child: panel) : panel,
-        );
-        if (!desktop) {
-          final height = shortSheet ? availableHeight : availableHeight * .86;
-          return themes.wrap(
-            Padding(
-              padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: SlideTransition(
-                  position: Tween(
-                    begin: const Offset(0, 1),
-                    end: Offset.zero,
-                  ).animate(curve),
-                  child: Container(
-                    width: double.infinity,
-                    constraints: BoxConstraints(maxHeight: height),
-                    decoration: BoxDecoration(
-                      color: darkSheet
-                          ? const Color(0xff1c1c1e)
-                          : dark
-                          ? Color.alphaBlend(
-                              cs.onSurface.withValues(alpha: .055),
-                              cs.surface,
-                            )
-                          : context.appColors.surfaceCard,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(26),
-                      ),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: SafeArea(top: false, child: body),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
         final radius = BorderRadius.circular(14);
         return themes.wrap(
           CustomSingleChildLayout(
@@ -163,7 +207,7 @@ Future<T?> showCreationPicker<T>(
                     width: .7,
                   ),
                 ),
-                child: body,
+                child: buildPanel(context, cs),
               ),
               builder: (_, child) {
                 final t = curve.value;

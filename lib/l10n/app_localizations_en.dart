@@ -5815,7 +5815,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
-      'Keep sidebar open when selecting assistant';
+      'Keep the sidebar open after choosing an assistant';
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnTopicTapTitle =>
@@ -17880,7 +17880,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarLayoutTitle => 'Layout';
 
   @override
-  String get sidebarPresetCurrent => 'Current layout';
+  String get sidebarPresetCurrent => 'Classic';
 
   @override
   String get sidebarPresetNavigation => 'Navigation list';
@@ -17889,16 +17889,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarPresetAssistantBottom => 'Assistant at bottom';
 
   @override
-  String get sidebarPresetAllTop => 'All at the top';
+  String get sidebarPresetAllTop => 'Top navigation';
 
   @override
   String get sidebarPresetCustom => 'Custom layout';
 
   @override
-  String get sidebarReorderTitle => 'Arrange blocks';
+  String get sidebarReorderTitle => 'Sidebar order';
 
   @override
-  String get sidebarReorderHint => 'Drag above or below the conversation list';
+  String get sidebarReorderHint =>
+      'Drag a handle to move an item above or below the conversation list.';
 
   @override
   String get sidebarReorderHandle => 'Reorder';
@@ -17925,7 +17926,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarBlockBottom => 'Bottom';
 
   @override
-  String get sidebarDisplayAs => 'Display as';
+  String get sidebarDisplayAs => 'Shortcut style';
 
   @override
   String get sidebarStyleList => 'List';
@@ -17973,18 +17974,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarHideCustomize => 'Hide from More';
 
   @override
-  String get sidebarShowCustomizeInMore => 'Show Customize sidebar in More';
+  String get sidebarShowCustomizeInMore => 'Show sidebar settings in More';
 
   @override
-  String get sidebarShowCustomizeInMoreHint => 'You can always change it here';
+  String get sidebarShowCustomizeInMoreHint =>
+      'Also available in Settings › Preferences › Sidebar.';
 
   @override
   String get sidebarHideSingleAssistant =>
-      'Hide assistant row when there is only one';
-
-  @override
-  String get sidebarHideSingleAssistantHint =>
-      'The assistant row is shown by default';
+      'Hide the switcher when there is only one assistant';
 
   @override
   String get sidebarRestoreDefaults => 'Restore defaults';
@@ -19017,6 +19015,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creationCustomCountLabel => 'Custom count';
 
   @override
+  String get creationPaymentHint =>
+      'Check the provider balance and the spending limit for this API key.';
+
+  @override
   String creationFailureCategory(String kind) {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'network': 'Network connection',
@@ -19028,6 +19030,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'parameters': 'Invalid parameters',
       'referenceTooLarge': 'Reference too large',
       'download': 'Download failed',
+      'paymentRequired': 'Payment required',
       'invalidResponse': 'Invalid response',
       'other': 'Generation error',
     });

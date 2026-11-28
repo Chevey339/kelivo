@@ -740,6 +740,108 @@ void main() {
   );
 
   testWidgets(
+    'a gallery link reveals the prompt of a tall batch in the middle of a topic',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 640);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final media = await _pumpCreationGallery(
+        tester,
+        desktop: false,
+        count: 1,
+        laterBatches: 31,
+      );
+      final repository = media.runner.repository;
+      await tester.runAsync(() async {
+        final source = media.itemsFor('batch').single;
+        for (var i = 0; i < 12; i++) {
+          await repository.addItem(
+            source.copyWith(
+              id: 'portrait-$i',
+              batchId: 'later-18',
+              ordinal: i,
+              width: const Value(9),
+              height: const Value(16),
+            ),
+          );
+        }
+        await repository.updateBatch(
+          'later-18',
+          const GenerationBatchRowsCompanion(
+            status: Value(GenerationStatus.succeeded),
+          ),
+        );
+        await repository.watchItems().firstWhere((items) => items.length == 13);
+      });
+      await tester.pump();
+      await tester.tap(find.text('All creations').hitTestable().first);
+      await tester.pumpAndSettle();
+      final artwork = find.byWidgetPredicate(
+        (w) => w is CreationArtworkTile && w.item.batchId == 'later-18',
+      );
+      await tester.tap(artwork.hitTestable().first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('More').hitTestable().last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Show in topic').hitTestable());
+      await tester.pumpAndSettle();
+      expect(find.text('Study 18').hitTestable(), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'submitting from the start of a long topic reveals the new batch',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 700);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final media = await _pumpCreationGallery(
+        tester,
+        desktop: false,
+        count: 1,
+        laterBatches: 120,
+      );
+      await tester.tap(find.text('Mountain trip'));
+      await tester.pumpAndSettle();
+      final first = find.text('A wide mountain lake');
+      await tester.scrollUntilVisible(
+        first,
+        -600,
+        scrollable: find
+            .descendant(
+              of: find.byType(CreationTimeline),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+        maxScrolls: 150,
+      );
+      await tester.pumpAndSettle();
+      expect(first.hitTestable(), findsOneWidget);
+      await tester.runAsync(() async {
+        media.updatePrompt('topic', 'Mountain at dusk');
+        await media.submit('topic');
+        final id = media.lastSubmission('topic')!;
+        await media.runner.repository.watchBatches().firstWhere(
+          (batches) => batches.any(
+            (b) => b.id == id && b.status == GenerationStatus.failed,
+          ),
+        );
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('Mountain at dusk').hitTestable(), findsOneWidget);
+      final row = find.byKey(ValueKey(media.lastSubmission('topic')!)).last;
+      expect(
+        tester.getRect(row).bottom,
+        lessThanOrEqualTo(
+          tester.getRect(find.byType(CreationComposer)).top + 1,
+        ),
+      );
+    },
+  );
+
+  testWidgets(
     'long topics open at the latest batch and gallery links reveal the original batch',
     (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -1324,6 +1426,281 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'mobile model picker uses available height, filters in place and drags closed',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final media = await _pumpCreationGallery(
+        tester,
+        desktop: false,
+        seedTopic: false,
+      );
+      await tester.runAsync(() async {
+        await media.settings.setProviderConfig(
+          _provider.id,
+          _provider.copyWith(
+            models: [_model, for (var i = 0; i < 80; i++) 'gpt-image-test-$i'],
+          ),
+        );
+      });
+      await tester.pumpAndSettle();
+      final current = media.model!.spec.displayName;
+      await tester.tap(find.text(current).hitTestable().last);
+      await tester.pumpAndSettle();
+      final sheet = find.byType(BottomSheet);
+      final list = find.descendant(of: sheet, matching: find.byType(ListView));
+      final title = find.text('Image models');
+      expect(tester.getSize(list).height, greaterThan(450));
+      expect(find.text('gpt-image-test-79'), findsNothing);
+      final titleTop = tester.getTopLeft(title).dy;
+      await tester.drag(list, const Offset(0, -250));
+      await tester.pumpAndSettle();
+      expect(title.hitTestable(), findsOneWidget);
+      final search = find.descendant(
+        of: sheet,
+        matching: find.byType(EditableText),
+      );
+      await tester.enterText(search, 'gpt-image-test-79');
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(title).dy, closeTo(titleTop, 1));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 305);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(search.hitTestable(), findsOneWidget);
+      expect(tester.getBottomLeft(list).dy, lessThanOrEqualTo(844 - 305));
+      await tester.runAsync(() async {
+        await tester.tap(find.text('gpt-image-test-79').hitTestable().last);
+        await media.preferences.flushPendingWrites();
+      });
+      await tester.pumpAndSettle();
+      expect(media.model!.spec.id, 'gpt-image-test-79');
+      expect(sheet, findsNothing);
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('gpt-image-test-79').hitTestable().last);
+      await tester.pumpAndSettle();
+      final start = Offset(
+        tester.getCenter(title).dx,
+        tester.getTopLeft(title).dy - 12,
+      );
+      final drag = await tester.startGesture(start);
+      await drag.moveBy(const Offset(0, 20));
+      await tester.pump(const Duration(milliseconds: 100));
+      await drag.moveBy(const Offset(0, 24));
+      await tester.pump();
+      expect(tester.getTopLeft(title).dy, greaterThan(titleTop));
+      await drag.up();
+      await tester.pumpAndSettle();
+      expect(title.hitTestable(), findsOneWidget);
+      await tester.flingFrom(start, const Offset(0, 500), 1400);
+      await tester.pumpAndSettle();
+      expect(sheet, findsNothing);
+      expect(media.model!.spec.id, 'gpt-image-test-79');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('search and the dismiss handle survive a landscape keyboard', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(660, 410);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetViewInsets);
+    final media = await _pumpCreationGallery(
+      tester,
+      desktop: false,
+      seedTopic: false,
+    );
+    await tester.runAsync(
+      () => media.settings.setProviderConfig(
+        _provider.id,
+        _provider.copyWith(
+          models: [_model, for (var i = 0; i < 15; i++) 'gpt-image-test-$i'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text(media.model!.spec.displayName).hitTestable().last,
+    );
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    final search = find.descendant(
+      of: sheet,
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(search, 'test-1');
+    await tester.pumpAndSettle();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 210);
+    await tester.pumpAndSettle();
+    final field = tester.widget<EditableText>(search);
+    expect(field.controller.text, 'test-1');
+    expect(field.focusNode.hasFocus, isTrue);
+    final grip = tester.getRect(sheet).topCenter + const Offset(0, 12);
+    await tester.flingFrom(grip, const Offset(0, 180), 1400);
+    await tester.pumpAndSettle();
+    expect(sheet, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final status in [GenerationStatus.failed, GenerationStatus.succeeded]) {
+    testWidgets(
+      'short topic stays at the top after a tall placeholder becomes ${status.name}',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 640);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        final media = await _pumpCreationGallery(
+          tester,
+          desktop: false,
+          count: 0,
+        );
+        await tester.pumpAndSettle();
+        final repo = media.runner.repository;
+        await tester.runAsync(() async {
+          await repo.updateBatch(
+            'batch',
+            const GenerationBatchRowsCompanion(
+              status: Value(GenerationStatus.running),
+              paramsJson: Value('{"aspectRatio":"9:16","count":1}'),
+            ),
+          );
+          await repo.watchBatches().firstWhere(
+            (rows) => rows.single.status.isActive,
+          );
+        });
+        await tester.pump();
+        await tester.tap(find.text('Mountain trip'));
+        for (var frame = 0; frame < 6; frame++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(find.byType(CreationTimeline), findsOneWidget);
+        await tester.runAsync(() async {
+          if (status == GenerationStatus.succeeded) {
+            final folder = await Directory.systemTemp.createTemp(
+              'creation-layout',
+            );
+            addTearDown(() => folder.delete(recursive: true));
+            final file = await File(
+              '${folder.path}/result.png',
+            ).writeAsBytes(image.encodePng(image.Image(width: 16, height: 9)));
+            await repo.addItem(
+              GenerationItemRow(
+                id: 'image',
+                batchId: 'batch',
+                ordinal: 0,
+                mode: MediaMode.image,
+                path: file.path,
+                mime: 'image/png',
+                width: 16,
+                height: 9,
+                byteSize: await file.length(),
+                favorite: false,
+                status: GenerationItemStatus.ready,
+                createdAt: DateTime.now(),
+              ),
+            );
+          }
+          await repo.updateBatch(
+            'batch',
+            GenerationBatchRowsCompanion(
+              status: Value(status),
+              errorJson: Value(
+                status == GenerationStatus.failed
+                    ? '{"kind":"invalidResponse","statusCode":402,"message":"HTTP 402"}'
+                    : null,
+              ),
+            ),
+          );
+          await repo.watchBatches().firstWhere(
+            (rows) => rows.single.status == status,
+          );
+        });
+        for (var frame = 0; frame < 6; frame++) {
+          await tester.pump(const Duration(milliseconds: 150));
+        }
+        final top = tester.getTopLeft(find.byType(CreationTimeline)).dy;
+        final first = tester
+            .getTopLeft(find.byKey(const ValueKey('batch')).last)
+            .dy;
+        expect(first - top, closeTo(12, 1));
+        if (status == GenerationStatus.failed) {
+          expect(find.textContaining('Payment required'), findsOneWidget);
+          expect(find.textContaining('spending limit'), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'collapsing the prompt after a job finishes realigns a short topic',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 700);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final media = await _pumpCreationGallery(
+        tester,
+        desktop: false,
+        count: 0,
+      );
+      final repo = media.runner.repository;
+      final prompt = List.generate(40, (i) => 'Mountain study $i').join('\n');
+      await tester.runAsync(() async {
+        await repo.updateBatch(
+          'batch',
+          GenerationBatchRowsCompanion(
+            status: const Value(GenerationStatus.running),
+            prompt: Value(prompt),
+            paramsJson: const Value('{"aspectRatio":"9:16","count":4}'),
+          ),
+        );
+        await repo.watchBatches().firstWhere(
+          (rows) => rows.single.status.isActive,
+        );
+      });
+      await tester.tap(find.text('Mountain trip'));
+      for (var frame = 0; frame < 6; frame++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      final text = find.text(prompt);
+      await tester.ensureVisible(text);
+      await tester.pump();
+      await tester.tap(text);
+      await tester.pump();
+      expect(tester.widget<Text>(text).maxLines, isNull);
+      await tester.runAsync(() async {
+        await repo.updateBatch(
+          'batch',
+          const GenerationBatchRowsCompanion(
+            status: Value(GenerationStatus.failed),
+          ),
+        );
+        await repo.watchBatches().firstWhere(
+          (rows) => rows.single.status == GenerationStatus.failed,
+        );
+      });
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(text);
+      await tester.pumpAndSettle();
+      final viewport = tester.getRect(find.byType(CreationTimeline));
+      final visiblePrompt = tester.getRect(text).intersect(viewport);
+      await tester.tapAt(visiblePrompt.topLeft + const Offset(12, 12));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(text).maxLines, 2);
+      final row = find.byKey(const ValueKey('batch')).last;
+      expect(tester.getTopLeft(row).dy - viewport.top, closeTo(12, 1));
+    },
+  );
+
   for (final chat in [false, true]) {
     testWidgets(
       '${chat ? 'chat' : 'creation timeline'} preserves a playing card through result publication',
@@ -1756,6 +2133,10 @@ Future<MediaCreationController> _pumpCreationGallery(
         final runner = MediaGenerationRunner(
           repository: repository,
           files: const MediaFileStore(),
+          clientFactory: (_, _) => MockClient(
+            (_) async =>
+                http.Response('{"error":{"message":"Fixture response"}}', 400),
+          ),
         );
         await runner.initialized;
         final folder = await Directory.systemTemp.createTemp(

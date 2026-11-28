@@ -493,13 +493,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
     }
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    Object? message;
-    try {
-      final diagnostics = jsonDecode(batch.errorJson ?? '{}');
-      if (diagnostics is Map) message = diagnostics['message'];
-    } on FormatException {
-      // The batch may have been interrupted before collecting diagnostics.
-    }
+    final message = creationFailureMessage(l10n, creationRequestDetails(batch));
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Color.alphaBlend(
@@ -523,7 +517,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
               ),
             ),
             Text(
-              message is String && message.isNotEmpty
+              message != null && message.isNotEmpty
                   ? message
                   : batch.status == GenerationStatus.interrupted
                   ? l10n.creationInterrupted

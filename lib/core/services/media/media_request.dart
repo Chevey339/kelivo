@@ -513,6 +513,7 @@ enum MediaFailureKind {
   server,
   rejected,
   login,
+  paymentRequired,
   unavailable,
   parameters,
   referenceTooLarge,

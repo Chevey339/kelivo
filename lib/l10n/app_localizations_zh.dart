@@ -5565,7 +5565,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
-      '点选助手时不自动关闭侧边栏';
+      '选择助手后保持侧边栏展开';
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnTopicTapTitle =>
@@ -16885,25 +16885,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sidebarLayoutTitle => '布局';
 
   @override
-  String get sidebarPresetCurrent => '现在的样子';
+  String get sidebarPresetCurrent => '经典样式';
 
   @override
-  String get sidebarPresetNavigation => '导航列表';
+  String get sidebarPresetNavigation => '列表导航';
 
   @override
-  String get sidebarPresetAssistantBottom => '助手在底部';
+  String get sidebarPresetAssistantBottom => '助手置底';
 
   @override
-  String get sidebarPresetAllTop => '都放顶部';
+  String get sidebarPresetAllTop => '顶部导航';
 
   @override
   String get sidebarPresetCustom => '已自定义';
 
   @override
-  String get sidebarReorderTitle => '调整位置';
+  String get sidebarReorderTitle => '排列顺序';
 
   @override
-  String get sidebarReorderHint => '拖到「对话列表」上面或下面';
+  String get sidebarReorderHint => '拖动手柄，将项目移到对话列表上方或下方。';
 
   @override
   String get sidebarReorderHandle => '拖动排序';
@@ -16930,7 +16930,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sidebarBlockBottom => '底部';
 
   @override
-  String get sidebarDisplayAs => '显示为';
+  String get sidebarDisplayAs => '入口样式';
 
   @override
   String get sidebarStyleList => '列表';
@@ -16978,16 +16978,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sidebarHideCustomize => '不在「更多」里显示';
 
   @override
-  String get sidebarShowCustomizeInMore => '在「更多」里显示「自定义侧边栏」';
+  String get sidebarShowCustomizeInMore => '在「更多」中显示侧边栏设置';
 
   @override
-  String get sidebarShowCustomizeInMoreHint => '调好后可以关掉，之后从这里改';
+  String get sidebarShowCustomizeInMoreHint => '也可从「设置 › 偏好设置 › 侧边栏」进入。';
 
   @override
-  String get sidebarHideSingleAssistant => '只有一个助手时隐藏助手行';
-
-  @override
-  String get sidebarHideSingleAssistantHint => '默认照常显示，和现在一样';
+  String get sidebarHideSingleAssistant => '仅有一个助手时隐藏切换入口';
 
   @override
   String get sidebarRestoreDefaults => '恢复默认';
@@ -17933,6 +17930,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationCustomCountLabel => '自定义张数';
 
   @override
+  String get creationPaymentHint => '请检查供应商账户余额和当前 API 密钥的可用额度。';
+
+  @override
   String creationFailureCategory(String kind) {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'network': '网络连接',
@@ -17944,6 +17944,7 @@ class AppLocalizationsZh extends AppLocalizations {
       'parameters': '参数无效',
       'referenceTooLarge': '参考图过大',
       'download': '下载失败',
+      'paymentRequired': '余额或额度不足',
       'invalidResponse': '响应无效',
       'other': '生成错误',
     });
@@ -23521,7 +23522,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
-      '点选助手时不自动关闭侧边栏';
+      '选择助手后保持侧边栏展开';
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnTopicTapTitle =>
@@ -34841,25 +34842,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sidebarLayoutTitle => '布局';
 
   @override
-  String get sidebarPresetCurrent => '现在的样子';
+  String get sidebarPresetCurrent => '经典样式';
 
   @override
-  String get sidebarPresetNavigation => '导航列表';
+  String get sidebarPresetNavigation => '列表导航';
 
   @override
-  String get sidebarPresetAssistantBottom => '助手在底部';
+  String get sidebarPresetAssistantBottom => '助手置底';
 
   @override
-  String get sidebarPresetAllTop => '都放顶部';
+  String get sidebarPresetAllTop => '顶部导航';
 
   @override
   String get sidebarPresetCustom => '已自定义';
 
   @override
-  String get sidebarReorderTitle => '调整位置';
+  String get sidebarReorderTitle => '排列顺序';
 
   @override
-  String get sidebarReorderHint => '拖到「对话列表」上面或下面';
+  String get sidebarReorderHint => '拖动手柄，将项目移到对话列表上方或下方。';
 
   @override
   String get sidebarReorderHandle => '拖动排序';
@@ -34886,7 +34887,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sidebarBlockBottom => '底部';
 
   @override
-  String get sidebarDisplayAs => '显示为';
+  String get sidebarDisplayAs => '入口样式';
 
   @override
   String get sidebarStyleList => '列表';
@@ -34934,16 +34935,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sidebarHideCustomize => '不在「更多」里显示';
 
   @override
-  String get sidebarShowCustomizeInMore => '在「更多」里显示「自定义侧边栏」';
+  String get sidebarShowCustomizeInMore => '在「更多」中显示侧边栏设置';
 
   @override
-  String get sidebarShowCustomizeInMoreHint => '调好后可以关掉，之后从这里改';
+  String get sidebarShowCustomizeInMoreHint => '也可从「设置 › 偏好设置 › 侧边栏」进入。';
 
   @override
-  String get sidebarHideSingleAssistant => '只有一个助手时隐藏助手行';
-
-  @override
-  String get sidebarHideSingleAssistantHint => '默认照常显示，和现在一样';
+  String get sidebarHideSingleAssistant => '仅有一个助手时隐藏切换入口';
 
   @override
   String get sidebarRestoreDefaults => '恢复默认';
@@ -35889,6 +35887,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get creationCustomCountLabel => '自定义张数';
 
   @override
+  String get creationPaymentHint => '请检查供应商账户余额和当前 API 密钥的可用额度。';
+
+  @override
   String creationFailureCategory(String kind) {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'network': '网络连接',
@@ -35900,6 +35901,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'parameters': '参数无效',
       'referenceTooLarge': '参考图过大',
       'download': '下载失败',
+      'paymentRequired': '余额或额度不足',
       'invalidResponse': '响应无效',
       'other': '生成错误',
     });
@@ -41491,7 +41493,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
-      '點選助手時不自動關閉側邊欄';
+      '選擇助手後保持側邊欄展開';
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnTopicTapTitle =>
@@ -52849,25 +52851,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get sidebarLayoutTitle => '版面配置';
 
   @override
-  String get sidebarPresetCurrent => '目前樣式';
+  String get sidebarPresetCurrent => '經典樣式';
 
   @override
-  String get sidebarPresetNavigation => '導覽清單';
+  String get sidebarPresetNavigation => '列表導覽';
 
   @override
-  String get sidebarPresetAssistantBottom => '助手置於底部';
+  String get sidebarPresetAssistantBottom => '助手置底';
 
   @override
-  String get sidebarPresetAllTop => '全部置於頂部';
+  String get sidebarPresetAllTop => '頂部導覽';
 
   @override
   String get sidebarPresetCustom => '已自訂';
 
   @override
-  String get sidebarReorderTitle => '調整區塊位置';
+  String get sidebarReorderTitle => '排列順序';
 
   @override
-  String get sidebarReorderHint => '拖曳至「對話列表」上方或下方';
+  String get sidebarReorderHint => '拖曳控點，將項目移到對話列表上方或下方。';
 
   @override
   String get sidebarReorderHandle => '拖曳排序';
@@ -52894,7 +52896,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get sidebarBlockBottom => '底部';
 
   @override
-  String get sidebarDisplayAs => '顯示為';
+  String get sidebarDisplayAs => '入口樣式';
 
   @override
   String get sidebarStyleList => '清單';
@@ -52942,16 +52944,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get sidebarHideCustomize => '不在「更多」裡顯示';
 
   @override
-  String get sidebarShowCustomizeInMore => '在「更多」裡顯示「自訂側邊欄」';
+  String get sidebarShowCustomizeInMore => '在「更多」中顯示側邊欄設定';
 
   @override
-  String get sidebarShowCustomizeInMoreHint => '之後仍可從這裡調整';
+  String get sidebarShowCustomizeInMoreHint => '也可從「設定 › 偏好設定 › 側邊欄」進入。';
 
   @override
-  String get sidebarHideSingleAssistant => '只有一個助手時隱藏助手列';
-
-  @override
-  String get sidebarHideSingleAssistantHint => '預設會照常顯示';
+  String get sidebarHideSingleAssistant => '僅有一個助手時隱藏切換入口';
 
   @override
   String get sidebarRestoreDefaults => '恢復預設';
@@ -53908,17 +53907,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get creationCustomCountLabel => '自訂張數';
 
   @override
+  String get creationPaymentHint => '請檢查供應商帳戶餘額和目前 API 金鑰的可用額度。';
+
+  @override
   String creationFailureCategory(String kind) {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'network': '網路連線',
       'rateLimited': '請求頻率限制',
       'server': '供應商錯誤',
-      'rejected': '請求遭拒',
+      'rejected': '請求被拒絕',
       'login': '需要登入',
-      'unavailable': '模型或端點無法使用',
+      'unavailable': '模型或介面無法使用',
       'parameters': '參數無效',
       'referenceTooLarge': '參考圖過大',
       'download': '下載失敗',
+      'paymentRequired': '餘額或額度不足',
       'invalidResponse': '回應無效',
       'other': '生成錯誤',
     });

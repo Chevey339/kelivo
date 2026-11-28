@@ -5901,7 +5901,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
-      'Не закрывать боковую панель при выборе ассистента';
+      'Оставлять боковую панель открытой после выбора ассистента';
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnTopicTapTitle =>
@@ -18194,7 +18194,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sidebarLayoutTitle => 'Макет';
 
   @override
-  String get sidebarPresetCurrent => 'Текущий макет';
+  String get sidebarPresetCurrent => 'Классический';
 
   @override
   String get sidebarPresetNavigation => 'Список навигации';
@@ -18203,16 +18203,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sidebarPresetAssistantBottom => 'Ассистент внизу';
 
   @override
-  String get sidebarPresetAllTop => 'Всё сверху';
+  String get sidebarPresetAllTop => 'Верхняя навигация';
 
   @override
   String get sidebarPresetCustom => 'Свой макет';
 
   @override
-  String get sidebarReorderTitle => 'Расположение блоков';
+  String get sidebarReorderTitle => 'Порядок в боковой панели';
 
   @override
-  String get sidebarReorderHint => 'Перетащите выше или ниже списка чатов';
+  String get sidebarReorderHint =>
+      'Перетащите за маркер, чтобы переместить элемент выше или ниже списка чатов.';
 
   @override
   String get sidebarReorderHandle => 'Переместить';
@@ -18239,7 +18240,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sidebarBlockBottom => 'Снизу';
 
   @override
-  String get sidebarDisplayAs => 'Отображать как';
+  String get sidebarDisplayAs => 'Стиль ярлыков';
 
   @override
   String get sidebarStyleList => 'Список';
@@ -18288,19 +18289,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get sidebarShowCustomizeInMore =>
-      'Показывать «Настроить боковую панель» в «Ещё»';
+      'Показывать настройки боковой панели в «Ещё»';
 
   @override
   String get sidebarShowCustomizeInMoreHint =>
-      'Вы всегда можете изменить это здесь';
+      'Также доступно в «Настройки › Предпочтения › Боковая панель».';
 
   @override
   String get sidebarHideSingleAssistant =>
-      'Скрывать строку ассистента, если он один';
-
-  @override
-  String get sidebarHideSingleAssistantHint =>
-      'Строка ассистента показывается по умолчанию';
+      'Скрывать переключатель, если есть только один ассистент';
 
   @override
   String get sidebarRestoreDefaults => 'Восстановить по умолчанию';
@@ -19360,10 +19357,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get creationCustomCountLabel => 'Своё количество';
 
   @override
+  String get creationPaymentHint =>
+      'Проверьте баланс провайдера и лимит расходов для этого API-ключа.';
+
+  @override
   String creationFailureCategory(String kind) {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'network': 'Сетевое подключение',
-      'rateLimited': 'Превышен лимит запросов',
+      'rateLimited': 'Ограничение частоты запросов',
       'server': 'Ошибка провайдера',
       'rejected': 'Запрос отклонён',
       'login': 'Требуется вход',
@@ -19371,6 +19372,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'parameters': 'Неверные параметры',
       'referenceTooLarge': 'Слишком большой референс',
       'download': 'Ошибка загрузки',
+      'paymentRequired': 'Требуется оплата',
       'invalidResponse': 'Неверный ответ',
       'other': 'Ошибка генерации',
     });

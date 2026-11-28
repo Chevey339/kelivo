@@ -702,7 +702,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                                   ? l10n.creationVideoModels
                                                   : l10n.creationImageModels,
                                               content: (close) => _ModelOptions(
-                                                autofocus: widget.desktop,
+                                                desktop: widget.desktop,
                                                 onSelected: (value) {
                                                   state.selectModel(value);
                                                   close();
@@ -987,8 +987,8 @@ class _ComposerChip extends StatelessWidget {
 }
 
 class _ModelOptions extends StatefulWidget {
-  const _ModelOptions({required this.onSelected, required this.autofocus});
-  final bool autofocus;
+  const _ModelOptions({required this.onSelected, required this.desktop});
+  final bool desktop;
   final ValueChanged<MediaModelChoice> onSelected;
 
   @override
@@ -1004,7 +1004,8 @@ class _ModelOptionsState extends State<_ModelOptions> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final groups = <String, List<MediaModelChoice>>{};
-    for (final model in state.models) {
+    final models = state.models;
+    for (final model in models) {
       final search =
           '${model.provider.name} ${model.spec.displayName} ${model.spec.id}'
               .toLowerCase();
@@ -1012,13 +1013,23 @@ class _ModelOptionsState extends State<_ModelOptions> {
         (groups[model.provider.id] ??= []).add(model);
       }
     }
+    final rows = [
+      for (final group in groups.values) ...[
+        (model: group.first, heading: true),
+        for (final model in group) (model: model, heading: false),
+      ],
+    ];
+    final selectedKey = state.model?.key;
+    // Keep the search box in place while filtering a long mobile catalog.
+    final fillHeight = !widget.desktop && models.length >= 8;
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: fillHeight ? MainAxisSize.max : MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         CreationSearchBox(
           hint: l10n.creationSearchModels,
-          autofocus: widget.autofocus,
+          mobile: !widget.desktop,
+          autofocus: widget.desktop,
           onChanged: (value) =>
               setState(() => _query = value.trim().toLowerCase()),
         ),
@@ -1035,19 +1046,24 @@ class _ModelOptionsState extends State<_ModelOptions> {
         if (groups.isNotEmpty)
           Flexible(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 320),
-              child: ListView(
+              constraints: BoxConstraints(
+                maxHeight: widget.desktop ? 320 : double.infinity,
+              ),
+              child: ListView.builder(
                 primary: false,
                 padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                children: [
-                  for (final models in groups.values) ...[
-                    Padding(
+                shrinkWrap: !fillHeight,
+                itemCount: rows.length,
+                itemBuilder: (context, index) {
+                  final row = rows[index];
+                  final model = row.model;
+                  if (row.heading) {
+                    return Padding(
                       padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 8, 5),
                       child: Text(
                         [
-                          models.first.provider.name,
-                          if (models.first.provider.isOAuth)
+                          model.provider.name,
+                          if (model.provider.isOAuth)
                             l10n.creationSubscriptionLogin,
                         ].join(' · '),
                         style: TextStyle(
@@ -1056,143 +1072,139 @@ class _ModelOptionsState extends State<_ModelOptions> {
                           color: cs.onSurface.withValues(alpha: .42),
                         ),
                       ),
-                    ),
-                    for (final model in models)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
-                        child: IosCardPress(
-                          onTap: () => widget.onSelected(model),
-                          focusable: true,
-                          baseColor: state.model?.key == model.key
-                              ? cs.primary.withValues(
-                                  alpha: cs.brightness == Brightness.dark
-                                      ? .16
-                                      : .12,
-                                )
-                              : Colors.transparent,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: IosCardPress(
+                      onTap: () => widget.onSelected(model),
+                      focusable: true,
+                      baseColor: selectedKey == model.key
+                          ? cs.primary.withValues(
+                              alpha: cs.brightness == Brightness.dark
+                                  ? .16
+                                  : .12,
+                            )
+                          : Colors.transparent,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Row(
+                        children: [
+                          CurrentModelIcon(
+                            providerKey: model.provider.id,
+                            modelId: model.spec.id,
+                            withBackground: false,
+                            iconScale: .85,
+                            size: 26,
                           ),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Row(
-                            children: [
-                              CurrentModelIcon(
-                                providerKey: model.provider.id,
-                                modelId: model.spec.id,
-                                withBackground: false,
-                                iconScale: .85,
-                                size: 26,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            model.spec.displayName,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 13.5,
-                                              fontWeight: FontWeight.w600,
+                                    Flexible(
+                                      child: Text(
+                                        model.spec.displayName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    if (model.spec.type == ModelType.chat)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsetsDirectional.only(
+                                              start: 5,
+                                            ),
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            color:
+                                                context.appColors.surfaceFill,
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 2,
+                                            ),
+                                            child: Text(
+                                              l10n.creationChatModelBadge,
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                color: cs.onSurfaceVariant,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                        if (model.spec.type == ModelType.chat)
-                                          Padding(
-                                            padding:
-                                                const EdgeInsetsDirectional.only(
-                                                  start: 5,
-                                                ),
-                                            child: DecoratedBox(
-                                              decoration: BoxDecoration(
-                                                color: context
-                                                    .appColors
-                                                    .surfaceFill,
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 4,
-                                                      vertical: 2,
-                                                    ),
-                                                child: Text(
-                                                  l10n.creationChatModelBadge,
-                                                  style: TextStyle(
-                                                    fontSize: 10.5,
-                                                    color: cs.onSurfaceVariant,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    Text(
-                                      [
-                                        if (model.spec.displayName !=
-                                            model.spec.id)
-                                          model.spec.id,
-                                        if (model.provider.isOAuth)
-                                          l10n.creationSubscriptionLogin,
-                                        if (state.mode == MediaMode.video) ...[
-                                          if (model
-                                              .capabilities
-                                              .durations
-                                              .isNotEmpty)
-                                            _durationSummary(
-                                              model.capabilities.durations,
-                                              l10n,
-                                            ),
-                                          if (model
-                                              .capabilities
-                                              .usesReferenceImages)
-                                            l10n.creationModelReferenceLimit(
-                                              model.capabilities.maxReferences,
-                                            )
-                                          else if (model
-                                              .capabilities
-                                              .frameRoles
-                                              .isEmpty)
-                                            l10n.creationTextOnlyVideo,
-                                        ] else
-                                          model.capabilities.maxReferences > 0
-                                              ? l10n.creationModelReferenceLimit(
-                                                  model.capabilities
-                                                      .referenceLimits(
-                                                        state.model?.key ==
-                                                                model.key
-                                                            ? state.parameters
-                                                            : const {},
-                                                      )
-                                                      .max,
-                                                )
-                                              : l10n.creationTextOnlyImage,
-                                      ].join(' · '),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        color: cs.onSurfaceVariant,
                                       ),
-                                    ),
                                   ],
                                 ),
-                              ),
-                              if (state.model?.key == model.key)
-                                Icon(Lucide.Check, size: 16, color: cs.primary),
-                            ],
+                                Text(
+                                  [
+                                    if (model.spec.displayName != model.spec.id)
+                                      model.spec.id,
+                                    if (model.provider.isOAuth)
+                                      l10n.creationSubscriptionLogin,
+                                    if (state.mode == MediaMode.video) ...[
+                                      if (model
+                                          .capabilities
+                                          .durations
+                                          .isNotEmpty)
+                                        _durationSummary(
+                                          model.capabilities.durations,
+                                          l10n,
+                                        ),
+                                      if (model
+                                          .capabilities
+                                          .usesReferenceImages)
+                                        l10n.creationModelReferenceLimit(
+                                          model.capabilities.maxReferences,
+                                        )
+                                      else if (model
+                                          .capabilities
+                                          .frameRoles
+                                          .isEmpty)
+                                        l10n.creationTextOnlyVideo,
+                                    ] else
+                                      model.capabilities.maxReferences > 0
+                                          ? l10n.creationModelReferenceLimit(
+                                              model.capabilities
+                                                  .referenceLimits(
+                                                    selectedKey == model.key
+                                                        ? state.parameters
+                                                        : const {},
+                                                  )
+                                                  .max,
+                                            )
+                                          : l10n.creationTextOnlyImage,
+                                  ].join(' · '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                          if (selectedKey == model.key)
+                            Icon(Lucide.Check, size: 16, color: cs.primary),
+                        ],
                       ),
-                  ],
-                ],
+                    ),
+                  );
+                },
               ),
             ),
           ),

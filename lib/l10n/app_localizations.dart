@@ -10480,7 +10480,7 @@ abstract class AppLocalizations {
   /// Toggle row label in display settings: selecting an assistant does not auto-close the sidebar.
   ///
   /// In en, this message translates to:
-  /// **'Keep sidebar open when selecting assistant'**
+  /// **'Keep the sidebar open after choosing an assistant'**
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle;
 
   /// Toggle row label in display settings: selecting a topic does not auto-close the sidebar.
@@ -31236,10 +31236,10 @@ abstract class AppLocalizations {
   /// **'Layout'**
   String get sidebarLayoutTitle;
 
-  /// Mobile sidebar layout preset matching the original Kelivo layout with icon entries and the user bar at the bottom.
+  /// Name of the classic mobile sidebar preset with icon shortcuts and the user bar at the bottom.
   ///
   /// In en, this message translates to:
-  /// **'Current layout'**
+  /// **'Classic'**
   String get sidebarPresetCurrent;
 
   /// Mobile sidebar layout preset with a list of entry rows near the top.
@@ -31257,7 +31257,7 @@ abstract class AppLocalizations {
   /// Mobile sidebar layout preset placing all fixed blocks above the scrolling conversation list.
   ///
   /// In en, this message translates to:
-  /// **'All at the top'**
+  /// **'Top navigation'**
   String get sidebarPresetAllTop;
 
   /// Status in Sidebar settings when the custom block order does not match a preset.
@@ -31269,13 +31269,13 @@ abstract class AppLocalizations {
   /// Heading above the reorderable sidebar blocks.
   ///
   /// In en, this message translates to:
-  /// **'Arrange blocks'**
+  /// **'Sidebar order'**
   String get sidebarReorderTitle;
 
   /// Instruction for moving fixed sidebar blocks around the non-draggable conversation list separator.
   ///
   /// In en, this message translates to:
-  /// **'Drag above or below the conversation list'**
+  /// **'Drag a handle to move an item above or below the conversation list.'**
   String get sidebarReorderHint;
 
   /// Accessible label for the reorder handle. Drag it or use Up and Down when focused.
@@ -31326,10 +31326,10 @@ abstract class AppLocalizations {
   /// **'Bottom'**
   String get sidebarBlockBottom;
 
-  /// Label next to the List or Icons segmented control in the mobile Sidebar settings.
+  /// Label beside the icon or list style picker for mobile sidebar shortcuts.
   ///
   /// In en, this message translates to:
-  /// **'Display as'**
+  /// **'Shortcut style'**
   String get sidebarDisplayAs;
 
   /// Sidebar display style with navigation entries as full-width rows.
@@ -31425,26 +31425,20 @@ abstract class AppLocalizations {
   /// Switch controlling the presence of the Customize sidebar shortcut in the mobile sidebar More entries.
   ///
   /// In en, this message translates to:
-  /// **'Show Customize sidebar in More'**
+  /// **'Show sidebar settings in More'**
   String get sidebarShowCustomizeInMore;
 
-  /// Subtitle reassuring users that they can still reach Sidebar settings after hiding the shortcut.
+  /// Alternative navigation path to the mobile sidebar settings when its shortcut in More is hidden.
   ///
   /// In en, this message translates to:
-  /// **'You can always change it here'**
+  /// **'Also available in Settings › Preferences › Sidebar.'**
   String get sidebarShowCustomizeInMoreHint;
 
   /// Switch for hiding the assistant selector when the user has only one assistant.
   ///
   /// In en, this message translates to:
-  /// **'Hide assistant row when there is only one'**
+  /// **'Hide the switcher when there is only one assistant'**
   String get sidebarHideSingleAssistant;
-
-  /// Description of the normal behavior for the single-assistant selector.
-  ///
-  /// In en, this message translates to:
-  /// **'The assistant row is shown by default'**
-  String get sidebarHideSingleAssistantHint;
 
   /// Action in the desktop sidebar customization panel to restore the default navigation icon order and visibility.
   ///
@@ -33186,10 +33180,16 @@ abstract class AppLocalizations {
   /// **'Custom count'**
   String get creationCustomCountLabel;
 
-  /// Category shown on a failed Creation job and in its request log. The kind is a stable error category. Use unavailable for a missing model or API endpoint.
+  /// Actionable text below a Creation or chat image failure when the provider returns HTTP 402. The HTTP status and provider details remain in the request log.
   ///
   /// In en, this message translates to:
-  /// **'{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} unavailable{Model or endpoint unavailable} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} invalidResponse{Invalid response} other{Generation error}}'**
+  /// **'Check the provider balance and the spending limit for this API key.'**
+  String get creationPaymentHint;
+
+  /// Category on a failed Creation job and in its request log. Use paymentRequired for insufficient funds or a spending cap and unavailable for a missing model or API endpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} unavailable{Model or endpoint unavailable} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} paymentRequired{Payment required} invalidResponse{Invalid response} other{Generation error}}'**
   String creationFailureCategory(String kind);
 
   /// Explanation on an interrupted generation card.
