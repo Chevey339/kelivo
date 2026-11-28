@@ -6,11 +6,13 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/auto_retry_options.dart';
 import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/memory_provider_v2.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/retry_policy.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/memory/memory_pipeline.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
@@ -123,7 +125,10 @@ void main() {
     }
   });
 
-  MemoryPipelineService buildPipeline(MemoryTraceRecorder recorder) {
+  MemoryPipelineService buildPipeline(
+    MemoryTraceRecorder recorder, {
+    Future<void> Function(Duration duration)? delay,
+  }) {
     return MemoryPipelineService(
       chatService: chatService,
       repository: memoryRepository,
@@ -132,6 +137,7 @@ void main() {
       assistants: () => assistants,
       memoryV2: () => memoryV2,
       traceRecorder: recorder,
+      delay: delay,
       generateText:
           ({
             required ProviderConfig config,
@@ -322,6 +328,115 @@ void main() {
       expect(trace.error, 'gate_parse_failed');
       expect(trace.advanced, isFalse);
     });
+
+    test(
+      'multi-attempt HTTP 200 recovery records all responses without duplicating prompt',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults();
+
+        final recorder = MemoryTraceRecorder();
+        final pipeline = buildPipeline(recorder, delay: (_) async {});
+        final convo = await chatService.createConversation(
+          title: 'retry-trace',
+          assistantId: 'a1',
+        );
+
+        var gateCalls = 0;
+        var extractCalls = 0;
+        final result = await pipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(convo.id),
+          llmCall: (prompt) async {
+            if (prompt.contains('<user_memory>')) {
+              gateCalls++;
+              if (gateCalls == 1) {
+                return 'The request was rejected because it was considered high risk';
+              }
+              return '<gate><user_memory>true</user_memory></gate>';
+            }
+            if (prompt.contains('<extracted>')) {
+              extractCalls++;
+              if (extractCalls == 1) {
+                return '该模型当前访问量过大，请您稍后再试';
+              }
+              return '<extracted><item type="identity">用户希望被称为小明。</item></extracted>';
+            }
+            if (prompt.contains('preferred_name')) {
+              return jsonEncode({
+                'fields': [
+                  {'key': 'preferred_name', 'value': '小明'},
+                ],
+              });
+            }
+            return jsonEncode({'action': 'NEW', 'relatedIds': <String>[]});
+          },
+        );
+
+        expect(result.advanced, isTrue);
+        final trace = recorder.traces.single;
+        expect(trace.error, isNull);
+        final gateStep = trace.steps[0];
+        expect(gateStep.status, MemoryTraceStepStatus.success);
+        expect(gateStep.prompt, isNot(contains('─── #2 ───')));
+        expect(gateStep.rawResponse, contains('considered high risk'));
+        expect(gateStep.rawResponse, contains('─── #2 ───'));
+        expect(gateStep.rawResponse, contains('<user_memory>true'));
+
+        final extractStep = trace.steps[1];
+        expect(extractStep.status, MemoryTraceStepStatus.success);
+        expect(extractStep.prompt, isNot(contains('─── #2 ───')));
+        expect(extractStep.rawResponse, contains('访问量过大'));
+        expect(extractStep.rawResponse, contains('─── #2 ───'));
+        expect(extractStep.rawResponse, contains('<extracted>'));
+      },
+    );
+
+    test(
+      'exhausted HTTP 200 risk-rejection records all attempts and risk_rejected failure code',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults().copyWith(
+          enabled: true,
+          maxRetries: 1,
+          jitter: false,
+        );
+
+        final recorder = MemoryTraceRecorder();
+        final pipeline = buildPipeline(recorder, delay: (_) async {});
+        final convo = await chatService.createConversation(
+          title: 'exhausted-trace',
+          assistantId: 'a1',
+        );
+
+        await pipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(convo.id),
+          llmCall: (_) async =>
+              'The request was rejected because it was considered high risk',
+        );
+
+        final trace = recorder.traces.single;
+        expect(trace.advanced, isFalse);
+        expect(trace.error, 'gate_parse_failed:risk_rejected');
+        final gateStep = trace.steps[0];
+        expect(gateStep.status, MemoryTraceStepStatus.failed);
+        expect(gateStep.error, 'gate_parse_failed:risk_rejected');
+        expect(gateStep.rawResponse, contains('─── #2 ───'));
+        expect(
+          trace.steps.skip(1).map((s) => s.status).toList(),
+          everyElement(MemoryTraceStepStatus.skipped),
+        );
+      },
+    );
   });
 
   group('toggle', () {

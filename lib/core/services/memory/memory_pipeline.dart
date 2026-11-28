@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../database/chat_database_repository.dart';
 import '../../models/assistant.dart';
+import '../../models/auto_retry_options.dart';
 import '../../models/reasoning_request.dart';
 import '../../models/chat_message.dart';
 import '../../models/memory_entry.dart';
@@ -13,6 +14,7 @@ import '../../providers/assistant_provider.dart';
 import '../../providers/memory_provider_v2.dart';
 import '../../providers/settings_provider.dart';
 import '../api/chat_api_service.dart';
+import '../api/retry_policy.dart';
 import '../chat/chat_service.dart';
 import 'memory_block_builder.dart';
 import 'memory_extractor.dart';
@@ -121,8 +123,10 @@ class MemoryPipelineService {
       ReasoningRequest reasoning,
     })?
     generateText,
+    Future<void> Function(Duration duration)? delay,
   }) : traceRecorder = traceRecorder ?? MemoryTraceRecorder.instance,
        _generateText = generateText ?? _defaultGenerateText,
+       _delay = delay ?? _defaultDelay,
        smartAdd = MemorySmartAdd(
          repository: repository,
          chatRepository: chatRepository,
@@ -131,6 +135,9 @@ class MemoryPipelineService {
          repository: repository,
          chatRepository: chatRepository,
        );
+
+  static Future<void> _defaultDelay(Duration duration) =>
+      Future<void>.delayed(duration);
 
   static Future<String> _defaultGenerateText({
     required ProviderConfig config,
@@ -168,10 +175,24 @@ class MemoryPipelineService {
     ReasoningRequest reasoning,
   })
   _generateText;
+  final Future<void> Function(Duration duration) _delay;
 
   static const int queueLimit = 8;
   static const int firstWindowCap = 20;
   static const int maxWindowFailures = 3;
+
+  /// Built-in HTTP 200 risk-rejection keywords that return as normal text
+  /// rather than thrown exceptions and therefore bypass [ChatApiService] retry.
+  static const List<String> _http200RetryKeywords = [
+    'considered high risk',
+    'high risk',
+    'request was rejected',
+    'content_filter',
+    '风控',
+    '安全风控',
+    '内容安全',
+    '风险控制',
+  ];
 
   final Queue<_PipelineJob> _queue = Queue<_PipelineJob>();
   bool _running = false;
@@ -578,10 +599,15 @@ class MemoryPipelineService {
       overrideZh: settings.memoryGatePromptZh,
       overrideEn: settings.memoryGatePromptEn,
     );
-    gateStep?.appendPrompt(gatePrompt);
-    final String gateRaw;
+    final ({MemoryGateParseResult parsed, bool retryableFailure}) gateResult;
     try {
-      gateRaw = await llmCall(gatePrompt);
+      gateResult = await _runStageWithRetry(
+        prompt: gatePrompt,
+        llmCall: llmCall,
+        step: gateStep,
+        parse: MemoryGatekeeper.parse,
+        isValid: (parsed) => parsed != MemoryGateParseResult.malformed,
+      );
     } catch (e) {
       gateStep?.finish(
         MemoryTraceStepStatus.failed,
@@ -598,14 +624,13 @@ class MemoryPipelineService {
         error: 'gate_request_failed:$e',
       );
     }
-    gateStep?.appendResponse(gateRaw);
-    final gate = MemoryGatekeeper.parse(gateRaw);
+    final gate = gateResult.parsed;
     gateStep?.parsedResult = gate.name;
     if (gate == MemoryGateParseResult.malformed) {
-      gateStep?.finish(
-        MemoryTraceStepStatus.failed,
-        error: 'gate_parse_failed',
-      );
+      final error = gateResult.retryableFailure
+          ? 'gate_parse_failed:risk_rejected'
+          : 'gate_parse_failed';
+      gateStep?.finish(MemoryTraceStepStatus.failed, error: error);
       _skipRemainingSteps(handle, from: MemoryTraceStepKind.extract);
       return _failWindow(
         failureKey: failureKey,
@@ -614,7 +639,7 @@ class MemoryPipelineService {
         assistantId: assistant.id,
         windowSize: window.length,
         gate: gate,
-        error: 'gate_parse_failed',
+        error: error,
       );
     }
     gateStep?.finish(MemoryTraceStepStatus.success);
@@ -652,10 +677,16 @@ class MemoryPipelineService {
       overrideZh: settings.memoryExtractPromptZh,
       overrideEn: settings.memoryExtractPromptEn,
     );
-    extractStep?.appendPrompt(extractPrompt);
-    final String extractRaw;
+    final ({MemoryExtractParseResult parsed, bool retryableFailure})
+    extractResult;
     try {
-      extractRaw = await llmCall(extractPrompt);
+      extractResult = await _runStageWithRetry(
+        prompt: extractPrompt,
+        llmCall: llmCall,
+        step: extractStep,
+        parse: MemoryExtractor.parse,
+        isValid: (parsed) => parsed.ok,
+      );
     } catch (e) {
       extractStep?.finish(
         MemoryTraceStepStatus.failed,
@@ -672,13 +703,12 @@ class MemoryPipelineService {
         error: 'extract_request_failed:$e',
       );
     }
-    extractStep?.appendResponse(extractRaw);
-    final extracted = MemoryExtractor.parse(extractRaw);
+    final extracted = extractResult.parsed;
     if (!extracted.ok) {
-      extractStep?.finish(
-        MemoryTraceStepStatus.failed,
-        error: 'extract_parse_failed',
-      );
+      final error = extractResult.retryableFailure
+          ? 'extract_parse_failed:risk_rejected'
+          : 'extract_parse_failed';
+      extractStep?.finish(MemoryTraceStepStatus.failed, error: error);
       _skipRemainingSteps(handle, from: MemoryTraceStepKind.smartAdd);
       return _failWindow(
         failureKey: failureKey,
@@ -687,7 +717,7 @@ class MemoryPipelineService {
         assistantId: assistant.id,
         windowSize: window.length,
         gate: gate,
-        error: 'extract_parse_failed',
+        error: error,
       );
     }
     extractStep?.setParsedJson({
@@ -785,6 +815,47 @@ class MemoryPipelineService {
       extractedCount: extracted.items.length,
       windowSize: window.length,
     );
+  }
+
+  static bool _shouldRetryMalformedResponse(
+    String raw,
+    AutoRetryOptions options,
+  ) {
+    if (raw.trim().isEmpty) return true;
+    final effective = options.copyWith(
+      retryKeywords: [...options.retryKeywords, ..._http200RetryKeywords],
+    );
+    return shouldRetryError(FormatException(raw), effective);
+  }
+
+  Future<({T parsed, bool retryableFailure})> _runStageWithRetry<T>({
+    required String prompt,
+    required Future<String> Function(String) llmCall,
+    required MemoryTraceStep? step,
+    required T Function(String raw) parse,
+    required bool Function(T parsed) isValid,
+  }) async {
+    final options = AutoRetryConfig.current;
+    final maxRetries = options.enabled
+        ? options.maxRetries
+        : const AutoRetryOptions.defaults().maxRetries;
+    step?.appendPrompt(prompt);
+    for (var attempt = 0; ; attempt++) {
+      final raw = await llmCall(prompt);
+      step?.appendResponse(raw);
+      final parsed = parse(raw);
+      if (isValid(parsed)) {
+        return (parsed: parsed, retryableFailure: false);
+      }
+      final retryable = _shouldRetryMalformedResponse(raw, options);
+      if (!retryable || attempt >= maxRetries) {
+        return (parsed: parsed, retryableFailure: retryable);
+      }
+      final wait = backoffDelay(attempt, options);
+      if (wait > Duration.zero) {
+        await _delay(wait);
+      }
+    }
   }
 
   /// Record a stage the run never reached, so the viewer shows the full chain.
