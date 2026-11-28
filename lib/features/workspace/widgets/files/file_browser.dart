@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:Kelivo/core/models/workspace_file_owner.dart';
 import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/core/services/workspace/workspace_file_coordinator.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
@@ -106,6 +107,8 @@ class FileBrowser extends StatefulWidget {
     required this.rootLabel,
     required this.modelPathOf,
     this.readOnly = false,
+    this.owner,
+    this.previewSource = 'workspace',
     this.pickDirectoryMode = false,
     this.onPickDirectory,
     this.mutationRunner,
@@ -125,6 +128,8 @@ class FileBrowser extends StatefulWidget {
   final String rootLabel;
   final String Function(String hostPath) modelPathOf;
   final bool readOnly;
+  final WorkspaceFileOwner? owner;
+  final String previewSource;
   final bool pickDirectoryMode;
   final ValueChanged<String>? onPickDirectory;
   final FileMutationRunner? mutationRunner;
@@ -299,17 +304,27 @@ class FileBrowserState extends State<FileBrowser> {
 
   Future<void> _runMutation(FileMutation mutation) async {
     final mounts = context.read<ExternalMountsProvider?>();
+    final runner = widget.mutationRunner ?? FileBrowserOps.runMutation;
     final readOnlyMessage = AppLocalizations.of(
       context,
     )!.workspaceMountReadOnly;
-    try {
-      await mounts?.requireWritableHostPaths(mutation.writePaths);
-    } on WorkspaceChannelException catch (error) {
-      if (error.code == 'mount_readonly') throw StateError(readOnlyMessage);
-      rethrow;
-    }
-    final runner = widget.mutationRunner ?? FileBrowserOps.runMutation;
-    await runner(mutation);
+    await WorkspaceFileCoordinator.runAll(
+      mutation.writePaths,
+      () async {
+        try {
+          await mounts?.requireWritableHostPaths(mutation.writePaths);
+        } on WorkspaceChannelException catch (error) {
+          if (error.code == 'mount_readonly') throw StateError(readOnlyMessage);
+          rethrow;
+        }
+        await runner(mutation);
+      },
+      sharedPaths: switch (mutation) {
+        CopyIntoMutation(:final sourcePath) ||
+        ZipDirectoryMutation(:final sourcePath) => [sourcePath],
+        _ => const <String>[],
+      },
+    );
   }
 
   Future<void> _reload() {
@@ -427,7 +442,14 @@ class FileBrowserState extends State<FileBrowser> {
     if (widget.onOpenFile case final open?) {
       await open(File(entry.hostPath));
     } else {
-      await showFilePreview(context, File(entry.hostPath), title: entry.name);
+      await showFilePreview(
+        context,
+        File(entry.hostPath),
+        title: entry.name,
+        owner: widget.owner,
+        source: widget.previewSource,
+        readOnly: widget.readOnly,
+      );
     }
   }
 
@@ -493,15 +515,25 @@ class FileBrowserState extends State<FileBrowser> {
       _showSnack(l10n.workspaceFilesInvalidName, NotificationType.error);
       return;
     }
+    final parent = _currentDir.path;
+    final owner = widget.owner;
     try {
       await _runMutation(
-        CreateFileMutation(
-          rootPath: _rootPath,
-          parentPath: _currentDir.path,
-          name: name,
-        ),
+        CreateFileMutation(rootPath: _rootPath, parentPath: parent, name: name),
       );
       await _reload();
+      if (mounted &&
+          widget.owner == owner &&
+          !widget.readOnly &&
+          owner != null &&
+          isNewWorkspaceTextFile(name)) {
+        await showFilePreview(
+          context,
+          File(p.join(parent, name)),
+          owner: owner,
+          startEditing: true,
+        );
+      }
     } catch (e) {
       await _handleError(e);
     }

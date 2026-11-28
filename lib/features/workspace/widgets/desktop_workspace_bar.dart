@@ -28,7 +28,7 @@ class DesktopWorkspaceBar extends StatelessWidget {
 
   final String? conversationId;
 
-  final Future<void> Function(String path, String source)? onOpenFile;
+  final OpenConversationFile? onOpenFile;
 
   static const Key emptyStateKey = ValueKey<String>('workspace-desk-bar-empty');
   static const Key openTerminalKey = ValueKey<String>(

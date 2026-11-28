@@ -9885,6 +9885,45 @@ class AppLocalizationsKo extends AppLocalizations {
       '파일이 너무 커서 미리 볼 수 없습니다. 외부 앱으로 여세요.';
 
   @override
+  String get workspacePreviewEdit => '편집';
+
+  @override
+  String get workspaceEditorUnsaved => '저장되지 않은 변경 사항';
+
+  @override
+  String workspaceEditorLeavePrompt(String name) {
+    return '나가기 전에 $name의 변경 사항을 저장할까요?';
+  }
+
+  @override
+  String get workspaceEditorKeepEditing => '계속 편집';
+
+  @override
+  String get workspaceEditorDiscard => '변경 사항 버리기';
+
+  @override
+  String get workspaceEditorConflict => '디스크의 파일이 변경됨';
+
+  @override
+  String get workspaceEditorConflictMessage =>
+      '초안은 안전하게 보관되어 있습니다. 별도 사본으로 저장하거나, 현재 파일을 불러오고 변경 사항을 버릴 수 있습니다.';
+
+  @override
+  String get workspaceEditorSaveCopy => '사본으로 저장';
+
+  @override
+  String get workspaceEditorReload => '최신 버전 불러오기';
+
+  @override
+  String get workspaceEditorLargePreview => '큰 파일과 긴 텍스트는 미리보기만 지원됩니다.';
+
+  @override
+  String get workspaceEditorEncoding => '이 텍스트 인코딩은 미리보기만 지원됩니다.';
+
+  @override
+  String get workspaceEditorReadOnly => '읽기 전용 위치';
+
+  @override
   String get workspacePreviewSource => '소스';
 
   @override

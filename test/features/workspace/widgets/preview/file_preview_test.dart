@@ -258,6 +258,10 @@ void main() {
     final sniffed = File(p.join(tempDir.path, 'unknown.dat'))
       ..writeAsStringSync('plain text without nuls');
     expect(await classifyFilePreview(sniffed), FilePreviewKind.code);
+    sniffed.writeAsStringSync('${'a' * (kFilePreviewSniffBytes - 1)}你好');
+    expect(await classifyFilePreview(sniffed), FilePreviewKind.code);
+    sniffed.writeAsBytesSync([65, 0xe4]);
+    expect(await classifyFilePreview(sniffed), FilePreviewKind.binary);
   });
 
   testWidgets('showFilePreview opens code files in CodeFilePreview', (

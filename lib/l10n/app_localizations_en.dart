@@ -10190,6 +10190,47 @@ class AppLocalizationsEn extends AppLocalizations {
       'This file is too large to preview. Open it externally instead.';
 
   @override
+  String get workspacePreviewEdit => 'Edit';
+
+  @override
+  String get workspaceEditorUnsaved => 'Unsaved changes';
+
+  @override
+  String workspaceEditorLeavePrompt(String name) {
+    return 'Save changes to $name before leaving?';
+  }
+
+  @override
+  String get workspaceEditorKeepEditing => 'Keep editing';
+
+  @override
+  String get workspaceEditorDiscard => 'Discard changes';
+
+  @override
+  String get workspaceEditorConflict => 'File changed on disk';
+
+  @override
+  String get workspaceEditorConflictMessage =>
+      'Your draft is safe. Save a separate copy, or load the current file and discard your changes.';
+
+  @override
+  String get workspaceEditorSaveCopy => 'Save a copy';
+
+  @override
+  String get workspaceEditorReload => 'Load latest version';
+
+  @override
+  String get workspaceEditorLargePreview =>
+      'Large files and long text are available in preview only.';
+
+  @override
+  String get workspaceEditorEncoding =>
+      'This text encoding is available in preview only.';
+
+  @override
+  String get workspaceEditorReadOnly => 'Read-only location';
+
+  @override
   String get workspacePreviewSource => 'Source';
 
   @override

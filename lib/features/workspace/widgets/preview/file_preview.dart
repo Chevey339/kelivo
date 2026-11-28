@@ -1,6 +1,5 @@
 import '../../../side_panel/desktop_side_panel_controller.dart';
 import '../../../../utils/platform_utils.dart';
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,14 +8,12 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:webview_flutter/webview_flutter.dart';
 
-import 'package:Kelivo/core/services/haptics.dart';
+import 'package:Kelivo/core/models/workspace_file_owner.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/code_file_preview.dart';
-import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/features/workspace/workspace_layout.dart';
-import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 import 'binary_file_preview.dart';
@@ -24,8 +21,10 @@ import 'csv_file_preview.dart';
 import 'html_file_preview.dart';
 import 'image_file_preview.dart';
 import 'markdown_file_preview.dart';
-import 'preview_actions.dart';
+import 'file_preview_frame.dart';
 import 'preview_file_type.dart';
+import 'workspace_text_editing.dart';
+import 'workspace_text_preview.dart';
 
 export 'binary_file_preview.dart';
 export 'csv_file_preview.dart';
@@ -33,8 +32,13 @@ export 'html_file_preview.dart';
 export 'image_file_preview.dart';
 export 'markdown_file_preview.dart';
 export 'preview_actions.dart';
+export 'file_preview_frame.dart';
 export 'preview_file_type.dart'
-    show highlightLanguageFor, languageForExtension, languageForPath;
+    show
+        FilePreviewKind,
+        highlightLanguageFor,
+        languageForExtension,
+        languageForPath;
 
 const int kFilePreviewSniffBytes = 8 * 1024;
 
@@ -44,7 +48,15 @@ const Set<String> _htmlExtensions = {'.html', '.htm', '.svg'};
 
 const Set<String> _csvExtensions = {'.csv', '.tsv'};
 
-enum FilePreviewKind { image, markdown, html, csv, code, binary }
+bool isWorkspaceTextKind(FilePreviewKind kind) =>
+    kind == FilePreviewKind.markdown || kind == FilePreviewKind.code;
+
+bool isNewWorkspaceTextFile(String path) {
+  final ext = p.extension(path).toLowerCase();
+  return ext.isEmpty ||
+      _markdownExtensions.contains(ext) ||
+      kPreviewCodeExtensions.contains(ext);
+}
 
 Future<FilePreviewKind> classifyFilePreview(File file) async {
   final ext = p.extension(file.path).toLowerCase();
@@ -66,7 +78,17 @@ Future<bool> fileSniffsAsUtf8Text(File file) async {
     final n = length < kFilePreviewSniffBytes ? length : kFilePreviewSniffBytes;
     final bytes = await raf.read(n);
     if (bytes.contains(0)) return false;
-    utf8.decode(bytes);
+    if (length <= bytes.length) {
+      utf8.decode(bytes);
+    } else {
+      // A UTF-8 sequence can continue beyond the sniff window. Validate the
+      // sampled stream without treating the end of this chunk as end-of-file.
+      utf8.decoder
+          .startChunkedConversion(
+            StringConversionSink.fromStringSink(StringBuffer()),
+          )
+          .add(bytes);
+    }
     return true;
   } catch (_) {
     return false;
@@ -87,10 +109,19 @@ Future<void> showFilePreview(
   String? title,
   FilePreviewKind? kind,
   bool autoLoad = true,
+  WorkspaceFileOwner? owner,
+  String source = 'workspace',
+  bool startEditing = false,
+  bool readOnly = false,
 }) async {
   final panel = DesktopSidePanelController.instance;
   if (PlatformUtils.isDesktopTarget && panel.isAvailable) {
-    panel.openPreview(file.path);
+    panel.openPreview(
+      file.path,
+      source: source,
+      owner: readOnly ? null : owner,
+      startEditing: startEditing,
+    );
     return;
   }
   if (!file.existsSync()) {
@@ -109,6 +140,33 @@ Future<void> showFilePreview(
   final resolvedTitle = title ?? p.basename(file.path);
   final desktop = useDesktopWorkspaceLayout(context);
 
+  if (!readOnly && owner != null && isWorkspaceTextKind(resolvedKind)) {
+    final preview = WorkspaceTextPreview(
+      session: WorkspaceTextEditing(file, owner),
+      surface: desktop
+          ? WorkspacePreviewSurface.dialog
+          : WorkspacePreviewSurface.page,
+      markdown: resolvedKind == FilePreviewKind.markdown,
+      startEditing: startEditing,
+      title: resolvedTitle,
+    );
+    if (desktop) {
+      await showAppDialog<void>(
+        context,
+        maxWidth: 960,
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * .8,
+          child: preview,
+        ),
+      );
+    } else {
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => preview));
+    }
+    return;
+  }
+
   if (resolvedKind == FilePreviewKind.image) {
     await _showImagePreview(
       context,
@@ -120,11 +178,28 @@ Future<void> showFilePreview(
     return;
   }
 
-  final body = buildFilePreviewBody(
+  Widget body = buildFilePreviewBody(
     kind: resolvedKind,
     file: file,
     autoLoad: autoLoad,
   );
+  if (readOnly && isWorkspaceTextKind(resolvedKind)) {
+    body = Column(
+      children: [
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 16, 2),
+            child: Text(
+              AppLocalizations.of(context)!.workspaceEditorReadOnly,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
+        ),
+        Expanded(child: body),
+      ],
+    );
+  }
   if (desktop) {
     final height = MediaQuery.sizeOf(context).height * 0.8;
     await showAppDialog<void>(
@@ -255,136 +330,5 @@ class FilePreviewPage extends StatelessWidget {
       dialog: false,
       child: child,
     );
-  }
-}
-
-class FilePreviewFrame extends StatelessWidget {
-  const FilePreviewFrame({
-    super.key,
-    required this.file,
-    required this.title,
-    required this.kind,
-    required this.dialog,
-    required this.child,
-  });
-
-  static const Key exportActionKey = ValueKey<String>(
-    'file-preview-header-export',
-  );
-  static const Key openInBrowserActionKey = ValueKey<String>(
-    'file-preview-header-open-in-browser',
-  );
-
-  final File file;
-  final String title;
-  final FilePreviewKind kind;
-  final bool dialog;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final actions = _headerActions(context);
-    if (dialog) {
-      return Column(
-        children: [
-          AppDialogHeader(title: title, actions: actions),
-          Expanded(child: child),
-        ],
-      );
-    }
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        leading: Tooltip(
-          message: l10n.workspacePreviewBack,
-          child: IosIconButton(
-            icon: Lucide.ArrowLeft,
-            semanticLabel: l10n.workspacePreviewBack,
-            color: Theme.of(context).colorScheme.onSurface,
-            size: 22,
-            minSize: 44,
-            onTap: () {
-              Haptics.light();
-              Navigator.of(context).maybePop();
-            },
-          ),
-        ),
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        actions: [...actions, const SizedBox(width: 12)],
-      ),
-      body: child,
-    );
-  }
-
-  List<Widget> _headerActions(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    // 20 is the IosIconButton default every other page's app-bar actions use;
-    // only the leading back arrow is 22.
-    final size = dialog ? 18.0 : 20.0;
-    final minSize = dialog ? 36.0 : 44.0;
-
-    Widget action({
-      Key? key,
-      required String label,
-      required IconData icon,
-      required VoidCallback onTap,
-    }) {
-      return Tooltip(
-        message: label,
-        child: IosIconButton(
-          key: key,
-          icon: icon,
-          semanticLabel: label,
-          color: cs.onSurface,
-          size: size,
-          minSize: minSize,
-          onTap: () {
-            Haptics.light();
-            onTap();
-          },
-        ),
-      );
-    }
-
-    final items = <Widget>[
-      action(
-        key: FilePreviewFrame.exportActionKey,
-        label: l10n.workspaceFilesExportItem,
-        icon: Lucide.Download,
-        onTap: () => unawaited(exportPreviewFile(context, file)),
-      ),
-      action(
-        label: l10n.workspacePreviewShare,
-        icon: Lucide.Share2,
-        onTap: () => unawaited(sharePreviewFile(context, file)),
-      ),
-      action(
-        label: l10n.workspacePreviewOpenWith,
-        icon: Lucide.ExternalLink,
-        onTap: () => unawaited(openPreviewFileExternally(context, file)),
-      ),
-    ];
-    if (canRevealPreviewFileInFileManager) {
-      items.add(
-        action(
-          label: revealInFileManagerLabel(l10n),
-          icon: Lucide.FolderOpen,
-          onTap: () => unawaited(revealPreviewFileInFileManager(context, file)),
-        ),
-      );
-    }
-    if (kind == FilePreviewKind.html) {
-      items.add(
-        action(
-          key: FilePreviewFrame.openInBrowserActionKey,
-          label: l10n.workspacePreviewOpenInBrowser,
-          icon: Lucide.Globe,
-          onTap: () => unawaited(openPreviewFileInBrowser(context, file)),
-        ),
-      );
-    }
-    return items;
   }
 }

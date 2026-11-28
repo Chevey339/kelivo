@@ -10265,6 +10265,47 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bu dosya önizleme için çok büyük. Bunun yerine harici olarak açın.';
 
   @override
+  String get workspacePreviewEdit => 'Düzenle';
+
+  @override
+  String get workspaceEditorUnsaved => 'Kaydedilmemiş değişiklikler';
+
+  @override
+  String workspaceEditorLeavePrompt(String name) {
+    return 'Ayrılmadan önce $name dosyasındaki değişiklikler kaydedilsin mi?';
+  }
+
+  @override
+  String get workspaceEditorKeepEditing => 'Düzenlemeye devam et';
+
+  @override
+  String get workspaceEditorDiscard => 'Değişiklikleri at';
+
+  @override
+  String get workspaceEditorConflict => 'Dosya diskte değişti';
+
+  @override
+  String get workspaceEditorConflictMessage =>
+      'Taslağınız güvende. Ayrı bir kopya kaydedin veya geçerli dosyayı yükleyip değişikliklerinizi atın.';
+
+  @override
+  String get workspaceEditorSaveCopy => 'Kopya kaydet';
+
+  @override
+  String get workspaceEditorReload => 'En son sürümü yükle';
+
+  @override
+  String get workspaceEditorLargePreview =>
+      'Büyük dosyalar ve uzun metinler yalnızca önizlemede kullanılabilir.';
+
+  @override
+  String get workspaceEditorEncoding =>
+      'Bu metin kodlaması yalnızca önizlemede kullanılabilir.';
+
+  @override
+  String get workspaceEditorReadOnly => 'Salt okunur konum';
+
+  @override
   String get workspacePreviewSource => 'Kaynak';
 
   @override

@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/database/business_preferences.dart';
+import '../../core/models/workspace_file_owner.dart';
 import '../../core/services/browser/browser_service.dart';
 import '../browser/models/browser_agent_activity.dart';
 import 'models/side_panel_tab.dart';
@@ -44,6 +45,8 @@ class DesktopSidePanelController extends ChangeNotifier {
   FocusScopeNode? _focusScope;
   String? persistenceError;
   Future<void> _writes = Future<void>.value();
+  Future<void> _closingPreviews = Future<void>.value();
+  final _pendingClose = <PreviewTab>{};
   String? _lastSavedTabs;
   bool? _lastSavedOpen;
   double? _lastSavedWidth;
@@ -157,9 +160,21 @@ class DesktopSidePanelController extends ChangeNotifier {
     if (row['kind'] == 'preview' &&
         row['id'] is String &&
         row['path'] is String) {
+      WorkspaceFileOwner? owner;
+      if (row['owner'] case {
+        'id': final String id,
+        'kind': final String name,
+      }) {
+        final kind = WorkspaceFileOwnerKind.values
+            .where((k) => k.name == name)
+            .firstOrNull;
+        if (kind != null) owner = (kind: kind, id: id);
+      }
       return PreviewTab(
         id: row['id'] as String,
         path: row['path'] as String,
+        owner: owner,
+        onPathChanged: _previewPathChanged,
         source: row['source'] is String ? row['source'] as String : 'workspace',
       );
     }
@@ -289,27 +304,49 @@ class DesktopSidePanelController extends ChangeNotifier {
     open(tabId: tab.id);
   }
 
-  void openPreview(String path, {String source = 'workspace'}) {
+  void openPreview(
+    String path, {
+    String source = 'workspace',
+    WorkspaceFileOwner? owner,
+    bool startEditing = false,
+  }) {
     final list = _resources.putIfAbsent(_conversationId, () => []);
     final existing = list
         .whereType<PreviewTab>()
-        .where((tab) => tab.path == path)
+        .where((tab) => tab.path == path && tab.owner == owner)
         .firstOrNull;
-    final tab =
-        existing ??
-        PreviewTab(
-          id: 'preview:${const Uuid().v4()}',
-          path: path,
-          source: source,
-        );
-    if (existing == null) list.add(tab);
+    if (existing != null &&
+        (!startEditing ||
+            existing.editing?.editing == true ||
+            existing.editing?.needsCloseGuard == true)) {
+      open(tabId: existing.id);
+      return;
+    }
+    final tab = PreviewTab(
+      id: existing?.id ?? 'preview:${const Uuid().v4()}',
+      path: path,
+      source: source,
+      owner: owner,
+      startEditing: startEditing,
+      onPathChanged: _previewPathChanged,
+    );
+    if (existing == null) {
+      list.add(tab);
+    } else {
+      list[list.indexOf(existing)] = tab;
+    }
     open(tabId: tab.id);
+  }
+
+  void _previewPathChanged() {
+    if (!_disposed) _changed();
   }
 
   void relocatePreview(String id, String path) {
     final list = _resources[_conversationId];
     final index = list?.indexWhere((tab) => tab.id == id) ?? -1;
     if (index < 0 || list![index] is! PreviewTab) return;
+    if ((list[index] as PreviewTab).editing?.needsCloseGuard == true) return;
     list[index] = PreviewTab(
       id: id,
       path: path,
@@ -323,6 +360,35 @@ class DesktopSidePanelController extends ChangeNotifier {
     final index = list?.indexWhere((tab) => tab.id == id) ?? -1;
     if (index < 0 || !list![index].closable) return false;
     final tab = list[index];
+    if (tab is PreviewTab && tab.editing?.needsCloseGuard == true) {
+      final owner = _conversationId;
+      if (_pendingClose.add(tab)) {
+        _closingPreviews = _closingPreviews.then((_) async {
+          try {
+            final context = _focusScope?.context;
+            if (_disposed ||
+                owner != _conversationId ||
+                context == null ||
+                !context.mounted) {
+              return;
+            }
+            if (await tab.editing!.leave(context) &&
+                !_disposed &&
+                owner == _conversationId &&
+                list.contains(tab)) {
+              closeTab(id);
+            }
+          } catch (error, stack) {
+            FlutterError.reportError(
+              FlutterErrorDetails(exception: error, stack: stack),
+            );
+          } finally {
+            _pendingClose.remove(tab);
+          }
+        });
+      }
+      return false;
+    }
     final history = _closed.putIfAbsent(_conversationId, () => []);
     history.add(tab.toJson());
     if (history.length > 10) history.removeAt(0);

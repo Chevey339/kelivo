@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/workspace_file_owner.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:async';
 import 'dart:io';
@@ -76,6 +77,13 @@ Future<void> showConversationFilesPanel(
   );
 }
 
+typedef OpenConversationFile =
+    Future<void> Function(
+      String path,
+      String source, {
+      WorkspaceFileOwner? owner,
+    });
+
 class ConversationFilesPanel extends StatefulWidget {
   const ConversationFilesPanel({
     super.key,
@@ -87,7 +95,7 @@ class ConversationFilesPanel extends StatefulWidget {
   });
 
   final String conversationId;
-  final Future<void> Function(String path, String source)? onOpenFile;
+  final OpenConversationFile? onOpenFile;
 
   /// When true, the dialog/sheet chrome is omitted so the tabs can sit in a
   /// desktop side bar or other host that already provides a header.
@@ -312,6 +320,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
               ? null
               : (file) => widget.onOpenFile!(file.path, "attachments"),
           rootLabel: l10n.workspaceFilesTabAttachments,
+          previewSource: 'attachments',
           readOnly: true,
           emptyIcon: Lucide.Paperclip,
           emptyTitle: l10n.workspaceFilesEmptyAttachments,
@@ -329,6 +338,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
               ? null
               : (file) => widget.onOpenFile!(file.path, "outputs"),
           rootLabel: l10n.workspaceFilesTabOutputs,
+          previewSource: 'outputs',
           readOnly: true,
           emptyIcon: Lucide.Sparkles,
           emptyTitle: l10n.workspaceFilesEmptyOutputs,
@@ -379,7 +389,9 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
       );
     }
     final root = _workspaceRoot!;
+    final owner = (kind: WorkspaceFileOwnerKind.workspace, id: _workspace!.id);
     return FileBrowser(
+      owner: owner,
       root: root,
       rootLabel: _workspace!.name,
       scrollController: widget.scrollController,
@@ -389,7 +401,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
             ['.html', '.htm'].contains(p.extension(file.path).toLowerCase()) &&
             !Platform.isLinux;
         if (!html && widget.onOpenFile != null) {
-          await widget.onOpenFile!(file.path, 'workspace');
+          await widget.onOpenFile!(file.path, 'workspace', owner: owner);
           return;
         }
         final navigator = Navigator.of(context);

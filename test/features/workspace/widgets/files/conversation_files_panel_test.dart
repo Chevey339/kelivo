@@ -157,7 +157,7 @@ void main() {
     List<ChatMessage> messages = const [],
     AssistantProvider? assistants,
     FileLinkResolver? resolver,
-    Future<void> Function(String, String)? onOpenFile,
+    OpenConversationFile? onOpenFile,
   }) {
     return MultiProvider(
       providers: [
@@ -344,7 +344,10 @@ void main() {
         conversationId: id,
         initialTab: ConversationFilesTab.workspace,
         resolver: resolver,
-        onOpenFile: (path, source) async => previews.add((path, source)),
+        onOpenFile: (path, source, {owner}) async {
+          expect(owner?.id, workspaceId);
+          previews.add((path, source));
+        },
       ),
     );
     await _awaitPanel(tester);

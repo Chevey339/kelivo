@@ -9710,6 +9710,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspacePreviewFileTooLarge => '文件过大，无法预览，请用其他应用打开。';
 
   @override
+  String get workspacePreviewEdit => '编辑';
+
+  @override
+  String get workspaceEditorUnsaved => '有未保存的更改';
+
+  @override
+  String workspaceEditorLeavePrompt(String name) {
+    return '离开前要保存对「$name」的更改吗？';
+  }
+
+  @override
+  String get workspaceEditorKeepEditing => '继续编辑';
+
+  @override
+  String get workspaceEditorDiscard => '放弃更改';
+
+  @override
+  String get workspaceEditorConflict => '原文件已发生变化';
+
+  @override
+  String get workspaceEditorConflictMessage =>
+      '你的修改已保留。可以另存副本，也可以放弃草稿并重新载入原文件。';
+
+  @override
+  String get workspaceEditorSaveCopy => '另存副本';
+
+  @override
+  String get workspaceEditorReload => '载入最新版本';
+
+  @override
+  String get workspaceEditorLargePreview => '文件较大或文本过长，仅支持预览。';
+
+  @override
+  String get workspaceEditorEncoding => '当前文本编码仅支持预览。';
+
+  @override
+  String get workspaceEditorReadOnly => '只读位置';
+
+  @override
   String get workspacePreviewSource => '源码';
 
   @override
@@ -27602,6 +27641,45 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspacePreviewFileTooLarge => '文件过大，无法预览，请用其他应用打开。';
+
+  @override
+  String get workspacePreviewEdit => '编辑';
+
+  @override
+  String get workspaceEditorUnsaved => '有未保存的更改';
+
+  @override
+  String workspaceEditorLeavePrompt(String name) {
+    return '离开前要保存对「$name」的更改吗？';
+  }
+
+  @override
+  String get workspaceEditorKeepEditing => '继续编辑';
+
+  @override
+  String get workspaceEditorDiscard => '放弃更改';
+
+  @override
+  String get workspaceEditorConflict => '原文件已发生变化';
+
+  @override
+  String get workspaceEditorConflictMessage =>
+      '你的修改已保留。可以另存副本，也可以放弃草稿并重新载入原文件。';
+
+  @override
+  String get workspaceEditorSaveCopy => '另存副本';
+
+  @override
+  String get workspaceEditorReload => '载入最新版本';
+
+  @override
+  String get workspaceEditorLargePreview => '文件较大或文本过长，仅支持预览。';
+
+  @override
+  String get workspaceEditorEncoding => '当前文本编码仅支持预览。';
+
+  @override
+  String get workspaceEditorReadOnly => '只读位置';
 
   @override
   String get workspacePreviewSource => '源码';
@@ -45512,6 +45590,45 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspacePreviewFileTooLarge => '檔案過大，無法預覽，請用其他應用程式開啟。';
+
+  @override
+  String get workspacePreviewEdit => '編輯';
+
+  @override
+  String get workspaceEditorUnsaved => '有未儲存的變更';
+
+  @override
+  String workspaceEditorLeavePrompt(String name) {
+    return '離開前要儲存對「$name」的變更嗎？';
+  }
+
+  @override
+  String get workspaceEditorKeepEditing => '繼續編輯';
+
+  @override
+  String get workspaceEditorDiscard => '放棄變更';
+
+  @override
+  String get workspaceEditorConflict => '原檔案已發生變化';
+
+  @override
+  String get workspaceEditorConflictMessage =>
+      '你的修改已保留。可以另存副本，也可以放棄草稿並重新載入原檔案。';
+
+  @override
+  String get workspaceEditorSaveCopy => '另存副本';
+
+  @override
+  String get workspaceEditorReload => '載入最新版本';
+
+  @override
+  String get workspaceEditorLargePreview => '檔案較大或文字過長，僅支援預覽。';
+
+  @override
+  String get workspaceEditorEncoding => '目前文字編碼僅支援預覽。';
+
+  @override
+  String get workspaceEditorReadOnly => '唯讀位置';
 
   @override
   String get workspacePreviewSource => '原始碼';

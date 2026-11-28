@@ -3,6 +3,8 @@ import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/icons/lucide_adapter.dart';
 
+enum FilePreviewKind { image, markdown, html, csv, code, binary }
+
 /// Visual identity for a file extension (icon + tint used by the binary card).
 class PreviewFileTypeStyle {
   const PreviewFileTypeStyle({required this.icon, required this.color});

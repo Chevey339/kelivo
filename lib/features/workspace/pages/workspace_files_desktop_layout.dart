@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:Kelivo/core/models/workspace_file_owner.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -243,6 +244,10 @@ class _DesktopWorkspaceFilesState extends State<DesktopWorkspaceFiles> {
                       key: ValueKey('${workspace.id}-$root'),
                       root: Directory(root),
                       rootLabel: workspace.name,
+                      owner: (
+                        kind: WorkspaceFileOwnerKind.workspace,
+                        id: workspace.id,
+                      ),
                       initialRelativePath: widget.initialRelativePath,
                       modelPathOf: (host) =>
                           WorkspaceModelPaths.workspaceFile(host, root),

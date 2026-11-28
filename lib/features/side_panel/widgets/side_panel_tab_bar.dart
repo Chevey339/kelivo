@@ -352,16 +352,23 @@ class SidePanelIconButton extends StatelessWidget {
     required this.icon,
     required this.label,
     this.onTap,
+    this.color,
+    this.focusNode,
   });
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final Color? color;
+  final FocusNode? focusNode;
   @override
   Widget build(BuildContext context) => Tooltip(
     message: label,
     child: IosIconButton(
       icon: icon,
       semanticLabel: label,
+      enabled: onTap != null,
+      color: color,
+      focusNode: focusNode,
       size: 14,
       minSize: 24,
       padding: const EdgeInsets.all(4),
@@ -489,7 +496,24 @@ class _TabButtonState extends State<_TabButton> {
                         ? MainAxisAlignment.center
                         : MainAxisAlignment.start,
                     children: [
-                      SidePanelTabIcon(tab: widget.tab),
+                      if (widget.tab case PreviewTab(editing: final session?))
+                        ListenableBuilder(
+                          listenable: session,
+                          builder: (context, _) => session.dirty
+                              ? Tooltip(
+                                  message: AppLocalizations.of(
+                                    context,
+                                  )!.workspaceEditorUnsaved,
+                                  child: Icon(
+                                    LucideIcons.circleSmall,
+                                    size: 15,
+                                    color: cs.primary,
+                                  ),
+                                )
+                              : SidePanelTabIcon(tab: widget.tab),
+                        )
+                      else
+                        SidePanelTabIcon(tab: widget.tab),
                       if (!tight) const SizedBox(width: 4),
                       Flexible(
                         fit: widget.tab.pinned ? FlexFit.loose : FlexFit.tight,

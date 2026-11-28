@@ -178,6 +178,12 @@ class _DesktopSidePanelState extends State<DesktopSidePanel> {
   }
 
   void _escape() {
+    if (_controller.activeTab case PreviewTab(
+      editing: final session?,
+    ) when session.editing) {
+      unawaited(session.leave(context));
+      return;
+    }
     if (_browserKey.currentState?.escapeAddress() == true) {
       _contentFocus.requestFocus();
       return;
@@ -479,8 +485,8 @@ class _DesktopSidePanelState extends State<DesktopSidePanel> {
               widget.filesBuilder?.call(context) ??
               DesktopWorkspaceBar(
                 conversationId: widget.conversationId,
-                onOpenFile: (path, source) async =>
-                    _controller.openPreview(path, source: source),
+                onOpenFile: (path, source, {owner}) async =>
+                    _controller.openPreview(path, source: source, owner: owner),
               ),
         ),
         if (widget.topicsOnRight)

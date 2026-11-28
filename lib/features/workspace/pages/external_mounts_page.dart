@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:Kelivo/core/models/workspace_file_owner.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
@@ -486,6 +487,7 @@ class _MountFilesPageState extends State<_MountFilesPage> {
             root: Directory(mount.sourcePath),
             rootLabel: mount.name,
             readOnly: mount.readOnly,
+            owner: (kind: WorkspaceFileOwnerKind.mount, id: mount.id),
             mutationRunner: (mutation) async {
               // FileBrowser has refreshed the registry and checked all targets.
               final current = provider.byId(mount.id);

@@ -4972,6 +4972,59 @@
   "workspacePreviewOpenExternally": "Open externally",
   "workspacePreviewOpenWith": "Open with…",
   "workspacePreviewFileTooLarge": "This file is too large to preview. Open it externally instead.",
+  "workspacePreviewEdit": "Edit",
+  "@workspacePreviewEdit": {
+    "description": "Button at the top of a writable workspace file preview that opens the original text for editing."
+  },
+  "workspaceEditorUnsaved": "Unsaved changes",
+  "@workspaceEditorUnsaved": {
+    "description": "Status beside the workspace text editor title while its draft differs from the original file."
+  },
+  "workspaceEditorLeavePrompt": "Save changes to {name} before leaving?",
+  "@workspaceEditorLeavePrompt": {
+    "description": "Unsaved workspace file confirmation before closing its editor. name is the displayed filename.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEditorKeepEditing": "Keep editing",
+  "@workspaceEditorKeepEditing": {
+    "description": "Action that dismisses a workspace file confirmation and keeps the current draft open."
+  },
+  "workspaceEditorDiscard": "Discard changes",
+  "@workspaceEditorDiscard": {
+    "description": "Destructive action that drops the unsaved workspace file draft."
+  },
+  "workspaceEditorConflict": "File changed on disk",
+  "@workspaceEditorConflict": {
+    "description": "Title of the workspace editor dialog when the original file changed, moved, or was deleted before saving."
+  },
+  "workspaceEditorConflictMessage": "Your draft is safe. Save a separate copy, or load the current file and discard your changes.",
+  "@workspaceEditorConflictMessage": {
+    "description": "Explains the choices when a workspace text draft conflicts with the current file on disk."
+  },
+  "workspaceEditorSaveCopy": "Save a copy",
+  "@workspaceEditorSaveCopy": {
+    "description": "Workspace file conflict action that creates a uniquely named sibling file containing the draft."
+  },
+  "workspaceEditorReload": "Load latest version",
+  "@workspaceEditorReload": {
+    "description": "Workspace text editor conflict action that discards the draft and reloads the original file from disk."
+  },
+  "workspaceEditorLargePreview": "Large files and long text are available in preview only.",
+  "@workspaceEditorLargePreview": {
+    "description": "Quiet status in a workspace text preview when the file exceeds the size, line count, or line length supported by the editor."
+  },
+  "workspaceEditorEncoding": "This text encoding is available in preview only.",
+  "@workspaceEditorEncoding": {
+    "description": "Status in a workspace text preview for binary content or an encoding the editor cannot save losslessly."
+  },
+  "workspaceEditorReadOnly": "Read-only location",
+  "@workspaceEditorReadOnly": {
+    "description": "Status in a workspace file preview when its source has no write permission."
+  },
   "workspacePreviewSource": "Source",
   "workspacePreviewRendered": "Rendered",
   "workspacePreviewFileName": "Name",

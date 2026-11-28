@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:Kelivo/core/models/workspace_file_owner.dart';
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
@@ -204,6 +205,7 @@ class WorkspaceFilesBodyState extends State<WorkspaceFilesBody> {
       key: widget.browserKey,
       root: root,
       rootLabel: widget.workspace.name,
+      owner: (kind: WorkspaceFileOwnerKind.workspace, id: widget.workspace.id),
       initialRelativePath: widget.initialRelativePath,
       showToolbar: widget.showToolbar,
       modelPathOf: (host) => WorkspaceModelPaths.workspaceFile(host, root.path),

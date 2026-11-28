@@ -20,9 +20,11 @@ class MarkdownFilePreview extends StatefulWidget {
     super.key,
     required this.file,
     this.autoLoad = true,
+    this.document,
   });
 
   final File file;
+  final PreviewTextDocument? document;
   final bool autoLoad;
 
   @override
@@ -38,7 +40,8 @@ class MarkdownFilePreviewState extends State<MarkdownFilePreview> {
   @override
   void initState() {
     super.initState();
-    if (widget.autoLoad) {
+    _document = widget.document;
+    if (_document == null && widget.autoLoad) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(load());
       });
@@ -48,12 +51,13 @@ class MarkdownFilePreviewState extends State<MarkdownFilePreview> {
   @override
   void didUpdateWidget(covariant MarkdownFilePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.file.path != widget.file.path) {
+    if (oldWidget.file.path != widget.file.path ||
+        oldWidget.document != widget.document) {
       _loadGeneration++;
-      _document = null;
+      _document = widget.document;
       _error = null;
-      _showSource = false;
-      if (widget.autoLoad) unawaited(load());
+      if (oldWidget.file.path != widget.file.path) _showSource = false;
+      if (_document == null && widget.autoLoad) unawaited(load());
     }
   }
 

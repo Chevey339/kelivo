@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:markstream/markstream.dart' show containsStrongRtl;
 import 'dart:async';
+import 'dart:ui' show BoxWidthStyle;
 import '../text_input/message_editing_controller.dart';
 import '../markdown/chat_prose_direction.dart';
 import 'app_text_selection_toolbar.dart';
@@ -27,10 +28,12 @@ class LongMessageEditor extends StatefulWidget {
     required this.controller,
     required this.decoration,
     this.scrollController,
+    this.lineScrollbarBuilder,
     this.autofocus = false,
     this.focusNode,
     this.style,
     this.cursorColor,
+    this.selectionWidthStyle,
     this.minLines = 8,
     this.maxLines,
     this.expands = false,
@@ -50,10 +53,14 @@ class LongMessageEditor extends StatefulWidget {
   final Future<void> Function()? onInputModeExit;
   final InputDecoration decoration;
   final ScrollController? scrollController;
+
+  /// Optional scrollbar for the line editor used by long documents.
+  final CodeScrollbarBuilder? lineScrollbarBuilder;
   final bool autofocus;
   final FocusNode? focusNode;
   final TextStyle? style;
   final Color? cursorColor;
+  final BoxWidthStyle? selectionWidthStyle;
   final int? minLines;
   final int? maxLines;
   final bool expands;
@@ -843,6 +850,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
           onSubmitted: widget.onSubmitted,
           style: widget.style,
           cursorColor: widget.cursorColor,
+          selectionWidthStyle: widget.selectionWidthStyle,
           textInputAction: widget.textInputAction,
           contentInsertionConfiguration: widget.contentInsertionConfiguration,
           contextMenuBuilder: (context, state) {
@@ -910,7 +918,8 @@ class LongMessageEditorState extends State<LongMessageEditor>
             maxLengthSingleLineRendering: 1 << 30,
             padding: EdgeInsets.zero,
             margin: EdgeInsets.zero,
-            scrollbarBuilder: (_, child, _) => child,
+            scrollbarBuilder:
+                widget.lineScrollbarBuilder ?? (_, child, _) => child,
             style: CodeEditorStyle(
               fontSize: style.fontSize,
               fontFamily: style.fontFamily,
@@ -950,6 +959,7 @@ class _PlainMessageShortcuts extends DefaultCodeShortcutsActivatorsBuilder {
   List<ShortcutActivator>? build(CodeShortcutType type) => switch (type) {
     CodeShortcutType.undo ||
     CodeShortcutType.redo ||
+    CodeShortcutType.save ||
     CodeShortcutType.indent ||
     CodeShortcutType.outdent ||
     CodeShortcutType.lineMoveUp ||

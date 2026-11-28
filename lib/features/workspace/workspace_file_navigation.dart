@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:Kelivo/core/models/workspace_file_owner.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
@@ -77,6 +78,12 @@ Future<void> openWorkspaceLinkedFile(
     WorkspaceNavigation.openTerminal(context, command: parsed!.terminalCommand);
     return;
   }
+  final chat = context.read<ChatService?>();
+  final chatId = conversationId ?? chat?.currentConversationId;
+  final conversation = chatId == null ? null : chat?.getConversation(chatId);
+  final workspaceId = WorkspaceBinding.fromExtras(
+    conversation?.extras ?? const {},
+  ).workspaceId;
   FileSystemEntity? entry;
   var error = l10n.workspaceFileNotAvailable;
   try {
@@ -96,6 +103,17 @@ Future<void> openWorkspaceLinkedFile(
     // Directory permissions may have changed since the tool ran.
   }
   if (!context.mounted) return;
+  final WorkspaceFileOwner? owner = switch (parsed?.kind) {
+    KelivoLinkKind.workspaceFile
+        when workspaceId != null &&
+            context.read<WorkspaceProvider?>()?.byId(workspaceId) != null =>
+      (kind: WorkspaceFileOwnerKind.workspace, id: workspaceId),
+    KelivoLinkKind.externalFile when parsed?.mountId != null => (
+      kind: WorkspaceFileOwnerKind.mount,
+      id: parsed!.mountId!,
+    ),
+    _ => null,
+  };
   if (entry is File &&
       parsed?.kind == KelivoLinkKind.workspaceFile &&
       ['.html', '.htm'].contains(p.extension(entry.path).toLowerCase()) &&
@@ -118,7 +136,18 @@ Future<void> openWorkspaceLinkedFile(
       }
     }
   } else if (entry is File) {
-    await showFilePreview(context, entry, title: title);
+    await showFilePreview(
+      context,
+      entry,
+      title: title,
+      owner: owner,
+      readOnly: owner == null,
+      source: switch (parsed?.kind) {
+        KelivoLinkKind.chatAttachment => 'attachments',
+        KelivoLinkKind.chatOutput => 'outputs',
+        _ => 'workspace',
+      },
+    );
   } else if (entry is Directory) {
     await _showDirectory(
       context,

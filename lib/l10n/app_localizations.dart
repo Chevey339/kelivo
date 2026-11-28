@@ -18133,6 +18133,78 @@ abstract class AppLocalizations {
   /// **'This file is too large to preview. Open it externally instead.'**
   String get workspacePreviewFileTooLarge;
 
+  /// Button at the top of a writable workspace file preview that opens the original text for editing.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get workspacePreviewEdit;
+
+  /// Status beside the workspace text editor title while its draft differs from the original file.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved changes'**
+  String get workspaceEditorUnsaved;
+
+  /// Unsaved workspace file confirmation before closing its editor. name is the displayed filename.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes to {name} before leaving?'**
+  String workspaceEditorLeavePrompt(String name);
+
+  /// Action that dismisses a workspace file confirmation and keeps the current draft open.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get workspaceEditorKeepEditing;
+
+  /// Destructive action that drops the unsaved workspace file draft.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes'**
+  String get workspaceEditorDiscard;
+
+  /// Title of the workspace editor dialog when the original file changed, moved, or was deleted before saving.
+  ///
+  /// In en, this message translates to:
+  /// **'File changed on disk'**
+  String get workspaceEditorConflict;
+
+  /// Explains the choices when a workspace text draft conflicts with the current file on disk.
+  ///
+  /// In en, this message translates to:
+  /// **'Your draft is safe. Save a separate copy, or load the current file and discard your changes.'**
+  String get workspaceEditorConflictMessage;
+
+  /// Workspace file conflict action that creates a uniquely named sibling file containing the draft.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a copy'**
+  String get workspaceEditorSaveCopy;
+
+  /// Workspace text editor conflict action that discards the draft and reloads the original file from disk.
+  ///
+  /// In en, this message translates to:
+  /// **'Load latest version'**
+  String get workspaceEditorReload;
+
+  /// Quiet status in a workspace text preview when the file exceeds the size, line count, or line length supported by the editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Large files and long text are available in preview only.'**
+  String get workspaceEditorLargePreview;
+
+  /// Status in a workspace text preview for binary content or an encoding the editor cannot save losslessly.
+  ///
+  /// In en, this message translates to:
+  /// **'This text encoding is available in preview only.'**
+  String get workspaceEditorEncoding;
+
+  /// Status in a workspace file preview when its source has no write permission.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only location'**
+  String get workspaceEditorReadOnly;
+
   /// Segmented tab label in CSV/HTML previews switching to the raw source view.
   ///
   /// In en, this message translates to:

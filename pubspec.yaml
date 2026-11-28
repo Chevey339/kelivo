@@ -63,6 +63,9 @@ dependencies:
   pointycastle: ^4.0.0
   hashlib: ^2.4.2
   ffi: ^2.2.0
+  code_assets: ^1.2.1
+  hooks: ^2.2.0
+  native_toolchain_c: ^0.19.2
   dio: 5.9.2
   socks5_proxy: ^2.1.1
   jose: ^0.3.4

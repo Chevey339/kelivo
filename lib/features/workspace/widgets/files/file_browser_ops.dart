@@ -375,7 +375,7 @@ class FileBrowserOps {
       _relChild(rootPath, parentPath, name),
     );
     if (dest == null) throw StateError('path escapes root');
-    await File(dest).create();
+    await File(dest).create(exclusive: true);
   }
 
   static Future<void> renameEntry({

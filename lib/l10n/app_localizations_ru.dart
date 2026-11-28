@@ -10355,6 +10355,47 @@ class AppLocalizationsRu extends AppLocalizations {
       'Файл слишком большой для предпросмотра. Откройте его во внешнем приложении.';
 
   @override
+  String get workspacePreviewEdit => 'Изменить';
+
+  @override
+  String get workspaceEditorUnsaved => 'Несохранённые изменения';
+
+  @override
+  String workspaceEditorLeavePrompt(String name) {
+    return 'Сохранить изменения в $name перед выходом?';
+  }
+
+  @override
+  String get workspaceEditorKeepEditing => 'Продолжить редактирование';
+
+  @override
+  String get workspaceEditorDiscard => 'Отменить изменения';
+
+  @override
+  String get workspaceEditorConflict => 'Файл изменён на диске';
+
+  @override
+  String get workspaceEditorConflictMessage =>
+      'Ваш черновик сохранён. Сохраните отдельную копию или загрузите текущий файл и отмените изменения.';
+
+  @override
+  String get workspaceEditorSaveCopy => 'Сохранить копию';
+
+  @override
+  String get workspaceEditorReload => 'Загрузить последнюю версию';
+
+  @override
+  String get workspaceEditorLargePreview =>
+      'Большие файлы и длинный текст доступны только для просмотра.';
+
+  @override
+  String get workspaceEditorEncoding =>
+      'Эта кодировка текста доступна только для просмотра.';
+
+  @override
+  String get workspaceEditorReadOnly => 'Местоположение только для чтения';
+
+  @override
   String get workspacePreviewSource => 'Исходный код';
 
   @override

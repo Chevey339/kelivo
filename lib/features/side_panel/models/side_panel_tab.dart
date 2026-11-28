@@ -1,4 +1,9 @@
+import 'dart:io';
+import 'dart:ui' show VoidCallback;
+
 import '../../../core/services/browser/browser_service.dart';
+import '../../../core/models/workspace_file_owner.dart';
+import '../../workspace/widgets/preview/workspace_text_editing.dart';
 import '../../browser/models/browser_models.dart';
 
 enum SidePanelTabKind { topics, files, web, preview }
@@ -52,14 +57,27 @@ class WebTab extends SidePanelTab {
 }
 
 class PreviewTab extends SidePanelTab {
-  const PreviewTab({
+  PreviewTab({
     required this.id,
-    required this.path,
+    required String path,
     required this.source,
-  });
+    this.owner,
+    bool startEditing = false,
+    VoidCallback? onPathChanged,
+  }) : _path = path,
+       editing = owner == null
+           ? null
+           : (WorkspaceTextEditing(
+               File(path),
+               owner,
+               onPathChanged: onPathChanged,
+             )..startEditingOnOpen = startEditing);
   @override
   final String id;
-  final String path;
+  final String _path;
+  String get path => editing?.file.path ?? _path;
+  final WorkspaceFileOwner? owner;
+  final WorkspaceTextEditing? editing;
   final String source;
   @override
   SidePanelTabKind get kind => SidePanelTabKind.preview;
@@ -69,5 +87,7 @@ class PreviewTab extends SidePanelTab {
     'id': id,
     'path': path,
     'source': source,
+    if (owner case final scope?)
+      'owner': {'kind': scope.kind.name, 'id': scope.id},
   };
 }

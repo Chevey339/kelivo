@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import 'package:Kelivo/shared/cache/byte_lru_cache.dart';
+import 'package:Kelivo/core/services/workspace/workspace_text_file.dart';
 
 Future<PreviewTextDocument> loadPreviewTextDocument(File file) =>
     compute(_openPreviewTextDocument, file.path);
@@ -19,13 +20,27 @@ PreviewTextDocument _openPreviewTextDocument(String path) {
       if (bytes.length != length) {
         throw FileSystemException('File changed', path);
       }
-      final source = utf8.decode(bytes, allowMalformed: true);
+      WorkspaceTextProblem? editProblem;
+      String source;
+      try {
+        source = utf8.decode(bytes);
+        if (source.contains('\x00')) {
+          editProblem = WorkspaceTextProblem.encoding;
+        }
+      } on FormatException {
+        source = utf8.decode(bytes, allowMalformed: true);
+        editProblem = WorkspaceTextProblem.encoding;
+      }
       final lines = source.split(RegExp(r'\r\n|\r|\n'));
-      if (lines.length <= PreviewTextDocument.richMaxLines &&
-          lines.every(
-            (line) => line.length <= PreviewTextDocument.chunkBytes,
-          )) {
-        return PreviewTextDocument._(path, length, source, lines, null);
+      if (WorkspaceTextLimits.fitsLines(lines)) {
+        return PreviewTextDocument._(
+          path,
+          length,
+          source,
+          lines,
+          null,
+          editProblem,
+        );
       }
     }
     file.setPositionSync(0);
@@ -38,6 +53,7 @@ PreviewTextDocument _openPreviewTextDocument(String path) {
       null,
       const [],
       _decodeChunk(first, readStart: 0, index: 0, fileLength: length),
+      WorkspaceTextProblem.large,
     );
   } finally {
     file.closeSync();
@@ -53,10 +69,11 @@ class PreviewTextDocument {
     this.source,
     this.lines,
     this.firstChunk,
+    this.editProblem,
   );
 
-  static const richMaxBytes = 128 * 1024;
-  static const richMaxLines = 2000;
+  static const richMaxBytes = WorkspaceTextLimits.bytes;
+  static const richMaxLines = WorkspaceTextLimits.lines;
   static const chunkBytes = 2048;
 
   final String path;
@@ -64,6 +81,7 @@ class PreviewTextDocument {
   final String? source;
   final List<String> lines;
   final String? firstChunk;
+  final WorkspaceTextProblem? editProblem;
 
   bool get usesPlainText => source == null;
   int get chunkCount => (byteLength + chunkBytes - 1) ~/ chunkBytes;
