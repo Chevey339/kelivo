@@ -4234,6 +4234,7 @@ Future<String?> showModelPickerForTest(
   final sel = await showModelSelector(
     context,
     limitProviderKey: providerKey,
+    includeEmbedding: true,
     initialProviderKey: initialModelId == null ? null : providerKey,
     initialModelId: initialModelId,
   );

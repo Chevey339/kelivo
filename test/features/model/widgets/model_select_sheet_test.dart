@@ -94,6 +94,7 @@ Future<void> _pumpModelSelector(
   required SettingsProvider settings,
   ThemeData? theme,
   String? limitProviderKey,
+  bool includeEmbedding = false,
   String? initialProviderKey,
   String? initialModelId,
   CreationModelSlot? creationSlot,
@@ -127,6 +128,7 @@ Future<void> _pumpModelSelector(
                     context,
                     limitProviderKey: limitProviderKey,
                     creationSlot: creationSlot,
+                    includeEmbedding: includeEmbedding,
                     initialProviderKey: initialProviderKey,
                     initialModelId: initialModelId,
                   );
@@ -962,6 +964,273 @@ void main() {
           await tester.pumpAndSettle();
           expect(selected?.providerKey, providerKey);
           expect(selected?.modelId, modelId);
+          expect(tester.takeException(), isNull);
+        } finally {
+          final navigator = tester.state<NavigatorState>(
+            find.byType(Navigator).first,
+          );
+          if (navigator.canPop()) navigator.pop();
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox());
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
+    testWidgets(
+      'model picker excludes embedding models from list, search, and favorites by default on $platform',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        tester.view.physicalSize = platform == TargetPlatform.iOS
+            ? const Size(390, 844)
+            : const Size(1100, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(settings.dispose);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
+        for (final key in settings.providerConfigs.keys.toList()) {
+          await settings.removeProviderConfig(key);
+        }
+
+        await settings.setProviderConfig(
+          'mixed',
+          _providerConfig('mixed', 'Mixed Provider', [
+            'gpt-4o',
+            'gemini-2.5-flash-image',
+            'text-embedding-3-small',
+            'custom-vec-v1',
+            'nomic-embed-chat',
+          ]).copyWith(
+            modelOverrides: const {
+              'gemini-2.5-flash-image': {'name': 'Gemini chat image'},
+              'custom-vec-v1': {
+                'name': 'Custom explicit embedding',
+                'type': 'embedding',
+              },
+              'nomic-embed-chat': {
+                'name': 'Overridden chat model',
+                'type': 'chat',
+              },
+            },
+          ),
+        );
+        await settings.setProvidersOrder(const ['mixed']);
+        await settings.setCurrentModel('mixed', 'gpt-4o');
+        await settings.togglePinModel('mixed', 'text-embedding-3-small');
+        await settings.togglePinModel('mixed', 'custom-vec-v1');
+        await settings.togglePinModel('mixed', 'gpt-4o');
+
+        try {
+          await _pumpModelSelector(tester, settings: settings);
+          await tester.pumpAndSettle();
+
+          expect(find.textContaining('gpt-4o'), findsWidgets);
+          expect(find.text('Gemini chat image'), findsOneWidget);
+          expect(find.text('Overridden chat model'), findsOneWidget);
+          expect(
+            find.textContaining('text-embedding-3-small', findRichText: true),
+            findsNothing,
+          );
+          expect(
+            find.textContaining(
+              'Custom explicit embedding',
+              findRichText: true,
+            ),
+            findsNothing,
+          );
+
+          // Search by model ID and by provider name must not surface embeddings.
+          await tester.enterText(find.byType(TextField), 'embedding');
+          await tester.pumpAndSettle();
+          expect(
+            find.textContaining('text-embedding-3-small', findRichText: true),
+            findsNothing,
+          );
+          expect(
+            find.textContaining(
+              'Custom explicit embedding',
+              findRichText: true,
+            ),
+            findsNothing,
+          );
+
+          await tester.enterText(find.byType(TextField), 'Mixed Provider');
+          await tester.pumpAndSettle();
+          expect(find.textContaining('gpt-4o'), findsWidgets);
+          expect(find.text('Gemini chat image'), findsOneWidget);
+          expect(find.text('Overridden chat model'), findsOneWidget);
+          expect(
+            find.textContaining('text-embedding-3-small', findRichText: true),
+            findsNothing,
+          );
+          expect(
+            find.textContaining(
+              'Custom explicit embedding',
+              findRichText: true,
+            ),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        } finally {
+          final navigator = tester.state<NavigatorState>(
+            find.byType(Navigator).first,
+          );
+          if (navigator.canPop()) navigator.pop();
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox());
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+
+    testWidgets(
+      'model picker omits embedding-only providers and handles all-embedding configs on $platform',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        tester.view.physicalSize = platform == TargetPlatform.iOS
+            ? const Size(390, 844)
+            : const Size(1100, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(settings.dispose);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
+        for (final key in settings.providerConfigs.keys.toList()) {
+          await settings.removeProviderConfig(key);
+        }
+
+        await settings.setProviderConfig(
+          'embed-only',
+          _providerConfig('embed-only', 'Embedding Only Provider', [
+            'text-embedding-3-large',
+            'custom-embed',
+          ]).copyWith(
+            modelOverrides: const {
+              'custom-embed': {'type': 'embedding'},
+            },
+          ),
+        );
+        await settings.setProviderConfig(
+          'chat-only',
+          _providerConfig('chat-only', 'Chat Only Provider', ['gpt-4.1']),
+        );
+        await settings.setProvidersOrder(const ['embed-only', 'chat-only']);
+        await settings.setCurrentModel('chat-only', 'gpt-4.1');
+
+        try {
+          await _pumpModelSelector(tester, settings: settings);
+          await tester.pumpAndSettle();
+
+          expect(find.text('Embedding Only Provider'), findsNothing);
+          expect(find.text('Chat Only Provider'), findsWidgets);
+          expect(find.text('gpt-4.1'), findsOneWidget);
+          expect(
+            find.byKey(
+              const ValueKey('model-selector-provider-tab-embed-only'),
+            ),
+            findsNothing,
+          );
+          if (platform == TargetPlatform.iOS) {
+            expect(
+              find.byKey(
+                const ValueKey('model-selector-provider-tab-chat-only'),
+              ),
+              findsOneWidget,
+            );
+          }
+          expect(tester.takeException(), isNull);
+
+          final navigator = tester.state<NavigatorState>(
+            find.byType(Navigator).first,
+          );
+          if (navigator.canPop()) navigator.pop();
+          await tester.pumpAndSettle();
+
+          // All-embedding configuration renders cleanly without throwing.
+          await settings.removeProviderConfig('chat-only');
+          await settings.setProvidersOrder(const ['embed-only']);
+          await _pumpModelSelector(tester, settings: settings);
+          await tester.pumpAndSettle();
+
+          expect(find.text('Embedding Only Provider'), findsNothing);
+          expect(find.text('text-embedding-3-large'), findsNothing);
+          expect(tester.takeException(), isNull);
+        } finally {
+          final navigator = tester.state<NavigatorState>(
+            find.byType(Navigator).first,
+          );
+          if (navigator.canPop()) navigator.pop();
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox());
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+
+    testWidgets(
+      'model picker includes embedding models when includeEmbedding is true on $platform',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        tester.view.physicalSize = platform == TargetPlatform.iOS
+            ? const Size(390, 844)
+            : const Size(1100, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(settings.dispose);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
+        for (final key in settings.providerConfigs.keys.toList()) {
+          await settings.removeProviderConfig(key);
+        }
+
+        await settings.setProviderConfig(
+          'test-provider',
+          _providerConfig('test-provider', 'Test Provider', [
+            'gpt-4o',
+            'text-embedding-3-small',
+            'custom-vec-v1',
+          ]).copyWith(
+            modelOverrides: const {
+              'custom-vec-v1': {
+                'name': 'Custom explicit embedding',
+                'type': 'embedding',
+              },
+            },
+          ),
+        );
+        await settings.setProvidersOrder(const ['test-provider']);
+
+        ModelSelection? selected;
+        try {
+          await _pumpModelSelector(
+            tester,
+            settings: settings,
+            limitProviderKey: 'test-provider',
+            includeEmbedding: true,
+            onSelected: (value) => selected = value,
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.text('gpt-4o'), findsOneWidget);
+          expect(find.text('text-embedding-3-small'), findsOneWidget);
+          expect(find.text('Custom explicit embedding'), findsOneWidget);
+
+          await tester.tap(find.text('text-embedding-3-small'));
+          await tester.pumpAndSettle();
+          expect(selected?.providerKey, 'test-provider');
+          expect(selected?.modelId, 'text-embedding-3-small');
           expect(tester.takeException(), isNull);
         } finally {
           final navigator = tester.state<NavigatorState>(
