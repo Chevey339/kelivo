@@ -72,6 +72,10 @@ Map<String, Object?> _businessFixture({required String secret}) => {
     'secretAccessKey': 's3-secret',
   }),
   'app_launch_count_v1': 42,
+  'backup_reminder_enabled_v1': true,
+  'backup_reminder_interval_days_v1': 7,
+  'backup_reminder_minutes_of_day_v1': 1200,
+  'backup_reminder_enabled_at_v1': '2026-07-18T09:00:00.000Z',
   'backup_reminder_last_backup_at_v1': '2026-07-18T12:30:00.000Z',
   'request_log_enabled_v1': true,
   'log_save_output_v1': true,
@@ -135,6 +139,10 @@ void main() {
         // portable exporter remains responsible for filtering them.
         await repository.setPreference('flutter_log_enabled_v1', true);
         await repository.setPreference('pinned_chat_ids', 'stale-chat');
+        await repository.setPreference(
+          'backup_reminder_last_backup_at_v1',
+          '2026-07-18T12:30:00.000Z',
+        );
 
         backup =
             await DataSync(
@@ -161,10 +169,14 @@ void main() {
         expect((providers['second'] as Map)['apiKey'], 'provider-secret');
         expect((providers['second'] as Map)['proxyPassword'], 'proxy-secret');
         expect(settings['app_launch_count_v1'], 42);
+        expect(settings['backup_reminder_enabled_v1'], isTrue);
+        expect(settings['backup_reminder_interval_days_v1'], 7);
+        expect(settings['backup_reminder_minutes_of_day_v1'], 1200);
         expect(
-          settings['backup_reminder_last_backup_at_v1'],
-          '2026-07-18T12:30:00.000Z',
+          settings['backup_reminder_enabled_at_v1'],
+          '2026-07-18T09:00:00.000Z',
         );
+        expect(settings, isNot(contains('backup_reminder_last_backup_at_v1')));
         expect(settings['request_log_enabled_v1'], isTrue);
         expect(settings['log_save_output_v1'], isTrue);
         expect(settings['unknown_portable_key_v1'], ['one', 'two']);

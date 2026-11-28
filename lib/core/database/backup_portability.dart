@@ -25,6 +25,7 @@ final class BackupPortability {
     'backup_password_verifier_v1',
     'backup_install_id_v1',
     'backup_outstanding_partial_v1',
+    'backup_reminder_last_backup_at_v1',
     'desktop_scheduled_tasks_v1',
     'scheduled_task_results_v1',
     'environment_state_v1',

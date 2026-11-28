@@ -176,4 +176,128 @@ void main() {
       }
     },
   );
+
+  test(
+    'backup reminder lastBackupAt is device-local while schedule preferences remain portable',
+    () async {
+      const lastBackupKey = 'backup_reminder_last_backup_at_v1';
+      const portableKeys = {
+        'backup_reminder_enabled_v1': true,
+        'backup_reminder_interval_days_v1': 7,
+        'backup_reminder_minutes_of_day_v1': 1200,
+        'backup_reminder_enabled_at_v1': '2026-07-18T09:00:00.000Z',
+      };
+
+      expect(
+        BusinessKeyRegistry.classify(lastBackupKey),
+        BusinessKeyDisposition.preference,
+      );
+      expect(BackupPortability.devicePreferenceKeys, contains(lastBackupKey));
+      for (final key in portableKeys.keys) {
+        expect(BackupPortability.devicePreferenceKeys, isNot(contains(key)));
+      }
+
+      final prefs = BusinessPreferences(repository);
+      await prefs.setBool('backup_reminder_enabled_v1', true);
+      await prefs.setInt('backup_reminder_interval_days_v1', 7);
+      await prefs.setInt('backup_reminder_minutes_of_day_v1', 1200);
+      await prefs.setString(
+        'backup_reminder_enabled_at_v1',
+        '2026-07-18T09:00:00.000Z',
+      );
+      await prefs.setString(lastBackupKey, '2026-07-19T23:30:00.000Z');
+
+      final portableSnapshot = BackupPortability.portable(
+        await repository.readSnapshot(),
+      );
+      expect(portableSnapshot.preferences, isNot(contains(lastBackupKey)));
+      for (final entry in portableKeys.entries) {
+        expect(portableSnapshot.preferences[entry.key], entry.value);
+      }
+
+      final exported = await DataSync.exportBusinessSettingsFrom(repository);
+      final exportedSettings =
+          jsonDecode(exported.settingsJson) as Map<String, dynamic>;
+      expect(exportedSettings, isNot(contains(lastBackupKey)));
+      for (final entry in portableKeys.entries) {
+        expect(exportedSettings[entry.key], entry.value);
+      }
+
+      await BackupPortability.sanitizeDatabase(database);
+      final sanitized = await repository.readSnapshot();
+      expect(sanitized.preferences, isNot(contains(lastBackupKey)));
+      for (final entry in portableKeys.entries) {
+        expect(sanitized.preferences[entry.key], entry.value);
+      }
+    },
+  );
+
+  for (final merge in [false, true]) {
+    test(
+      '${merge ? 'merge' : 'overwrite'} keeps local backup reminder timestamp and ignores stale incoming timestamp',
+      () async {
+        const lastBackupKey = 'backup_reminder_last_backup_at_v1';
+        final prefs = BusinessPreferences(repository);
+        await prefs.setString(lastBackupKey, '2026-07-19T23:30:00.000Z');
+
+        final service = BusinessRestoreService(repository);
+        final foreignBackup = <String, Object?>{
+          'backup_reminder_enabled_v1': true,
+          'backup_reminder_interval_days_v1': 3,
+          'backup_reminder_minutes_of_day_v1': 540,
+          'backup_reminder_enabled_at_v1': '2026-07-17T08:00:00.000Z',
+          lastBackupKey: '2026-07-17T21:41:00.000Z',
+        };
+        if (merge) {
+          await service.merge(foreignBackup);
+        } else {
+          await service.overwrite(foreignBackup);
+        }
+
+        final afterExisting = await repository.readSnapshot();
+        expect(
+          afterExisting.preferences[lastBackupKey],
+          '2026-07-19T23:30:00.000Z',
+        );
+        expect(afterExisting.preferences['backup_reminder_enabled_v1'], isTrue);
+        expect(
+          afterExisting.preferences['backup_reminder_interval_days_v1'],
+          3,
+        );
+        expect(
+          afterExisting.preferences['backup_reminder_minutes_of_day_v1'],
+          540,
+        );
+        expect(
+          afterExisting.preferences['backup_reminder_enabled_at_v1'],
+          '2026-07-17T08:00:00.000Z',
+        );
+
+        final freshDb = AppDatabase(NativeDatabase.memory());
+        try {
+          final freshRepo = BusinessRepository(freshDb);
+          final freshService = BusinessRestoreService(freshRepo);
+          if (merge) {
+            await freshService.merge(foreignBackup);
+          } else {
+            await freshService.overwrite(foreignBackup);
+          }
+          final afterFresh = await freshRepo.readSnapshot();
+          expect(afterFresh.preferences, isNot(contains(lastBackupKey)));
+          expect(afterFresh.preferences['backup_reminder_enabled_v1'], isTrue);
+          expect(afterFresh.preferences['backup_reminder_interval_days_v1'], 3);
+          expect(
+            afterFresh.preferences['backup_reminder_minutes_of_day_v1'],
+            540,
+          );
+          expect(
+            afterFresh.preferences['backup_reminder_enabled_at_v1'],
+            '2026-07-17T08:00:00.000Z',
+          );
+        } finally {
+          await freshDb.close();
+        }
+      },
+    );
+  }
 }
