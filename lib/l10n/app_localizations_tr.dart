@@ -17398,7 +17398,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get storageAttachmentImagesCleanupHint =>
-      'Kullanılmayanları temizle, referans verilmeyen görselleri siler. Kullanımdaki bir sohbet görselini silmek için sohbet adlarına dokunun.';
+      'Orijinal mesajı görüntülemek veya yerel görseli silmek için bir görselin sohbet adlarına dokunun. Kullanılmayanları temizle, artık kullanılmayan görselleri kaldırır.';
 
   @override
   String get storageAttachmentImageCopiesPending =>
@@ -17407,6 +17407,21 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get storageAttachmentImageFrozen =>
       'Sıkıştırılmış sohbet bağlamı kaydedilmiş bir kopyayı hâlâ gönderebileceği için bu görsel korunuyor.';
+
+  @override
+  String get storageImageShowSource => 'Orijinal mesajı görüntüle';
+
+  @override
+  String get storageImageSourceNotFound =>
+      'Bu sohbetin geçerli sürümünde bu görseli kullanan bir mesaj bulunamadı.';
+
+  @override
+  String get storageImageSourceBusy =>
+      'Bir yanıt oluşturuluyor. Tamamlandığında tekrar deneyin.';
+
+  @override
+  String get storageImageSourceFailed =>
+      'Orijinal mesaj aranamadı. Tekrar deneyin.';
 
   @override
   String get storageAttachmentDetailsTitle => 'Dosya bilgisi';

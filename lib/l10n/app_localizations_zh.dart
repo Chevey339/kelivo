@@ -16367,13 +16367,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageAttachmentImagesCleanupHint =>
-      '「清理未使用」会删除闲置图片。要删除聊天中仍在使用的图片，请点图片下方的对话名。';
+      '点图片下方的对话名，可以查看原消息或删除本地图片。「清理未使用」会删除闲置图片。';
 
   @override
   String get storageAttachmentImageCopiesPending => '图片已删除，Kelivo 稍后会重试清理会话副本。';
 
   @override
   String get storageAttachmentImageFrozen => '压缩后的对话可能继续发送已保存的图片副本，因此这张图片受到保护。';
+
+  @override
+  String get storageImageShowSource => '查看原消息';
+
+  @override
+  String get storageImageSourceNotFound => '在此对话的当前版本中找不到使用这张图片的消息。';
+
+  @override
+  String get storageImageSourceBusy => '正在生成回复，请在回复结束后再查看。';
+
+  @override
+  String get storageImageSourceFailed => '查找原消息失败，请重试。';
 
   @override
   String get storageAttachmentDetailsTitle => '文件信息';
@@ -34249,13 +34261,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageAttachmentImagesCleanupHint =>
-      '「清理未使用」会删除闲置图片。要删除聊天中仍在使用的图片，请点图片下方的对话名。';
+      '点图片下方的对话名，可以查看原消息或删除本地图片。「清理未使用」会删除闲置图片。';
 
   @override
   String get storageAttachmentImageCopiesPending => '图片已删除，Kelivo 稍后会重试清理会话副本。';
 
   @override
   String get storageAttachmentImageFrozen => '压缩后的对话可能继续发送已保存的图片副本，因此这张图片受到保护。';
+
+  @override
+  String get storageImageShowSource => '查看原消息';
+
+  @override
+  String get storageImageSourceNotFound => '在此对话的当前版本中找不到使用这张图片的消息。';
+
+  @override
+  String get storageImageSourceBusy => '正在生成回复，请在回复结束后再查看。';
+
+  @override
+  String get storageImageSourceFailed => '查找原消息失败，请重试。';
 
   @override
   String get storageAttachmentDetailsTitle => '文件信息';
@@ -52154,7 +52178,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageAttachmentImagesCleanupHint =>
-      '「清理未使用」會刪除未被引用的圖片。若要刪除聊天中仍在使用的圖片，請點選圖片下方的對話名稱。';
+      '點擊圖片下方的對話名稱，即可查看原訊息或刪除本機圖片。「清理未使用」會刪除閒置圖片。';
 
   @override
   String get storageAttachmentImageCopiesPending => '圖片已刪除，Kelivo 稍後會重試清理會話副本。';
@@ -52162,6 +52186,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get storageAttachmentImageFrozen =>
       '由於壓縮後的對話仍可能傳送已儲存的圖片副本，因此這張圖片受到保護。';
+
+  @override
+  String get storageImageShowSource => '查看原訊息';
+
+  @override
+  String get storageImageSourceNotFound => '在此對話的目前版本中找不到使用這張圖片的訊息。';
+
+  @override
+  String get storageImageSourceBusy => '正在生成回覆，請在回覆結束後再查看。';
+
+  @override
+  String get storageImageSourceFailed => '查找原訊息失敗，請重試。';
 
   @override
   String get storageAttachmentDetailsTitle => '檔案資訊';

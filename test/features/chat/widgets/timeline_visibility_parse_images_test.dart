@@ -1,4 +1,4 @@
-import 'package:Kelivo/features/chat/widgets/timeline_visibility.dart';
+import 'package:Kelivo/shared/markdown/tool_result_images.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'package:flutter_test/flutter_test.dart';
 

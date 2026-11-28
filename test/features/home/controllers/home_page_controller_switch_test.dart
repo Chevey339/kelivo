@@ -40,6 +40,11 @@ class _ControlledChatService extends ChatService {
   final List<_PageRequest> pageRequests = <_PageRequest>[];
   final List<String?> setCurrentCalls = <String?>[];
   String? _trackedCurrentConversationId;
+  final temporary = <String>{};
+  @override
+  bool isTemporaryConversation(String? id) =>
+      temporary.contains(id) || super.isTemporaryConversation(id);
+  int messageBodyReads = 0;
   int checkpointWrites = 0;
   ComposerDraftStore? controlledDrafts;
 
@@ -50,11 +55,13 @@ class _ControlledChatService extends ChatService {
       _messagesByConversation[id] ?? const <ChatMessage>[];
 
   @override
-  Future<List<ChatMessage>> loadMessagesByIds(List<String> ids) async =>
-      _messagesByConversation.values
-          .expand((messages) => messages)
-          .where((message) => ids.contains(message.id))
-          .toList();
+  Future<List<ChatMessage>> loadMessagesByIds(List<String> ids) async {
+    messageBodyReads++;
+    return _messagesByConversation.values
+        .expand((messages) => messages)
+        .where((message) => ids.contains(message.id))
+        .toList();
+  }
 
   @override
   String? get currentConversationId => _trackedCurrentConversationId;
@@ -419,9 +426,7 @@ void main() {
     );
   }
 
-  testWidgets('show in conversation pulses once per explicit artwork jump', (
-    tester,
-  ) async {
+  testWidgets('artwork and storage jumps highlight the target', (tester) async {
     final message = _message('conv-a', 1);
     final service = _ControlledChatService({
       'conv-a': [message],
@@ -439,10 +444,11 @@ void main() {
       ),
     );
     await switchAndSettle(tester, controller, service, 'conv-b');
-    Future<void> openArtwork() async {
+    Future<void> openSource({required bool selectVersion}) async {
       final switching = controller.currentConversation?.id != 'conv-a';
       final pages = service.pageRequests.length;
-      final opened = controller.openCreationSource(
+      final opened = controller.openMessageSource(
+        selectVersion: selectVersion,
         conversationId: 'conv-a',
         messageId: message.id,
         stillCurrent: () => true,
@@ -460,7 +466,7 @@ void main() {
       expect(controller.spotlightMessageId, message.id);
     }
 
-    await openArtwork();
+    await openSource(selectVersion: true);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(controller.spotlightOpacity.value, inExclusiveRange(0.0, 1.0));
@@ -469,7 +475,22 @@ void main() {
     await switchAndSettle(tester, controller, service, 'conv-b');
     await switchAndSettle(tester, controller, service, 'conv-a');
     expect(controller.spotlightMessageId, isNull);
-    await openArtwork();
+    await switchAndSettle(tester, controller, service, 'conv-b');
+    service.temporary.add('conv-b');
+    expect(
+      await controller.openMessageSource(
+        conversationId: 'conv-a',
+        messageId: message.id,
+        stillCurrent: () => true,
+        selectVersion: false,
+      ),
+      isFalse,
+    );
+    expect(controller.currentConversation?.id, 'conv-b');
+    service.temporary.clear();
+    final readsBeforeStorageJump = service.messageBodyReads;
+    await openSource(selectVersion: false);
+    expect(service.messageBodyReads, readsBeforeStorageJump);
     await switchAndSettle(tester, controller, service, 'conv-b');
     expect(controller.spotlightMessageId, isNull);
   });
@@ -525,7 +546,8 @@ void main() {
       totalSlotCount: 2,
     );
     await pumpUntilDone(tester, [switching]);
-    final jump = controller.openCreationSource(
+    final jump = controller.openMessageSource(
+      selectVersion: true,
       conversationId: 'conv-a',
       messageId: previous.id,
       stillCurrent: () => true,

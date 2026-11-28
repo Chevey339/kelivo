@@ -17591,7 +17591,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get storageAttachmentImagesCleanupHint =>
-      '«Очистить неиспользуемые» удаляет изображения без ссылок. Чтобы удалить используемое изображение из чата, нажмите на названия чатов под ним.';
+      'Нажмите на название чата под изображением, чтобы открыть исходное сообщение или удалить локальное изображение. «Очистить неиспользуемые» удаляет изображения, которые больше не используются.';
 
   @override
   String get storageAttachmentImageCopiesPending =>
@@ -17600,6 +17600,21 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get storageAttachmentImageFrozen =>
       'Это изображение защищено, поскольку сжатый контекст чата может по-прежнему отправлять сохранённую копию.';
+
+  @override
+  String get storageImageShowSource => 'Открыть исходное сообщение';
+
+  @override
+  String get storageImageSourceNotFound =>
+      'В текущей версии этого чата не найдено сообщений с этим изображением.';
+
+  @override
+  String get storageImageSourceBusy =>
+      'Генерируется ответ. Повторите попытку после его завершения.';
+
+  @override
+  String get storageImageSourceFailed =>
+      'Не удалось найти исходное сообщение. Повторите попытку.';
 
   @override
   String get storageAttachmentDetailsTitle => 'Информация о файле';

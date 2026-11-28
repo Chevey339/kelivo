@@ -14,7 +14,8 @@ import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Kelivo/core/services/api/tool_result_content.dart';
 import 'package:Kelivo/core/services/tool_image.dart';
-import 'package:Kelivo/features/chat/widgets/timeline_visibility.dart';
+import 'package:Kelivo/shared/markdown/tool_result_images.dart'
+    show parseToolResultImages;
 import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 

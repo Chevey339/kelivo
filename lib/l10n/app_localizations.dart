@@ -30294,10 +30294,10 @@ abstract class AppLocalizations {
   /// **'Image deleted'**
   String get storageAttachmentImageDeleted;
 
-  /// Hint on the Storage Space Images page. Explains the separate bulk cleanup and individual action available through a photo’s chat label.
+  /// Hint on the Storage Space Images page explaining how to open an image’s chat sources or delete the local photo, and what bulk cleanup removes.
   ///
   /// In en, this message translates to:
-  /// **'Clean unused removes unreferenced images. To delete a chat image in use, tap its chat names.'**
+  /// **'Tap an image’s chat names to view the original message or delete the local image. Clean unused removes images no longer in use.'**
   String get storageAttachmentImagesCleanupHint;
 
   /// Storage Space notification after the original was removed but a conversation copy could not be cleaned. Cleanup is retried during attachment maintenance.
@@ -30311,6 +30311,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This image is protected because a compressed chat context may still send a saved copy.'**
   String get storageAttachmentImageFrozen;
+
+  /// Button beside a chat name in Storage Space image details. On demand, find the first currently selected message that uses this image and highlight it in that chat.
+  ///
+  /// In en, this message translates to:
+  /// **'View original message'**
+  String get storageImageShowSource;
+
+  /// Notice in Storage Space image details when the image is used only by other revisions, or the message or its attachment has been removed.
+  ///
+  /// In en, this message translates to:
+  /// **'No message using this image was found in the current version of this chat.'**
+  String get storageImageSourceNotFound;
+
+  /// Notice shown only after the user requests an original image message while a chat reply is being generated. The lookup yields to the reply.
+  ///
+  /// In en, this message translates to:
+  /// **'A reply is being generated. Try again when it finishes.'**
+  String get storageImageSourceBusy;
+
+  /// Storage Space image details message when a requested lookup cannot read the chat database.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t look up the original message. Try again.'**
+  String get storageImageSourceFailed;
 
   /// Title of the information dialog opened by tapping an attachment status label. Shows its chats or cleanup status; this is not the automatic-cleanup settings dialog.
   ///

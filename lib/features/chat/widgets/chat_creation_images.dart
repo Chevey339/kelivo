@@ -713,7 +713,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
         if (showLink)
           _link(
             l10n.creationShowInCreation,
-            () => ChatActionBus.instance.fireCreation(
+            () => ChatActionBus.instance.fireNavigation(
               OpenCreationArtwork(item.id),
             ),
             external: true,

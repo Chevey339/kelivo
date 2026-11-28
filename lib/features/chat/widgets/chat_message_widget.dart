@@ -107,6 +107,8 @@ import 'viewport_block_list.dart';
 import '../../../core/models/message_part_snapshot.dart';
 import 'select_copy_sheet.dart';
 import 'timeline_visibility.dart';
+import '../../../shared/markdown/tool_result_images.dart'
+    show parseToolResultImages;
 import 'citation_sources_sheet.dart';
 import '../../../shared/markdown/citation_syntax.dart';
 import 'chat_surface.dart';

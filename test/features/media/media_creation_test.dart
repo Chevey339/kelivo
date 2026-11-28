@@ -1521,8 +1521,8 @@ void main() {
         }
         expect(images, findsNWidgets(chat ? 1 : 3));
         if (chat) {
-          final events = <CreationChatAction>[];
-          final subscription = ChatActionBus.instance.creationStream.listen(
+          final events = <ChatNavigationAction>[];
+          final subscription = ChatActionBus.instance.navigationStream.listen(
             events.add,
           );
           addTearDown(subscription.cancel);

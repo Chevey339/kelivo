@@ -22469,9 +22469,9 @@
   "@storageAttachmentImageDeleted": {
     "description": "Placeholder shown in a chat at the position of a local image the user explicitly deleted in Storage Space."
   },
-  "storageAttachmentImagesCleanupHint": "Clean unused removes unreferenced images. To delete a chat image in use, tap its chat names.",
+  "storageAttachmentImagesCleanupHint": "Tap an image’s chat names to view the original message or delete the local image. Clean unused removes images no longer in use.",
   "@storageAttachmentImagesCleanupHint": {
-    "description": "Hint on the Storage Space Images page. Explains the separate bulk cleanup and individual action available through a photo’s chat label."
+    "description": "Hint on the Storage Space Images page explaining how to open an image’s chat sources or delete the local photo, and what bulk cleanup removes."
   },
   "storageAttachmentImageCopiesPending": "Image deleted. Kelivo will retry cleaning up its conversation copies.",
   "@storageAttachmentImageCopiesPending": {
@@ -22480,6 +22480,22 @@
   "storageAttachmentImageFrozen": "This image is protected because a compressed chat context may still send a saved copy.",
   "@storageAttachmentImageFrozen": {
     "description": "Storage Space notice when an active compressed chat context retains the image and would otherwise keep sending its stored pixels."
+  },
+  "storageImageShowSource": "View original message",
+  "@storageImageShowSource": {
+    "description": "Button beside a chat name in Storage Space image details. On demand, find the first currently selected message that uses this image and highlight it in that chat."
+  },
+  "storageImageSourceNotFound": "No message using this image was found in the current version of this chat.",
+  "@storageImageSourceNotFound": {
+    "description": "Notice in Storage Space image details when the image is used only by other revisions, or the message or its attachment has been removed."
+  },
+  "storageImageSourceBusy": "A reply is being generated. Try again when it finishes.",
+  "@storageImageSourceBusy": {
+    "description": "Notice shown only after the user requests an original image message while a chat reply is being generated. The lookup yields to the reply."
+  },
+  "storageImageSourceFailed": "Couldn’t look up the original message. Try again.",
+  "@storageImageSourceFailed": {
+    "description": "Storage Space image details message when a requested lookup cannot read the chat database."
   },
   "storageAttachmentDetailsTitle": "File info",
   "@storageAttachmentDetailsTitle": {

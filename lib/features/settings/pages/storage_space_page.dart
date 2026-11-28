@@ -1,6 +1,7 @@
 import '../../../shared/widgets/ios_date_picker.dart';
 import '../widgets/custom_theme_widgets.dart';
 import '../widgets/attachment_cleanup_button.dart';
+import '../widgets/storage_image_sources.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -11,6 +12,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
 import '../../../desktop/macos_window_drag_area.dart';
+import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../core/database/business_repository.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
@@ -2429,9 +2431,11 @@ class _UploadManagerState extends State<_UploadManager> {
         ? _selected.toList(growable: false)
         : [chatImage.path];
     final count = pathsToDelete.length;
+    OpenConversationMessage? source;
     final ok = await showAppDialog<bool>(
       context,
       maxWidth: 420,
+      waitForExit: chatImage != null,
       child: Builder(
         builder: (ctx) => Padding(
           padding: const EdgeInsets.all(20),
@@ -2441,19 +2445,22 @@ class _UploadManagerState extends State<_UploadManager> {
               if (chatImage == null)
                 Text(l10n.storageAttachmentDeleteConfirm(count))
               else ...[
-                Text(l10n.storageAttachmentDeleteLocalImageConfirm),
+                Text(
+                  l10n.storageAttachmentDetailsTitle,
+                  style: Theme.of(ctx).textTheme.titleMedium,
+                ),
+                if (chatImage.canRemoveChatImage) ...[
+                  const SizedBox(height: 12),
+                  Text(l10n.storageAttachmentDeleteLocalImageConfirm),
+                ],
                 const SizedBox(height: 12),
                 Flexible(
-                  child: SingleChildScrollView(
-                    child: Text(
-                      chatImage.conversations.values
-                          .map(
-                            (title) => title.trim().isEmpty
-                                ? l10n.incomingShareNewChat
-                                : title,
-                          )
-                          .join('\n'),
-                    ),
+                  child: StorageImageSources(
+                    entry: chatImage,
+                    onFound: (chat, message) {
+                      source = OpenConversationMessage(chat, message);
+                      Navigator.of(ctx).pop(false);
+                    },
                   ),
                 ),
               ],
@@ -2467,14 +2474,15 @@ class _UploadManagerState extends State<_UploadManager> {
                     icon: Lucide.X,
                     onTap: () => Navigator.of(ctx).pop(false),
                   ),
-                  IosTileButton(
-                    label: chatImage == null
-                        ? l10n.homePageDelete
-                        : l10n.storageAttachmentDeleteLocalImage,
-                    icon: Lucide.Trash2,
-                    backgroundColor: Theme.of(ctx).colorScheme.error,
-                    onTap: () => Navigator.of(ctx).pop(true),
-                  ),
+                  if (chatImage == null || chatImage.canRemoveChatImage)
+                    IosTileButton(
+                      label: chatImage == null
+                          ? l10n.homePageDelete
+                          : l10n.storageAttachmentDeleteLocalImage,
+                      icon: Lucide.Trash2,
+                      backgroundColor: Theme.of(ctx).colorScheme.error,
+                      onTap: () => Navigator.of(ctx).pop(true),
+                    ),
                 ],
               ),
             ],
@@ -2482,7 +2490,18 @@ class _UploadManagerState extends State<_UploadManager> {
         ),
       ),
     );
-    if (ok != true || !mounted || !_usageReady) return;
+    if (!mounted) return;
+    if (source case final target?) {
+      final chat = context.read<ChatService?>();
+      if (ModalRoute.of(context)?.isCurrent != false &&
+          chat != null &&
+          !chat.isTemporaryConversation(chat.currentConversationId) &&
+          !chat.isTemporaryConversation(target.conversationId)) {
+        ChatActionBus.instance.fireNavigation(target);
+      }
+      return;
+    }
+    if (ok != true || !_usageReady) return;
     setState(() => _deleting = true);
 
     try {
@@ -2743,7 +2762,7 @@ class _UploadManagerState extends State<_UploadManager> {
                   key: ValueKey('storage-image-${e.path}'),
                   entry: e,
                   selected: selected,
-                  onShowDetails: e.canRemoveChatImage && !_deleting
+                  onShowDetails: e.conversations.isNotEmpty && !_deleting
                       ? () => _deleteSelected(chatImage: e)
                       : null,
                   onToggle: () => _toggleSelect(e.path),

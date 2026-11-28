@@ -550,8 +550,12 @@ class _CreationLightboxState extends State<_CreationLightbox> {
         widget.canOpenTopic && conversation != null && messageId != null;
     void openChat() {
       Navigator.of(context).pop();
-      ChatActionBus.instance.fireCreation(
-        OpenCreationConversation(conversationId!, messageId!),
+      ChatActionBus.instance.fireNavigation(
+        OpenConversationMessage(
+          conversationId!,
+          messageId!,
+          selectVersion: true,
+        ),
       );
     }
 
@@ -1686,7 +1690,7 @@ Future<bool> _deleteArtwork(
 void _sendArtworkToChat(BuildContext context, GenerationItemRow item) {
   final file = SandboxPathResolver.resolveForIo(item.path);
   if (file != null) {
-    ChatActionBus.instance.fireCreation(PrefillChatImage(file));
+    ChatActionBus.instance.fireNavigation(PrefillChatImage(file));
   } else {
     showAppSnackBar(
       context,

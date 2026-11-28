@@ -11,22 +11,27 @@ enum ChatAction {
   exitGlobalSearch,
 }
 
-sealed class CreationChatAction {
-  const CreationChatAction();
+sealed class ChatNavigationAction {
+  const ChatNavigationAction();
 }
 
-final class PrefillChatImage extends CreationChatAction {
+final class PrefillChatImage extends ChatNavigationAction {
   const PrefillChatImage(this.path);
   final String path;
 }
 
-final class OpenCreationArtwork extends CreationChatAction {
+final class OpenCreationArtwork extends ChatNavigationAction {
   const OpenCreationArtwork(this.itemId);
   final String itemId;
 }
 
-final class OpenCreationConversation extends CreationChatAction {
-  const OpenCreationConversation(this.conversationId, this.messageId);
+final class OpenConversationMessage extends ChatNavigationAction {
+  const OpenConversationMessage(
+    this.conversationId,
+    this.messageId, {
+    this.selectVersion = false,
+  });
+  final bool selectVersion;
   final String conversationId, messageId;
 }
 
@@ -35,14 +40,16 @@ class ChatActionBus {
   static final ChatActionBus instance = ChatActionBus._();
 
   final _controller = StreamController<ChatAction>.broadcast();
-  final _creationController = StreamController<CreationChatAction>.broadcast();
+  final _navigationController =
+      StreamController<ChatNavigationAction>.broadcast();
   Stream<ChatAction> get stream => _controller.stream;
-  Stream<CreationChatAction> get creationStream => _creationController.stream;
+  Stream<ChatNavigationAction> get navigationStream =>
+      _navigationController.stream;
   void fire(ChatAction action) => _controller.add(action);
-  void fireCreation(CreationChatAction action) =>
-      _creationController.add(action);
+  void fireNavigation(ChatNavigationAction action) =>
+      _navigationController.add(action);
   void dispose() {
     unawaited(_controller.close());
-    unawaited(_creationController.close());
+    unawaited(_navigationController.close());
   }
 }

@@ -1432,39 +1432,49 @@ class HomePageController extends ChangeNotifier {
         currentConversation?.id == conversationId;
   }
 
-  Future<bool> openCreationSource({
+  Future<bool> openMessageSource({
     required String conversationId,
     required String messageId,
     required bool Function() stillCurrent,
+    required bool selectVersion,
   }) async {
+    if (!stillCurrent() ||
+        !selectVersion &&
+            (isTemporaryConversation ||
+                _chatService.isTemporaryConversation(conversationId))) {
+      return false;
+    }
     _cancelMessageJump();
     final intent = _sourceNavigationIntent;
-    final message = (await _chatService.loadMessagesByIds([
-      messageId,
-    ])).firstOrNull;
+    // Storage already resolved the selected revision. Only artwork may need
+    // the original group/version to reveal an inactive revision.
+    final source = selectVersion
+        ? (await _chatService.loadMessagesByIds([messageId])).firstOrNull
+        : null;
     if (_composerDisposed ||
         intent != _sourceNavigationIntent ||
-        message == null ||
-        message.conversationId != conversationId ||
-        !stillCurrent()) {
+        !stillCurrent() ||
+        selectVersion && source?.conversationId != conversationId) {
       return false;
     }
     if (!await _switchForSourceJump(conversationId) || !stillCurrent()) {
       return false;
     }
-    final groupId = message.groupId ?? message.id;
     return scrollToMessageId(
       messageId,
       stillCurrent: stillCurrent,
       spotlight: true,
-      selectMissingRevision: (current) async {
-        await setSelectedVersion(
-          groupId,
-          message.version,
-          stillCurrent: current,
-        );
-        return versionSelections[groupId] == message.version;
-      },
+      selectMissingRevision: source == null
+          ? null
+          : (current) async {
+              final groupId = source.groupId ?? source.id;
+              await setSelectedVersion(
+                groupId,
+                source.version,
+                stillCurrent: current,
+              );
+              return versionSelections[groupId] == source.version;
+            },
     );
   }
 

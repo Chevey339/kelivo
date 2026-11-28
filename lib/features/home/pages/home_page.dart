@@ -178,9 +178,9 @@ class _HomePageState extends State<HomePage>
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   HomeSurface _surface = HomeSurface.chat;
-  StreamSubscription<CreationChatAction>? _creationActionSub;
+  StreamSubscription<ChatNavigationAction>? _navigationSub;
   OpenCreationArtwork? _artworkRequest;
-  int _creationNavigationSerial = 0;
+  int _chatNavigationSerial = 0;
   final InteractiveDrawerController _drawerController =
       InteractiveDrawerController();
   final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
@@ -563,8 +563,8 @@ class _HomePageState extends State<HomePage>
     _drawerController.addListener(_onDrawerValueChanged);
 
     _chatReady = _controller.initChat();
-    _creationActionSub = ChatActionBus.instance.creationStream.listen(
-      _handleCreationAction,
+    _navigationSub = ChatActionBus.instance.navigationStream.listen(
+      _handleChatNavigation,
     );
     _initProcessText();
     _initIncomingShares();
@@ -619,7 +619,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   void dispose() {
-    unawaited(_creationActionSub?.cancel());
+    unawaited(_navigationSub?.cancel());
     try {
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
@@ -1026,14 +1026,14 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  Future<void> _handleCreationAction(CreationChatAction action) async {
+  Future<void> _handleChatNavigation(ChatNavigationAction action) async {
     if (!mounted ||
         _controller.isDesktopPlatform &&
             ModalRoute.of(context)?.isCurrent == false) {
       return;
     }
-    final serial = ++_creationNavigationSerial;
-    bool current() => mounted && serial == _creationNavigationSerial;
+    final serial = ++_chatNavigationSerial;
+    bool current() => mounted && serial == _chatNavigationSerial;
     if (action is OpenCreationArtwork) {
       if (_controller.isDesktopPlatform) return;
       _openCreation();
@@ -1057,8 +1057,13 @@ class _HomePageState extends State<HomePage>
       switch (action) {
         case PrefillChatImage(:final path):
           if (await _controller.prefillCreationImage(path)) return;
-        case OpenCreationConversation(:final conversationId, :final messageId):
-          if (await _controller.openCreationSource(
+        case OpenConversationMessage(
+          :final conversationId,
+          :final messageId,
+          :final selectVersion,
+        ):
+          if (await _controller.openMessageSource(
+            selectVersion: selectVersion,
             conversationId: conversationId,
             messageId: messageId,
             stillCurrent: current,
@@ -1074,7 +1079,9 @@ class _HomePageState extends State<HomePage>
     if (mounted && current()) {
       showAppSnackBar(
         context,
-        message: AppLocalizations.of(context)!.creationActionFailed,
+        message: action is OpenConversationMessage && !action.selectVersion
+            ? AppLocalizations.of(context)!.storageImageSourceNotFound
+            : AppLocalizations.of(context)!.creationActionFailed,
       );
     }
   }

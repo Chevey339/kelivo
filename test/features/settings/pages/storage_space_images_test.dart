@@ -13,6 +13,9 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/desktop/hotkeys/chat_action_bus.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/utils/icon_cache.dart';
@@ -104,6 +107,64 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'tapping a chat source opens only that message and preserves the image, desktop=$desktop',
+      (tester) async {
+        tester.view.physicalSize = Size(desktop ? 1200 : 400, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+        addTearDown(fixture.dispose);
+        final repo = ChatDatabaseRepository(fixture.database);
+        final file = (await tester.runAsync(() async {
+          final file = await fixture.file(
+            'upload/source.png',
+            img.encodePng(img.Image(width: 2, height: 2)),
+          );
+          for (final id in ['A', 'B']) {
+            await repo.putConversation(Conversation(id: id, title: id));
+            await repo.putMessage(
+              ChatMessage(
+                id: 'msg-$id',
+                role: 'user',
+                conversationId: id,
+                parts: [ImagePart(uri: file.path)],
+              ),
+            );
+          }
+          return file;
+        }))!;
+        final chat = ChatService(existingRepository: repo);
+        final events = <ChatNavigationAction>[];
+        final sub = ChatActionBus.instance.navigationStream.listen(events.add);
+        addTearDown(sub.cancel);
+        await tester.pumpWidget(_storagePage(fixture, chat: chat));
+        await _until(tester, () => find.text('图片').evaluate().isNotEmpty);
+        if (!desktop) await tester.tap(find.text('图片').last);
+        final details = find.textContaining('对话：');
+        await _until(tester, () => details.evaluate().isNotEmpty);
+        await tester.tap(details.first);
+        await tester.pumpAndSettle();
+        expect(events, isEmpty);
+        expect(find.text('查看原消息'), findsNWidgets(2));
+        await tester.tap(find.text('B'));
+        await _until(tester, () => events.isNotEmpty);
+        final target = events.single as OpenConversationMessage;
+        expect(
+          (target.conversationId, target.messageId, target.selectVersion),
+          ('B', 'msg-B', false),
+        );
+        expect(file.existsSync(), isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+      variant: TargetPlatformVariant.only(
+        desktop ? TargetPlatform.macOS : TargetPlatform.android,
+      ),
+    );
+  }
+
   for (final desktop in [false, true]) {
     testWidgets(
       'file metadata is browsable while the database is busy, desktop=$desktop',

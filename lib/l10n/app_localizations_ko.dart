@@ -16766,7 +16766,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get storageAttachmentImagesCleanupHint =>
-      '사용하지 않는 항목 정리는 참조되지 않는 이미지를 삭제합니다. 사용 중인 채팅 이미지를 삭제하려면 해당 이미지의 대화 이름을 탭하세요.';
+      '이미지의 채팅 이름을 탭하면 원본 메시지를 보거나 로컬 이미지를 삭제할 수 있습니다. 사용하지 않는 항목 정리는 더 이상 사용되지 않는 이미지를 삭제합니다.';
 
   @override
   String get storageAttachmentImageCopiesPending =>
@@ -16775,6 +16775,19 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get storageAttachmentImageFrozen =>
       '압축된 대화 컨텍스트가 저장된 사본을 계속 전송할 수 있으므로 이 이미지는 보호됩니다.';
+
+  @override
+  String get storageImageShowSource => '원본 메시지 보기';
+
+  @override
+  String get storageImageSourceNotFound =>
+      '이 채팅의 현재 버전에서 이 이미지를 사용하는 메시지를 찾을 수 없습니다.';
+
+  @override
+  String get storageImageSourceBusy => '응답을 생성하는 중입니다. 완료된 후 다시 시도하세요.';
+
+  @override
+  String get storageImageSourceFailed => '원본 메시지를 조회하지 못했습니다. 다시 시도하세요.';
 
   @override
   String get storageAttachmentDetailsTitle => '파일 정보';

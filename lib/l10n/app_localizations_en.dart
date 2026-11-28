@@ -17294,7 +17294,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageAttachmentImagesCleanupHint =>
-      'Clean unused removes unreferenced images. To delete a chat image in use, tap its chat names.';
+      'Tap an image’s chat names to view the original message or delete the local image. Clean unused removes images no longer in use.';
 
   @override
   String get storageAttachmentImageCopiesPending =>
@@ -17303,6 +17303,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get storageAttachmentImageFrozen =>
       'This image is protected because a compressed chat context may still send a saved copy.';
+
+  @override
+  String get storageImageShowSource => 'View original message';
+
+  @override
+  String get storageImageSourceNotFound =>
+      'No message using this image was found in the current version of this chat.';
+
+  @override
+  String get storageImageSourceBusy =>
+      'A reply is being generated. Try again when it finishes.';
+
+  @override
+  String get storageImageSourceFailed =>
+      'Couldn’t look up the original message. Try again.';
 
   @override
   String get storageAttachmentDetailsTitle => 'File info';

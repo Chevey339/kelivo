@@ -53,7 +53,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   bool _globalSearchActive = false;
   StreamSubscription<HotkeyAction>? _hotkeySub;
   StreamSubscription<ChatAction>? _chatActionSub;
-  StreamSubscription<CreationChatAction>? _creationActionSub;
+  StreamSubscription<ChatNavigationAction>? _navigationSub;
   OpenCreationArtwork? _artworkRequest;
   StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
   StreamSubscription<String>? _conversationOpenSub;
@@ -189,13 +189,13 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((_) {
       if (mounted) _selectTab(DesktopTab.settings, dismissNavigation: false);
     });
-    _creationActionSub = ChatActionBus.instance.creationStream.listen((action) {
+    _navigationSub = ChatActionBus.instance.navigationStream.listen((action) {
       if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
       switch (action) {
         case OpenCreationArtwork():
           _artworkRequest = action;
           _selectTab(DesktopTab.media);
-        case PrefillChatImage() || OpenCreationConversation():
+        case PrefillChatImage() || OpenConversationMessage():
           _selectTab(DesktopTab.chat);
       }
     });
@@ -412,7 +412,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   @override
   void dispose() {
     unawaited(_conversationOpenSub?.cancel());
-    unawaited(_creationActionSub?.cancel());
+    unawaited(_navigationSub?.cancel());
     try {
       _hotkeySub?.cancel();
     } catch (_) {}
