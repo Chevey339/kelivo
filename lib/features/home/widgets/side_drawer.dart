@@ -202,6 +202,17 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   String? _cachedSidebarRowsAssistantId;
   List<String>? _cachedSidebarRowsAssistantIds;
   List<_SidebarRow>? _cachedSidebarRows;
+  int? _lastListSignature;
+  int? _settledListSignature;
+  final Set<String> _entranceAnimatedRowKeys = <String>{};
+
+  bool _shouldAnimateSidebarRow(int listSignature, String rowKey) {
+    if (_settledListSignature != listSignature) {
+      _entranceAnimatedRowKeys.add(rowKey);
+      return true;
+    }
+    return _entranceAnimatedRowKeys.contains(rowKey);
+  }
 
   bool _selectionMode = false;
   final Set<String> _selectedConversationIds = <String>{};
@@ -3372,6 +3383,16 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         listSignature = Object.hash(listSignature, row.chat.id);
       }
     }
+    if (_lastListSignature != listSignature) {
+      _lastListSignature = listSignature;
+      _settledListSignature = null;
+      _entranceAnimatedRowKeys.clear();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _lastListSignature == listSignature) {
+          _settledListSignature = listSignature;
+        }
+      });
+    }
 
     final showDates = context.watch<SettingsProvider>().showChatListDate;
     final visibleRows = <_SidebarRow>[
@@ -3442,77 +3463,79 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               )!.sideDrawerPinnedLabel,
               _SidebarHeaderKind.date => _dateLabel(context, row.dateBucket!),
             };
+            final headerKey = row.kind == _SidebarHeaderKind.pinned
+                ? 'hdr-pin'
+                : 'hdr-${_sidebarDateBucketKey(row.dateBucket)}';
+            Widget header = Text(
+              headerLabel,
+              textAlign: TextAlign.left,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: AppFontWeights.semibold,
+                color: cs.primary,
+              ),
+            );
+            if (_shouldAnimateSidebarRow(listSignature, headerKey)) {
+              header = header
+                  .animate()
+                  .fadeIn(duration: 180.ms)
+                  .moveY(
+                    begin: 4,
+                    end: 0,
+                    duration: 220.ms,
+                    curve: Curves.easeOutCubic,
+                  );
+            }
             return Padding(
               padding: const EdgeInsets.fromLTRB(14, 6, 0, 6),
-              child:
-                  Text(
-                        headerLabel,
-                        textAlign: TextAlign.left,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: AppFontWeights.semibold,
-                          color: cs.primary,
-                        ),
-                      )
-                      .animate()
-                      .fadeIn(duration: 180.ms)
-                      .moveY(
-                        begin: 4,
-                        end: 0,
-                        duration: 220.ms,
-                        curve: Curves.easeOutCubic,
-                      ),
+              child: header,
             );
           }
 
           final tile = row as _SidebarTileRow;
           final isPinnedSection = tile.kind == _SidebarHeaderKind.pinned;
-          // Cap absolute-index stagger to the first ~8 visual items so
-          // virtualized far rows (e.g. index 1000) never wait multiple seconds.
-          final staggerDelay = SideDrawer.debugSidebarTileStaggerDelay(
-            indexInSection: tile.indexInSection,
-            pinnedSection: isPinnedSection,
+          final tileKey = isPinnedSection
+              ? 'pin-${tile.chat.id}'
+              : 'grp-${_sidebarDateBucketKey(tile.dateBucket)}-${tile.chat.id}';
+          Widget chatTile = _ChatTile(
+            chat: tile.chat,
+            textColor: textBase,
+            loading: widget.loadingConversationIds.contains(tile.chat.id),
+            selectionMode: _selectionMode,
+            selected: _selectedConversationIds.contains(tile.chat.id),
+            onToggleSelect: () => _toggleConversationSelected(tile.chat.id),
+            onTap: () {
+              final keepOpen = context
+                  .read<SettingsProvider>()
+                  .keepSidebarOpenOnTopicTap;
+              final closeDrawer = keepOpen == false;
+              widget.onSelectConversation?.call(
+                tile.chat.id,
+                closeDrawer: closeDrawer,
+              );
+            },
+            onLongPress: () => _showChatMenu(context, tile.chat),
+            onSecondaryTap: (pos) =>
+                _showChatMenu(context, tile.chat, anchor: pos),
           );
-          final chatTile =
-              _ChatTile(
-                    chat: tile.chat,
-                    textColor: textBase,
-                    loading: widget.loadingConversationIds.contains(
-                      tile.chat.id,
-                    ),
-                    selectionMode: _selectionMode,
-                    selected: _selectedConversationIds.contains(tile.chat.id),
-                    onToggleSelect: () =>
-                        _toggleConversationSelected(tile.chat.id),
-                    onTap: () {
-                      final keepOpen = context
-                          .read<SettingsProvider>()
-                          .keepSidebarOpenOnTopicTap;
-                      final closeDrawer = keepOpen == false;
-                      widget.onSelectConversation?.call(
-                        tile.chat.id,
-                        closeDrawer: closeDrawer,
-                      );
-                    },
-                    onLongPress: () => _showChatMenu(context, tile.chat),
-                    onSecondaryTap: (pos) =>
-                        _showChatMenu(context, tile.chat, anchor: pos),
-                  )
-                  .animate(
-                    key: ValueKey(
-                      isPinnedSection
-                          ? 'pin-${tile.chat.id}'
-                          : 'grp-${_sidebarDateBucketKey(tile.dateBucket)}-${tile.chat.id}',
-                    ),
-                  )
-                  .fadeIn(duration: 220.ms, delay: staggerDelay)
-                  .moveY(
-                    begin: isPinnedSection ? 8 : 6,
-                    end: 0,
-                    duration: (isPinnedSection ? 260 : 240).ms,
-                    curve: Curves.easeOutCubic,
-                    delay: staggerDelay,
-                  );
+          if (_shouldAnimateSidebarRow(listSignature, tileKey)) {
+            // Cap absolute-index stagger to the first ~8 visual items so
+            // virtualized far rows (e.g. index 1000) never wait multiple seconds.
+            final staggerDelay = SideDrawer.debugSidebarTileStaggerDelay(
+              indexInSection: tile.indexInSection,
+              pinnedSection: isPinnedSection,
+            );
+            chatTile = chatTile
+                .animate(key: ValueKey(tileKey))
+                .fadeIn(duration: 220.ms, delay: staggerDelay)
+                .moveY(
+                  begin: isPinnedSection ? 8 : 6,
+                  end: 0,
+                  duration: (isPinnedSection ? 260 : 240).ms,
+                  curve: Curves.easeOutCubic,
+                  delay: staggerDelay,
+                );
+          }
 
           final isLastInSection =
               rowIndex + 1 >= visibleRows.length ||
@@ -3726,64 +3749,70 @@ class _ChatTileState extends State<_ChatTile> {
               tween: Tween<double>(end: widget.selectionMode ? 1 : 0),
               duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.chat.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: _isDesktop ? 14 : 15,
+                        color: widget.textColor,
+                        fontWeight: AppFontWeights.regular,
+                      ),
+                    ),
+                  ),
+                  if (context.select<ChatService, bool>(
+                    (service) =>
+                        service.composerDrafts?.hasDraft(widget.chat.id) ??
+                        false,
+                  )) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      AppLocalizations.of(context)!.composerDraftLabel,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                  if (compression != null) ...[
+                    const SizedBox(width: 6),
+                    ContextTaskStatusIcon(status: compression),
+                  ],
+                  ToolPermissionBadge(conversationId: widget.chat.id),
+                  if (widget.loading) ...[
+                    const SizedBox(width: 8),
+                    _LoadingDot(),
+                  ],
+                ],
+              ),
               builder: (context, t, child) {
                 return Row(
                   children: [
-                    ClipRect(
-                      child: SizedBox(
-                        width: 28 * t,
-                        child: Opacity(
-                          opacity: t,
-                          child: Transform.scale(
-                            scale: 0.8 + 0.2 * t,
-                            child: IgnorePointer(
-                              child: IosCheckbox(
-                                value: widget.selected,
-                                size: 20,
-                                hitTestSize: 20,
-                                enableHaptics: false,
-                                onChanged: (_) {},
+                    if (t > 0)
+                      ClipRect(
+                        child: SizedBox(
+                          width: 28 * t,
+                          child: Opacity(
+                            opacity: t,
+                            child: Transform.scale(
+                              scale: 0.8 + 0.2 * t,
+                              child: IgnorePointer(
+                                child: IosCheckbox(
+                                  value: widget.selected,
+                                  size: 20,
+                                  hitTestSize: 20,
+                                  enableHaptics: false,
+                                  onChanged: (_) {},
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        widget.chat.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: _isDesktop ? 14 : 15,
-                          color: widget.textColor,
-                          fontWeight: AppFontWeights.regular,
-                        ),
-                      ),
-                    ),
-                    if (context.select<ChatService, bool>(
-                      (service) =>
-                          service.composerDrafts?.hasDraft(widget.chat.id) ??
-                          false,
-                    )) ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        AppLocalizations.of(context)!.composerDraftLabel,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                    if (compression != null) ...[
-                      const SizedBox(width: 6),
-                      ContextTaskStatusIcon(status: compression),
-                    ],
-                    ToolPermissionBadge(conversationId: widget.chat.id),
-                    if (widget.loading) ...[
-                      const SizedBox(width: 8),
-                      _LoadingDot(),
-                    ],
+                    Expanded(child: child!),
                   ],
                 );
               },
