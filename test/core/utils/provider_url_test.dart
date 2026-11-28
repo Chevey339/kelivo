@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/model_provider.dart';
@@ -233,7 +234,15 @@ void main() {
       ).copyWith(vertexAI: true, location: 'us-central1', projectId: 'demo');
       expect(
         resolveRequestUrl(c, modelId: 'gemini-test'),
-        'https://aiplatform.googleapis.com/v1/projects/demo/locations/us-central1/publishers/google/models/gemini-test:streamGenerateContent',
+        'https://us-central1-aiplatform.googleapis.com/v1/projects/demo/locations/us-central1/publishers/google/models/gemini-test:streamGenerateContent',
+      );
+      expect(
+        resolveRequestUrl(
+          c.copyWith(location: 'eu'),
+          modelId: 'gemini-test',
+          stream: false,
+        ),
+        'https://aiplatform.eu.rep.googleapis.com/v1/projects/demo/locations/eu/publishers/google/models/gemini-test:generateContent',
       );
       expect(
         resolveRequestUrl(c.copyWith(projectId: ''), modelId: 'gemini-test'),
@@ -243,6 +252,36 @@ void main() {
         resolveRequestUrl(c, modelId: 'claude-test'),
         'https://us-central1-aiplatform.googleapis.com/v1/projects/demo/locations/us-central1/publishers/anthropic/models/claude-test:streamRawPredict',
       );
+    });
+    test('Vertex Gemini ignores a Gemini base URL kept from before', () {
+      const origins = {
+        'global': 'https://aiplatform.googleapis.com',
+        'us-central1': 'https://us-central1-aiplatform.googleapis.com',
+        'eu': 'https://aiplatform.eu.rep.googleapis.com',
+      };
+      for (final MapEntry(key: location, value: origin) in origins.entries) {
+        final c = config(
+          'https://gemini-gateway.example.com/v1beta',
+          kind: ProviderKind.google,
+        ).copyWith(vertexAI: true, location: location, projectId: 'demo');
+        for (final stream in [true, false]) {
+          final url =
+              '$origin/v1/projects/demo/locations/$location/publishers/google/models/gemini-test:'
+              '${stream ? 'streamGenerateContent' : 'generateContent'}';
+          expect(
+            resolveRequestUrl(c, modelId: 'gemini-test', stream: stream),
+            url,
+          );
+          expect(
+            ProviderManager.connectionTestUrl(
+              c,
+              'gemini-test',
+              useStream: stream,
+            ),
+            url,
+          );
+        }
+      }
     });
     test('opt-out survives serialization and unrelated copies', () {
       final old = config('https://example.com');
